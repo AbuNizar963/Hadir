@@ -92,12 +92,6 @@ export default function ManagerLayout({
             </NavLink>
           ))}
         </nav>
-
-        <div className="p-3 border-t border-border/60">
-          <button onClick={logout} className="btn-secondary w-full">
-            تسجيل خروج
-          </button>
-        </div>
       </aside>
 
       {/* المحتوى الرئيسي */}
