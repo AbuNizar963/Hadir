@@ -29,6 +29,7 @@ export default function ManagerLayout({
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [theme, setTheme] = useState("system"); // system | light | dark
 
   useEffect(() => {
     const loadNotifs = () => {
@@ -64,6 +65,16 @@ export default function ManagerLayout({
     setMenuOpen(false);
     nav("/manager/settings");
   };
+
+  // تطبيق الوضع حسب الاختيار
+  useEffect(() => {
+    if (theme === "system") {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.classList.toggle("dark", prefersDark);
+    } else {
+      document.documentElement.classList.toggle("dark", theme === "dark");
+    }
+  }, [theme]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -109,7 +120,7 @@ export default function ManagerLayout({
               </button>
 
               {menuOpen && (
-                <div className="absolute left-0 mt-2 w-44 bg-card border border-border rounded-xl shadow-lg p-2 space-y-2 z-50">
+                <div className="absolute left-0 mt-2 w-52 bg-card border border-border rounded-xl shadow-lg p-2 space-y-2 z-50">
                   <button
                     onClick={() => {
                       setShowNotifications(true);
@@ -125,6 +136,30 @@ export default function ManagerLayout({
                   >
                     ⚙️ الإعدادات
                   </button>
+
+                  {/* خيارات الوضع */}
+                  <div className="border-t border-border pt-2 space-y-1">
+                    <div className="text-xs font-bold text-muted-foreground px-3">الوضع</div>
+                    <button
+                      onClick={() => { setTheme("light"); setMenuOpen(false); }}
+                      className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
+                    >
+                      ☀️ الوضع المشرق
+                    </button>
+                    <button
+                      onClick={() => { setTheme("dark"); setMenuOpen(false); }}
+                      className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
+                    >
+                      🌙 الوضع الداكن
+                    </button>
+                    <button
+                      onClick={() => { setTheme("system"); setMenuOpen(false); }}
+                      className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
+                    >
+                      🖥️ تلقائي (حسب النظام)
+                    </button>
+                  </div>
+
                   <button
                     onClick={logout}
                     className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-red-600"
