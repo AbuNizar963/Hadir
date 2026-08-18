@@ -62,12 +62,19 @@ export const defaultSettings: Settings = {
   workStart: "08:00",
   workEnd: "16:00",
   lateGraceMinutes: 10,
-  managerPasswordHash: hash("manager123"),
-  managerName: "مدير عام",
+  
+  ownerUsername: "owner",
   ownerPasswordHash: hash("owner123"),
   ownerName: "المالك",
+
+  managerUsername: "manager",
+  managerPasswordHash: hash("manager123"),
+  managerName: "مدير عام",
+
+  supervisorUsername: "supervisor",
   supervisorPasswordHash: hash("super123"),
   supervisorName: "المشرف",
+
   brandName: "حاضِر",
   brandLogo: null,
   locations: [],
