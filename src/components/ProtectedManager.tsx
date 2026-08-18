@@ -1,8 +1,14 @@
 import { Navigate } from "react-router-dom";
-import { currentManager } from "@/lib/auth";
 
 export default function ProtectedManager({ children }: { children: React.ReactNode }) {
-  const m = currentManager();
-  if (!m) return <Navigate to="/manager/login" replace />;
+  // التحقق من حالة الدخول المخزنة في localStorage
+  const isAuthenticated = localStorage.getItem("managerAuth") === "true";
+
+  if (!isAuthenticated) {
+    // إذا لم يكن المستخدم مسجل دخول → إعادة التوجيه لصفحة تسجيل الدخول
+    return <Navigate to="/manager/login" replace />;
+  }
+
+  // إذا كان مسجل دخول → عرض المحتوى
   return <>{children}</>;
 }
