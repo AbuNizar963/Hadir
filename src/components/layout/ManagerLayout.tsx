@@ -29,6 +29,7 @@ export default function ManagerLayout({
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [theme, setTheme] = useState("system"); // system | light | dark
 
   useEffect(() => {
@@ -137,27 +138,36 @@ export default function ManagerLayout({
                     ⚙️ الإعدادات
                   </button>
 
-                  {/* خيارات الوضع */}
-                  <div className="border-t border-border pt-2 space-y-1">
-                    <div className="text-xs font-bold text-muted-foreground px-3">الوضع</div>
+                  {/* خيار الوضع */}
+                  <div className="relative">
                     <button
-                      onClick={() => { setTheme("light"); setMenuOpen(false); }}
+                      onClick={() => setThemeMenuOpen(!themeMenuOpen)}
                       className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
                     >
-                      ☀️ الوضع المشرق
+                      🎨 الوضع
                     </button>
-                    <button
-                      onClick={() => { setTheme("dark"); setMenuOpen(false); }}
-                      className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
-                    >
-                      🌙 الوضع الداكن
-                    </button>
-                    <button
-                      onClick={() => { setTheme("system"); setMenuOpen(false); }}
-                      className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
-                    >
-                      🖥️ تلقائي (حسب النظام)
-                    </button>
+                    {themeMenuOpen && (
+                      <div className="mt-1 border border-border rounded-lg bg-card shadow-lg">
+                        <button
+                          onClick={() => { setTheme("light"); setThemeMenuOpen(false); setMenuOpen(false); }}
+                          className="block w-full text-right px-3 py-2 text-sm hover:bg-secondary"
+                        >
+                          ☀️ الوضع المشرق
+                        </button>
+                        <button
+                          onClick={() => { setTheme("dark"); setThemeMenuOpen(false); setMenuOpen(false); }}
+                          className="block w-full text-right px-3 py-2 text-sm hover:bg-secondary"
+                        >
+                          🌙 الوضع الداكن
+                        </button>
+                        <button
+                          onClick={() => { setTheme("system"); setThemeMenuOpen(false); setMenuOpen(false); }}
+                          className="block w-full text-right px-3 py-2 text-sm hover:bg-secondary"
+                        >
+                          🖥️ تلقائي (حسب النظام)
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <button
