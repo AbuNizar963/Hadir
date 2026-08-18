@@ -14,12 +14,16 @@ export default function ManagerLogin() {
     e.preventDefault();
     setErr(null);
     setLoading(true);
+
     setTimeout(() => {
       const success = loginManager(username, pw);
       setLoading(false);
+
       if (!success) {
         setErr("اسم المستخدم أو كلمة المرور غير صحيحة");
       } else {
+        // حفظ حالة الدخول في التخزين المحلي
+        localStorage.setItem("managerAuth", "true");
         nav("/manager");
       }
     }, 250);
