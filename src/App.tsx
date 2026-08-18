@@ -17,7 +17,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* الصفحة الرئيسية */}
         <Route path="/" element={<Landing />} />
+
+        {/* تسجيل دخول الموظف */}
         <Route path="/login" element={<EmployeeLogin />} />
         <Route
           path="/employee"
@@ -36,6 +39,7 @@ export default function App() {
           }
         />
 
+        {/* تسجيل دخول المدير */}
         <Route path="/manager/login" element={<ManagerLogin />} />
         <Route
           path="/manager"
@@ -77,7 +81,11 @@ export default function App() {
             </ProtectedManager>
           }
         />
+
+        {/* إعادة توجيه قديمة */}
         <Route path="/manager-home" element={<Navigate to="/manager" replace />} />
+
+        {/* صفحة غير موجودة */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
