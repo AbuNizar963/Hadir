@@ -7,7 +7,7 @@ import type { Settings, Location } from "@/types";
 export default function ManagerSettings() {
   const [s, setS] = useState<Settings>(getSettings());
   
-  // 1. حالات الأسئلة وكلمات المرور الجديدة للأدوار المتعددة
+  // 1. إضافة الحقول الجديدة للأدوار بعد استدعاء useState(getSettings())
   const [managerName, setManagerName] = useState(s.managerName || "");
   const [managerPassword, setManagerPassword] = useState("");
   const [ownerName, setOwnerName] = useState(s.ownerName || "");
@@ -34,7 +34,7 @@ export default function ManagerSettings() {
     }
   }, []);
 
-  // 2. تحديث دالة الحفظ لتشمل الأدوار الجديدة (المدير، المالك، المشرف)
+  // 2. تحديث دالة الحفظ (save / saveAll) لتشمل الأدوار الجديدة
   const save = (e: React.FormEvent) => {
     e.preventDefault();
     const next: Settings = { ...s };
@@ -56,6 +56,7 @@ export default function ManagerSettings() {
     setOwnerPassword("");
     setSupervisorPassword("");
     setSaved(true);
+    alert("تم حفظ الإعدادات بنجاح ✅");
     setTimeout(() => setSaved(false), 1800);
   };
 
@@ -500,7 +501,7 @@ export default function ManagerSettings() {
         </section>
 
         {/* 3. إضافة واجهة المالك */}
-        <section className="hud-card p-5 sm:p-6 mb-6 lg:col-span-2">
+        <div className="hud-card p-5 mb-6 lg:col-span-2">
           <h2 className="text-lg font-bold mb-3">إعدادات المالك</h2>
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="اسم المالك">
@@ -524,10 +525,10 @@ export default function ManagerSettings() {
           <div className="text-sm text-muted-foreground mt-2">
             صلاحيات كاملة لإدارة النظام المالي والإداري.
           </div>
-        </section>
+        </div>
 
         {/* 4. إضافة واجهة المشرف مع زر إعادة الضبط */}
-        <section className="hud-card p-5 sm:p-6 mb-6 lg:col-span-2">
+        <div className="hud-card p-5 mb-6 lg:col-span-2">
           <h2 className="text-lg font-bold mb-3">إعدادات المشرف وإدارة النظام</h2>
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             <Field label="اسم المشرف">
@@ -548,25 +549,19 @@ export default function ManagerSettings() {
               />
             </Field>
           </div>
-          
-          <div className="border-t border-border pt-4 flex items-center justify-between">
-            <div>
-              <div className="font-bold text-sm">إعادة ضبط الجهاز</div>
-              <div className="text-xs text-muted-foreground">مسح كافة البيانات المحلية واستعادة النظام لحالته الأولى</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm("هل أنت متأكد من رغبتك في إعادة ضبط الجهاز؟")) {
-                  doReset();
-                }
-              }}
-              className="btn-danger text-xs px-4 py-2"
-            >
-              إعادة ضبط الجهاز
-            </button>
-          </div>
-        </section>
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm("هل تريد إعادة ضبط الجهاز بالكامل؟")) {
+                doReset();
+                alert("تمت إعادة الضبط ⚠️");
+              }
+            }}
+            className="bg-red-700 px-3 py-1 rounded-lg mt-3 text-white text-xs hover:bg-red-800 transition"
+          >
+            إعادة ضبط الجهاز
+          </button>
+        </div>
 
         {/* كلمة مرور المدير التقليدية */}
         <section className="hud-card p-5 sm:p-6 lg:col-span-2">
