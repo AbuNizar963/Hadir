@@ -13,7 +13,7 @@ import { generateId } from "@/lib/utils";
 export type { EmployeeRequest, RequestType } from "@/types";
 
 /* ------------------------------------------------------------------ */
-/*  Storage keys and low-level helpers                                 */
+/*  Storage keys                                                       */
 /* ------------------------------------------------------------------ */
 
 const K = {
@@ -25,6 +25,10 @@ const K = {
   SESSION: "hadir.session",
   MANAGER_SESSION: "hadir.manager_session",
 } as const;
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -47,59 +51,6 @@ function write<T>(key: string, value: T): void {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Public generic adapter (kept for backward compatibility)           */
-/* ------------------------------------------------------------------ */
-
-export interface StorageAdapter {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
-
-class LocalStorageAdapter implements StorageAdapter {
-  getItem(key: string): string | null {
-    if (typeof window === "undefined") return null;
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  }
-  setItem(key: string, value: string): void {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(key, value);
-    } catch (e) {
-      console.error("Error saving to localStorage", e);
-    }
-  }
-  removeItem(key: string): void {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.removeItem(key);
-    } catch (e) {
-      console.error("Error removing from localStorage", e);
-    }
-  }
-}
-
-export const storage: StorageAdapter = new LocalStorageAdapter();
-
-export function getStoredJSON<T>(key: string, defaultValue: T): T {
-  const val = storage.getItem(key);
-  if (!val) return defaultValue;
-  try {
-    return JSON.parse(val) as T;
-  } catch {
-    return defaultValue;
-  }
-}
-
-export function setStoredJSON<T>(key: string, value: T): void {
-  storage.setItem(key, JSON.stringify(value));
-}
-
-/* ------------------------------------------------------------------ */
 /*  Settings                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -111,7 +62,12 @@ export const defaultSettings: Settings = {
   workStart: "08:00",
   workEnd: "16:00",
   lateGraceMinutes: 10,
-  managerPasswordHash: hash("admin123"),
+  managerPasswordHash: hash("manager123"),
+  managerName: "مدير عام",
+  ownerPasswordHash: hash("owner123"),
+  ownerName: "المالك",
+  supervisorPasswordHash: hash("super123"),
+  supervisorName: "المشرف",
   brandName: "حاضِر",
   brandLogo: null,
   locations: [],
@@ -140,11 +96,6 @@ export function getEmployees(): Employee[] {
 
 export function saveEmployees(list: Employee[]): void {
   write(K.EMPLOYEES, list);
-}
-
-export function findEmployeeByJobNumber(jobNumber: string): Employee | null {
-  const list = getEmployees();
-  return list.find((e) => e.jobNumber === jobNumber) ?? null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -176,7 +127,7 @@ export function addAudit(entry: AuditEntry): void {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Employee requests (permission / leave / checkout)                  */
+/*  Employee requests                                                   */
 /* ------------------------------------------------------------------ */
 
 export function getRequests(): EmployeeRequest[] {
@@ -206,73 +157,6 @@ export function updateRequestStatus(
     r.id === id ? { ...r, status } : r
   );
   write(K.REQUESTS, list);
-}
-
-/* ------------------------------------------------------------------ */
-/*  Manager manual check-in/out                                        */
-/* ------------------------------------------------------------------ */
-
-export function forceCheckInByManager(
-  emp: Employee,
-  type: "check-in" | "check-out"
-): AttendanceRecord {
-  const s = getSettings();
-  const now = new Date().toISOString();
-  const rec: AttendanceRecord = {
-    id: generateId(),
-    employeeId: emp.id,
-    jobNumber: emp.jobNumber,
-    employeeName: emp.name,
-    type,
-    timestamp: now,
-    lat: s.workSiteLat,
-    lng: s.workSiteLng,
-    distanceMeters: 0,
-    deviceId: "manager-manual",
-    ip: "server-side",
-    qrCode: "MANAGER-MANUAL",
-    locationId: emp.locationId || "main",
-  };
-  addAttendance(rec);
-
-  const auditEntry: AuditEntry = {
-    id: generateId(),
-    employeeId: emp.id,
-    jobNumber: emp.jobNumber,
-    actorName: "المدير",
-    action: type,
-    result: "success",
-    reason: "تسجيل يدوي بواسطة المدير",
-    timestamp: now,
-    deviceId: "manager-manual",
-    ip: "server-side",
-    lat: s.workSiteLat,
-    lng: s.workSiteLng,
-    distanceMeters: 0,
-  };
-  addAudit(auditEntry);
-
-  return rec;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Shift helpers                                                      */
-/* ------------------------------------------------------------------ */
-
-/**
- * Returns true when the employee's scheduled work-end time has passed.
- * Falls back to the global settings.workEnd when the employee has no
- * explicit workEndTime configured.
- */
-export function isShiftOver(emp?: Employee | null): boolean {
-  const s = getSettings();
-  const endStr = emp?.workEndTime || s.workEnd || "16:00";
-  const [h, m] = endStr.split(":").map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return true;
-  const now = new Date();
-  const end = new Date(now);
-  end.setHours(h, m, 0, 0);
-  return now.getTime() >= end.getTime();
 }
 
 /* ------------------------------------------------------------------ */
@@ -330,7 +214,7 @@ export function seedIfEmpty(): void {
     saveSettings({ ...defaultSettings });
   }
 
-  // Employees — create a couple of demo accounts on first launch
+  // Employees — create demo accounts
   if (!localStorage.getItem(K.EMPLOYEES)) {
     const now = new Date().toISOString();
     const demo: Employee[] = [
@@ -355,24 +239,57 @@ export function seedIfEmpty(): void {
       },
       {
         id: generateId(),
-        jobNumber: "1002",
-        name: "سارة المشرفة",
-        pinHash: hash("1002"),
+        jobNumber: "2001",
+        name: "مدير النظام",
+        pinHash: hash("2001"),
         status: "active",
         deviceId: null,
         deviceLabel: null,
         createdAt: now,
-        scheduleType: "ROTATION",
-        rotationStartDate: now.slice(0, 10),
-        rotationDaysOn: 4,
-        rotationDaysOff: 4,
+        scheduleType: "ADMIN",
         workStartTime: "08:00",
-        workEndTime: "20:00",
-        gracePeriodMinutes: 15,
+        workEndTime: "16:00",
+        gracePeriodMinutes: 10,
+        avatar: null,
+        role: "manager",
+        locationId: null,
+        specialties: ["management"],
+      },
+      {
+        id: generateId(),
+        jobNumber: "3001",
+        name: "مالك الشركة",
+        pinHash: hash("3001"),
+        status: "active",
+        deviceId: null,
+        deviceLabel: null,
+        createdAt: now,
+        scheduleType: "ADMIN",
+        workStartTime: "08:00",
+        workEndTime: "16:00",
+        gracePeriodMinutes: 10,
+        avatar: null,
+        role: "owner",
+        locationId: null,
+        specialties: ["executive"],
+      },
+      {
+        id: generateId(),
+        jobNumber: "4001",
+        name: "مشرف النظام",
+        pinHash: hash("4001"),
+        status: "active",
+        deviceId: null,
+        deviceLabel: null,
+        createdAt: now,
+        scheduleType: "ADMIN",
+        workStartTime: "08:00",
+        workEndTime: "16:00",
+        gracePeriodMinutes: 10,
         avatar: null,
         role: "supervisor",
         locationId: null,
-        specialties: ["general"],
+        specialties: ["support"],
       },
     ];
     saveEmployees(demo);
