@@ -28,6 +28,7 @@ export default function ManagerLayout({
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const loadNotifs = () => {
@@ -55,9 +56,13 @@ export default function ManagerLayout({
   };
 
   const logout = () => {
-    // مسح حالة الدخول من التخزين المحلي
     localStorage.removeItem("managerAuth");
     nav("/manager/login");
+  };
+
+  const goSettings = () => {
+    setMenuOpen(false);
+    nav("/manager/settings");
   };
 
   return (
@@ -101,27 +106,40 @@ export default function ManagerLayout({
         <div className="lg:hidden sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border/60">
           <div className="px-4 py-3 flex items-center justify-between">
             <Brand />
-            <button onClick={logout} className="btn-ghost text-xs">خروج</button>
-          </div>
-
-          <div className="px-2 pb-2 flex gap-1 overflow-x-auto">
-            {NAV.map((n) => (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                end={n.end as any}
-                className={({ isActive }) =>
-                  cn(
-                    "shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold",
-                    isActive
-                      ? "bg-primary/15 text-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )
-                }
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="p-2 rounded-lg border border-border text-sm font-semibold"
               >
-                {n.label}
-              </NavLink>
-            ))}
+                ☰
+              </button>
+
+              {menuOpen && (
+                <div className="absolute left-0 mt-2 w-44 bg-card border border-border rounded-xl shadow-lg p-2 space-y-2 z-50">
+                  <button
+                    onClick={() => {
+                      setShowNotifications(true);
+                      setMenuOpen(false);
+                    }}
+                    className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
+                  >
+                    🔔 الإشعارات {unreadCount > 0 && `(${unreadCount})`}
+                  </button>
+                  <button
+                    onClick={goSettings}
+                    className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
+                  >
+                    ⚙️ الإعدادات
+                  </button>
+                  <button
+                    onClick={logout}
+                    className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-red-600"
+                  >
+                    🚪 تسجيل خروج
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -134,61 +152,7 @@ export default function ManagerLayout({
               {subtitle && <div className="text-sm text-muted-foreground mt-1">{subtitle}</div>}
             </div>
 
-            <div className="flex items-center gap-3 relative">
-              <div className="relative">
-                <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="p-2.5 rounded-xl bg-card border border-border shadow-sm text-foreground hover:bg-secondary transition flex items-center gap-2 text-sm font-semibold"
-                  type="button"
-                >
-                  <span className="text-base">🔔 الإشعارات</span>
-                  {unreadCount > 0 && (
-                    <span className="bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full font-bold">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {showNotifications && (
-                  <div className="absolute left-0 mt-2 w-80 bg-card border border-border rounded-xl shadow-2xl p-4 z-50 space-y-3">
-                    <div className="flex items-center justify-between border-b border-border pb-2">
-                      <span className="text-xs font-bold">الإشعارات ({unreadCount})</span>
-                      <button
-                        onClick={() => setShowNotifications(false)}
-                        className="text-[11px] text-muted-foreground hover:text-foreground"
-                      >
-                        إغلاق ✕
-                      </button>
-                    </div>
-
-                    <div className="max-h-64 overflow-y-auto space-y-2">
-                      {notifications.length === 0 ? (
-                        <div className="text-xs text-muted-foreground text-center py-6">
-                          لا توجد إشعارات جديدة
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <div
-                            key={n.id}
-                            onClick={() => handleMarkAsRead(n.id)}
-                            className={`p-3 rounded-lg border text-xs cursor-pointer transition ${
-                              n.read
-                                ? "bg-secondary/20 border-border/40 opacity-60"
-                                : "bg-primary/10 border-primary/30 font-semibold"
-                            }`}
-                          >
-                            <div className="text-foreground font-bold">{n.title}</div>
-                            <div className="text-muted-foreground text-[11px] mt-1">{n.body}</div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {actions}
-            </div>
+            {actions}
           </div>
         </header>
 
