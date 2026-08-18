@@ -2,8 +2,8 @@ export type EmployeeStatus = "active" | "suspended";
 
 export type ScheduleType = "ADMIN" | "ROTATION";
 
-// تحديث الأدوار لتشمل المشرف/المراقب (supervisor) بجانب المدير والموظف
-export type UserRole = "staff" | "admin" | "manager" | "supervisor";
+// تحديث الأدوار لتشمل المالك (owner) والمدير (manager) والمشرف (supervisor) والموظف (staff) والإداري (admin)
+export type UserRole = "owner" | "admin" | "manager" | "supervisor" | "staff";
 
 // أنواع طلبات الموظفين (استئذان / إجازة / انصراف)
 export type RequestType = "permission" | "leave" | "checkout";
@@ -93,7 +93,11 @@ export interface AuditEntry {
     | "manager-login"
     | "manager-login-failed"
     | "supervisor-login"
-    | "supervisor-login-failed";
+    | "supervisor-login-failed"
+    | "owner-login"
+    | "owner-login-failed"
+    | "admin-login"
+    | "admin-login-failed";
   result: AuditResult;
   reason?: string;
   timestamp: string;
@@ -113,6 +117,11 @@ export interface Settings {
   workEnd: string; // "16:00"
   lateGraceMinutes: number;
   managerPasswordHash: string;
+  managerName?: string; // اسم المدير الحالي
+  ownerPasswordHash?: string; // كلمة مرور المالك
+  ownerName?: string; // اسم المالك
+  supervisorPasswordHash?: string; // كلمة مرور المشرف
+  supervisorName?: string; // اسم المشرف
   brandLogo?: string | null;
   brandName?: string;
   // قائمة المواقع المتاحة في الشركة
