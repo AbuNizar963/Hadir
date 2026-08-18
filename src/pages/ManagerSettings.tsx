@@ -7,15 +7,16 @@ import type { Settings, Location } from "@/types";
 export default function ManagerSettings() {
   const [s, setS] = useState<Settings>(getSettings());
   
-  // 1. إضافة الحقول الجديدة للأدوار بعد استدعاء useState(getSettings())
-  const [managerName, setManagerName] = useState(s.managerName || "");
-  const [managerPassword, setManagerPassword] = useState("");
-  const [ownerName, setOwnerName] = useState(s.ownerName || "");
+  // حالات حقول الصلاحيات الجديدة (المالك، المدراء، المشرفين)
+  const [ownerUsername, setOwnerUsername] = useState(s.ownerUsername || "");
   const [ownerPassword, setOwnerPassword] = useState("");
-  const [supervisorName, setSupervisorName] = useState(s.supervisorName || "");
+
+  const [managerUsername, setManagerUsername] = useState(s.managerUsername || "");
+  const [managerPassword, setManagerPassword] = useState("");
+
+  const [supervisorUsername, setSupervisorUsername] = useState(s.supervisorUsername || "");
   const [supervisorPassword, setSupervisorPassword] = useState("");
 
-  const [pw, setPw] = useState("");
   const [saved, setSaved] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [loginUrl, setLoginUrl] = useState("");
@@ -34,26 +35,26 @@ export default function ManagerSettings() {
     }
   }, []);
 
-  // 2. تحديث دالة الحفظ (save / saveAll) لتشمل الأدوار الجديدة
+  // دالة الحفظ المحدثة لتشمل بيانات المالك، المدراء، والمشرفين
   const save = (e: React.FormEvent) => {
     e.preventDefault();
     const next: Settings = { ...s };
     
-    if (managerName) next.managerName = managerName;
-    if (managerPassword) next.managerPasswordHash = hash(managerPassword);
-    
-    if (ownerName) next.ownerName = ownerName;
+    // حفظ بيانات المالك
+    if (ownerUsername) next.ownerUsername = ownerUsername;
     if (ownerPassword) next.ownerPasswordHash = hash(ownerPassword);
-    
-    if (supervisorName) next.supervisorName = supervisorName;
-    if (supervisorPassword) next.supervisorPasswordHash = hash(supervisorPassword);
 
-    if (pw) next.managerPasswordHash = hash(pw);
+    // حفظ بيانات المدير
+    if (managerUsername) next.managerUsername = managerUsername;
+    if (managerPassword) next.managerPasswordHash = hash(managerPassword);
+
+    // حفظ بيانات المشرف
+    if (supervisorUsername) next.supervisorUsername = supervisorUsername;
+    if (supervisorPassword) next.supervisorPasswordHash = hash(supervisorPassword);
     
     saveSettings(next);
-    setPw("");
-    setManagerPassword("");
     setOwnerPassword("");
+    setManagerPassword("");
     setSupervisorPassword("");
     setSaved(true);
     alert("تم حفظ الإعدادات بنجاح ✅");
@@ -500,98 +501,87 @@ export default function ManagerSettings() {
           </div>
         </section>
 
-        {/* 3. إضافة واجهة المالك */}
-        <div className="hud-card p-5 mb-6 lg:col-span-2">
-          <h2 className="text-lg font-bold mb-3">إعدادات المالك</h2>
+        {/* إعدادات المالك (اسم المستخدم وكلمة المرور) */}
+        <section className="hud-card p-5 sm:p-6 lg:col-span-2">
+          <div className="text-xs mono text-muted-foreground mb-3">
+            OWNER CONFIG · إعدادات حساب المالك
+          </div>
           <div className="grid md:grid-cols-2 gap-4">
-            <Field label="اسم المالك">
+            <Field label="اسم مستخدم المالك">
               <input
                 className="input"
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-                placeholder="اسم المالك"
+                value={ownerUsername}
+                onChange={(e) => setOwnerUsername(e.target.value)}
+                placeholder="أدخل اسم مستخدم المالك"
               />
             </Field>
-            <Field label="كلمة مرور المالك">
+            <Field label="كلمة مرور المالك الجديدة">
               <input
                 type="password"
                 className="input"
                 value={ownerPassword}
                 onChange={(e) => setOwnerPassword(e.target.value)}
-                placeholder="••••••••"
-              />
-            </Field>
-          </div>
-          <div className="text-sm text-muted-foreground mt-2">
-            صلاحيات كاملة لإدارة النظام المالي والإداري.
-          </div>
-        </div>
-
-        {/* 4. إضافة واجهة المشرف مع زر إعادة الضبط */}
-        <div className="hud-card p-5 mb-6 lg:col-span-2">
-          <h2 className="text-lg font-bold mb-3">إعدادات المشرف وإدارة النظام</h2>
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <Field label="اسم المشرف">
-              <input
-                className="input"
-                value={supervisorName}
-                onChange={(e) => setSupervisorName(e.target.value)}
-                placeholder="اسم المشرف"
-              />
-            </Field>
-            <Field label="كلمة مرور المشرف">
-              <input
-                type="password"
-                className="input"
-                value={supervisorPassword}
-                onChange={(e) => setSupervisorPassword(e.target.value)}
-                placeholder="••••••••"
-              />
-            </Field>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm("هل تريد إعادة ضبط الجهاز بالكامل؟")) {
-                doReset();
-                alert("تمت إعادة الضبط ⚠️");
-              }
-            }}
-            className="bg-red-700 px-3 py-1 rounded-lg mt-3 text-white text-xs hover:bg-red-800 transition"
-          >
-            إعادة ضبط الجهاز
-          </button>
-        </div>
-
-        {/* كلمة مرور المدير التقليدية */}
-        <section className="hud-card p-5 sm:p-6 lg:col-span-2">
-          <div className="text-xs mono text-muted-foreground mb-3">
-            SECURITY · كلمة مرور المدير الرئيسية
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="اسم المدير">
-              <input
-                className="input"
-                value={managerName}
-                onChange={(e) => setManagerName(e.target.value)}
-                placeholder="اسم المدير"
-              />
-            </Field>
-            <Field label="كلمة مرور جديدة (اتركها فارغة للإبقاء عليها)">
-              <input
-                type="password"
-                className="input"
-                value={managerPassword || pw}
-                onChange={(e) => {
-                  setManagerPassword(e.target.value);
-                  setPw(e.target.value);
-                }}
-                placeholder="••••••••"
+                placeholder="•••••••• (اتركها فارغة للإبقاء عليها)"
               />
             </Field>
           </div>
         </section>
 
+        {/* إعدادات المدراء (صلاحيات المدير) */}
+        <section className="hud-card p-5 sm:p-6 lg:col-span-2">
+          <div className="text-xs mono text-muted-foreground mb-3">
+            MANAGERS CONFIG · إعدادات حسابات المدراء
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Field label="اسم مستخدم المدير">
+              <input
+                className="input"
+                value={managerUsername}
+                onChange={(e) => setManagerUsername(e.target.value)}
+                placeholder="أدخل اسم مستخدم المدير"
+              />
+            </Field>
+            <Field label="كلمة مرور المدير الجديدة">
+              <input
+                type="password"
+                className="input"
+                value={managerPassword}
+                onChange={(e) => setManagerPassword(e.target.value)}
+                placeholder="•••••••• (اتركها فارغة للإبقاء عليها)"
+              />
+            </Field>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">يملك المدير صلاحيات إدارة الموظفين، التقارير، وسجل التدقيق.</p>
+        </section>
+
+        {/* إعدادات المشرفين (صلاحيات المشرف) */}
+        <section className="hud-card p-5 sm:p-6 lg:col-span-2">
+          <div className="text-xs mono text-muted-foreground mb-3">
+            SUPERVISORS CONFIG · إعدادات حسابات المشرفين
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Field label="اسم مستخدم المشرف">
+              <input
+                className="input"
+                value={supervisorUsername}
+                onChange={(e) => setSupervisorUsername(e.target.value)}
+                placeholder="أدخل اسم مستخدم المشرف"
+              />
+            </Field>
+            <Field label="كلمة مرور المشرف الجديدة">
+              <input
+                type="password"
+                className="input"
+                value={supervisorPassword}
+                onChange={(e) => setSupervisorPassword(e.target.value)}
+                placeholder="•••••••• (اتركها فارغة للإبقاء عليها)"
+              />
+            </Field>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">يملك المشرف صلاحيات متابعة الحضور والانصراف بصفة إشرافية.</p>
+        </section>
+
+        {/* أزرار الحفظ وإعادة التعيين */}
         <div className="lg:col-span-2 flex flex-wrap items-center gap-3">
           <button className="btn-primary">حفظ الإعدادات</button>
           {saved && <span className="text-primary text-sm">تم الحفظ ✓</span>}
