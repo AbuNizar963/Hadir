@@ -3,8 +3,6 @@ import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getAttendance, getAudit, getEmployees, getSettings } from "@/lib/storage";
 import { todayKey } from "@/lib/utils";
 import { Link } from "react-router-dom";
-
-// مكتبة للرسم البياني (مثال بسيط)
 import { Bar } from "react-chartjs-2";
 
 export default function ManagerDashboard() {
@@ -16,6 +14,7 @@ export default function ManagerDashboard() {
 
   const [filter, setFilter] = useState<"all" | "present" | "absent" | "late">("all");
   const [search, setSearch] = useState("");
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const todayRec = useMemo(() => all.filter((r) => r.timestamp.startsWith(today)), [all, today]);
   const presentIds = new Set(todayRec.filter((r) => r.type === "check-in").map((r) => r.employeeId));
@@ -38,7 +37,6 @@ export default function ManagerDashboard() {
   const absentList = employees.filter((e) => e.status === "active" && !presentIds.has(e.id));
   const rejectedToday = audit.filter((a) => a.result === "rejected" && a.timestamp.startsWith(today));
 
-  // فلترة وبحث
   const filteredEmployees = employees.filter((e) => {
     if (search && !e.name.includes(search)) return false;
     if (filter === "present" && !presentIds.has(e.id)) return false;
@@ -47,7 +45,6 @@ export default function ManagerDashboard() {
     return true;
   });
 
-  // بيانات الرسم البياني
   const chartData = {
     labels: ["حضور", "غياب", "مرفوض"],
     datasets: [
@@ -68,16 +65,41 @@ export default function ManagerDashboard() {
           <Link to="/manager/reports" className="btn-secondary text-xs">
             عرض التقارير
           </Link>
-          <button
-            onClick={() => alert("تم تصدير البيانات (مثال)")}
-            className="btn-secondary text-xs"
-          >
-            ⬇️ تصدير البيانات
-          </button>
+
+          <div className="relative">
+            <button
+              onClick={() => setExportMenuOpen(!exportMenuOpen)}
+              className="btn-secondary text-xs"
+            >
+              ⬇️ تصدير البيانات
+            </button>
+
+            {exportMenuOpen && (
+              <div className="absolute mt-1 right-0 w-32 bg-card border border-border rounded-lg shadow-lg">
+                <button
+                  onClick={() => {
+                    setExportMenuOpen(false);
+                    alert("تم اختيار PDF (مثال)");
+                  }}
+                  className="block w-full text-right px-3 py-2 text-sm hover:bg-secondary"
+                >
+                  📄 PDF
+                </button>
+                <button
+                  onClick={() => {
+                    setExportMenuOpen(false);
+                    alert("تم اختيار CSV (مثال)");
+                  }}
+                  className="block w-full text-right px-3 py-2 text-sm hover:bg-secondary"
+                >
+                  📊 CSV
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       }
     >
-      {/* مؤشرات الأداء */}
       <div className="grid md:grid-cols-4 gap-4 mb-6">
         <Kpi label="إجمالي الموظفين" value={employees.length} />
         <Kpi label="حضور اليوم" value={presentIds.size} accent="primary" />
@@ -85,12 +107,10 @@ export default function ManagerDashboard() {
         <Kpi label="محاولات مرفوضة اليوم" value={rejectedToday.length} accent="destructive" />
       </div>
 
-      {/* الرسم البياني */}
       <div className="hud-card p-5 mb-6">
         <Bar data={chartData} />
       </div>
 
-      {/* أدوات الفلترة والبحث */}
       <div className="flex gap-2 mb-4">
         <select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="btn-secondary text-xs">
           <option value="all">الكل</option>
@@ -107,7 +127,6 @@ export default function ManagerDashboard() {
         />
       </div>
 
-      {/* قائمة الموظفين */}
       <div className="hud-card p-5">
         <SectionTitle title="قائمة الموظفين" hint={`عدد: ${filteredEmployees.length}`} />
         <ul className="space-y-2">
@@ -120,7 +139,6 @@ export default function ManagerDashboard() {
         </ul>
       </div>
 
-      {/* إدارة الطلبات (مثال مبسط) */}
       <div className="hud-card p-5 mt-6">
         <SectionTitle title="إدارة الطلبات" hint="إجازات واستئذان" />
         <p className="text-sm text-muted-foreground">لا توجد طلبات جديدة اليوم.</p>
