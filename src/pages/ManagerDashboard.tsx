@@ -2,10 +2,9 @@ import { useMemo } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getAttendance, getAudit, getEmployees, getSettings } from "@/lib/storage";
 import { formatTime, todayKey } from "@/lib/utils";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 export default function ManagerDashboard() {
-  const navigate = useNavigate();
   const employees = getEmployees();
   const settings = getSettings();
   const all = getAttendance();
@@ -34,11 +33,6 @@ export default function ManagerDashboard() {
   const absentList = employees.filter((e) => e.status === "active" && !presentIds.has(e.id));
   const rejectedToday = audit.filter((a) => a.result === "rejected" && a.timestamp.startsWith(today));
 
-  const handleLogout = () => {
-    localStorage.removeItem("managerAuth");
-    navigate("/manager/login");
-  };
-
   return (
     <ManagerLayout
       title="لوحة القيادة"
@@ -48,12 +42,6 @@ export default function ManagerDashboard() {
           <Link to="/manager/reports" className="btn-secondary text-xs">
             عرض التقارير
           </Link>
-          <button
-            onClick={handleLogout}
-            className="btn-secondary text-xs bg-red-600 text-white hover:bg-red-700 px-3 py-1 rounded-lg"
-          >
-            تسجيل خروج
-          </button>
         </div>
       }
     >
