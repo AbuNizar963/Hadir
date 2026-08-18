@@ -17,6 +17,8 @@ export default function ManagerLogin() {
     try {
       // تحقق من اسم المستخدم وكلمة المرور
       if (username === "admin" && pw === "1234") {
+        // حفظ حالة الدخول
+        localStorage.setItem("managerAuth", "true");
         navigate("/manager");
       } else {
         setErr("اسم المستخدم أو كلمة المرور غير صحيحة");
