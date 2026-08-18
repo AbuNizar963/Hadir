@@ -141,6 +141,26 @@ export default function ManagerLayout({
               )}
             </div>
           </div>
+
+          <div className="px-2 pb-2 flex gap-1 overflow-x-auto">
+            {NAV.map((n) => (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                end={n.end as any}
+                className={({ isActive }) =>
+                  cn(
+                    "shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold",
+                    isActive
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )
+                }
+              >
+                {n.label}
+              </NavLink>
+            ))}
+          </div>
         </div>
 
         {/* الهيدر الرئيسي */}
