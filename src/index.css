@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 32% 7%;
+    --foreground: 210 25% 96%;
+
+    --card: 222 26% 11%;
+    --card-foreground: 210 25% 96%;
+
+    --popover: 222 26% 11%;
+    --popover-foreground: 210 25% 96%;
+
+    --primary: 158 65% 48%;
+    --primary-foreground: 158 90% 7%;
+
+    --secondary: 222 20% 15%;
+    --secondary-foreground: 210 25% 96%;
+
+    --muted: 222 20% 16%;
+    --muted-foreground: 220 12% 68%;
+
+    --accent: 195 85% 55%;
+    --accent-foreground: 195 90% 8%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 210 25% 98%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 38 90% 8%;
+
+    --border: 222 20% 20%;
+    --input: 222 20% 18%;
+    --ring: 158 65% 48%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 222 26% 9%;
+    --sidebar-foreground: 210 25% 96%;
+    --sidebar-primary: 158 65% 48%;
+    --sidebar-primary-foreground: 158 90% 7%;
+    --sidebar-accent: 222 20% 15%;
+    --sidebar-accent-foreground: 210 25% 96%;
+    --sidebar-border: 222 20% 20%;
+    --sidebar-ring: 158 65% 48%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Cairo', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(circle at 20% 0%, hsl(158 65% 48% / 0.08), transparent 45%),
+      radial-gradient(circle at 100% 100%, hsl(195 85% 55% / 0.06), transparent 40%);
+    background-attachment: fixed;
+  }
+
+  .mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+}
+
+@layer components {
+  .hud-card {
+    @apply relative rounded-2xl border border-border/70 bg-card/80 backdrop-blur-sm shadow-lg shadow-black/20;
+    overflow: visible; /* prevent clipping of child content during transitions */
+    will-change: transform, opacity; /* hint browser for smooth animations */
+  }
+  .hud-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(140deg, hsl(158 65% 48% / 0.35), transparent 45%, hsl(195 85% 55% / 0.25));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition
+    disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-primary-foreground hover:brightness-110 active:brightness-95;
+  }
+  .btn-secondary {
+    @apply btn bg-secondary text-secondary-foreground hover:bg-secondary/80;
+  }
+  .btn-ghost {
+    @apply btn text-foreground/80 hover:bg-secondary hover:text-foreground;
+  }
+  .btn-danger {
+    @apply btn bg-destructive text-destructive-foreground hover:brightness-110;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-input bg-secondary/50 px-4 py-2.5 text-base text-foreground placeholder:text-muted-foreground
+      focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  .signal-ring {
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.4),
+      0 0 0 6px hsl(var(--primary) / 0.15),
+      0 0 40px hsl(var(--primary) / 0.35);
+  }
+}
