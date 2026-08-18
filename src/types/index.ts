@@ -116,12 +116,20 @@ export interface Settings {
   workStart: string; // "08:00"
   workEnd: string; // "16:00"
   lateGraceMinutes: number;
+  
+  // بيانات الاعتماد للأدوار الإدارية الجديدة
+  ownerUsername?: string;
+  ownerPasswordHash?: string;
+  ownerName?: string;
+
+  managerUsername?: string;
   managerPasswordHash: string;
-  managerName?: string; // اسم المدير الحالي
-  ownerPasswordHash?: string; // كلمة مرور المالك
-  ownerName?: string; // اسم المالك
-  supervisorPasswordHash?: string; // كلمة مرور المشرف
-  supervisorName?: string; // اسم المشرف
+  managerName?: string;
+
+  supervisorUsername?: string;
+  supervisorPasswordHash?: string;
+  supervisorName?: string;
+
   brandLogo?: string | null;
   brandName?: string;
   // قائمة المواقع المتاحة في الشركة
