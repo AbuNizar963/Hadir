@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
-import { logoutManager, getCurrentUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { getNotifications, markAsRead as markNotificationAsRead } from "@/lib/notifications";
 import type { AppNotification } from "@/lib/notifications";
@@ -26,8 +25,6 @@ export default function ManagerLayout({
   children: React.ReactNode;
 }) {
   const nav = useNavigate();
-  const user = getCurrentUser();
-  const isSupervisor = user?.role === "supervisor";
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -57,10 +54,9 @@ export default function ManagerLayout({
     );
   };
 
-  const filteredNav = NAV.filter((item) => !(isSupervisor && item.managerOnly));
-
   const logout = () => {
-    logoutManager();
+    // مسح حالة الدخول من التخزين المحلي
+    localStorage.removeItem("managerAuth");
     nav("/manager/login");
   };
 
@@ -73,7 +69,7 @@ export default function ManagerLayout({
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
-          {filteredNav.map((n) => (
+          {NAV.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -94,7 +90,7 @@ export default function ManagerLayout({
 
         <div className="p-3 border-t border-border/60">
           <button onClick={logout} className="btn-secondary w-full">
-            {isSupervisor ? "تسجيل خروج المشرف" : "تسجيل خروج المدير"}
+            تسجيل خروج
           </button>
         </div>
       </aside>
@@ -109,7 +105,7 @@ export default function ManagerLayout({
           </div>
 
           <div className="px-2 pb-2 flex gap-1 overflow-x-auto">
-            {filteredNav.map((n) => (
+            {NAV.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
@@ -133,9 +129,7 @@ export default function ManagerLayout({
         <header className="px-5 lg:px-10 pt-6 pb-4 border-b border-border/40 mb-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-xs text-muted-foreground mono">
-                {isSupervisor ? "SUPERVISOR" : "MANAGER"}
-              </div>
+              <div className="text-xs text-muted-foreground mono">MANAGER</div>
               <h1 className="text-2xl md:text-3xl font-extrabold mt-1">{title}</h1>
               {subtitle && <div className="text-sm text-muted-foreground mt-1">{subtitle}</div>}
             </div>
