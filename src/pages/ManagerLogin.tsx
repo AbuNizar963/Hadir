@@ -1,10 +1,10 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
-import { loginManager } from "@/lib/auth";
 
 export default function ManagerLogin() {
   const navigate = useNavigate();
+  const [username, setUsername] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -15,15 +15,12 @@ export default function ManagerLogin() {
     setLoading(true);
 
     try {
-      // loginManager returns a LoginResult { ok, reason }
-      const result = loginManager(pw);
-
-      if (!result.ok) {
-        setErr(result.reason ?? "كلمة المرور غير صحيحة");
-        return;
+      // تحقق من اسم المستخدم وكلمة المرور
+      if (username === "admin" && pw === "1234") {
+        navigate("/manager");
+      } else {
+        setErr("اسم المستخدم أو كلمة المرور غير صحيحة");
       }
-
-      navigate("/manager");
     } catch (error) {
       console.error("Manager login error:", error);
       setErr("حدث خطأ أثناء محاولة تسجيل الدخول. حاول مرة أخرى.");
@@ -42,9 +39,20 @@ export default function ManagerLogin() {
           <div className="text-xs mono text-muted-foreground">MANAGER · لوحة التحكم</div>
           <h1 className="text-2xl font-extrabold mt-1">دخول النظام</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            أدخل كلمة المرور للوصول لصلاحيات الإدارة.
+            أدخل اسم المستخدم وكلمة المرور للوصول لصلاحيات الإدارة.
           </p>
           <form onSubmit={submit} className="mt-6 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold mb-1.5">اسم المستخدم</label>
+              <input
+                type="text"
+                className="input w-full"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="أدخل اسم المستخدم"
+                required
+              />
+            </div>
             <div>
               <label className="block text-sm font-semibold mb-1.5">كلمة المرور</label>
               <input
