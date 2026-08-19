@@ -15,27 +15,56 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  VITE_BASE_PATH: /Hadir/
+  VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      VITE_BASE_PATH: /Hadir/
-      VITE_API_URL: ${{ secrets.VITE_API_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate Cloudflare API URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${VITE_API_URL:-}" ]; then
+            echo "VITE_API_URL GitHub Secret is missing. Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          case "$VITE_API_URL" in
+            https://*) ;;
+            *) echo "VITE_API_URL must start with https://"; exit 1 ;;
+          esac
+          echo "Cloudflare API URL is configured."
+
+      - name: Validate Cloudflare API health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 "${VITE_API_URL%/}/api/health" > /tmp/hadir-health.json
+          grep -q '"ok":true' /tmp/hadir-health.json
+          echo "Cloudflare Worker health check passed."
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.2.15
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
       - name: Build
         run: bun run build
+
       - name: Make SPA fallback
         run: cp dist/index.html dist/404.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
