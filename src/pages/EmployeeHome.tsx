@@ -15,8 +15,15 @@ import { formatTime, formatDurationMinutes, todayKey, minutesBetween } from "@/l
 
 export default function EmployeeHome() {
   const nav = useNavigate();
-  const session = currentSession()!;
+  const session = currentSession();
   const [now, setNow] = useState(new Date());
+
+  // حماية ضد الشاشة السوداء في حال لم تكن الجلسة موجودة
+  useEffect(() => {
+    if (!session) {
+      nav("/login", { replace: true });
+    }
+  }, [session, nav]);
 
   // حالة النافذة المنبثقة للطلبات (استئذان / إجازة)
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -28,6 +35,10 @@ export default function EmployeeHome() {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  if (!session) {
+    return null; // إرجاع فارغ لحين التحويل لصفحة تسجيل الدخول
+  }
 
   const emp = findEmployeeByJobNumber(session.jobNumber);
   const settings = getSettings();
@@ -132,7 +143,7 @@ export default function EmployeeHome() {
               ) : (
                 <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-primary/15 grid place-items-center border-2 border-primary/30 shrink-0">
                   <span className="text-primary font-extrabold text-lg sm:text-xl">
-                    {session.name.charAt(0)}
+                    {session.name ? session.name.charAt(0) : "م"}
                   </span>
                 </div>
               )}
