@@ -1,20 +1,13 @@
 import type { AdminAccount, Employee, AttendanceRecord, EmployeeRequest, Settings, Location } from "@/types";
 import { getDeviceId } from "@/lib/device";
-
 const API_URL=(import.meta.env.VITE_API_URL||"https://hadir-api.abunizar963.workers.dev").replace(/\/$/,"");
 export const backendEnabled=Boolean(API_URL);
 function token(){return typeof window==="undefined"?"":localStorage.getItem("hadir.api.token")||"";}
-async function request<T>(path:string,init:RequestInit={}):Promise<T>{
-  const headers=new Headers(init.headers); headers.set("content-type","application/json");
-  const t=token(); if(t)headers.set("authorization",`Bearer ${t}`);
-  const d=getDeviceId(); if(d)headers.set("x-device-id",d);
-  const response=await fetch(`${API_URL}${path}`,{...init,headers});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error((data as any).error||`فشل الاتصال بالخادم (${response.status})`);
-  return data as T;
-}
+async function request<T>(path:string,init:RequestInit={}):Promise<T>{const headers=new Headers(init.headers);headers.set("content-type","application/json");const t=token();if(t)headers.set("authorization",`Bearer ${t}`);const d=getDeviceId();if(d)headers.set("x-device-id",d);const response=await fetch(`${API_URL}${path}`,{...init,headers});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error((data as any).error||`فشل الاتصال بالخادم (${response.status})`);return data as T;}
 export async function backendLogin(username:string,password:string){const data=await request<{token:string;user:any;kind:"admin"|"employee"}>("/api/auth/login",{method:"POST",body:JSON.stringify({username,password,deviceId:getDeviceId()})});if(data.kind!=="admin")throw new Error("هذا الحساب موظف وليس حساب إدارة");localStorage.setItem("hadir.api.token",data.token);return data.user;}
 export async function backendEmployeeLogin(username:string,password:string){const data=await request<{token:string;user:any;kind:"admin"|"employee"}>("/api/auth/login",{method:"POST",body:JSON.stringify({username,password,deviceId:getDeviceId()})});if(data.kind!=="employee")throw new Error("هذا الحساب إداري وليس حساب موظف");localStorage.setItem("hadir.api.token",data.token);return data.user as Employee;}
+export async function bootstrapBackend(){const data=await request<{token:string;bootstrap:boolean}>("/api/bootstrap");if(!data.bootstrap)throw new Error("تم إعداد حساب المالك مسبقًا");localStorage.setItem("hadir.api.token",data.token);return data;}
+export async function createBootstrapOwner(input:{name:string;username:string;password:string}){const data=await request<{token:string;user:any;kind:"admin"}>("/api/bootstrap/owner",{method:"POST",body:JSON.stringify(input)});localStorage.setItem("hadir.api.token",data.token);return data.user;}
 export function backendLogout(){localStorage.removeItem("hadir.api.token");}
 export async function backendMe(){return request<{user:any}>("/api/me");}
 export async function getBackendAdmins(){return request<Array<{id:string;username:string;name:string;role:"owner"|"manager"|"supervisor";active:boolean;createdAt:string}>>("/api/admins");}
