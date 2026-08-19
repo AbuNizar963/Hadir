@@ -4,6 +4,7 @@ export type GeoPosition = {
   accuracy?: number;
 };
 
+// دالة حساب المسافة بالمتر بين نقطتين
 export function haversineMeters(p1: { lat: number; lng: number }, p2: { lat: number; lng: number }): number {
   const R = 6371e3;
   const φ1 = (p1.lat * Math.PI) / 180;
@@ -19,14 +20,17 @@ export function haversineMeters(p1: { lat: number; lng: number }, p2: { lat: num
   return Math.round(R * c);
 }
 
+// دالة التحقق من التزييف المتوافقة مع attendance.ts
 export async function isLikelyMockedPosition(_pos: GeoPosition): Promise<{ mocked: boolean; reasons: string[] }> {
+  // يمكنك تطوير الفحص هنا مستقبلاً، افتراضياً تعود بأن الموقع غير مزيف لضمان نجاح العملية
   return { mocked: false, reasons: [] };
 }
 
+// دالة جلب الموقع الذكية مع دعم تدرج الدقة
 export function getCurrentPosition(): Promise<GeoPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("Geolocation is not supported by your browser."));
+      reject(new Error("المتصفح لا يدعم تحديد الموقع الجغرافي."));
       return;
     }
 
@@ -35,7 +39,7 @@ export function getCurrentPosition(): Promise<GeoPosition> {
     const safetyTimer = setTimeout(() => {
       if (!isDone) {
         isDone = true;
-        reject(new Error("GPS request timed out. Please check your location settings."));
+        reject(new Error("انتهت مهلة استجابة الـ GPS. تأكد من تفعيل الموقع."));
       }
     }, 15000);
 
@@ -63,9 +67,9 @@ export function getCurrentPosition(): Promise<GeoPosition> {
             clearTimeout(safetyTimer);
             
             if (err2.code === 1) {
-              reject(new Error("Permission denied. Please allow location access."));
+              reject(new Error("تم رفض الصلاحية. يرجى السماح للمتصفح بالوصول لموقعك."));
             } else {
-              reject(new Error("Unable to determine location. Please ensure GPS is enabled."));
+              reject(new Error("تعذر تحديد موقعك. تأكد من تفعيل الـ GPS في الجوال."));
             }
           },
           { enableHighAccuracy: false, timeout: 7000, maximumAge: 60000 }
