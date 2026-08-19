@@ -11,18 +11,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.2.15
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: bun install --frozen-lockfile
 
-      - name: Typecheck
+      - name: Typecheck frontend
         run: bun run typecheck
 
-      - name: Build
+      - name: Build frontend
         run: bun run build
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Validate Worker bundle
+        working-directory: backend
+        run: npx wrangler@latest deploy --dry-run
