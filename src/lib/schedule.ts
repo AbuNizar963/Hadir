@@ -39,6 +39,14 @@ export function getEmployeeScheduleStatus(
   }
 
   const start = parseYYYYMMDD(startString);
+  if (!start) {
+    return {
+      isWorkDay: false,
+      label: "تاريخ بداية الوردية غير صالح",
+      detail: "يرجى تحديد تاريخ صحيح بصيغة YYYY-MM-DD.",
+    };
+  }
+
   const today = new Date(target.getFullYear(), target.getMonth(), target.getDate());
   const diffDays = Math.floor((today.getTime() - start.getTime()) / 86400000);
 
@@ -76,20 +84,22 @@ export function getEmployeeScheduleStatus(
   };
 }
 
-function parseYYYYMMDD(value: string): Date {
-  const parts = value.split("-").map(Number);
-  if (
-    parts.length === 3 &&
-    parts.every(Number.isFinite) &&
-    parts[0] >= 1970 &&
-    parts[1] >= 1 &&
-    parts[1] <= 12 &&
-    parts[2] >= 1 &&
-    parts[2] <= 31
-  ) {
-    return new Date(parts[0], parts[1] - 1, parts[2]);
-  }
+function parseYYYYMMDD(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
 
-  const parsed = new Date(value);
-  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
 }
