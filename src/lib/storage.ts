@@ -1,313 +1,67 @@
-import type {
-  AttendanceRecord,
-  AuditEntry,
-  Employee,
-  EmployeeRequest,
-  RequestType,
-  Settings,
-} from "@/types";
+import type { AttendanceRecord, AuditEntry, Employee, EmployeeRequest, RequestType, Settings, AdminAccount } from "@/types";
 import { hash } from "@/lib/hash";
 import { generateId } from "@/lib/utils";
 import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
-
 export type { EmployeeRequest, RequestType } from "@/types";
 
-const K = {
-  EMPLOYEES: "hadir.employees",
-  ATTENDANCE: "hadir.attendance",
-  AUDIT: "hadir.audit",
-  REQUESTS: "hadir.requests",
-  SETTINGS: "hadir.settings",
-  SESSION: "hadir.session",
-  MANAGER_SESSION: "hadir.manager_session",
-} as const;
+const K = { EMPLOYEES:"hadir.employees", ATTENDANCE:"hadir.attendance", AUDIT:"hadir.audit", REQUESTS:"hadir.requests", SETTINGS:"hadir.settings", SESSION:"hadir.session", MANAGER_SESSION:"hadir.manager_session" } as const;
+function read<T>(key:string, fallback:T):T { if(typeof window === "undefined") return fallback; try { const raw=localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; } }
+function write<T>(key:string,value:T):void { if(typeof window === "undefined") return; try { localStorage.setItem(key,JSON.stringify(value)); } catch(error){ console.error("Error writing to localStorage",error); } }
 
-function read<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+const DEFAULT_OWNER_USERNAME="AbuNizar";
+const DEFAULT_OWNER_PASSWORD="963963963";
 
-function write<T>(key: string, value: T): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error("Error writing to localStorage", error);
-  }
-}
-
-const DEFAULT_OWNER_USERNAME = "AbuNizar";
-const DEFAULT_OWNER_PASSWORD = "963963963";
-
-export const defaultSettings: Settings = {
-  qrCode: "HADIR-SITE-01-STATIC",
-  workSiteLat: 24.7136,
-  workSiteLng: 46.6753,
-  radiusMeters: 100,
-  workStart: "08:00",
-  workEnd: "16:00",
-  lateGraceMinutes: 10,
-  ownerUsername: DEFAULT_OWNER_USERNAME,
-  ownerPasswordHash: hash(DEFAULT_OWNER_PASSWORD),
-  ownerName: "المالك",
-  managerUsername: "",
-  managerPasswordHash: "",
-  managerName: "",
-  supervisorUsername: "",
-  supervisorPasswordHash: "",
-  supervisorName: "",
-  brandName: "حاضِر",
-  brandLogo: null,
-  locations: [],
+export const defaultSettings:Settings={
+  qrCode:"HADIR-SITE-01-STATIC", workSiteLat:24.7136, workSiteLng:46.6753, radiusMeters:100,
+  workStart:"08:00", workEnd:"16:00", lateGraceMinutes:10,
+  ownerUsername:DEFAULT_OWNER_USERNAME, ownerPasswordHash:hash(DEFAULT_OWNER_PASSWORD), ownerName:"المالك",
+  managerUsername:"", managerPasswordHash:"", managerName:"", supervisorUsername:"", supervisorPasswordHash:"", supervisorName:"",
+  adminAccounts:[{id:"owner-account",username:DEFAULT_OWNER_USERNAME,passwordHash:hash(DEFAULT_OWNER_PASSWORD),name:"المالك",role:"owner",active:true,createdAt:new Date(0).toISOString()}],
+  brandName:"حاضِر", brandLogo:null, locations:[]
 };
 
-export function getSettings(): Settings {
-  const stored = read<Partial<Settings> | null>(K.SETTINGS, null);
-  const settings = { ...defaultSettings, ...(stored ?? {}) };
-
-  // Keep the requested default owner credentials available even for an existing
-  // browser installation that was initialized with the previous default PIN.
-  if (settings.ownerUsername === DEFAULT_OWNER_USERNAME) {
-    settings.ownerPasswordHash = hash(DEFAULT_OWNER_PASSWORD);
-  }
-
+export function getSettings():Settings {
+  const stored=read<Partial<Settings>|null>(K.SETTINGS,null);
+  const settings={...defaultSettings,...(stored??{})};
+  let accounts:Array<AdminAccount>=Array.isArray(settings.adminAccounts)?settings.adminAccounts:[];
+  const ownerUsername=settings.ownerUsername||DEFAULT_OWNER_USERNAME;
+  const ownerHash=settings.ownerPasswordHash||hash(DEFAULT_OWNER_PASSWORD);
+  if(!accounts.some(a=>a.role==="owner")) accounts.unshift({id:"owner-account",username:ownerUsername,passwordHash:ownerHash,name:settings.ownerName||"المالك",role:"owner",active:true,createdAt:new Date(0).toISOString()});
+  else accounts=accounts.map(a=>a.role==="owner"?{...a,username:ownerUsername,passwordHash:ownerHash,name:settings.ownerName||a.name}:a);
+  // Migrate the old single manager/supervisor fields into the new account list.
+  if(settings.managerUsername && settings.managerPasswordHash && !accounts.some(a=>a.role==="manager"&&a.username===settings.managerUsername)) accounts.push({id:"manager-legacy",username:settings.managerUsername,passwordHash:settings.managerPasswordHash,name:settings.managerName||"المدير",role:"manager",active:true,createdAt:new Date().toISOString()});
+  if(settings.supervisorUsername && settings.supervisorPasswordHash && !accounts.some(a=>a.role==="supervisor"&&a.username===settings.supervisorUsername)) accounts.push({id:"supervisor-legacy",username:settings.supervisorUsername,passwordHash:settings.supervisorPasswordHash,name:settings.supervisorName||"المشرف",role:"supervisor",active:true,createdAt:new Date().toISOString()});
+  settings.adminAccounts=accounts;
   return settings;
 }
+export function saveSettings(next:Settings):void { write(K.SETTINGS,next); if(typeof window!=="undefined") window.dispatchEvent(new Event("hadir:settings-changed")); }
+export function getEmployees():Employee[]{return read<Employee[]>(K.EMPLOYEES,[]);}
+export function saveEmployees(list:Employee[]):void{write(K.EMPLOYEES,list);}
+export function getAttendance():AttendanceRecord[]{return read<AttendanceRecord[]>(K.ATTENDANCE,[]);}
+export function addAttendance(record:AttendanceRecord):void{const list=getAttendance();list.unshift(record);write(K.ATTENDANCE,list);}
+export function getAudit():AuditEntry[]{return read<AuditEntry[]>(K.AUDIT,[]);}
+export function addAudit(entry:AuditEntry):void{const list=getAudit();list.unshift(entry);write(K.AUDIT,list);}
+export function getRequests():EmployeeRequest[]{return read<EmployeeRequest[]>(K.REQUESTS,[]);}
+export function addRequest(request:Omit<EmployeeRequest,"id"|"status"|"createdAt">):EmployeeRequest{const full={...request,id:generateId(),status:"pending" as const,createdAt:new Date().toISOString()};const list=getRequests();list.unshift(full);write(K.REQUESTS,list);return full;}
+export function updateRequestStatus(id:string,status:"approved"|"rejected"):void{write(K.REQUESTS,getRequests().map(r=>r.id===id?{...r,status}:r));}
+export interface Session{employeeId:string;jobNumber:string;name:string;loginAt:string;role?:string;}
+export interface ManagerSession{loginAt:string;name?:string;role?:string;jobNumber?:string;accountId?:string;}
+export function getSession():Session|null{return read<Session|null>(K.SESSION,null);}
+export function setSession(session:Session|null):void{if(session===null){if(typeof window!=="undefined")localStorage.removeItem(K.SESSION);return;}write(K.SESSION,session);}
+export function getManagerSession():ManagerSession|null{return read<ManagerSession|null>(K.MANAGER_SESSION,null);}
+export function setManagerSession(session:ManagerSession|null):void{if(session===null){if(typeof window!=="undefined")localStorage.removeItem(K.MANAGER_SESSION);return;}write(K.MANAGER_SESSION,session);}
 
-export function saveSettings(next: Settings): void {
-  write(K.SETTINGS, next);
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("hadir:settings-changed"));
-  }
+export function seedIfEmpty():void{
+  if(typeof window==="undefined")return;
+  const settings=getSettings(); saveSettings(settings); const now=new Date().toISOString(); const existing=getEmployees();
+  const previousOwner=existing.find(e=>e.role==="owner"||e.jobNumber===settings.ownerUsername);
+  const owner:Employee={id:previousOwner?.id||"owner-account",jobNumber:settings.ownerUsername||DEFAULT_OWNER_USERNAME,name:settings.ownerName||"المالك",pinHash:settings.ownerPasswordHash||hash(DEFAULT_OWNER_PASSWORD),status:previousOwner?.status||"active",deviceId:previousOwner?.deviceId||null,deviceLabel:previousOwner?.deviceLabel||null,createdAt:previousOwner?.createdAt||now,scheduleType:"ADMIN",workStartTime:settings.workStart,workEndTime:settings.workEnd,gracePeriodMinutes:settings.lateGraceMinutes,rotationStartDate:null,avatar:previousOwner?.avatar||null,role:"owner",locationId:previousOwner?.locationId||null,specialties:["executive"]};
+  if(existing.length===0){saveEmployees([{id:generateId(),jobNumber:"1001",name:"أحمد الموظف",pinHash:hash("1001"),status:"active",deviceId:null,deviceLabel:null,createdAt:now,scheduleType:"ADMIN",workStartTime:settings.workStart,workEndTime:settings.workEnd,gracePeriodMinutes:settings.lateGraceMinutes,rotationStartDate:null,role:"staff",locationId:null,specialties:["general"]},owner]);}
+  else {const list=existing.filter(e=>e.id!==previousOwner?.id&&e.role!=="owner");saveEmployees([...list,owner]);}
+  if(!localStorage.getItem(K.ATTENDANCE))write<AttendanceRecord[]>(K.ATTENDANCE,[]); if(!localStorage.getItem(K.AUDIT))write<AuditEntry[]>(K.AUDIT,[]); if(!localStorage.getItem(K.REQUESTS))write<EmployeeRequest[]>(K.REQUESTS,[]);
 }
-
-export function getEmployees(): Employee[] {
-  return read<Employee[]>(K.EMPLOYEES, []);
-}
-
-export function saveEmployees(list: Employee[]): void {
-  write(K.EMPLOYEES, list);
-}
-
-export function getAttendance(): AttendanceRecord[] {
-  return read<AttendanceRecord[]>(K.ATTENDANCE, []);
-}
-
-export function addAttendance(record: AttendanceRecord): void {
-  const list = getAttendance();
-  list.unshift(record);
-  write(K.ATTENDANCE, list);
-}
-
-export function getAudit(): AuditEntry[] {
-  return read<AuditEntry[]>(K.AUDIT, []);
-}
-
-export function addAudit(entry: AuditEntry): void {
-  const list = getAudit();
-  list.unshift(entry);
-  write(K.AUDIT, list);
-}
-
-export function getRequests(): EmployeeRequest[] {
-  return read<EmployeeRequest[]>(K.REQUESTS, []);
-}
-
-export function addRequest(
-  request: Omit<EmployeeRequest, "id" | "status" | "createdAt">
-): EmployeeRequest {
-  const full: EmployeeRequest = {
-    ...request,
-    id: generateId(),
-    status: "pending",
-    createdAt: new Date().toISOString(),
-  };
-  const list = getRequests();
-  list.unshift(full);
-  write(K.REQUESTS, list);
-  return full;
-}
-
-export function updateRequestStatus(
-  id: string,
-  status: "approved" | "rejected"
-): void {
-  const list = getRequests().map((request) =>
-    request.id === id ? { ...request, status } : request
-  );
-  write(K.REQUESTS, list);
-}
-
-export interface Session {
-  employeeId: string;
-  jobNumber: string;
-  name: string;
-  loginAt: string;
-  role?: string;
-}
-
-export interface ManagerSession {
-  loginAt: string;
-  name?: string;
-  role?: string;
-  jobNumber?: string;
-}
-
-export function getSession(): Session | null {
-  return read<Session | null>(K.SESSION, null);
-}
-
-export function setSession(session: Session | null): void {
-  if (session === null) {
-    if (typeof window !== "undefined") localStorage.removeItem(K.SESSION);
-    return;
-  }
-  write(K.SESSION, session);
-}
-
-export function getManagerSession(): ManagerSession | null {
-  return read<ManagerSession | null>(K.MANAGER_SESSION, null);
-}
-
-export function setManagerSession(session: ManagerSession | null): void {
-  if (session === null) {
-    if (typeof window !== "undefined") localStorage.removeItem(K.MANAGER_SESSION);
-    return;
-  }
-  write(K.MANAGER_SESSION, session);
-}
-
-export function seedIfEmpty(): void {
-  if (typeof window === "undefined") return;
-
-  const settings = getSettings();
-  saveSettings(settings);
-  const now = new Date().toISOString();
-  const existing = getEmployees();
-  const previousOwner = existing.find(
-    (employee) => employee.role === "owner" || employee.jobNumber === settings.ownerUsername
-  );
-
-  const owner: Employee = {
-    id: previousOwner?.id || "owner-account",
-    jobNumber: settings.ownerUsername || DEFAULT_OWNER_USERNAME,
-    name: settings.ownerName || "المالك",
-    pinHash: settings.ownerPasswordHash || hash(DEFAULT_OWNER_PASSWORD),
-    status: previousOwner?.status || "active",
-    deviceId: previousOwner?.deviceId || null,
-    deviceLabel: previousOwner?.deviceLabel || null,
-    createdAt: previousOwner?.createdAt || now,
-    scheduleType: "ADMIN",
-    workStartTime: settings.workStart,
-    workEndTime: settings.workEnd,
-    gracePeriodMinutes: settings.lateGraceMinutes,
-    rotationStartDate: null,
-    avatar: previousOwner?.avatar || null,
-    role: "owner",
-    locationId: previousOwner?.locationId || null,
-    specialties: ["executive"],
-  };
-
-  if (existing.length === 0) {
-    saveEmployees([
-      {
-        id: generateId(),
-        jobNumber: "1001",
-        name: "أحمد الموظف",
-        pinHash: hash("1001"),
-        status: "active",
-        deviceId: null,
-        deviceLabel: null,
-        createdAt: now,
-        scheduleType: "ADMIN",
-        workStartTime: settings.workStart,
-        workEndTime: settings.workEnd,
-        gracePeriodMinutes: settings.lateGraceMinutes,
-        rotationStartDate: null,
-        role: "staff",
-        locationId: null,
-        specialties: ["general"],
-      },
-      owner,
-    ]);
-  } else {
-    const list = existing.filter(
-      (employee) => employee.id !== previousOwner?.id && employee.role !== "owner"
-    );
-    saveEmployees([...list, owner]);
-  }
-
-  if (!localStorage.getItem(K.ATTENDANCE)) write<AttendanceRecord[]>(K.ATTENDANCE, []);
-  if (!localStorage.getItem(K.AUDIT)) write<AuditEntry[]>(K.AUDIT, []);
-  if (!localStorage.getItem(K.REQUESTS)) write<EmployeeRequest[]>(K.REQUESTS, []);
-}
-
-export function resetAll(): void {
-  if (typeof window === "undefined") return;
-  Object.values(K).forEach((key) => localStorage.removeItem(key));
-  seedIfEmpty();
-}
-
-export function findEmployeeByJobNumber(jobNumber: string): Employee | undefined {
-  const normalized = jobNumber.trim();
-  return getEmployees().find((employee) => employee.jobNumber.trim() === normalized);
-}
-
-function parseTime(value: string): { hours: number; minutes: number } | null {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) return null;
-  return { hours, minutes };
-}
-
-export function isShiftOver(employee?: Employee): boolean {
-  const settings = getSettings();
-  const time = parseTime(employee?.workEndTime || settings.workEnd);
-  if (!time) return false;
-
-  const now = new Date();
-  const end = new Date(now);
-  end.setHours(time.hours, time.minutes, 0, 0);
-  return now.getTime() >= end.getTime();
-}
-
-export function forceCheckInByManager(
-  employeeOrId: Employee | string,
-  type: "check-in" | "check-out" | "checkIn" | "checkOut"
-): AttendanceRecord | null {
-  const employee = typeof employeeOrId === "string"
-    ? getEmployees().find((item) => item.id === employeeOrId)
-    : getEmployees().find((item) => item.id === employeeOrId.id);
-
-  if (!employee) return null;
-
-  const normalizedType: "check-in" | "check-out" =
-    type === "checkIn" ? "check-in" : type === "checkOut" ? "check-out" : type;
-
-  const record: AttendanceRecord = {
-    id: generateId(),
-    employeeId: employee.id,
-    jobNumber: employee.jobNumber,
-    employeeName: employee.name,
-    type: normalizedType,
-    timestamp: new Date().toISOString(),
-    lat: 0,
-    lng: 0,
-    distanceMeters: 0,
-    deviceId: employee.deviceId || getDeviceId(),
-    ip: getClientIpPlaceholder(),
-    qrCode: "MANUAL",
-    locationId: employee.locationId || "main",
-  };
-
-  addAttendance(record);
-  return record;
-}
+export function resetAll():void{if(typeof window==="undefined")return;Object.values(K).forEach(key=>localStorage.removeItem(key));seedIfEmpty();}
+export function findEmployeeByJobNumber(jobNumber:string):Employee|undefined{const n=jobNumber.trim();return getEmployees().find(e=>e.jobNumber.trim()===n);}
+function parseTime(value:string):{hours:number;minutes:number}|null{const m=/^(\d{1,2}):(\d{2})$/.exec(value);if(!m)return null;const hours=Number(m[1]),minutes=Number(m[2]);if(hours>23||minutes>59)return null;return{hours,minutes};}
+export function isShiftOver(employee?:Employee):boolean{const settings=getSettings();const time=parseTime(employee?.workEndTime||settings.workEnd);if(!time)return false;const now=new Date();const end=new Date(now);end.setHours(time.hours,time.minutes,0,0);return now.getTime()>=end.getTime();}
+export function forceCheckInByManager(employeeOrId:Employee|string,type:"check-in"|"check-out"|"checkIn"|"checkOut"):AttendanceRecord|null{const employee=typeof employeeOrId==="string"?getEmployees().find(i=>i.id===employeeOrId):getEmployees().find(i=>i.id===employeeOrId.id);if(!employee)return null;const normalizedType=type==="checkIn"?"check-in":type==="checkOut"?"check-out":type;const record:AttendanceRecord={id:generateId(),employeeId:employee.id,jobNumber:employee.jobNumber,employeeName:employee.name,type:normalizedType,timestamp:new Date().toISOString(),lat:0,lng:0,distanceMeters:0,deviceId:employee.deviceId||getDeviceId(),ip:getClientIpPlaceholder(),qrCode:"MANUAL",locationId:employee.locationId||"main"};addAttendance(record);return record;}
