@@ -12,7 +12,9 @@ export interface Employee {
   deviceId: string | null; deviceLabel: string | null; createdAt: string;
   scheduleType?: ScheduleType; rotationStartDate?: string | null; avatar?: string | null;
   workStartTime?: string; workEndTime?: string; gracePeriodMinutes?: number;
-  role?: UserRole; locationId?: string | null; rotationDaysOn?: number; rotationDaysOff?: number; specialties?: string[];
+  role?: UserRole; locationId?: string | null; rotationDaysOn?: number; rotationDaysOff?: number;
+  workDays?: number[];
+  specialties?: string[];
 }
 
 export interface AttendanceRecord { id: string; employeeId: string; jobNumber: string; employeeName: string; type: "check-in" | "check-out"; timestamp: string; lat: number; lng: number; distanceMeters: number; deviceId: string; ip: string; qrCode: string; locationId?: string; }
