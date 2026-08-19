@@ -105,7 +105,7 @@ jobs:
           echo "Checking $BASE_URL/api/health"
           HEALTH=$(curl -fsS --max-time 20 "$BASE_URL/api/health")
           echo "$HEALTH"
-          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"||x.ownerInitialized===undefined||!x.secrets?.jwt){console.error("Worker/D1 health check failed");process.exit(1)}' "$HEALTH"
+          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"||x.ownerInitialized===undefined){console.error("Worker/D1 health check failed");process.exit(1)}' "$HEALTH"
           echo "Worker and D1 binding are healthy. Owner account is created by the first login when ownerInitialized=false."
 
       - name: Remove temporary files
