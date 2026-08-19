@@ -316,7 +316,6 @@ export function seedIfEmpty(): void {
   if (existingEmployees.length === 0) {
     saveEmployees(demo);
   } else {
-    // التأكد من وجود الحسابات الأساسية وتحديثها إن وجدت أو إضافتها إن لم توجد
     let updated = [...existingEmployees];
     for (const d of demo) {
       const exists = updated.find(
@@ -325,7 +324,6 @@ export function seedIfEmpty(): void {
       if (!exists) {
         updated.push(d);
       } else {
-        // تحديث بيانات الحساب الأساسي لضمان عمل كلمة المرور
         const index = updated.indexOf(exists);
         updated[index] = {
           ...exists,
@@ -339,7 +337,6 @@ export function seedIfEmpty(): void {
     saveEmployees(updated);
   }
 
-  // Empty collections if missing
   if (!localStorage.getItem(K.ATTENDANCE)) write(K.ATTENDANCE, []);
   if (!localStorage.getItem(K.AUDIT)) write(K.AUDIT, []);
   if (!localStorage.getItem(K.REQUESTS)) write(K.REQUESTS, []);
@@ -356,4 +353,13 @@ export function resetAll(): void {
   localStorage.removeItem(K.MANAGER_SESSION);
   localStorage.removeItem("managerAuth");
   seedIfEmpty();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Find Employee Helper                                               */
+/* ------------------------------------------------------------------ */
+
+export function findEmployeeByJobNumber(jobNumber: string): Employee | undefined {
+  const employees = getEmployees();
+  return employees.find((e) => e.jobNumber === jobNumber);
 }
