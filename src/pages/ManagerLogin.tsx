@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
+import { getSettings, setManagerSession } from "@/lib/storage";
+import { hash } from "@/lib/hash";
 
 export default function ManagerLogin() {
   const navigate = useNavigate();
@@ -15,9 +17,43 @@ export default function ManagerLogin() {
     setLoading(true);
 
     try {
-      // تحقق من اسم المستخدم وكلمة المرور
-      if (username === "admin" && pw === "1234") {
-        // حفظ حالة الدخول
+      const settings = getSettings();
+      const hashedPw = hash(pw);
+      let matchedRole = "";
+      let matchedName = "";
+
+      // التحقق من حساب المالك
+      if (
+        username === (settings.ownerUsername || "owner") &&
+        hashedPw === settings.ownerPasswordHash
+      ) {
+        matchedRole = "owner";
+        matchedName = settings.ownerName || "المالك";
+      }
+      // التحقق من حساب المدير
+      else if (
+        username === (settings.managerUsername || "manager") &&
+        hashedPw === settings.managerPasswordHash
+      ) {
+        matchedRole = "manager";
+        matchedName = settings.managerName || "مدير عام";
+      }
+      // التحقق من حساب المشرف
+      else if (
+        username === (settings.supervisorUsername || "supervisor") &&
+        hashedPw === settings.supervisorPasswordHash
+      ) {
+        matchedRole = "supervisor";
+        matchedName = settings.supervisorName || "المشرف";
+      }
+
+      if (matchedRole) {
+        // حفظ جلسة المدير/الإداري بنجاح
+        setManagerSession({
+          loginAt: new Date().toISOString(),
+          name: matchedName,
+          role: matchedRole,
+        });
         localStorage.setItem("managerAuth", "true");
         navigate("/manager");
       } else {
@@ -41,7 +77,7 @@ export default function ManagerLogin() {
           <div className="text-xs mono text-muted-foreground">MANAGER · لوحة التحكم</div>
           <h1 className="text-2xl font-extrabold mt-1">دخول النظام</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            أدخل اسم المستخدم وكلمة المرور للوصول لصلاحيات الإدارة.
+            أدخل اسم المستخدم وكلمة المرور للوصول لصلاحيات الإدارة (مالك، مدير، مشرف).
           </p>
           <form onSubmit={submit} className="mt-6 space-y-4">
             <div>
