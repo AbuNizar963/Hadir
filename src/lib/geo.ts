@@ -4,7 +4,7 @@ export type GeoPosition = {
   accuracy?: number;
 };
 
-// دالة حساب المسافة (إذا لم تكن موجودة لديك أضفها أيضاً لضمان عدم حدوث نقص)
+// دالة حساب المسافة بالمتر بين نقطتين
 export function haversineMeters(p1: { lat: number; lng: number }, p2: { lat: number; lng: number }): number {
   const R = 6371e3;
   const φ1 = (p1.lat * Math.PI) / 180;
@@ -20,12 +20,13 @@ export function haversineMeters(p1: { lat: number; lng: number }, p2: { lat: num
   return Math.round(R * c);
 }
 
-// الدالة الناقصة التي يطلبها ملف attendance.ts
-export function isLikelyMockedPosition(_pos: GeoPosition): boolean {
-  return false;
+// دالة التحقق من التزييف المتوافقة مع attendance.ts
+export async function isLikelyMockedPosition(_pos: GeoPosition): Promise<{ mocked: boolean; reasons: string[] }> {
+  // يمكنك تطوير الفحص هنا مستقبلاً، افتراضياً تعود بأن الموقع غير مزيف لضمان نجاح العملية
+  return { mocked: false, reasons: [] };
 }
 
-// الكود الذكي الخاص بك لجلب الموقع بدقة مع fallback
+// دالة جلب الموقع الذكية مع دعم تدرج الدقة
 export function getCurrentPosition(): Promise<GeoPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -35,7 +36,6 @@ export function getCurrentPosition(): Promise<GeoPosition> {
 
     let isDone = false;
 
-    // 1. مؤقت أمان قسري لمنع تعليق المتصفح للأبد (15 ثانية كحد أقصى)
     const safetyTimer = setTimeout(() => {
       if (!isDone) {
         isDone = true;
@@ -54,13 +54,11 @@ export function getCurrentPosition(): Promise<GeoPosition> {
       });
     };
 
-    // 2. المحاولة الأولى: طلب دقة عالية (GPS)
     navigator.geolocation.getCurrentPosition(
       onSuccess,
-      (_err) => {
+      () => {
         if (isDone) return;
         
-        // 3. المحاولة الثانية (المنقذة): طلب دقة عادية (تعمل فوراً داخل المباني)
         navigator.geolocation.getCurrentPosition(
           onSuccess,
           (err2) => {
