@@ -7,7 +7,7 @@ workers_dev = true
 APP_ORIGIN = "*"
 
 [secrets]
-required = ["JWT_SECRET", "OWNER_USERNAME", "OWNER_PASSWORD"]
+required = ["JWT_SECRET"]
 
 [[d1_databases]]
 binding = "DB"
