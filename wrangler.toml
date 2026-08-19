@@ -1,0 +1,5 @@
+name = "hadir"
+pages_build_output_dir = "dist"
+
+# Static Cloudflare Pages configuration.
+# GitHub Pages remains the primary deployment target.
