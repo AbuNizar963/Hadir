@@ -63,8 +63,9 @@ export const defaultSettings: Settings = {
   workEnd: "16:00",
   lateGraceMinutes: 10,
   
-  ownerUsername: "owner",
-  ownerPasswordHash: hash("owner123"),
+  // تحديث بيانات المالك الافتراضية
+  ownerUsername: "AbuNizar",
+  ownerPasswordHash: hash("963963963"),
   ownerName: "المالك",
 
   managerUsername: "manager",
