@@ -13,6 +13,7 @@ required = ["JWT_SECRET"]
 binding = "DB"
 database_name = "Hadir"
 database_id = "c9a96776-fcaa-4ae0-befa-b8c5a9345ebe"
+migrations_dir = "migrations"
 
 [observability]
 enabled = true
