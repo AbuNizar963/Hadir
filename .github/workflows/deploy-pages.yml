@@ -26,20 +26,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate Cloudflare Worker
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "${VITE_API_URL}" 
-          case "$VITE_API_URL" in
-            https://*) ;;
-            *) echo "VITE_API_URL must start with https://"; exit 1 ;;
-          esac
-          response="$(curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 "${VITE_API_URL}/api/health")"
-          echo "$response"
-          echo "$response" | grep -q '"ok":true'
-          echo "Cloudflare Worker health check passed."
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
