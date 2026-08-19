@@ -177,8 +177,8 @@ export function seedIfEmpty(): void {
 
   const settings = getSettings();
   saveSettings(settings);
-
   const now = new Date().toISOString();
+
   const owner: Employee = {
     id: "owner-account",
     jobNumber: settings.ownerUsername || "AbuNizar",
@@ -266,23 +266,26 @@ export function isShiftOver(employee?: Employee): boolean {
   return now.getTime() >= end.getTime();
 }
 
-/**
- * Manager-assisted attendance is intentionally recorded with a real employee,
- * device and timestamp. It does not fabricate GPS/QR validation data.
- */
+/** Record a manager-assisted attendance event. It is marked as MANUAL and never pretends to have GPS/QR proof. */
 export function forceCheckInByManager(
-  employeeId: string,
-  type: "check-in" | "check-out"
+  employeeOrId: Employee | string,
+  type: "check-in" | "check-out" | "checkIn" | "checkOut"
 ): AttendanceRecord | null {
-  const employee = getEmployees().find((item) => item.id === employeeId);
+  const employee = typeof employeeOrId === "string"
+    ? getEmployees().find((item) => item.id === employeeOrId)
+    : getEmployees().find((item) => item.id === employeeOrId.id);
+
   if (!employee) return null;
+
+  const normalizedType: "check-in" | "check-out" =
+    type === "checkIn" ? "check-in" : type === "checkOut" ? "check-out" : type;
 
   const record: AttendanceRecord = {
     id: generateId(),
     employeeId: employee.id,
     jobNumber: employee.jobNumber,
     employeeName: employee.name,
-    type,
+    type: normalizedType,
     timestamp: new Date().toISOString(),
     lat: 0,
     lng: 0,
