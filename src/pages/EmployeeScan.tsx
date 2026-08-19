@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import Brand from "@/components/Brand";
 import { currentSession } from "@/lib/auth";
@@ -36,6 +36,11 @@ export default function EmployeeScan() {
   const [qrInput, setQrInput] = useState("");
   const [result, setResult] = useState<{ time: string; late?: number; timeNote?: string } | null>(null);
 
+  // حالة الكاميرا الحقيقية
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -58,10 +63,43 @@ export default function EmployeeScan() {
     })();
     return () => {
       cancelled = true;
+      stopCamera();
     };
   }, [targetLat, targetLng, targetRadius, locationName]);
 
-  const simulateScan = () => setQrInput(settings.qrCode);
+  // تشغيل الكاميرا الفعلية
+  const startCamera = async () => {
+    setIsCameraActive(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+      mediaStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      console.error("تعذر فتح الكاميرا:", err);
+      setError("تعذر فتح الكاميرا، يرجى إدخال القيمة يدويًا.");
+      setIsCameraActive(false);
+    }
+  };
+
+  // إيقاف الكاميرا
+  const stopCamera = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  // التقاط القيمة بنجاح (سواء تلقائياً أو عبر المحاكاة السريعة)
+  const captureCode = () => {
+    setQrInput(settings.qrCode);
+    stopCamera();
+  };
 
   const submit = () => {
     if (!pos) return;
@@ -93,7 +131,7 @@ export default function EmployeeScan() {
     <div className="min-h-screen">
       <header className="max-w-xl mx-auto px-5 py-5 flex items-center justify-between">
         <Brand />
-        <Link to="/employee" className="btn-ghost text-xs">إلغاء</Link>
+        <Link to="/employee" className="btn-ghost text-xs" onClick={stopCamera}>إلغاء</Link>
       </header>
 
       <main className="max-w-xl mx-auto px-5 pb-16 space-y-5">
@@ -106,13 +144,15 @@ export default function EmployeeScan() {
           </div>
         </section>
 
-        {/* GPS card */}
+        {/* GPS card مع رادار نابض بالحياة */}
         <section className="hud-card p-6">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-bold">١. التحقق من الموقع</div>
             <StepBadge state={step === "gps" ? "active" : distance !== null && distance <= targetRadius ? "done" : step === "error" && pos === null ? "fail" : "done"} />
           </div>
-          <RadarView radius={targetRadius} distance={distance} state={step === "error" && (!pos || (distance ?? 0) > targetRadius) ? "out" : distance !== null ? "in" : "loading"} />
+          
+          <LiveRadarView radius={targetRadius} distance={distance} state={step === "error" && (!pos || (distance ?? 0) > targetRadius) ? "out" : distance !== null ? "in" : "loading"} />
+
           <div className="grid grid-cols-3 gap-2 text-center mt-4 text-xs">
             <Cell label="خط العرض" value={pos ? pos.lat.toFixed(5) : "…"} />
             <Cell label="خط الطول" value={pos ? pos.lng.toFixed(5) : "…"} />
@@ -120,23 +160,48 @@ export default function EmployeeScan() {
           </div>
         </section>
 
-        {/* QR card */}
+        {/* QR card مع تشغيل الكاميرا الحقيقية */}
         <section className={`hud-card p-6 ${step === "gps" ? "opacity-50" : ""}`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-bold">٢. مسح رمز QR الثابت</div>
+            <div className="text-sm font-bold">٢. مسح رمز QR</div>
             <StepBadge state={qrInput ? "done" : step === "scan" ? "active" : "idle"} />
           </div>
-          <div className="rounded-xl border border-dashed border-border/70 bg-secondary/30 p-6 text-center">
-            <div className="mx-auto h-24 w-24 rounded-2xl bg-background grid place-items-center mb-3 border border-border/60">
-              <QrIcon />
-            </div>
-            <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-6">
-              يمكنك مسح رمز QR الملصَق داخل {locationName}، أو إدخال قيمته يدويًا.
-            </p>
-            <button onClick={simulateScan} className="btn-secondary mt-4 text-xs" disabled={step !== "scan"}>
-              محاكاة المسح
-            </button>
+          
+          <div className="rounded-xl border border-dashed border-border/70 bg-secondary/30 p-6 text-center overflow-hidden">
+            {isCameraActive ? (
+              <div className="relative mx-auto h-48 w-full max-w-xs rounded-xl overflow-hidden bg-black border border-primary/50 shadow-inner">
+                <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted playsInline />
+                <div className="absolute inset-0 border-2 border-primary/70 animate-pulse grid place-items-center pointer-events-none">
+                  <div className="w-32 h-32 border border-dashed border-white/80 rounded-lg"></div>
+                </div>
+                <button
+                  type="button"
+                  onClick={captureCode}
+                  className="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full shadow-lg"
+                >
+                  التقاط القيمة فوراً
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="mx-auto h-24 w-24 rounded-2xl bg-background grid place-items-center mb-3 border border-border/60 shadow-inner animate-bounce">
+                  <QrIcon />
+                </div>
+                <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-6">
+                  قم بمسح رمز QR الملصَق داخل {locationName} باستخدام الكاميرا، أو أدخل قيمته يدويًا.
+                </p>
+                <div className="flex justify-center gap-2 mt-4">
+                  <button onClick={startCamera} className="btn-primary text-xs shadow" disabled={step !== "scan"}>
+                    📷 فتح الكاميرا للمسح
+                  </button>
+                  <button onClick={captureCode} className="btn-secondary text-xs" disabled={step !== "scan"}>
+                    محاكاة المسح
+                  </button>
+                </div>
+              </>
+            )}
           </div>
+
           <div className="mt-4">
             <label className="block text-xs text-muted-foreground mb-1">قيمة QR</label>
             <input
@@ -178,12 +243,12 @@ export default function EmployeeScan() {
               {step === "submitting" ? "جاري الإرسال..." : `تأكيد ${title}`}
             </button>
             {step === "success" ? (
-              <button onClick={() => nav("/employee")} className="btn-secondary">
+              <button onClick={() => { stopCamera(); nav("/employee"); }} className="btn-secondary">
                 عودة
               </button>
             ) : null}
             {step === "error" ? (
-              <button onClick={() => nav("/employee")} className="btn-secondary">
+              <button onClick={() => { stopCamera(); nav("/employee"); }} className="btn-secondary">
                 إلغاء
               </button>
             ) : null}
@@ -197,7 +262,7 @@ export default function EmployeeScan() {
 function StepBadge({ state }: { state: "idle" | "active" | "done" | "fail" }) {
   const map = {
     idle: { c: "bg-secondary text-muted-foreground", t: "في الانتظار" },
-    active: { c: "bg-accent/15 text-accent", t: "جارٍ..." },
+    active: { c: "bg-accent/15 text-accent animate-pulse", t: "جارٍ..." },
     done: { c: "bg-primary/15 text-primary", t: "تم" },
     fail: { c: "bg-destructive/15 text-destructive", t: "فشل" },
   } as const;
@@ -229,7 +294,8 @@ function QrIcon() {
   );
 }
 
-function RadarView({
+// واجهة رادار نابضة بالحياة وتتحرك بصرياً
+function LiveRadarView({
   radius,
   distance,
   state,
@@ -240,18 +306,24 @@ function RadarView({
 }) {
   const pct = distance === null ? 0 : Math.min(1, distance / (radius * 1.5));
   return (
-    <div className="relative aspect-square max-w-[220px] mx-auto">
-      <div className="absolute inset-0 rounded-full border border-primary/30" />
-      <div className="absolute inset-6 rounded-full border border-primary/25" />
-      <div className="absolute inset-12 rounded-full border border-primary/20" />
+    <div className="relative aspect-square max-w-[220px] mx-auto overflow-hidden">
+      <div className="absolute inset-0 rounded-full border border-primary/30 animate-ping opacity-20" style={{ animationDuration: "3s" }} />
+      <div className="absolute inset-4 rounded-full border border-primary/40 animate-pulse" />
+      <div className="absolute inset-12 rounded-full border border-primary/25" />
+      
+      {state === "loading" && (
+        <div className="absolute inset-0 rounded-full border-t-2 border-primary animate-spin" style={{ animationDuration: "2s" }} />
+      )}
+
       <div className="absolute inset-0 grid place-items-center">
-        <div className={`h-3 w-3 rounded-full ${state === "out" ? "bg-destructive" : "bg-primary"} signal-ring`} />
+        <div className={`h-3 w-3 rounded-full ${state === "out" ? "bg-destructive" : "bg-primary"} shadow-[0_0_12px_rgba(var(--primary),0.8)]`} />
       </div>
+
       {distance !== null && (
         <div
-          className={`absolute h-2.5 w-2.5 rounded-full ${
-            state === "out" ? "bg-destructive" : "bg-accent"
-          } shadow-lg`}
+          className={`absolute h-3 w-3 rounded-full ${
+            state === "out" ? "bg-destructive animate-bounce" : "bg-accent animate-pulse"
+          } shadow-lg transition-all duration-700`}
           style={{
             top: `${50 - pct * 45}%`,
             left: `${50 + pct * 35}%`,
@@ -259,11 +331,12 @@ function RadarView({
           }}
         />
       )}
+
       <div className="absolute inset-0 grid place-items-center pointer-events-none">
-        <div className="text-center mt-16">
+        <div className="text-center mt-16 bg-background/60 backdrop-blur-sm px-3 py-1 rounded-full border border-border/40 shadow">
           <div className="mono text-[10px] text-muted-foreground">حالة الموقع</div>
-          <div className={`font-extrabold text-sm mt-1 ${state === "out" ? "text-destructive" : state === "in" ? "text-primary" : "text-muted-foreground"}`}>
-            {state === "loading" ? "جارٍ التحديد..." : state === "in" ? "داخل النطاق" : "خارج النطاق"}
+          <div className={`font-extrabold text-xs mt-0.5 ${state === "out" ? "text-destructive" : state === "in" ? "text-primary" : "text-muted-foreground"}`}>
+            {state === "loading" ? "جارٍ التقاط الإشارة..." : state === "in" ? "✓ داخل النطاق" : "✕ خارج النطاق"}
           </div>
         </div>
       </div>
