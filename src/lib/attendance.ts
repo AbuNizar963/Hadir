@@ -12,6 +12,7 @@ import type { AttendanceRecord } from "@/types";
 import { log } from "@/lib/audit";
 import { todayKey } from "@/lib/utils";
 import { addNotification } from "@/lib/notifications";
+import { getEmployeeScheduleStatus } from "@/lib/schedule";
 
 export interface RecordArgs {
   jobNumber: string;
@@ -79,7 +80,14 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     return { ok: false, reason: "الحساب موقوف" };
   }
 
-  // Device binding must be persisted. A missing device is bound once; a different device is rejected.
+  const schedule = getEmployeeScheduleStatus(employee);
+  if (!schedule.isWorkDay) {
+    return {
+      ok: false,
+      reason: `لا يوجد دوام للموظف اليوم: ${schedule.label}${schedule.detail ? ` · ${schedule.detail}` : ""}`,
+    };
+  }
+
   if (!employee.deviceId) {
     const employees = getEmployees();
     const index = employees.findIndex((item) => item.id === employee.id);
@@ -104,14 +112,12 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     return { ok: false, reason: "الجهاز الحالي غير موثّق لهذا الحساب. يرجى استخدام الجهاز المسجل." };
   }
 
-  // QR is an exact site credential. Prefix-only values are intentionally rejected.
   const submittedQr = args.qrCode.trim();
   const expectedQr = (settings.qrCode || "").trim();
   if (!submittedQr || !expectedQr || submittedQr !== expectedQr) {
     return { ok: false, reason: "رمز QR غير صحيح أو لا يخص موقع العمل" };
   }
 
-  // Browser APIs cannot reliably prove mock GPS. geo.ts only returns a rejection when it has evidence.
   const mockCheck = await isLikelyMockedPosition(args.position);
   if (mockCheck.mocked) {
     log({
