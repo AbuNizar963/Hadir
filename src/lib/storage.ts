@@ -217,7 +217,6 @@ export function setManagerSession(s: ManagerSession | null): void {
 export function seedIfEmpty(): void {
   if (typeof window === "undefined") return;
 
-  // تحديث الإعدادات وإجبار دمج بيانات المالك الجديدة
   const currentSettings = read<Settings | null>(K.SETTINGS, null);
   if (!currentSettings) {
     saveSettings({ ...defaultSettings });
@@ -234,7 +233,6 @@ export function seedIfEmpty(): void {
     });
   }
 
-  // تحديث الموظفين والحسابات الافتراضية بشكل يضمن دمجها وعدم ضياعها
   const now = new Date().toISOString();
   const demo: Employee[] = [
     {
@@ -356,10 +354,14 @@ export function resetAll(): void {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Find Employee Helper                                               */
+/*  Additional Helpers                                                 */
 /* ------------------------------------------------------------------ */
 
 export function findEmployeeByJobNumber(jobNumber: string): Employee | undefined {
   const employees = getEmployees();
   return employees.find((e) => e.jobNumber === jobNumber);
+}
+
+export function isShiftOver(): boolean {
+  return false;
 }
