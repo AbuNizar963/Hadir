@@ -25,7 +25,7 @@ export function getEmployeeScheduleStatus(
     const configuredDays = Array.isArray(employee.workDays)
       ? employee.workDays.filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
       : null;
-    const workDays = configuredDays && configuredDays.length > 0
+    const workDays = configuredDays !== null
       ? [...new Set(configuredDays)].sort((a, b) => a - b)
       : [0, 1, 2, 3, 4];
     const isWorkDay = workDays.includes(day);
@@ -36,7 +36,9 @@ export function getEmployeeScheduleStatus(
       label: isWorkDay ? "يوم عمل (إداري)" : "إجازة أسبوعية",
       detail: isDefault
         ? (isWorkDay ? "الدوام من الأحد إلى الخميس" : "الجمعة والسبت إجازة أسبوعية")
-        : `أيام الدوام: ${workDays.map((value) => dayNames[value]).join("، ")}`,
+        : workDays.length > 0
+          ? `أيام الدوام: ${workDays.map((value) => dayNames[value]).join("، ")}`
+          : "لم يتم تحديد أيام دوام إداري.",
     };
   }
 
