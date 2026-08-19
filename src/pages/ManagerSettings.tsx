@@ -12,8 +12,9 @@ export default function ManagerSettings() {
 
   const [s, setS] = useState<Settings>(getSettings());
   
-  // حالات تعديل الحساب الحالي
-  const [currentPassword, setCurrentPassword] = useState("");
+  // حالات تعديل الحساب الحالي (اسم المستخدم وكلمة المرور)
+  const [usernameInput, setUsernameInput] = useState(currentUsername);
+  const [passwordInput, setPasswordInput] = useState("");
 
   // حالات إضافة مدير / مشرف جديد (خاصة بالمالك فقط)
   const [newManagerUser, setNewManagerUser] = useState("");
@@ -25,7 +26,8 @@ export default function ManagerSettings() {
   const [loginUrl, setLoginUrl] = useState("");
   const printQrRef = useRef<HTMLDivElement>(null);
 
-  // حالة إضافة موقع جديد
+  // حالة إظهار/إخفاء صندوق إضافة موقع جديد
+  const [showAddLocationBox, setShowAddLocationBox] = useState(false);
   const [newLocName, setNewLocName] = useState("");
   const [newLocLat, setNewLocLat] = useState(s.workSiteLat || 0);
   const [newLocLng, setNewLocLng] = useState(s.workSiteLng || 0);
@@ -41,16 +43,19 @@ export default function ManagerSettings() {
     e.preventDefault();
     const next: Settings = { ...s };
     
-    // تحديث بيانات الحساب الحالي بناءً على دور المستخدم المدمج بالجلسة
-    if (currentPassword) {
-      const hashedPass = hash(currentPassword);
-      if (role === "owner") {
-        next.ownerPasswordHash = hashedPass;
-      } else if (role === "manager") {
-        next.managerPasswordHash = hashedPass;
-      } else if (role === "supervisor") {
-        next.supervisorPasswordHash = hashedPass;
-      }
+    // تحديث كلمة المرور للحساب الحالي إن وجدت
+    if (passwordInput) {
+      const hashedPass = hash(passwordInput);
+      if (role === "owner") next.ownerPasswordHash = hashedPass;
+      else if (role === "manager") next.managerPasswordHash = hashedPass;
+      else if (role === "supervisor") next.supervisorPasswordHash = hashedPass;
+    }
+
+    // تحديث اسم المستخدم للحساب الحالي
+    if (usernameInput && usernameInput !== currentUsername) {
+      if (role === "owner") next.ownerUsername = usernameInput;
+      else if (role === "manager") next.managerUsername = usernameInput;
+      else if (role === "supervisor") next.supervisorUsername = usernameInput;
     }
 
     // إذا كان المالك أضاف مديراً جديداً
@@ -66,7 +71,7 @@ export default function ManagerSettings() {
     }
     
     saveSettings(next);
-    setCurrentPassword("");
+    setPasswordInput("");
     setNewManagerPass("");
     setNewSupervisorPass("");
     setSaved(true);
@@ -81,7 +86,7 @@ export default function ManagerSettings() {
     setS((prev) => ({ ...prev, qrCode: newCode }));
   };
 
-  const useCurrentLocation = async () => {
+  const useCurrentLocation = () => {
     if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع");
     navigator.geolocation.getCurrentPosition(
       (p) => {
@@ -92,6 +97,7 @@ export default function ManagerSettings() {
         });
         setNewLocLat(p.coords.latitude);
         setNewLocLng(p.coords.longitude);
+        alert("تم تحديث إحداثيات موقعك الحالي بنجاح بنجاح 📍");
       },
       (err) => alert("تعذر تحديد الموقع: " + err.message),
       { enableHighAccuracy: true }
@@ -110,6 +116,7 @@ export default function ManagerSettings() {
     const updatedLocations = [...(s.locations || []), newLocation];
     setS({ ...s, locations: updatedLocations });
     setNewLocName("");
+    setShowAddLocationBox(false); // إغلاق الصندوق بعد الحفظ
   };
 
   const removeLocation = (id: string) => {
@@ -164,12 +171,12 @@ export default function ManagerSettings() {
     >
       <form onSubmit={save} className="grid lg:grid-cols-2 gap-5">
         
-        {/* موقع مقر العمل الرئيسي */}
+        {/* موقع مقر العمل الرئيسي + زر التحديد التلقائي تحته مباشرة */}
         <section className="hud-card p-5 sm:p-6">
           <div className="text-xs mono text-muted-foreground mb-3">
             GPS · الموقع الرئيسي لمقر العمل
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 mb-3">
             <Field label="خط العرض">
               <input
                 className="input mono"
@@ -188,7 +195,7 @@ export default function ManagerSettings() {
                 onChange={(e) => setS({ ...s, workSiteLng: +e.target.value })}
               />
             </Field>
-            <Field label="نطاق النقطة (متر)">
+            <Field label="نطاق النقطة (متر)" className="col-span-2">
               <input
                 className="input mono"
                 type="number"
@@ -198,53 +205,78 @@ export default function ManagerSettings() {
                 onChange={(e) => setS({ ...s, radiusMeters: +e.target.value })}
               />
             </Field>
-            <div className="flex items-end">
-              <button type="button" onClick={useCurrentLocation} className="btn-secondary w-full text-xs">
-                استخدام موقعي الحالي
-              </button>
-            </div>
           </div>
+          {/* زر استخدام موقعي الحالي */}
+          <button
+            type="button"
+            onClick={useCurrentLocation}
+            className="btn-secondary w-full text-xs py-2.5 mt-2"
+          >
+            📍 استخدام موقعي الحالي (تحديث الإحداثيات)
+          </button>
         </section>
 
-        {/* إضافة مواقع عمل فرعية جديدة */}
+        {/* إضافة مواقع عمل فرعية (مخفية ولا تظهر إلا عند الضغط على الزر) */}
         <section className="hud-card p-5 sm:p-6">
           <div className="text-xs mono text-muted-foreground mb-3">
-            LOCATIONS · إضافة مواقع ومقرات عمل أخرى
+            LOCATIONS · الفروع ومقرات العمل الإضافية
           </div>
-          <div className="space-y-3 mb-4">
-            <Field label="اسم الموقع الجديد">
-              <input
-                className="input"
-                placeholder="مثال: فرع الإدارة الجديدة"
-                value={newLocName}
-                onChange={(e) => setNewLocName(e.target.value)}
-              />
-            </Field>
-            <div className="grid grid-cols-3 gap-2">
-              <Field label="خط العرض">
-                <input type="number" step="0.000001" className="input mono text-xs" value={newLocLat} onChange={(e) => setNewLocLat(+e.target.value)} />
-              </Field>
-              <Field label="خط الطول">
-                <input type="number" step="0.000001" className="input mono text-xs" value={newLocLng} onChange={(e) => setNewLocLng(+e.target.value)} />
-              </Field>
-              <Field label="النطاق (متر)">
-                <input type="number" className="input mono text-xs" value={newLocRadius} onChange={(e) => setNewLocRadius(+e.target.value)} />
-              </Field>
-            </div>
-            <button type="button" onClick={addLocation} className="btn-secondary w-full text-xs">
-              + إضافة الموقع إلى قائمة المواقع
+          
+          {!showAddLocationBox ? (
+            <button
+              type="button"
+              onClick={() => setShowAddLocationBox(true)}
+              className="btn-secondary w-full text-xs py-3 border-dashed border-primary/50"
+            >
+              + إضافة موقع عمل آخر
             </button>
-          </div>
+          ) : (
+            <div className="space-y-3 p-3 rounded-xl bg-secondary/30 border border-border">
+              <div className="flex justify-between items-center text-xs font-bold">
+                <span>بيانات الموقع الجديد</span>
+                <button
+                  type="button"
+                  onClick={() => setShowAddLocationBox(false)}
+                  className="text-destructive text-[11px]"
+                >
+                  إلغاء
+                </button>
+              </div>
+              <Field label="اسم الموقع الجديد">
+                <input
+                  className="input text-xs"
+                  placeholder="مثال: الفرع الإقليمي"
+                  value={newLocName}
+                  onChange={(e) => setNewLocName(e.target.value)}
+                />
+              </Field>
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="خط العرض">
+                  <input type="number" step="0.000001" className="input mono text-xs" value={newLocLat} onChange={(e) => setNewLocLat(+e.target.value)} />
+                </Field>
+                <Field label="خط الطول">
+                  <input type="number" step="0.000001" className="input mono text-xs" value={newLocLng} onChange={(e) => setNewLocLng(+e.target.value)} />
+                </Field>
+                <Field label="النطاق (م)">
+                  <input type="number" className="input mono text-xs" value={newLocRadius} onChange={(e) => setNewLocRadius(+e.target.value)} />
+                </Field>
+              </div>
+              <button type="button" onClick={addLocation} className="btn-primary w-full text-xs">
+                حفظ وإضافة الموقع للقائمة
+              </button>
+            </div>
+          )}
 
           {s.locations && s.locations.length > 0 && (
-            <div className="border-t border-border pt-3 space-y-2 max-h-32 overflow-y-auto">
+            <div className="border-t border-border mt-4 pt-3 space-y-2 max-h-32 overflow-y-auto">
+              <div className="text-[11px] text-muted-foreground">المواقع المضافة مسبقاً:</div>
               {s.locations.map((loc) => (
                 <div key={loc.id} className="flex items-center justify-between p-2 rounded-lg bg-secondary/40 text-xs">
                   <div>
                     <span className="font-bold">{loc.name}</span>
                     <span className="text-muted-foreground block text-[10px] mono">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</span>
                   </div>
-                  <button type="button" onClick={() => removeLocation(loc.id)} className="text-destructive font-bold px-2 py-1">حذف</button>
+                  <button type="button" onClick={() => removeLocation(loc.id)} className="text-destructive font-bold px-2 py-1 text-xs">حذف</button>
                 </div>
               ))}
             </div>
@@ -284,76 +316,56 @@ export default function ManagerSettings() {
           </div>
         </section>
 
-        {/* 1. حساب المالك أو المدير أو المشرف (حسب الجلسة الحالية) */}
+        {/* إعدادات الحساب الحالي (تعديل اسم المستخدم وكلمة المرور بالأسفل بوضوح) */}
         <section className="hud-card p-5 sm:p-6 lg:col-span-2">
           <div className="text-xs mono text-muted-foreground mb-3">
             ACCOUNT SETTINGS · إعدادات الحساب الحالي ({role.toUpperCase()})
           </div>
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="اسم المستخدم الحالي">
-              <input className="input bg-secondary/50" value={currentUsername} disabled />
+              <input
+                className="input"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                placeholder="أدخل اسم المستخدم الجديد"
+              />
             </Field>
             <Field label="تغيير كلمة المرور الجديدة">
               <input
                 type="password"
                 className="input"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="•••••••• (اتركها فارغة إن لمن ترد التغيير)"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="•••••••• (اتركها فارغة إن لم ترد التغيير)"
               />
             </Field>
           </div>
         </section>
 
-        {/* 2. خيارات المالك فقط: إضافة مدير جديد أو مشرف جديد */}
+        {/* خيارات المالك فقط: إضافة مدير أو مشرف جديد */}
         {role === "owner" && (
           <section className="hud-card p-5 sm:p-6 lg:col-span-2 border-primary/40 border">
             <div className="text-xs mono text-primary mb-3 font-bold">
               OWNER EXCLUSIVE · إنشاء وتعديل صلاحيات المدراء والمشرفين
             </div>
-            
             <div className="grid md:grid-cols-2 gap-6">
-              {/* إضافة مدير */}
               <div className="space-y-3 p-4 rounded-xl bg-secondary/20">
                 <div className="text-xs font-bold">إدارة حساب المدير</div>
                 <Field label="اسم مستخدم المدير">
-                  <input
-                    className="input"
-                    value={newManagerUser || s.managerUsername || ""}
-                    onChange={(e) => setNewManagerUser(e.target.value)}
-                    placeholder="اسم المدير الجديد"
-                  />
+                  <input className="input" value={newManagerUser || s.managerUsername || ""} onChange={(e) => setNewManagerUser(e.target.value)} placeholder="اسم المدير الجديد" />
                 </Field>
                 <Field label="كلمة المرور الجديدة للمدير">
-                  <input
-                    type="password"
-                    className="input"
-                    value={newManagerPass}
-                    onChange={(e) => setNewManagerPass(e.target.value)}
-                    placeholder="••••••••"
-                  />
+                  <input type="password" className="input" value={newManagerPass} onChange={(e) => setNewManagerPass(e.target.value)} placeholder="••••••••" />
                 </Field>
               </div>
 
-              {/* إضافة مشرف */}
               <div className="space-y-3 p-4 rounded-xl bg-secondary/20">
                 <div className="text-xs font-bold">إدارة حساب المشرف</div>
                 <Field label="اسم مستخدم المشرف">
-                  <input
-                    className="input"
-                    value={newSupervisorUser || s.supervisorUsername || ""}
-                    onChange={(e) => setNewSupervisorUser(e.target.value)}
-                    placeholder="اسم المشرف الجديد"
-                  />
+                  <input className="input" value={newSupervisorUser || s.supervisorUsername || ""} onChange={(e) => setNewSupervisorUser(e.target.value)} placeholder="اسم المشرف الجديد" />
                 </Field>
                 <Field label="كلمة المرور الجديدة للمشرف">
-                  <input
-                    type="password"
-                    className="input"
-                    value={newSupervisorPass}
-                    onChange={(e) => setNewSupervisorPass(e.target.value)}
-                    placeholder="••••••••"
-                  />
+                  <input type="password" className="input" value={newSupervisorPass} onChange={(e) => setNewSupervisorPass(e.target.value)} placeholder="••••••••" />
                 </Field>
               </div>
             </div>
@@ -361,9 +373,9 @@ export default function ManagerSettings() {
         )}
 
         {/* أزرار الحفظ */}
-        <div className="lg:col-span-2 flex flex-wrap items-center gap-3">
-          <button className="btn-primary">حفظ الإعدادات</button>
-          {saved && <span className="text-primary text-sm">تم الحفظ ✓</span>}
+        <div className="lg:col-span-2 flex flex-wrap items-center gap-3 pt-2">
+          <button className="btn-primary py-3 px-6">حفظ الإعدادات</button>
+          {saved && <span className="text-primary text-sm font-semibold">تم الحفظ ✓</span>}
           {role === "owner" && (
             <>
               <div className="flex-1" />
@@ -378,9 +390,9 @@ export default function ManagerSettings() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div>
+    <div className={className}>
       <label className="block text-xs text-muted-foreground mb-1">{label}</label>
       {children}
     </div>
