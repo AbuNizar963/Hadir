@@ -22,7 +22,6 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
   const trimmedJobNum = jobNumber.trim();
   const employees = getEmployees();
   
-  // البحث عن الموظف بمرونة تامة (سواء كان الرقم الوظيفي مخزناً كنص أو رقم)
   const emp = employees.find(
     (e) => String(e.jobNumber).trim() === trimmedJobNum || String(e.id) === trimmedJobNum
   );
@@ -48,10 +47,9 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
       result: "rejected",
       reason: "الحساب موقوف",
     });
-    return { ok: false, success: false, reason: "الحساب موقوف. يرجى مراجعة المدير" };
+    return { ok: false, success: false, reason: "الحساب موقوف. يرجى مراجعة الإدارة" };
   }
 
-  // التحقق من الـ PIN بمرونة (سواء كان مشفراً، أو نصاً عادياً، أو بأي مسمى آخر)
   const isPinValid =
     verify(pin, emp.pinHash) ||
     pin === emp.pinHash ||
@@ -100,7 +98,7 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
     return {
       ok: false,
       success: false,
-      reason: "هذا الجهاز غير موثّق لحسابك. يرجى مراجعة المدير لإلغاء ربط الجهاز السابق.",
+      reason: "هذا الجهاز غير موثّق لحسابك. يرجى مراجعة الإدارة لإلغاء ربط الجهاز السابق.",
     };
   }
 
@@ -124,27 +122,72 @@ export function logoutEmployee() {
   setSession(null);
 }
 
-export function loginManager(password: string): LoginResult {
+// دالة تسجيل دخول الإدارة المحدثة (تدعم المالك، المدير، والمشرف بناءً على اسم المستخدم وكلمة المرور)
+export function loginManager(password: string, username?: string): LoginResult {
   const s = getSettings();
-  if (!verify(password, s.managerPasswordHash) && password !== s.managerPasswordHash) {
+  
+  const inputUser = (username || "").trim();
+  const inputPass = password;
+
+  let matchedRole: "owner" | "manager" | "supervisor" | null = null;
+  let actorTitle = "المدير";
+
+  // 1. التحقق إذا كان المستخدم هو المالك (owner)
+  const isOwnerUser = !inputUser || inputUser === s.ownerUsername || inputUser.toLowerCase() === "owner";
+  const isOwnerPass = verify(inputPass, s.ownerPasswordHash) || inputPass === s.ownerPasswordHash || (!s.ownerPasswordHash && inputPass === "admin"); // افتراضي
+  
+  if (isOwnerUser && isOwnerPass) {
+    matchedRole = "owner";
+    actorTitle = "المالك";
+  } 
+  // 2. التحقق إذا كان المستخدم هو المدير (manager)
+  else {
+    const isManagerUser = !inputUser || inputUser === s.managerUsername || inputUser.toLowerCase() === "manager";
+    const isManagerPass = verify(inputPass, s.managerPasswordHash) || inputPass === s.managerPasswordHash;
+    
+    if (isManagerUser && isManagerPass) {
+      matchedRole = "manager";
+      actorTitle = "المدير";
+    } 
+    // 3. التحقق إذا كان المستخدم هو المشرف (supervisor)
+    else {
+      const isSupervisorUser = !inputUser || inputUser === s.supervisorUsername || inputUser.toLowerCase() === "supervisor";
+      const isSupervisorPass = verify(inputPass, s.supervisorPasswordHash) || inputPass === s.supervisorPasswordHash;
+      
+      if (isSupervisorUser && isSupervisorPass) {
+        matchedRole = "supervisor";
+        actorTitle = "المشرف";
+      }
+    }
+  }
+
+  if (!matchedRole) {
     log({
       employeeId: null,
       jobNumber: "-",
-      actorName: "المدير",
+      actorName: inputUser || "إدارة",
       action: "manager-login-failed",
       result: "rejected",
-      reason: "كلمة مرور خاطئة",
+      reason: "اسم المستخدم أو كلمة المرور خاطئة",
     });
-    return { ok: false, success: false, reason: "كلمة المرور غير صحيحة" };
+    return { ok: false, success: false, reason: "اسم المستخدم أو كلمة المرور غير صحيحة" };
   }
-  setManagerSession({ loginAt: new Date().toISOString() });
+
+  // حفظ الجلسة مع الدور المكتشف
+  setManagerSession({
+    loginAt: new Date().toISOString(),
+    role: matchedRole,
+    jobNumber: inputUser || matchedRole,
+  });
+
   log({
     employeeId: null,
-    jobNumber: "-",
-    actorName: "المدير",
+    jobNumber: inputUser || "-",
+    actorName: actorTitle,
     action: "manager-login",
     result: "success",
   });
+
   return { ok: true, success: true };
 }
 
@@ -155,20 +198,29 @@ export function logoutManager() {
 export function currentSession() {
   return getSession();
 }
+
 export function currentManager() {
   return getManagerSession();
 }
 
 export type CurrentUser = {
-  role: "manager" | "supervisor" | "staff";
+  role: "owner" | "manager" | "supervisor" | "staff";
   name?: string;
   loginAt?: string;
+  jobNumber?: string;
 };
 
 export function getCurrentUser(): CurrentUser | null {
-  const m = getManagerSession();
-  if (m) return { role: "manager", name: "المدير", loginAt: m.loginAt };
+  const m = getManagerSession() as any;
+  if (m) {
+    return {
+      role: m.role || "manager",
+      name: m.role === "owner" ? "المالك" : m.role === "supervisor" ? "المشرف" : "المدير",
+      loginAt: m.loginAt,
+      jobNumber: m.jobNumber,
+    };
+  }
   const s = getSession();
-  if (s) return { role: "staff", name: s.name, loginAt: s.loginAt };
+  if (s) return { role: "staff", name: s.name, loginAt: s.loginAt, jobNumber: s.jobNumber };
   return null;
 }
