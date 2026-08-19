@@ -34,6 +34,27 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Validate required deployment secrets
+        shell: bash
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          OWNER_USERNAME: ${{ secrets.OWNER_USERNAME }}
+          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "$CF_TOKEN" ]] || missing+=(CLOUDFLARE_API_TOKEN)
+          [[ -n "$CF_ACCOUNT" ]] || missing+=(CLOUDFLARE_ACCOUNT_ID)
+          [[ -n "$JWT_SECRET" ]] || missing+=(JWT_SECRET)
+          [[ -n "$OWNER_USERNAME" ]] || missing+=(OWNER_USERNAME)
+          [[ -n "$OWNER_PASSWORD" ]] || missing+=(OWNER_PASSWORD)
+          if (( ${#missing[@]} )); then
+            printf 'Missing required GitHub Actions secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
       - name: Set JWT secret
         run: printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET
         env:
