@@ -1,90 +1,157 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import Brand from "@/components/Brand";
-import { loginEmployee } from "@/lib/auth";
-import { getSettings } from "@/lib/storage";
+import {
+  findEmployeeByJobNumber,
+  getManagerSession,
+  getSession,
+  getSettings,
+  saveEmployees,
+  getEmployees,
+  setManagerSession,
+  setSession,
+} from "@/lib/storage";
+import { verify } from "@/lib/hash";
+import { getDeviceId, getDeviceLabel } from "@/lib/device";
+import { log } from "@/lib/audit";
 
-export default function EmployeeLogin() {
-  const nav = useNavigate();
-  const settings = getSettings();
-  const [jobNumber, setJobNumber] = useState("");
-  const [pin, setPin] = useState("");
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+export interface LoginResult {
+  ok: boolean;
+  reason?: string;
+  needsDeviceBinding?: boolean;
+}
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErr(null);
-    setLoading(true);
+export function loginEmployee(jobNumber: string, pin: string): LoginResult {
+  const emp = findEmployeeByJobNumber(jobNumber.trim());
+  if (!emp) {
+    log({
+      employeeId: null,
+      jobNumber,
+      actorName: "-",
+      action: "login-failed",
+      result: "rejected",
+      reason: "الرقم الوظيفي غير موجود",
+    });
+    return { ok: false, reason: "الرقم الوظيفي أو كلمة المرور غير صحيحة" };
+  }
+  if (emp.status !== "active") {
+    log({
+      employeeId: emp.id,
+      jobNumber: emp.jobNumber,
+      actorName: emp.name,
+      action: "login-failed",
+      result: "rejected",
+      reason: "الحساب موقوف",
+    });
+    return { ok: false, reason: "الحساب موقوف. يرجى مراجعة المدير" };
+  }
+  if (!verify(pin, emp.pinHash)) {
+    log({
+      employeeId: emp.id,
+      jobNumber: emp.jobNumber,
+      actorName: emp.name,
+      action: "login-failed",
+      result: "rejected",
+      reason: "كلمة المرور خاطئة",
+    });
+    return { ok: false, reason: "الرقم الوظيفي أو كلمة المرور غير صحيحة" };
+  }
 
-    setTimeout(() => {
-      const res = loginEmployee(jobNumber, pin);
-      setLoading(false);
+  const deviceId = getDeviceId();
 
-      if (!res.ok) {
-        setErr(res.reason || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");
-      } else {
-        nav("/employee");
-      }
-    }, 250);
-  };
+  if (!emp.deviceId) {
+    const list = getEmployees();
+    const idx = list.findIndex((e) => e.id === emp.id);
+    if (idx >= 0) {
+      list[idx].deviceId = deviceId;
+      list[idx].deviceLabel = getDeviceLabel();
+      saveEmployees(list);
+    }
+    log({
+      employeeId: emp.id,
+      jobNumber: emp.jobNumber,
+      actorName: emp.name,
+      action: "device-bound",
+      result: "success",
+      reason: `تم ربط الجهاز: ${getDeviceLabel()}`,
+    });
+  } else if (emp.deviceId !== deviceId) {
+    log({
+      employeeId: emp.id,
+      jobNumber: emp.jobNumber,
+      actorName: emp.name,
+      action: "login-failed",
+      result: "rejected",
+      reason: "محاولة تسجيل دخول من جهاز غير موثّق",
+    });
+    return {
+      ok: false,
+      reason: "هذا الجهاز غير موثّق لحسابك. يرجى مراجعة المدير لإلغاء ربط الجهاز السابق.",
+    };
+  }
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      <header className="p-5">
-        <Brand />
-      </header>
-      <main className="flex-1 grid place-items-center px-5 pb-10">
-        <div className="w-full max-w-md hud-card p-7">
-          <div className="text-xs mono text-muted-foreground">{settings.brandName || "HADIR"} · بوابة الموظفين</div>
-          <h1 className="text-2xl font-extrabold mt-1">تسجيل دخول الموظف</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            أدخل رقمك الوظيفي ورمز الـ PIN الخاص بك للوصول لنظام الحضور.
-          </p>
-          <form onSubmit={submit} className="mt-6 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold mb-1.5">الرقم الوظيفي</label>
-              <input
-                type="text"
-                className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm"
-                value={jobNumber}
-                onChange={(e) => setJobNumber(e.target.value)}
-                placeholder="مثال: 1000"
-                required
-              />
-            </div>
+  setSession({
+    employeeId: emp.id,
+    jobNumber: emp.jobNumber,
+    name: emp.name,
+    loginAt: new Date().toISOString(),
+  });
+  log({
+    employeeId: emp.id,
+    jobNumber: emp.jobNumber,
+    actorName: emp.name,
+    action: "login",
+    result: "success",
+  });
+  return { ok: true };
+}
 
-            <div>
-              <label className="block text-sm font-semibold mb-1.5">رمز الـ PIN السري</label>
-              <input
-                type="password"
-                className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder="أدخل رمز الـ PIN"
-                required
-              />
-            </div>
+export function logoutEmployee() {
+  setSession(null);
+}
 
-            {err && (
-              <div className="rounded-xl border border-destructive/40 bg-destructive/10 text-destructive-foreground p-3 text-sm">
-                {err}
-              </div>
-            )}
-            <button className="btn-primary w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl" disabled={loading}>
-              {loading ? "جاري التحقق..." : "دخول الموظف"}
-            </button>
-          </form>
-          <div className="mt-5 text-xs text-center flex justify-between items-center">
-            <Link to="/" className="text-muted-foreground hover:text-foreground">
-              ← العودة للرئيسية
-            </Link>
-            <Link to="/manager/login" className="text-primary hover:underline">
-              دخول الإدارة ؟
-            </Link>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
+export function loginManager(password: string): LoginResult {
+  const s = getSettings();
+  if (!verify(password, s.managerPasswordHash)) {
+    log({
+      employeeId: null,
+      jobNumber: "-",
+      actorName: "المدير",
+      action: "manager-login-failed",
+      result: "rejected",
+      reason: "كلمة مرور خاطئة",
+    });
+    return { ok: false, reason: "كلمة المرور غير صحيحة" };
+  }
+  setManagerSession({ loginAt: new Date().toISOString() });
+  log({
+    employeeId: null,
+    jobNumber: "-",
+    actorName: "المدير",
+    action: "manager-login",
+    result: "success",
+  });
+  return { ok: true };
+}
+
+export function logoutManager() {
+  setManagerSession(null);
+}
+
+export function currentSession() {
+  return getSession();
+}
+export function currentManager() {
+  return getManagerSession();
+}
+
+export type CurrentUser = {
+  role: "manager" | "supervisor" | "staff";
+  name?: string;
+  loginAt?: string;
+};
+
+export function getCurrentUser(): CurrentUser | null {
+  const m = getManagerSession();
+  if (m) return { role: "manager", name: "المدير", loginAt: m.loginAt };
+  const s = getSession();
+  if (s) return { role: "staff", name: s.name, loginAt: s.loginAt };
+  return null;
 }
