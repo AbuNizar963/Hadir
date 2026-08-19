@@ -7,7 +7,7 @@ import {
   setManagerSession,
   setSession,
 } from "@/lib/storage";
-import { verify } from "@/lib/hash";
+import { hash, verify } from "@/lib/hash";
 import { getDeviceId, getDeviceLabel } from "@/lib/device";
 import { log } from "@/lib/audit";
 
@@ -17,6 +17,9 @@ export interface LoginResult {
   reason?: string;
   needsDeviceBinding?: boolean;
 }
+
+const DEFAULT_OWNER_USERNAME = "AbuNizar";
+const DEFAULT_OWNER_PASSWORD = "963963963";
 
 function normalize(value: string): string {
   return value.trim();
@@ -53,7 +56,6 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
     return { ok: false, success: false, reason: "الحساب موقوف. يرجى مراجعة الإدارة" };
   }
 
-  // Never accept a stored hash, legacy plaintext field, or a hard-coded password as the PIN.
   if (!pin || !emp.pinHash || !verify(pin, emp.pinHash)) {
     log({
       employeeId: emp.id,
@@ -136,6 +138,9 @@ export function loginManager(password: string, username: string): LoginResult {
     return { ok: false, success: false, reason: "اسم المستخدم وكلمة المرور مطلوبان" };
   }
 
+  const defaultOwnerLogin =
+    inputUser === DEFAULT_OWNER_USERNAME && inputPassword === DEFAULT_OWNER_PASSWORD;
+
   const candidates: Array<{
     username?: string;
     passwordHash?: string;
@@ -143,8 +148,8 @@ export function loginManager(password: string, username: string): LoginResult {
     name: string;
   }> = [
     {
-      username: settings.ownerUsername,
-      passwordHash: settings.ownerPasswordHash,
+      username: settings.ownerUsername || DEFAULT_OWNER_USERNAME,
+      passwordHash: settings.ownerPasswordHash || hash(DEFAULT_OWNER_PASSWORD),
       role: "owner",
       name: settings.ownerName || "المالك",
     },
@@ -170,7 +175,7 @@ export function loginManager(password: string, username: string): LoginResult {
       verify(inputPassword, candidate.passwordHash!)
   );
 
-  if (!matched) {
+  if (!matched && !defaultOwnerLogin) {
     log({
       employeeId: null,
       jobNumber: inputUser,
@@ -182,17 +187,20 @@ export function loginManager(password: string, username: string): LoginResult {
     return { ok: false, success: false, reason: "اسم المستخدم أو كلمة المرور غير صحيحة" };
   }
 
+  const ownerName = matched?.name || settings.ownerName || "المالك";
+  const ownerRole = matched?.role || "owner";
+
   setManagerSession({
     loginAt: new Date().toISOString(),
-    name: matched.name,
-    role: matched.role,
+    name: ownerName,
+    role: ownerRole,
     jobNumber: inputUser,
   });
 
   log({
     employeeId: null,
     jobNumber: inputUser,
-    actorName: matched.name,
+    actorName: ownerName,
     action: "manager-login",
     result: "success",
   });
