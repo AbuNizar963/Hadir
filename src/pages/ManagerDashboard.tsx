@@ -3,7 +3,6 @@ import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getAttendance, getAudit, getEmployees, getSettings } from "@/lib/storage";
 import { todayKey } from "@/lib/utils";
 import { Link } from "react-router-dom";
-import { Bar } from "react-chartjs-2";
 
 export default function ManagerDashboard() {
   const employees = getEmployees();
@@ -19,7 +18,7 @@ export default function ManagerDashboard() {
   const todayRec = useMemo(() => all.filter((r) => r.timestamp.startsWith(today)), [all, today]);
   const presentIds = new Set(todayRec.filter((r) => r.type === "check-in").map((r) => r.employeeId));
 
-  const [hh, mm] = settings.workStart.split(":").map(Number);
+  const [hh, mm] = (settings?.workStart || "08:00").split(":").map(Number);
   const scheduled = new Date();
   scheduled.setHours(hh, mm, 0, 0);
 
@@ -28,7 +27,7 @@ export default function ManagerDashboard() {
     .map((r) => {
       const late = Math.max(
         0,
-        Math.round((new Date(r.timestamp).getTime() - scheduled.getTime()) / 60000) - settings.lateGraceMinutes
+        Math.round((new Date(r.timestamp).getTime() - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)
       );
       return { ...r, late };
     })
@@ -44,17 +43,6 @@ export default function ManagerDashboard() {
     if (filter === "late" && !lateList.find((r) => r.employeeId === e.id)) return false;
     return true;
   });
-
-  const chartData = {
-    labels: ["حضور", "غياب", "مرفوض"],
-    datasets: [
-      {
-        label: "إحصائيات اليوم",
-        data: [presentIds.size, absentList.length, rejectedToday.length],
-        backgroundColor: ["#4ade80", "#facc15", "#f87171"],
-      },
-    ],
-  };
 
   return (
     <ManagerLayout
@@ -75,7 +63,7 @@ export default function ManagerDashboard() {
             </button>
 
             {exportMenuOpen && (
-              <div className="absolute mt-1 right-0 w-32 bg-card border border-border rounded-lg shadow-lg">
+              <div className="absolute mt-1 right-0 w-32 bg-card border border-border rounded-lg shadow-lg z-50">
                 <button
                   onClick={() => {
                     setExportMenuOpen(false);
@@ -107,12 +95,8 @@ export default function ManagerDashboard() {
         <Kpi label="محاولات مرفوضة اليوم" value={rejectedToday.length} accent="destructive" />
       </div>
 
-      <div className="hud-card p-5 mb-6">
-        <Bar data={chartData} />
-      </div>
-
       <div className="flex gap-2 mb-4">
-        <select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="btn-secondary text-xs">
+        <select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="border px-2 py-1.5 rounded-lg text-sm bg-secondary/50">
           <option value="all">الكل</option>
           <option value="present">الحاضرون</option>
           <option value="absent">الغائبون</option>
@@ -123,19 +107,23 @@ export default function ManagerDashboard() {
           placeholder="🔍 بحث بالاسم"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border px-2 py-1 rounded-lg text-sm"
+          className="border px-3 py-1.5 rounded-lg text-sm bg-secondary/50 flex-1"
         />
       </div>
 
       <div className="hud-card p-5">
         <SectionTitle title="قائمة الموظفين" hint={`عدد: ${filteredEmployees.length}`} />
         <ul className="space-y-2">
-          {filteredEmployees.map((e) => (
-            <li key={e.id} className="flex justify-between border-b pb-1">
-              <span>{e.name}</span>
-              <span className="text-xs text-muted-foreground">{e.role}</span>
-            </li>
-          ))}
+          {filteredEmployees.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">لا توجد نتائج مطابقة</p>
+          ) : (
+            filteredEmployees.map((e) => (
+              <li key={e.id} className="flex justify-between items-center border-b border-border/50 pb-2">
+                <span className="font-medium">{e.name}</span>
+                <span className="text-xs px-2 py-1 rounded bg-secondary text-muted-foreground">{e.role}</span>
+              </li>
+            ))
+          )}
         </ul>
       </div>
 
