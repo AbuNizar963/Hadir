@@ -13,6 +13,7 @@ import { log } from "@/lib/audit";
 
 export interface LoginResult {
   ok: boolean;
+  success: boolean;
   reason?: string;
   needsDeviceBinding?: boolean;
 }
@@ -35,7 +36,7 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
       result: "rejected",
       reason: "الرقم الوظيفي غير موجود",
     });
-    return { ok: false, reason: "الرقم الوظيفي أو كلمة المرور غير صحيحة" };
+    return { ok: false, success: false, reason: "الرقم الوظيفي أو كلمة المرور غير صحيحة" };
   }
 
   if (emp.status && emp.status !== "active") {
@@ -47,7 +48,7 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
       result: "rejected",
       reason: "الحساب موقوف",
     });
-    return { ok: false, reason: "الحساب موقوف. يرجى مراجعة المدير" };
+    return { ok: false, success: false, reason: "الحساب موقوف. يرجى مراجعة المدير" };
   }
 
   // التحقق من الـ PIN بمرونة (سواء كان مشفراً، أو نصاً عادياً، أو بأي مسمى آخر)
@@ -66,7 +67,7 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
       result: "rejected",
       reason: "كلمة المرور خاطئة",
     });
-    return { ok: false, reason: "الرقم الوظيفي أو كلمة المرور غير صحيحة" };
+    return { ok: false, success: false, reason: "الرقم الوظيفي أو كلمة المرور غير صحيحة" };
   }
 
   const deviceId = getDeviceId();
@@ -98,6 +99,7 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
     });
     return {
       ok: false,
+      success: false,
       reason: "هذا الجهاز غير موثّق لحسابك. يرجى مراجعة المدير لإلغاء ربط الجهاز السابق.",
     };
   }
@@ -115,7 +117,7 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
     action: "login",
     result: "success",
   });
-  return { ok: true };
+  return { ok: true, success: true };
 }
 
 export function logoutEmployee() {
@@ -133,7 +135,7 @@ export function loginManager(password: string): LoginResult {
       result: "rejected",
       reason: "كلمة مرور خاطئة",
     });
-    return { ok: false, reason: "كلمة المرور غير صحيحة" };
+    return { ok: false, success: false, reason: "كلمة المرور غير صحيحة" };
   }
   setManagerSession({ loginAt: new Date().toISOString() });
   log({
@@ -143,7 +145,7 @@ export function loginManager(password: string): LoginResult {
     action: "manager-login",
     result: "success",
   });
-  return { ok: true };
+  return { ok: true, success: true };
 }
 
 export function logoutManager() {
