@@ -2,7 +2,7 @@ import type { AttendanceRecord, AuditEntry, Employee, EmployeeRequest, RequestTy
 import { hash } from "@/lib/hash";
 import { generateId } from "@/lib/utils";
 import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
-import { backendEnabled } from "@/lib/backend";
+import { backendEnabled, createBackendAttendance, createBackendRequest, updateBackendRequest } from "@/lib/backend";
 import { syncEmployeesToCloud, removeEmployeeFromCloud } from "@/lib/cloudSync";
 export type { EmployeeRequest, RequestType } from "@/types";
 const K={EMPLOYEES:"hadir.employees",ATTENDANCE:"hadir.attendance",AUDIT:"hadir.audit",REQUESTS:"hadir.requests",SETTINGS:"hadir.settings",SESSION:"hadir.session",MANAGER_SESSION:"hadir.manager_session"} as const;
@@ -15,12 +15,12 @@ export function saveSettings(next:Settings):void{write(K.SETTINGS,next);if(typeo
 export function getEmployees():Employee[]{return read<Employee[]>(K.EMPLOYEES,[])}
 export function saveEmployees(list:Employee[]):void{const previous=getEmployees();write(K.EMPLOYEES,list);if(backendEnabled){for(const oldEmployee of previous)if(!list.some(e=>e.id===oldEmployee.id||e.jobNumber===oldEmployee.jobNumber))void removeEmployeeFromCloud(oldEmployee.id);void syncEmployeesToCloud(list)}}
 export function getAttendance():AttendanceRecord[]{return read<AttendanceRecord[]>(K.ATTENDANCE,[])}
-export function addAttendance(record:AttendanceRecord):void{const list=getAttendance();list.unshift(record);write(K.ATTENDANCE,list)}
+export function addAttendance(record:AttendanceRecord):void{const list=getAttendance();list.unshift(record);write(K.ATTENDANCE,list);if(backendEnabled)void createBackendAttendance({...record,id:undefined as never,ip:undefined as never} as any)}
 export function getAudit():AuditEntry[]{return read<AuditEntry[]>(K.AUDIT,[])}
 export function addAudit(entry:AuditEntry):void{const list=getAudit();list.unshift(entry);write(K.AUDIT,list)}
 export function getRequests():EmployeeRequest[]{return read<EmployeeRequest[]>(K.REQUESTS,[])}
-export function addRequest(request:Omit<EmployeeRequest,"id"|"status"|"createdAt">):EmployeeRequest{const full={...request,id:generateId(),status:"pending" as const,createdAt:new Date().toISOString()};const list=getRequests();list.unshift(full);write(K.REQUESTS,list);return full}
-export function updateRequestStatus(id:string,status:"approved"|"rejected"):void{write(K.REQUESTS,getRequests().map(r=>r.id===id?{...r,status}:r))}
+export function addRequest(request:Omit<EmployeeRequest,"id"|"status"|"createdAt">):EmployeeRequest{const full={...request,id:generateId(),status:"pending" as const,createdAt:new Date().toISOString()};const list=getRequests();list.unshift(full);write(K.REQUESTS,list);if(backendEnabled)void createBackendRequest(request);return full}
+export function updateRequestStatus(id:string,status:"approved"|"rejected"):void{write(K.REQUESTS,getRequests().map(r=>r.id===id?{...r,status}:r));if(backendEnabled)void updateBackendRequest(id,status)}
 export interface Session{employeeId:string;jobNumber:string;name:string;loginAt:string;role?:string}
 export interface ManagerSession{loginAt:string;name?:string;role?:string;jobNumber?:string;accountId?:string}
 export function getSession():Session|null{return read<Session|null>(K.SESSION,null)}
