@@ -12,14 +12,18 @@ export default function ManagerSettings() {
 
   const [s, setS] = useState<Settings>(getSettings());
   
-  // حالات تعديل الحساب الحالي (اسم المستخدم وكلمة المرور)
-  const [usernameInput, setUsernameInput] = useState(currentUsername);
+  // حالات تعديل الحساب الحالي (الملف الشخصي)
+  const [usernameInput, setUsernameInput] = useState(
+    role === "owner" ? (s.ownerUsername || currentUsername) :
+    role === "manager" ? (s.managerUsername || currentUsername) :
+    (s.supervisorUsername || currentUsername)
+  );
   const [passwordInput, setPasswordInput] = useState("");
 
-  // حالات إضافة مدير / مشرف جديد (خاصة بالمالك فقط)
-  const [newManagerUser, setNewManagerUser] = useState("");
+  // حالات إضافة / تعديل مدير ومشرف جديد (خاصة بالمالك فقط)
+  const [newManagerUser, setNewManagerUser] = useState(s.managerUsername || "");
   const [newManagerPass, setNewManagerPass] = useState("");
-  const [newSupervisorUser, setNewSupervisorUser] = useState("");
+  const [newSupervisorUser, setNewSupervisorUser] = useState(s.supervisorUsername || "");
   const [newSupervisorPass, setNewSupervisorPass] = useState("");
 
   const [saved, setSaved] = useState(false);
@@ -43,7 +47,7 @@ export default function ManagerSettings() {
     e.preventDefault();
     const next: Settings = { ...s };
     
-    // تحديث كلمة المرور للحساب الحالي إن وجدت
+    // 1. تحديث الملف الشخصي للحساب الحالي
     if (passwordInput) {
       const hashedPass = hash(passwordInput);
       if (role === "owner") next.ownerPasswordHash = hashedPass;
@@ -51,22 +55,18 @@ export default function ManagerSettings() {
       else if (role === "supervisor") next.supervisorPasswordHash = hashedPass;
     }
 
-    // تحديث اسم المستخدم للحساب الحالي
-    if (usernameInput && usernameInput !== currentUsername) {
+    if (usernameInput) {
       if (role === "owner") next.ownerUsername = usernameInput;
       else if (role === "manager") next.managerUsername = usernameInput;
       else if (role === "supervisor") next.supervisorUsername = usernameInput;
     }
 
-    // إذا كان المالك أضاف مديراً جديداً
-    if (role === "owner" && newManagerUser) {
-      next.managerUsername = newManagerUser;
+    // 2. إذا كان المستخدم الحالي هو "المالك"، يمكنه حفظ وتحديث حسابات المدراء والمشرفين
+    if (role === "owner") {
+      if (newManagerUser) next.managerUsername = newManagerUser;
       if (newManagerPass) next.managerPasswordHash = hash(newManagerPass);
-    }
 
-    // إذا كان المالك أضاف مشرفاً جديداً
-    if (role === "owner" && newSupervisorUser) {
-      next.supervisorUsername = newSupervisorUser;
+      if (newSupervisorUser) next.supervisorUsername = newSupervisorUser;
       if (newSupervisorPass) next.supervisorPasswordHash = hash(newSupervisorPass);
     }
     
@@ -86,7 +86,6 @@ export default function ManagerSettings() {
     setS((prev) => ({ ...prev, qrCode: newCode }));
   };
 
-  // دالة تحديد الموقع للمقر الرئيسي
   const useCurrentLocation = () => {
     if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع");
     navigator.geolocation.getCurrentPosition(
@@ -103,7 +102,6 @@ export default function ManagerSettings() {
     );
   };
 
-  // دالة تحديد الموقع المخصص للموقع الجديد
   const useCurrentLocationForNewLoc = () => {
     if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع");
     navigator.geolocation.getCurrentPosition(
@@ -129,7 +127,7 @@ export default function ManagerSettings() {
     const updatedLocations = [...(s.locations || []), newLocation];
     setS({ ...s, locations: updatedLocations });
     setNewLocName("");
-    setShowAddLocationBox(false); // إغلاق الصندوق بعد الحفظ
+    setShowAddLocationBox(false);
   };
 
   const removeLocation = (id: string) => {
@@ -177,10 +175,16 @@ export default function ManagerSettings() {
   const qrDataToEncode = s.qrCode || loginUrl;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(qrDataToEncode)}`;
 
+  const getRoleDisplayName = (r: string) => {
+    if (r === "owner") return "مالك (Owner)";
+    if (r === "manager") return "مدير (Manager)";
+    return "مشرف (Supervisor)";
+  };
+
   return (
     <ManagerLayout
       title="الإعدادات"
-      subtitle="إدارة المواقع، النطاق، مولد QR، والحسابات"
+      subtitle="إدارة المواقع، النطاق، مولد QR، والملف الشخصي"
     >
       <form onSubmit={save} className="grid lg:grid-cols-2 gap-5">
         
@@ -228,7 +232,7 @@ export default function ManagerSettings() {
           </button>
         </section>
 
-        {/* إضافة مواقع عمل فرعية مع زر استخدام الموقع الحالي */}
+        {/* إضافة مواقع عمل فرعية */}
         <section className="hud-card p-5 sm:p-6">
           <div className="text-xs mono text-muted-foreground mb-3">
             LOCATIONS · الفروع ومقرات العمل الإضافية
@@ -280,7 +284,6 @@ export default function ManagerSettings() {
                 </Field>
               </div>
 
-              {/* زر استخدام موقعي الحالي للموقع الجديد */}
               <button
                 type="button"
                 onClick={useCurrentLocationForNewLoc}
@@ -344,11 +347,17 @@ export default function ManagerSettings() {
           </div>
         </section>
 
-        {/* إعدادات الحساب الحالي */}
-        <section className="hud-card p-5 sm:p-6 lg:col-span-2">
-          <div className="text-xs mono text-muted-foreground mb-3">
-            ACCOUNT SETTINGS · إعدادات الحساب الحالي ({role.toUpperCase()})
+        {/* خيار الملف الشخصي (يعرض نوع الحساب الحالي واسم المستخدم وكلمة المرور) */}
+        <section className="hud-card p-5 sm:p-6 lg:col-span-2 border border-primary/30">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-xs mono text-primary font-bold">
+              👤 الملف الشخصي (PROFILE SETTINGS)
+            </div>
+            <div className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
+              نوع الحساب: {getRoleDisplayName(role)}
+            </div>
           </div>
+          
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="اسم المستخدم الحالي">
               <input
@@ -370,30 +379,30 @@ export default function ManagerSettings() {
           </div>
         </section>
 
-        {/* خيارات المالك فقط */}
+        {/* خيارات المالك فقط: إضافة وتعديل حسابات المدراء والمشرفين */}
         {role === "owner" && (
-          <section className="hud-card p-5 sm:p-6 lg:col-span-2 border-primary/40 border">
+          <section className="hud-card p-5 sm:p-6 lg:col-span-2 border-primary/50 border bg-primary/5">
             <div className="text-xs mono text-primary mb-3 font-bold">
-              OWNER EXCLUSIVE · إنشاء وتعديل صلاحيات المدراء والمشرفين
+              👑 إدارة حسابات المدراء والمشرفين (صلاحيات المالك)
             </div>
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-3 p-4 rounded-xl bg-secondary/20">
-                <div className="text-xs font-bold">إدارة حساب المدير</div>
+              <div className="space-y-3 p-4 rounded-xl bg-background border border-border">
+                <div className="text-xs font-bold text-primary">حساب المدير (Manager)</div>
                 <Field label="اسم مستخدم المدير">
-                  <input className="input" value={newManagerUser || s.managerUsername || ""} onChange={(e) => setNewManagerUser(e.target.value)} placeholder="اسم المدير الجديد" />
+                  <input className="input" value={newManagerUser} onChange={(e) => setNewManagerUser(e.target.value)} placeholder="اسم المدير" />
                 </Field>
-                <Field label="كلمة المرور الجديدة للمدير">
-                  <input type="password" className="input" value={newManagerPass} onChange={(e) => setNewManagerPass(e.target.value)} placeholder="••••••••" />
+                <Field label="كلمة المرور الجديدة">
+                  <input type="password" className="input" value={newManagerPass} onChange={(e) => setNewManagerPass(e.target.value)} placeholder="•••••••• (اتركها فارغة للتخطي)" />
                 </Field>
               </div>
 
-              <div className="space-y-3 p-4 rounded-xl bg-secondary/20">
-                <div className="text-xs font-bold">إدارة حساب المشرف</div>
+              <div className="space-y-3 p-4 rounded-xl bg-background border border-border">
+                <div className="text-xs font-bold text-primary">حساب المشرف (Supervisor)</div>
                 <Field label="اسم مستخدم المشرف">
-                  <input className="input" value={newSupervisorUser || s.supervisorUsername || ""} onChange={(e) => setNewSupervisorUser(e.target.value)} placeholder="اسم المشرف الجديد" />
+                  <input className="input" value={newSupervisorUser} onChange={(e) => setNewSupervisorUser(e.target.value)} placeholder="اسم المشرف" />
                 </Field>
-                <Field label="كلمة المرور الجديدة للمشرف">
-                  <input type="password" className="input" value={newSupervisorPass} onChange={(e) => setNewSupervisorPass(e.target.value)} placeholder="••••••••" />
+                <Field label="كلمة المرور الجديدة">
+                  <input type="password" className="input" value={newSupervisorPass} onChange={(e) => setNewSupervisorPass(e.target.value)} placeholder="•••••••• (اتركها فارغة للتخطي)" />
                 </Field>
               </div>
             </div>
