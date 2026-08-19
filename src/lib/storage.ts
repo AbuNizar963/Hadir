@@ -178,28 +178,31 @@ export function seedIfEmpty(): void {
   const settings = getSettings();
   saveSettings(settings);
   const now = new Date().toISOString();
+  const existing = getEmployees();
+  const previousOwner = existing.find(
+    (employee) => employee.role === "owner" || employee.jobNumber === settings.ownerUsername
+  );
 
   const owner: Employee = {
-    id: "owner-account",
+    id: previousOwner?.id || "owner-account",
     jobNumber: settings.ownerUsername || "AbuNizar",
     name: settings.ownerName || "المالك",
     pinHash: settings.ownerPasswordHash || hash("963"),
-    status: "active",
-    deviceId: null,
-    deviceLabel: null,
-    createdAt: now,
+    status: previousOwner?.status || "active",
+    deviceId: previousOwner?.deviceId || null,
+    deviceLabel: previousOwner?.deviceLabel || null,
+    createdAt: previousOwner?.createdAt || now,
     scheduleType: "ADMIN",
     workStartTime: settings.workStart,
     workEndTime: settings.workEnd,
     gracePeriodMinutes: settings.lateGraceMinutes,
     rotationStartDate: null,
-    avatar: null,
+    avatar: previousOwner?.avatar || null,
     role: "owner",
-    locationId: null,
+    locationId: previousOwner?.locationId || null,
     specialties: ["executive"],
   };
 
-  const existing = getEmployees();
   if (existing.length === 0) {
     saveEmployees([
       {
@@ -216,7 +219,6 @@ export function seedIfEmpty(): void {
         workEndTime: settings.workEnd,
         gracePeriodMinutes: settings.lateGraceMinutes,
         rotationStartDate: null,
-        avatar: null,
         role: "staff",
         locationId: null,
         specialties: ["general"],
@@ -225,7 +227,7 @@ export function seedIfEmpty(): void {
     ]);
   } else {
     const list = existing.filter(
-      (employee) => employee.jobNumber !== owner.jobNumber && employee.role !== "owner"
+      (employee) => employee.id !== previousOwner?.id && employee.role !== "owner"
     );
     saveEmployees([...list, owner]);
   }
@@ -266,7 +268,6 @@ export function isShiftOver(employee?: Employee): boolean {
   return now.getTime() >= end.getTime();
 }
 
-/** Record a manager-assisted attendance event. It is marked as MANUAL and never pretends to have GPS/QR proof. */
 export function forceCheckInByManager(
   employeeOrId: Employee | string,
   type: "check-in" | "check-out" | "checkIn" | "checkOut"
