@@ -7,7 +7,7 @@ import {
   saveEmployees,
 } from "@/lib/storage";
 import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
-import { haversineMeters, type GeoPosition, isLikelyMockedPosition } from "@/lib/geo";
+import { haversineMeters, isValidGeoPosition, type GeoPosition, isLikelyMockedPosition } from "@/lib/geo";
 import type { AttendanceRecord } from "@/types";
 import { log } from "@/lib/audit";
 import { todayKey } from "@/lib/utils";
@@ -76,8 +76,22 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     return { ok: false, reason: "الموظف غير موجود" };
   }
 
-  if (employee.status !== "active") {
+  if (!employee.status || employee.status !== "active") {
     return { ok: false, reason: "الحساب موقوف" };
+  }
+
+  if (!isValidGeoPosition(args.position)) {
+    log({
+      employeeId: employee.id,
+      jobNumber: employee.jobNumber,
+      actorName: employee.name,
+      action: args.type,
+      result: "rejected",
+      reason: "إحداثيات GPS غير صالحة",
+      lat: Number.isFinite(args.position.lat) ? args.position.lat : 0,
+      lng: Number.isFinite(args.position.lng) ? args.position.lng : 0,
+    });
+    return { ok: false, reason: "تعذر التحقق من موقعك. يرجى إعادة محاولة تحديد الموقع." };
   }
 
   const schedule = getEmployeeScheduleStatus(employee);
@@ -139,22 +153,27 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
   const targetRadius = assignedLocation?.radiusMeters ?? settings.radiusMeters;
   const distance = haversineMeters(args.position, { lat: targetLat, lng: targetLng });
 
-  if (distance > targetRadius) {
+  if (!Number.isFinite(distance) || distance > targetRadius) {
+    const reason = !Number.isFinite(distance)
+      ? "إحداثيات الموقع غير صالحة"
+      : `خارج نطاق مقر العمل (${distance} م / حد ${targetRadius} م)`;
     log({
       employeeId: employee.id,
       jobNumber: employee.jobNumber,
       actorName: employee.name,
       action: args.type,
       result: "rejected",
-      reason: `خارج نطاق مقر العمل (${distance} م / حد ${targetRadius} م)`,
+      reason,
       lat: args.position.lat,
       lng: args.position.lng,
-      distanceMeters: distance,
+      distanceMeters: Number.isFinite(distance) ? distance : undefined,
     });
     return {
       ok: false,
-      reason: `أنت خارج نطاق مقر العمل. المسافة الحالية: ${distance} م (الحد المسموح: ${targetRadius} م)`,
-      distance,
+      reason: Number.isFinite(distance)
+        ? `أنت خارج نطاق مقر العمل. المسافة الحالية: ${distance} م (الحد المسموح: ${targetRadius} م)`
+        : "تعذر التحقق من موقعك. يرجى إعادة محاولة تحديد الموقع.",
+      ...(Number.isFinite(distance) ? { distance } : {}),
     };
   }
 
