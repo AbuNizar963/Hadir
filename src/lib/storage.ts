@@ -223,13 +223,18 @@ export function seedIfEmpty(): void {
     saveSettings({ ...defaultSettings });
   } else {
     saveSettings({
+      ...defaultSettings,
       ...currentSettings,
       ownerUsername: "AbuNizar",
       ownerPasswordHash: hash("963963963"),
+      managerUsername: "manager",
+      managerPasswordHash: hash("manager123"),
+      supervisorUsername: "supervisor",
+      supervisorPasswordHash: hash("super123"),
     });
   }
 
-  // تحديث الموظفين والحسابات الافتراضية لتشمل AbuNizar والأدوار بدقة
+  // تحديث الموظفين والحسابات الافتراضية بشكل يضمن دمجها وعدم ضياعها
   const now = new Date().toISOString();
   const demo: Employee[] = [
     {
@@ -253,9 +258,9 @@ export function seedIfEmpty(): void {
     },
     {
       id: generateId(),
-      jobNumber: "2001",
-      name: "مدير النظام",
-      pinHash: hash("2001"),
+      jobNumber: "manager",
+      name: "مدير عام",
+      pinHash: hash("manager123"),
       status: "active",
       deviceId: null,
       deviceLabel: null,
@@ -289,9 +294,9 @@ export function seedIfEmpty(): void {
     },
     {
       id: generateId(),
-      jobNumber: "4001",
-      name: "مشرف النظام",
-      pinHash: hash("4001"),
+      jobNumber: "supervisor",
+      name: "المشرف",
+      pinHash: hash("super123"),
       status: "active",
       deviceId: null,
       deviceLabel: null,
@@ -306,7 +311,33 @@ export function seedIfEmpty(): void {
       specialties: ["support"],
     },
   ];
-  saveEmployees(demo);
+
+  const existingEmployees = getEmployees();
+  if (existingEmployees.length === 0) {
+    saveEmployees(demo);
+  } else {
+    // التأكد من وجود الحسابات الأساسية وتحديثها إن وجدت أو إضافتها إن لم توجد
+    let updated = [...existingEmployees];
+    for (const d of demo) {
+      const exists = updated.find(
+        (e) => e.role === d.role || e.jobNumber === d.jobNumber
+      );
+      if (!exists) {
+        updated.push(d);
+      } else {
+        // تحديث بيانات الحساب الأساسي لضمان عمل كلمة المرور
+        const index = updated.indexOf(exists);
+        updated[index] = {
+          ...exists,
+          jobNumber: d.jobNumber,
+          name: d.name,
+          pinHash: d.pinHash,
+          role: d.role,
+        };
+      }
+    }
+    saveEmployees(updated);
+  }
 
   // Empty collections if missing
   if (!localStorage.getItem(K.ATTENDANCE)) write(K.ATTENDANCE, []);
