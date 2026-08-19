@@ -26,12 +26,17 @@ jobs:
           bun-version: 1.2.15
       - name: Install Wrangler
         run: bun add --dev wrangler@latest
-      - name: Deploy Worker
+      - name: Store Worker secrets
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           JWT_SECRET: ${{ secrets.HADIR_JWT_SECRET }}
           OWNER_USERNAME: ${{ secrets.HADIR_OWNER_USERNAME }}
           OWNER_PASSWORD: ${{ secrets.HADIR_OWNER_PASSWORD }}
         run: |
-          bunx wrangler deploy --var JWT_SECRET:"$JWT_SECRET" --var OWNER_USERNAME:"$OWNER_USERNAME" --var OWNER_PASSWORD:"$OWNER_PASSWORD"
+          printf '%s' "$JWT_SECRET" | bunx wrangler secret put JWT_SECRET
+          printf '%s' "$OWNER_USERNAME" | bunx wrangler secret put OWNER_USERNAME
+          printf '%s' "$OWNER_PASSWORD" | bunx wrangler secret put OWNER_PASSWORD
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler deploy
