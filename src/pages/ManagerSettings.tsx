@@ -5,6 +5,21 @@ import { currentSession } from "@/lib/auth";
 import { hash } from "@/lib/hash";
 import type { Settings, Location } from "@/types";
 
+interface FieldProps {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}
+
+function Field({ label, children, className = "" }: FieldProps) {
+  return (
+    <div className={className}>
+      <label className="block text-xs text-muted-foreground mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 export default function ManagerSettings() {
   const session = currentSession();
   let role = session?.role || "supervisor"; // owner, manager, supervisor
@@ -429,14 +444,5 @@ export default function ManagerSettings() {
         </div>
       </form>
     </ManagerLayout>
-  );
-}
-
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className = "" }) {
-  return (
-    <div className={className}>
-      <label className="block text-xs text-muted-foreground mb-1">{label}</label>
-      {children}
-    </div>
   );
 }
