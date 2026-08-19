@@ -1,19 +1,18 @@
 name = "hadir-api"
 main = "src/index.ts"
-compatibility_date = "2026-08-19"
+compatibility_date = "2026-08-20"
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
+preview_urls = false
 
 [vars]
 APP_ORIGIN = "*"
 
-[secrets]
-required = ["JWT_SECRET"]
+[observability]
+enabled = true
 
 [[d1_databases]]
 binding = "DB"
 database_name = "Hadir"
 database_id = "c9a96776-fcaa-4ae0-befa-b8c5a9345ebe"
 migrations_dir = "migrations"
-
-[observability]
-enabled = true
