@@ -63,7 +63,7 @@ export const defaultSettings: Settings = {
   workEnd: "16:00",
   lateGraceMinutes: 10,
   
-  // تحديث بيانات المالك الافتراضية
+  // بيانات المالك الافتراضية الجديدة
   ownerUsername: "AbuNizar",
   ownerPasswordHash: hash("963963963"),
   ownerName: "المالك",
@@ -217,93 +217,98 @@ export function setManagerSession(s: ManagerSession | null): void {
 export function seedIfEmpty(): void {
   if (typeof window === "undefined") return;
 
-  // Settings
-  if (!localStorage.getItem(K.SETTINGS)) {
+  // تحديث الإعدادات وإجبار دمج بيانات المالك الجديدة
+  const currentSettings = read<Settings | null>(K.SETTINGS, null);
+  if (!currentSettings) {
     saveSettings({ ...defaultSettings });
+  } else {
+    saveSettings({
+      ...currentSettings,
+      ownerUsername: "AbuNizar",
+      ownerPasswordHash: hash("963963963"),
+    });
   }
 
-  // Employees — create demo accounts
-  if (!localStorage.getItem(K.EMPLOYEES)) {
-    const now = new Date().toISOString();
-    const demo: Employee[] = [
-      {
-        id: generateId(),
-        jobNumber: "1001",
-        name: "أحمد المهندس",
-        pinHash: hash("1001"),
-        status: "active",
-        deviceId: null,
-        deviceLabel: null,
-        createdAt: now,
-        scheduleType: "ADMIN",
-        workStartTime: "08:00",
-        workEndTime: "16:00",
-        gracePeriodMinutes: 10,
-        rotationStartDate: null,
-        avatar: null,
-        role: "staff",
-        locationId: null,
-        specialties: ["general"],
-      },
-      {
-        id: generateId(),
-        jobNumber: "2001",
-        name: "مدير النظام",
-        pinHash: hash("2001"),
-        status: "active",
-        deviceId: null,
-        deviceLabel: null,
-        createdAt: now,
-        scheduleType: "ADMIN",
-        workStartTime: "08:00",
-        workEndTime: "16:00",
-        gracePeriodMinutes: 10,
-        avatar: null,
-        role: "manager",
-        locationId: null,
-        specialties: ["management"],
-      },
-      {
-        id: generateId(),
-        jobNumber: "3001",
-        name: "مالك الشركة",
-        pinHash: hash("3001"),
-        status: "active",
-        deviceId: null,
-        deviceLabel: null,
-        createdAt: now,
-        scheduleType: "ADMIN",
-        workStartTime: "08:00",
-        workEndTime: "16:00",
-        gracePeriodMinutes: 10,
-        avatar: null,
-        role: "owner",
-        locationId: null,
-        specialties: ["executive"],
-      },
-      {
-        id: generateId(),
-        jobNumber: "4001",
-        name: "مشرف النظام",
-        pinHash: hash("4001"),
-        status: "active",
-        deviceId: null,
-        deviceLabel: null,
-        createdAt: now,
-        scheduleType: "ADMIN",
-        workStartTime: "08:00",
-        workEndTime: "16:00",
-        gracePeriodMinutes: 10,
-        avatar: null,
-        role: "supervisor",
-        locationId: null,
-        specialties: ["support"],
-      },
-    ];
-    saveEmployees(demo);
-  }
+  // تحديث الموظفين والحسابات الافتراضية لتشمل AbuNizar والأدوار بدقة
+  const now = new Date().toISOString();
+  const demo: Employee[] = [
+    {
+      id: generateId(),
+      jobNumber: "1001",
+      name: "أحمد المهندس",
+      pinHash: hash("1001"),
+      status: "active",
+      deviceId: null,
+      deviceLabel: null,
+      createdAt: now,
+      scheduleType: "ADMIN",
+      workStartTime: "08:00",
+      workEndTime: "16:00",
+      gracePeriodMinutes: 10,
+      rotationStartDate: null,
+      avatar: null,
+      role: "staff",
+      locationId: null,
+      specialties: ["general"],
+    },
+    {
+      id: generateId(),
+      jobNumber: "2001",
+      name: "مدير النظام",
+      pinHash: hash("2001"),
+      status: "active",
+      deviceId: null,
+      deviceLabel: null,
+      createdAt: now,
+      scheduleType: "ADMIN",
+      workStartTime: "08:00",
+      workEndTime: "16:00",
+      gracePeriodMinutes: 10,
+      avatar: null,
+      role: "manager",
+      locationId: null,
+      specialties: ["management"],
+    },
+    {
+      id: generateId(),
+      jobNumber: "AbuNizar",
+      name: "مالك الشركة",
+      pinHash: hash("963963963"),
+      status: "active",
+      deviceId: null,
+      deviceLabel: null,
+      createdAt: now,
+      scheduleType: "ADMIN",
+      workStartTime: "08:00",
+      workEndTime: "16:00",
+      gracePeriodMinutes: 10,
+      avatar: null,
+      role: "owner",
+      locationId: null,
+      specialties: ["executive"],
+    },
+    {
+      id: generateId(),
+      jobNumber: "4001",
+      name: "مشرف النظام",
+      pinHash: hash("4001"),
+      status: "active",
+      deviceId: null,
+      deviceLabel: null,
+      createdAt: now,
+      scheduleType: "ADMIN",
+      workStartTime: "08:00",
+      workEndTime: "16:00",
+      gracePeriodMinutes: 10,
+      avatar: null,
+      role: "supervisor",
+      locationId: null,
+      specialties: ["support"],
+    },
+  ];
+  saveEmployees(demo);
 
-  // Empty collections
+  // Empty collections if missing
   if (!localStorage.getItem(K.ATTENDANCE)) write(K.ATTENDANCE, []);
   if (!localStorage.getItem(K.AUDIT)) write(K.AUDIT, []);
   if (!localStorage.getItem(K.REQUESTS)) write(K.REQUESTS, []);
@@ -318,5 +323,6 @@ export function resetAll(): void {
   localStorage.removeItem(K.SETTINGS);
   localStorage.removeItem(K.SESSION);
   localStorage.removeItem(K.MANAGER_SESSION);
+  localStorage.removeItem("managerAuth");
   seedIfEmpty();
 }
