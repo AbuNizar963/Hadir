@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
-import { loginEmployee } from "@/lib/auth";
-import { getSettings } from "@/lib/storage";
+import { loginManager } from "@/lib/auth";
 
-export default function EmployeeLogin() {
+export default function ManagerLogin() {
   const nav = useNavigate();
-  const settings = getSettings();
-  const [jobNumber, setJobNumber] = useState("");
-  const [pin, setPin] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -18,13 +16,14 @@ export default function EmployeeLogin() {
     setLoading(true);
 
     setTimeout(() => {
-      const res = loginEmployee(jobNumber, pin);
+      // نمرر كلمة المرور واسم المستخدم (إن وجد) للدالة المحدثة
+      const res = loginManager(password, username);
       setLoading(false);
 
       if (!res.success) {
-        setErr(res.error || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");
+        setErr(res.reason || "اسم المستخدم أو كلمة المرور غير صحيحة");
       } else {
-        nav("/employee");
+        nav("/manager"); // توجيه لوحة التحكم
       }
     }, 250);
   };
@@ -36,32 +35,34 @@ export default function EmployeeLogin() {
       </header>
       <main className="flex-1 grid place-items-center px-5 pb-10">
         <div className="w-full max-w-md hud-card p-7">
-          <div className="text-xs mono text-muted-foreground">{settings.brandName || "HADIR"} · بوابة الموظفين</div>
-          <h1 className="text-2xl font-extrabold mt-1">تسجيل دخول الموظف</h1>
+          <div className="text-xs mono text-muted-foreground">بوابة الإدارة والتحكم</div>
+          <h1 className="text-2xl font-extrabold mt-1">تسجيل دخول الإدارة</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            أدخل رقمك الوظيفي ورمز الـ PIN الخاص بك للوصول لنظام الحضور.
+            أدخل اسم المستخدم وكلمة المرور الخاصة بحسابك (المالك، المدير، أو المشرف).
           </p>
           <form onSubmit={submit} className="mt-6 space-y-4">
+            
+            {/* حقل اسم المستخدم الجديد */}
             <div>
-              <label className="block text-sm font-semibold mb-1.5">الرقم الوظيفي</label>
+              <label className="block text-sm font-semibold mb-1.5">اسم المستخدم (اختياري أو محدد)</label>
               <input
                 type="text"
                 className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm"
-                value={jobNumber}
-                onChange={(e) => setJobNumber(e.target.value)}
-                placeholder="مثال: 1001"
-                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="مثال: owner, manager, supervisor"
               />
             </div>
 
+            {/* حقل كلمة المرور */}
             <div>
-              <label className="block text-sm font-semibold mb-1.5">رمز الـ PIN السري</label>
+              <label className="block text-sm font-semibold mb-1.5">كلمة المرور</label>
               <input
                 type="password"
                 className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder="أدخل رمز الـ PIN"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="أدخل كلمة المرور"
                 required
               />
             </div>
@@ -71,16 +72,18 @@ export default function EmployeeLogin() {
                 {err}
               </div>
             )}
+            
             <button className="btn-primary w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl" disabled={loading}>
-              {loading ? "جاري التحقق..." : "دخول الموظف"}
+              {loading ? "جاري التحقق..." : "دخول الإدارة"}
             </button>
           </form>
+
           <div className="mt-5 text-xs text-center flex justify-between items-center">
             <Link to="/" className="text-muted-foreground hover:text-foreground">
               ← العودة للرئيسية
             </Link>
-            <Link to="/manager/login" className="text-primary hover:underline">
-              دخول الإدارة ؟
+            <Link to="/login" className="text-primary hover:underline">
+              دخول الموظفين ؟
             </Link>
           </div>
         </div>
