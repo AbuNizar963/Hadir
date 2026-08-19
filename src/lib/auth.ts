@@ -122,7 +122,7 @@ export function logoutEmployee() {
   setSession(null);
 }
 
-// دالة تسجيل دخول الإدارة المحدثة (تدعم المالك، المدير، والمشرف بناءً على اسم المستخدم وكلمة المرور)
+// دالة تسجيل دخول الإدارة المحدثة (تعتمد حصراً على تطابق اسم المستخدم وكلمة المرور)
 export function loginManager(password: string, username?: string): LoginResult {
   const s = getSettings();
   
@@ -132,32 +132,36 @@ export function loginManager(password: string, username?: string): LoginResult {
   let matchedRole: "owner" | "manager" | "supervisor" | null = null;
   let actorTitle = "المدير";
 
-  // 1. التحقق إذا كان المستخدم هو المالك (owner)
-  const isOwnerUser = !inputUser || inputUser === s.ownerUsername || inputUser.toLowerCase() === "owner";
-  const isOwnerPass = verify(inputPass, s.ownerPasswordHash) || inputPass === s.ownerPasswordHash || (!s.ownerPasswordHash && inputPass === "admin"); // افتراضي
-  
-  if (isOwnerUser && isOwnerPass) {
-    matchedRole = "owner";
-    actorTitle = "المالك";
+  // دالة مساعدة للتحقق من كلمة المرور
+  const isValidPass = (hashVal?: string, defaultPass = "") => {
+    if (!hashVal) return inputPass === defaultPass;
+    return verify(inputPass, hashVal) || inputPass === hashVal;
+  };
+
+  // الأسماء المعتمدة (الافتراضية أو المخزنة في الإعدادات)
+  const ownerUser = s.ownerUsername || "AbuNizar";
+  const managerUser = s.managerUsername || "manager";
+  const supervisorUser = s.supervisorUsername || "supervisor";
+
+  // 1. التحقق الصارم للمالك
+  if (inputUser === ownerUser) {
+    if (isValidPass(s.ownerPasswordHash, "admin")) {
+      matchedRole = "owner";
+      actorTitle = "المالك";
+    }
   } 
-  // 2. التحقق إذا كان المستخدم هو المدير (manager)
-  else {
-    const isManagerUser = !inputUser || inputUser === s.managerUsername || inputUser.toLowerCase() === "manager";
-    const isManagerPass = verify(inputPass, s.managerPasswordHash) || inputPass === s.managerPasswordHash;
-    
-    if (isManagerUser && isManagerPass) {
+  // 2. التحقق الصارم للمدير
+  else if (inputUser === managerUser) {
+    if (isValidPass(s.managerPasswordHash)) {
       matchedRole = "manager";
       actorTitle = "المدير";
-    } 
-    // 3. التحقق إذا كان المستخدم هو المشرف (supervisor)
-    else {
-      const isSupervisorUser = !inputUser || inputUser === s.supervisorUsername || inputUser.toLowerCase() === "supervisor";
-      const isSupervisorPass = verify(inputPass, s.supervisorPasswordHash) || inputPass === s.supervisorPasswordHash;
-      
-      if (isSupervisorUser && isSupervisorPass) {
-        matchedRole = "supervisor";
-        actorTitle = "المشرف";
-      }
+    }
+  } 
+  // 3. التحقق الصارم للمشرف
+  else if (inputUser === supervisorUser) {
+    if (isValidPass(s.supervisorPasswordHash)) {
+      matchedRole = "supervisor";
+      actorTitle = "المشرف";
     }
   }
 
@@ -173,16 +177,16 @@ export function loginManager(password: string, username?: string): LoginResult {
     return { ok: false, success: false, reason: "اسم المستخدم أو كلمة المرور غير صحيحة" };
   }
 
-  // حفظ الجلسة مع الدور المكتشف
+  // حفظ الجلسة بالصفة الصحيحة تماماً
   setManagerSession({
     loginAt: new Date().toISOString(),
     role: matchedRole,
-    jobNumber: inputUser || matchedRole,
+    jobNumber: inputUser,
   });
 
   log({
     employeeId: null,
-    jobNumber: inputUser || "-",
+    jobNumber: inputUser,
     actorName: actorTitle,
     action: "manager-login",
     result: "success",
