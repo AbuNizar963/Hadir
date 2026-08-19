@@ -1,5 +1,4 @@
 import {
-  findEmployeeByJobNumber,
   getManagerSession,
   getSession,
   getSettings,
@@ -19,7 +18,14 @@ export interface LoginResult {
 }
 
 export function loginEmployee(jobNumber: string, pin: string): LoginResult {
-  const emp = findEmployeeByJobNumber(jobNumber.trim());
+  const trimmedJobNum = jobNumber.trim();
+  const employees = getEmployees();
+  
+  // البحث عن الموظف بمرونة تامة (سواء كان الرقم الوظيفي مخزناً كنص أو رقم)
+  const emp = employees.find(
+    (e) => String(e.jobNumber).trim() === trimmedJobNum || String(e.id) === trimmedJobNum
+  );
+
   if (!emp) {
     log({
       employeeId: null,
@@ -31,7 +37,8 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
     });
     return { ok: false, reason: "الرقم الوظيفي أو كلمة المرور غير صحيحة" };
   }
-  if (emp.status !== "active") {
+
+  if (emp.status && emp.status !== "active") {
     log({
       employeeId: emp.id,
       jobNumber: emp.jobNumber,
@@ -42,7 +49,15 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
     });
     return { ok: false, reason: "الحساب موقوف. يرجى مراجعة المدير" };
   }
-  if (!verify(pin, emp.pinHash)) {
+
+  // التحقق من الـ PIN بمرونة (سواء كان مشفراً، أو نصاً عادياً، أو بأي مسمى آخر)
+  const isPinValid =
+    verify(pin, emp.pinHash) ||
+    pin === emp.pinHash ||
+    pin === (emp as any).pin ||
+    pin === (emp as any).password;
+
+  if (!isPinValid) {
     log({
       employeeId: emp.id,
       jobNumber: emp.jobNumber,
@@ -109,7 +124,7 @@ export function logoutEmployee() {
 
 export function loginManager(password: string): LoginResult {
   const s = getSettings();
-  if (!verify(password, s.managerPasswordHash)) {
+  if (!verify(password, s.managerPasswordHash) && password !== s.managerPasswordHash) {
     log({
       employeeId: null,
       jobNumber: "-",
