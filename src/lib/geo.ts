@@ -23,37 +23,38 @@ export function haversineMeters(
 export function getCurrentPosition(): Promise<GeoPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("المتصفح لا يدعم تحديد الموقع"));
+      reject(new Error("المتصفح لا يدعم تحديد الموقع الجغرافي."));
       return;
     }
+
     navigator.geolocation.getCurrentPosition(
-      (p) =>
+      (p) => {
         resolve({
           lat: p.coords.latitude,
           lng: p.coords.longitude,
           accuracy: p.coords.accuracy,
-        }),
+        });
+      },
       (e) => {
-        const msg =
-          e.code === 1
-            ? "تم رفض إذن تحديد الموقع. يرجى تفعيل الموقع من إعدادات المتصفح."
-            : e.code === 2
-            ? "تعذر تحديد الموقع الجغرافي للجهاز."
-            : "انتهت مهلة استجابة الـ GPS.";
+        let msg = "تعذر تحديد الموقع الجغرافي.";
+        if (e.code === 1) {
+          msg = "تم رفض إذن الوصول للموقع. يرجى السماح للمتصفح بالوصول إلى الموقع من إعدادات الجوال.";
+        } else if (e.code === 2) {
+          msg = "تعذر تحديد مكانك من قِبل الأقمار الصناعية (GPS)، تأكد من تفعيل خدمة الموقع في جهازك.";
+        } else if (e.code === 3) {
+          msg = "انتهت مهلة استجابة الـ GPS. تأكد من قوة الإشارة أو الوقوف في مكان مكشوف.";
+        }
         reject(new Error(msg));
       },
       { 
         enableHighAccuracy: true, 
-        timeout: 30000, // تم رفع المهلة إلى 30 ثانية
-        maximumAge: 60000 // السماح بقبول موقع مخزن مؤقتاً خلال آخر دقيقة لتسريع الاستجابة
+        timeout: 20000, // مهلة 20 ثانية كافية لالتقاط إشارة دقيقة
+        maximumAge: 0 
       }
     );
   });
 }
 
-/**
- * فحص ذكي وموثوق للكشف عن المواقع المزيفة بدون التسبب في حظر مستخدمي شبكات الجوال (4G/5G)
- */
 export async function isLikelyMockedPosition(
   pos: GeoPosition,
   options?: { prevPositions?: (GeoPosition & { timestamp?: number })[] }
@@ -61,18 +62,16 @@ export async function isLikelyMockedPosition(
   const reasons: string[] = [];
   const prev = options?.prevPositions ?? [];
 
-  // فحص دقة الـ GPS: إذا كانت الدقة 0 أو غير منطقية
   if (pos.accuracy === 0) {
     reasons.push("دقة الـ GPS غير صالحة (0m)");
   }
 
-  // فحص القفزات اللحظية المستحيلة (أكثر من 80 كم في أقل من دقيقة)
   if (prev.length > 0) {
     const last = prev[prev.length - 1];
     const d = haversineMeters({ lat: last.lat, lng: last.lng }, pos);
     const dt = Math.abs(Date.now() - (last.timestamp ?? Date.now()));
     if (d > 80000 && dt < 1000 * 60) {
-      reasons.push("قفزة مكانية غير منطقية بسرعة تفوق سرعة الطيران");
+      reasons.push("قفزة مكانية غير منطقية");
     }
   }
 
