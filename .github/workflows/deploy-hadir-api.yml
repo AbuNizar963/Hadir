@@ -80,11 +80,34 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --secrets-file .worker-secrets.json
+
+      - name: Ensure workers.dev endpoint and discover public URL
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx wrangler deploy --secrets-file .worker-secrets.json 2>&1 | tee /tmp/hadir-deploy.log
-          URL=$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' /tmp/hadir-deploy.log | tail -1 || true)
-          [[ -n "$URL" ]] && printf '%s\n' "$URL" > /tmp/hadir-worker-url || true
+          API="https://api.cloudflare.com/client/v4"
+          AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+          ACCOUNT="$CLOUDFLARE_ACCOUNT_ID"
+          WORKER="hadir-api"
+
+          account_json=$(curl -fsS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}")
+          subdomain=$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.success || !x.result?.subdomain) process.exit(1); process.stdout.write(x.result.subdomain)' "$account_json")
+          echo "Workers.dev subdomain: ${subdomain}.workers.dev"
+
+          worker_json=$(curl -fsS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}")
+          enabled=$(node -e 'const x=JSON.parse(process.argv[1]); process.stdout.write(String(Boolean(x.result?.enabled)))' "$worker_json")
+          if [[ "$enabled" != "true" ]]; then
+            echo "Enabling ${WORKER} on workers.dev"
+            curl -fsS --max-time 20 -X POST "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}" -d '{"enabled":true}' >/tmp/hadir-subdomain.json
+          fi
+
+          URL="https://${WORKER}.${subdomain}.workers.dev"
+          printf '%s\n' "$URL" > /tmp/hadir-worker-url
+          echo "Worker endpoint: $URL"
 
       - name: Verify deployed API and initialize owner in D1
         shell: bash
@@ -94,10 +117,9 @@ jobs:
           HADIR_API_URL: ${{ secrets.HADIR_API_URL }}
         run: |
           set -euo pipefail
-          # The frontend already uses this production Worker URL. A dedicated
-          # HADIR_API_URL secret can override it when a custom domain is used.
-          BASE_URL="${HADIR_API_URL:-https://hadir-api.abunizar963.workers.dev}"
-          if [[ -f /tmp/hadir-worker-url ]]; then BASE_URL=$(cat /tmp/hadir-worker-url); fi
+          BASE_URL="${HADIR_API_URL:-}"
+          if [[ -z "$BASE_URL" && -f /tmp/hadir-worker-url ]]; then BASE_URL=$(cat /tmp/hadir-worker-url); fi
+          if [[ -z "$BASE_URL" ]]; then echo 'Worker URL was not discovered' >&2; exit 1; fi
           BASE_URL="${BASE_URL%/}"
           echo "Checking $BASE_URL/api/health"
           for i in {1..12}; do
@@ -111,6 +133,7 @@ jobs:
             fi
             sleep 5
           done
+
           echo "Checking owner login without printing credentials"
           HTTP_CODE=$(curl -sS -o /tmp/hadir-login.json -w '%{http_code}' --max-time 15 \
             -H 'content-type: application/json' \
@@ -125,4 +148,4 @@ jobs:
 
       - name: Remove temporary secrets and deployment response
         if: always()
-        run: rm -f .worker-secrets.json /tmp/hadir-login.json /tmp/hadir-deploy.log /tmp/hadir-worker-url
+        run: rm -f .worker-secrets.json /tmp/hadir-login.json /tmp/hadir-subdomain.json /tmp/hadir-worker-url
