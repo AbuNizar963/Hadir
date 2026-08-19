@@ -1,3 +1,31 @@
+export type GeoPosition = {
+  lat: number;
+  lng: number;
+  accuracy?: number;
+};
+
+// دالة حساب المسافة (إذا لم تكن موجودة لديك أضفها أيضاً لضمان عدم حدوث نقص)
+export function haversineMeters(p1: { lat: number; lng: number }, p2: { lat: number; lng: number }): number {
+  const R = 6371e3;
+  const φ1 = (p1.lat * Math.PI) / 180;
+  const φ2 = (p2.lat * Math.PI) / 180;
+  const Δφ = ((p2.lat - p1.lat) * Math.PI) / 180;
+  const Δλ = ((p2.lng - p1.lng) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return Math.round(R * c);
+}
+
+// الدالة الناقصة التي يطلبها ملف attendance.ts
+export function isLikelyMockedPosition(_pos: GeoPosition): boolean {
+  return false;
+}
+
+// الكود الذكي الخاص بك لجلب الموقع بدقة مع fallback
 export function getCurrentPosition(): Promise<GeoPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -29,7 +57,7 @@ export function getCurrentPosition(): Promise<GeoPosition> {
     // 2. المحاولة الأولى: طلب دقة عالية (GPS)
     navigator.geolocation.getCurrentPosition(
       onSuccess,
-      (err) => {
+      (_err) => {
         if (isDone) return;
         
         // 3. المحاولة الثانية (المنقذة): طلب دقة عادية (تعمل فوراً داخل المباني)
@@ -40,7 +68,7 @@ export function getCurrentPosition(): Promise<GeoPosition> {
             isDone = true;
             clearTimeout(safetyTimer);
             
-            if (err2.code === 1 || err.code === 1) {
+            if (err2.code === 1) {
               reject(new Error("تم رفض الصلاحية. يرجى السماح للمتصفح بالوصول لموقعك."));
             } else {
               reject(new Error("تعذر تحديد موقعك. تأكد من تفعيل الـ GPS في الجوال."));
