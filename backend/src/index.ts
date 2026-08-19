@@ -1,216 +1,48 @@
-type Env = {
-  DB: D1Database;
-  JWT_SECRET: string;
-  OWNER_USERNAME?: string;
-  OWNER_PASSWORD?: string;
-  APP_ORIGIN?: string;
-};
+type Role = "owner" | "manager" | "supervisor" | "staff";
+type Actor = { id: string; username: string; role: Role; name: string };
+type Env = { DB: D1Database; JWT_SECRET: string; OWNER_USERNAME?: string; OWNER_PASSWORD?: string; APP_ORIGIN?: string };
+const now=()=>new Date().toISOString(); const id=()=>crypto.randomUUID();
+const json=(data:unknown,status=200,origin="*")=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","access-control-allow-origin":origin,"access-control-allow-headers":"content-type, authorization, x-device-id","access-control-allow-methods":"GET,POST,PATCH,PUT,DELETE,OPTIONS"}});
+function b64(bytes:ArrayBuffer|Uint8Array){const a=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);let s="";for(const x of a)s+=String.fromCharCode(x);return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
+function unb64(v:string){const s=atob(v.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((v.length+3)%4));return Uint8Array.from(s,c=>c.charCodeAt(0))}
+async function passwordHash(password:string){const salt=crypto.getRandomValues(new Uint8Array(16));const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]);const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:150000,hash:"SHA-256"},key,256);return `${b64(salt)}.${b64(bits)}`}
+async function passwordVerify(password:string,stored:string){try{const[s,h]=stored.split(".");if(!s||!h)return false;const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]);const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt:unb64(s),iterations:150000,hash:"SHA-256"},key,256);return b64(bits)===h}catch{return false}}
+async function sign(payload:Actor,secret:string){const h=b64(new TextEncoder().encode(JSON.stringify({alg:"HS256",typ:"JWT"})));const p=b64(new TextEncoder().encode(JSON.stringify({...payload,exp:Math.floor(Date.now()/1000)+43200})));const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);const s=await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(`${h}.${p}`));return`${h}.${p}.${b64(s)}`}
+async function auth(request:Request,env:Env):Promise<Actor|null>{const token=request.headers.get("authorization")?.replace(/^Bearer\s+/i,"");if(!token||!env.JWT_SECRET)return null;const[h,p,s]=token.split(".");if(!h||!p||!s)return null;try{const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(env.JWT_SECRET),{name:"HMAC",hash:"SHA-256"},false,["verify"]);if(!(await crypto.subtle.verify("HMAC",key,unb64(s),new TextEncoder().encode(`${h}.${p}`))))return null;const x=JSON.parse(new TextDecoder().decode(unb64(p))) as Actor&{exp:number};if(!x.exp||x.exp<Math.floor(Date.now()/1000))return null;return{id:x.id,username:x.username,role:x.role,name:x.name}}catch{return null}}
+const canWrite=(r:Role)=>r==="owner"||r==="manager";const canAdmin=(r:Role)=>r==="owner";const canRead=(r:Role)=>r!=="staff";
+async function ensureSchema(env:Env){await env.DB.batch([
+ env.DB.prepare(`CREATE TABLE IF NOT EXISTS admin_accounts(id TEXT PRIMARY KEY,username TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,name TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('owner','manager','supervisor')),active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL)`),
+ env.DB.prepare(`CREATE TABLE IF NOT EXISTS employees(id TEXT PRIMARY KEY,job_number TEXT NOT NULL UNIQUE,name TEXT NOT NULL,pin_hash TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',device_id TEXT,device_label TEXT,created_at TEXT NOT NULL,schedule_type TEXT NOT NULL DEFAULT 'ADMIN',rotation_start_date TEXT,work_start_time TEXT,work_end_time TEXT,grace_period_minutes INTEGER NOT NULL DEFAULT 10,role TEXT NOT NULL DEFAULT 'staff',location_id TEXT,rotation_days_on INTEGER,rotation_days_off INTEGER,specialties_json TEXT NOT NULL DEFAULT '[]',work_days_json TEXT NOT NULL DEFAULT '[]',avatar TEXT)`),
+ env.DB.prepare(`CREATE TABLE IF NOT EXISTS locations(id TEXT PRIMARY KEY,name TEXT NOT NULL,lat REAL NOT NULL,lng REAL NOT NULL,radius_meters REAL NOT NULL)`),
+ env.DB.prepare(`CREATE TABLE IF NOT EXISTS attendance(id TEXT PRIMARY KEY,employee_id TEXT NOT NULL,job_number TEXT NOT NULL,employee_name TEXT NOT NULL,type TEXT NOT NULL CHECK(type IN ('check-in','check-out')),timestamp TEXT NOT NULL,lat REAL NOT NULL,lng REAL NOT NULL,distance_meters REAL NOT NULL,device_id TEXT NOT NULL,ip TEXT NOT NULL,qr_code TEXT NOT NULL,location_id TEXT)`),
+ env.DB.prepare(`CREATE TABLE IF NOT EXISTS requests(id TEXT PRIMARY KEY,employee_id TEXT NOT NULL,employee_name TEXT NOT NULL,job_number TEXT NOT NULL,type TEXT NOT NULL,reason TEXT,status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL)`),
+ env.DB.prepare(`CREATE TABLE IF NOT EXISTS audit(id TEXT PRIMARY KEY,employee_id TEXT,job_number TEXT NOT NULL,actor_name TEXT NOT NULL,action TEXT NOT NULL,result TEXT NOT NULL,reason TEXT,timestamp TEXT NOT NULL,device_id TEXT NOT NULL,ip TEXT NOT NULL,lat REAL,lng REAL,distance_meters REAL)`),
+ env.DB.prepare(`CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)`)]);
+ await env.DB.batch([env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_attendance_employee_time ON attendance(employee_id,timestamp DESC)`),env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_attendance_time ON attendance(timestamp DESC)`),env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_time ON audit(timestamp DESC)`),env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status)`)])}
+async function ensureOwner(env:Env){const x=await env.DB.prepare("SELECT id FROM admin_accounts WHERE role='owner' LIMIT 1").first();if(x||!env.OWNER_USERNAME||!env.OWNER_PASSWORD)return;await env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)").bind(id(),env.OWNER_USERNAME,await passwordHash(env.OWNER_PASSWORD),"المالك","owner",1,now()).run()}
+function row(r:any){return{id:r.id,jobNumber:r.job_number,name:r.name,pinHash:r.pin_hash,status:r.status,deviceId:r.device_id,deviceLabel:r.device_label,createdAt:r.created_at,scheduleType:r.schedule_type,rotationStartDate:r.rotation_start_date,workStartTime:r.work_start_time,workEndTime:r.work_end_time,gracePeriodMinutes:r.grace_period_minutes,role:r.role,locationId:r.location_id,rotationDaysOn:r.rotation_days_on,rotationDaysOff:r.rotation_days_off,workDays:JSON.parse(r.work_days_json||"[]"),avatar:r.avatar||null,specialties:JSON.parse(r.specialties_json||"[]")}}
+async function audit(env:Env,request:Request,name:string,action:string,result:"success"|"rejected",employeeId:string|null=null,jobNumber="",reason:string|null=null){return env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id(),employeeId,jobNumber,name,action,result,reason,now(),request.headers.get("x-device-id")||"unknown",request.headers.get("CF-Connecting-IP")||"unknown").run()}
 
-type Role = "owner" | "manager" | "supervisor";
-
-const json = (data: unknown, status = 200, origin = "*") =>
-  new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "access-control-allow-origin": origin,
-      "access-control-allow-headers": "content-type, authorization",
-      "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
-    },
-  });
-
-const now = () => new Date().toISOString();
-const id = () => crypto.randomUUID();
-
-function bytesToBase64Url(bytes: ArrayBuffer | Uint8Array) {
-  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  let s = "";
-  for (const b of arr) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-function base64UrlToBytes(value: string) {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4);
-  const s = atob(padded);
-  return Uint8Array.from(s, c => c.charCodeAt(0));
-}
-
-async function derivePassword(password: string, salt: Uint8Array) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 120000, hash: "SHA-256" }, key, 256);
-  return `${bytesToBase64Url(salt)}.${bytesToBase64Url(bits)}`;
-}
-
-async function verifyPassword(password: string, stored: string) {
-  const [saltText, hash] = stored.split(".");
-  if (!saltText || !hash) return false;
-  const derived = await derivePassword(password, base64UrlToBytes(saltText));
-  return derived.split(".")[1] === hash;
-}
-
-async function hashPassword(password: string) {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  return derivePassword(password, salt);
-}
-
-async function signToken(payload: { id: string; username: string; role: Role; name: string }, secret: string) {
-  const header = bytesToBase64Url(new TextEncoder().encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
-  const body = bytesToBase64Url(new TextEncoder().encode(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 12 })));
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${header}.${body}`));
-  return `${header}.${body}.${bytesToBase64Url(sig)}`;
-}
-
-async function auth(request: Request, env: Env): Promise<{ id: string; username: string; role: Role; name: string } | null> {
-  const value = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!value || !env.JWT_SECRET) return null;
-  const [header, body, signature] = value.split(".");
-  if (!header || !body || !signature) return null;
-  try {
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.JWT_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
-    const valid = await crypto.subtle.verify("HMAC", key, base64UrlToBytes(signature), new TextEncoder().encode(`${header}.${body}`));
-    if (!valid) return null;
-    const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(body))) as { id: string; username: string; role: Role; name: string; exp: number };
-    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return { id: payload.id, username: payload.username, role: payload.role, name: payload.name };
-  } catch { return null; }
-}
-
-function canWrite(role: Role) { return role === "owner" || role === "manager"; }
-function canManageAdmins(role: Role) { return role === "owner"; }
-
-async function ensureOwner(env: Env) {
-  const exists = await env.DB.prepare("SELECT id FROM admin_accounts WHERE role='owner' LIMIT 1").first();
-  if (exists) return;
-  if (!env.OWNER_USERNAME || !env.OWNER_PASSWORD) return;
-  const passwordHash = await hashPassword(env.OWNER_PASSWORD);
-  await env.DB.prepare("INSERT INTO admin_accounts (id,username,password_hash,name,role,active,created_at) VALUES (?,?,?,?,?,?,?)")
-    .bind(id(), env.OWNER_USERNAME, passwordHash, "المالك", "owner", 1, now()).run();
-}
-
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const origin = env.APP_ORIGIN || "*";
-    if (request.method === "OPTIONS") return json({}, 204, origin);
-    const url = new URL(request.url);
-    const path = url.pathname.replace(/\/$/, "");
-
-    try {
-      await ensureOwner(env);
-
-      if (path === "/api/health") return json({ ok: true, service: "hadir-api", time: now() }, 200, origin);
-
-      if (path === "/api/auth/login" && request.method === "POST") {
-        const body = await request.json() as { username?: string; password?: string };
-        const account = await env.DB.prepare("SELECT id,username,password_hash,name,role,active FROM admin_accounts WHERE username=? LIMIT 1").bind((body.username || "").trim()).first<any>();
-        if (!account || !account.active || !(await verifyPassword(body.password || "", account.password_hash))) return json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" }, 401, origin);
-        const role = account.role as Role;
-        const token = await signToken({ id: account.id, username: account.username, role, name: account.name }, env.JWT_SECRET);
-        await env.DB.prepare("INSERT INTO audit (id,employee_id,job_number,actor_name,action,result,timestamp,device_id,ip) VALUES (?,?,?,?,?,?,?,?,?)")
-          .bind(id(), null, "", account.name, `${role}-login`, "success", now(), "admin", request.headers.get("CF-Connecting-IP") || "unknown").run();
-        return json({ token, user: { id: account.id, username: account.username, name: account.name, role } }, 200, origin);
-      }
-
-      const actor = await auth(request, env);
-      if (!actor) return json({ error: "غير مصرح" }, 401, origin);
-
-      if (path === "/api/me" && request.method === "GET") return json({ user: actor }, 200, origin);
-
-      if (path === "/api/admins" && request.method === "GET") {
-        const rows = await env.DB.prepare("SELECT id,username,name,role,active,created_at AS createdAt FROM admin_accounts ORDER BY role, name").all();
-        return json(rows.results, 200, origin);
-      }
-      if (path === "/api/admins" && request.method === "POST") {
-        if (!canManageAdmins(actor.role)) return json({ error: "المالك فقط يستطيع إدارة المدراء والمشرفين" }, 403, origin);
-        const body = await request.json() as { username?: string; password?: string; name?: string; role?: Role };
-        if (!body.username || !body.password || !body.name || !body.role || !["manager", "supervisor"].includes(body.role)) return json({ error: "بيانات الحساب غير مكتملة" }, 400, origin);
-        const passwordHash = await hashPassword(body.password);
-        try {
-          await env.DB.prepare("INSERT INTO admin_accounts (id,username,password_hash,name,role,active,created_at) VALUES (?,?,?,?,?,?,?)").bind(id(), body.username.trim(), passwordHash, body.name.trim(), body.role, 1, now()).run();
-        } catch { return json({ error: "اسم المستخدم مستخدم مسبقًا" }, 409, origin); }
-        return json({ ok: true }, 201, origin);
-      }
-      if (path.startsWith("/api/admins/") && request.method === "PATCH") {
-        if (!canManageAdmins(actor.role)) return json({ error: "المالك فقط يستطيع إدارة المدراء والمشرفين" }, 403, origin);
-        const accountId = path.split("/").pop()!;
-        const body = await request.json() as { name?: string; active?: boolean; password?: string };
-        if (body.password) {
-          await env.DB.prepare("UPDATE admin_accounts SET password_hash=? WHERE id=? AND role!='owner'").bind(await hashPassword(body.password), accountId).run();
-        }
-        if (body.name !== undefined || body.active !== undefined) {
-          await env.DB.prepare("UPDATE admin_accounts SET name=COALESCE(?,name), active=COALESCE(?,active) WHERE id=? AND role!='owner'").bind(body.name ?? null, body.active === undefined ? null : (body.active ? 1 : 0), accountId).run();
-        }
-        return json({ ok: true }, 200, origin);
-      }
-      if (path.startsWith("/api/admins/") && request.method === "DELETE") {
-        if (!canManageAdmins(actor.role)) return json({ error: "المالك فقط يستطيع إدارة المدراء والمشرفين" }, 403, origin);
-        const accountId = path.split("/").pop()!;
-        await env.DB.prepare("DELETE FROM admin_accounts WHERE id=? AND role!='owner'").bind(accountId).run();
-        return json({ ok: true }, 200, origin);
-      }
-
-      if (path === "/api/employees" && request.method === "GET") {
-        const rows = await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,device_id AS deviceId,device_label AS deviceLabel,created_at AS createdAt,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,role,location_id AS locationId,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,specialties_json AS specialtiesJson FROM employees ORDER BY name").all();
-        return json(rows.results.map((r:any)=>({...r, specialties: JSON.parse(r.specialtiesJson || "[]"), specialtiesJson: undefined})), 200, origin);
-      }
-      if (path === "/api/employees" && request.method === "POST") {
-        if (!canWrite(actor.role)) return json({ error: "المشرف للعرض فقط" }, 403, origin);
-        const b = await request.json() as any;
-        if (!b.jobNumber || !b.name || !b.pinHash) return json({ error: "بيانات الموظف غير مكتملة" }, 400, origin);
-        await env.DB.prepare("INSERT INTO employees (id,job_number,name,pin_hash,status,device_id,device_label,created_at,schedule_type,rotation_start_date,work_start_time,work_end_time,grace_period_minutes,role,location_id,rotation_days_on,rotation_days_off,specialties_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-          .bind(id(), b.jobNumber, b.name, b.pinHash, b.status || "active", b.deviceId || null, b.deviceLabel || null, now(), b.scheduleType || "ADMIN", b.rotationStartDate || null, b.workStartTime || null, b.workEndTime || null, b.gracePeriodMinutes ?? 10, b.role || "staff", b.locationId || null, b.rotationDaysOn || null, b.rotationDaysOff || null, JSON.stringify(b.specialties || [])).run();
-        return json({ ok: true }, 201, origin);
-      }
-      if (path.startsWith("/api/employees/") && ["PATCH","DELETE"].includes(request.method)) {
-        if (!canWrite(actor.role)) return json({ error: "المشرف للعرض فقط" }, 403, origin);
-        const employeeId = path.split("/").pop()!;
-        if (request.method === "DELETE") { await env.DB.prepare("DELETE FROM employees WHERE id=?").bind(employeeId).run(); return json({ ok: true }, 200, origin); }
-        const b = await request.json() as any;
-        await env.DB.prepare("UPDATE employees SET name=COALESCE(?,name), status=COALESCE(?,status), device_id=COALESCE(?,device_id), device_label=COALESCE(?,device_label), work_start_time=COALESCE(?,work_start_time), work_end_time=COALESCE(?,work_end_time), grace_period_minutes=COALESCE(?,grace_period_minutes), location_id=COALESCE(?,location_id), specialties_json=COALESCE(?,specialties_json) WHERE id=?")
-          .bind(b.name ?? null,b.status ?? null,b.deviceId ?? null,b.deviceLabel ?? null,b.workStartTime ?? null,b.workEndTime ?? null,b.gracePeriodMinutes ?? null,b.locationId ?? null,b.specialties ? JSON.stringify(b.specialties) : null,employeeId).run();
-        return json({ ok: true }, 200, origin);
-      }
-
-      if (path === "/api/attendance" && request.method === "GET") {
-        const limit = Math.min(Number(url.searchParams.get("limit") || 500), 2000);
-        const rows = await env.DB.prepare("SELECT * FROM attendance ORDER BY timestamp DESC LIMIT ?").bind(limit).all();
-        return json(rows.results, 200, origin);
-      }
-      if (path === "/api/attendance" && request.method === "POST") {
-        if (!canWrite(actor.role)) return json({ error: "المشرف للعرض فقط" }, 403, origin);
-        const b = await request.json() as any;
-        await env.DB.prepare("INSERT INTO attendance (id,employee_id,job_number,employee_name,type,timestamp,lat,lng,distance_meters,device_id,ip,qr_code,location_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
-          .bind(id(),b.employeeId,b.jobNumber,b.employeeName,b.type,b.timestamp || now(),b.lat || 0,b.lng || 0,b.distanceMeters || 0,b.deviceId || "",request.headers.get("CF-Connecting-IP") || "unknown",b.qrCode || "",b.locationId || null).run();
-        return json({ ok: true }, 201, origin);
-      }
-
-      if (path === "/api/audit" && request.method === "GET") {
-        const limit = Math.min(Number(url.searchParams.get("limit") || 500), 2000);
-        const rows = await env.DB.prepare("SELECT * FROM audit ORDER BY timestamp DESC LIMIT ?").bind(limit).all();
-        return json(rows.results, 200, origin);
-      }
-      if (path === "/api/requests" && request.method === "GET") {
-        const rows = await env.DB.prepare("SELECT * FROM requests ORDER BY created_at DESC").all();
-        return json(rows.results, 200, origin);
-      }
-      if (path === "/api/requests" && request.method === "POST") {
-        const b = await request.json() as any;
-        await env.DB.prepare("INSERT INTO requests (id,employee_id,employee_name,job_number,type,reason,status,created_at) VALUES (?,?,?,?,?,?,?,?)")
-          .bind(id(),b.employeeId,b.employeeName,b.jobNumber,b.type,b.reason || null,"pending",now()).run();
-        return json({ ok: true }, 201, origin);
-      }
-      if (path.startsWith("/api/requests/") && request.method === "PATCH") {
-        if (!canWrite(actor.role)) return json({ error: "المشرف للعرض فقط" }, 403, origin);
-        const requestId = path.split("/").pop()!;
-        const b = await request.json() as { status?: "approved"|"rejected" };
-        if (!b.status) return json({ error: "الحالة مطلوبة" }, 400, origin);
-        await env.DB.prepare("UPDATE requests SET status=? WHERE id=?").bind(b.status, requestId).run();
-        return json({ ok: true }, 200, origin);
-      }
-
-      return json({ error: "المسار غير موجود" }, 404, origin);
-    } catch (error) {
-      console.error(error);
-      return json({ error: "خطأ داخلي في الخادم" }, 500, origin);
-    }
-  },
-};
+export default {async fetch(request:Request,env:Env){const origin=env.APP_ORIGIN||"*";if(request.method==="OPTIONS")return json({},204,origin);const url=new URL(request.url),path=url.pathname.replace(/\/$/,"");try{await ensureSchema(env);await ensureOwner(env);if(path==="/api/health")return json({ok:true,service:"hadir-api",time:now()},200,origin);
+if(path==="/api/auth/login"&&request.method==="POST"){const b=await request.json() as any,u=(b.username||"").trim(),p=b.password||"";const a=await env.DB.prepare("SELECT id,username,password_hash,name,role,active FROM admin_accounts WHERE username=? LIMIT 1").bind(u).first<any>();if(a&&a.active&&await passwordVerify(p,a.password_hash)){const actor:Actor={id:a.id,username:a.username,name:a.name,role:a.role};await audit(env,a.name,`${a.role}-login`,"success",request);return json({token:await sign(actor,env.JWT_SECRET),user:actor,kind:"admin"},200,origin)}const e=await env.DB.prepare("SELECT * FROM employees WHERE job_number=? LIMIT 1").bind(u).first<any>();if(!e||e.status!=="active"||!(await passwordVerify(p,e.pin_hash))){await audit(env,e?.name||u,"login","rejected",request,e?.id||null,u,"invalid-credentials");return json({error:"رقم الموظف أو رمز PIN غير صحيح"},401,origin)}const device=b.deviceId||request.headers.get("x-device-id")||"";if(device&&e.device_id&&e.device_id!==device)return json({error:"هذا الحساب مرتبط بجهاز آخر. اطلب من الإدارة إعادة تعيين الجهاز."},403,origin);if(device&&!e.device_id)await env.DB.prepare("UPDATE employees SET device_id=? WHERE id=?").bind(device,e.id).run();const actor:Actor={id:e.id,username:e.job_number,name:e.name,role:"staff"};await audit(env,e.name,"login","success",request,e.id,e.job_number);return json({token:await sign(actor,env.JWT_SECRET),user:row(e),kind:"employee"},200,origin)}
+const actor=await auth(request,env);if(!actor)return json({error:"غير مصرح"},401,origin);if(path==="/api/me")return json({user:actor},200,origin);
+if(path==="/api/admins"&&request.method==="GET"){if(!canRead(actor.role))return json({error:"غير مصرح"},403,origin);const r=await env.DB.prepare("SELECT id,username,name,role,active,created_at AS createdAt FROM admin_accounts ORDER BY name").all();return json(r.results,200,origin)}
+if(path==="/api/admins"&&request.method==="POST"){if(!canAdmin(actor.role))return json({error:"المالك فقط"},403,origin);const b=await request.json() as any;if(!b.username||!b.password||!b.name||!["manager","supervisor"].includes(b.role))return json({error:"بيانات الحساب غير مكتملة"},400,origin);try{await env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)").bind(id(),b.username.trim(),await passwordHash(b.password),b.name.trim(),b.role,1,now()).run();return json({ok:true},201,origin)}catch{return json({error:"اسم المستخدم مستخدم مسبقًا"},409,origin)}}
+if(path.startsWith("/api/admins/")&&request.method==="PATCH"){if(!canAdmin(actor.role))return json({error:"المالك فقط"},403,origin);const aid=path.split("/").pop()!,b=await request.json() as any;if(b.password)await env.DB.prepare("UPDATE admin_accounts SET password_hash=? WHERE id=? AND role!='owner'").bind(await passwordHash(b.password),aid).run();if(b.name!==undefined||b.active!==undefined)await env.DB.prepare("UPDATE admin_accounts SET name=COALESCE(?,name),active=COALESCE(?,active) WHERE id=? AND role!='owner'").bind(b.name??null,b.active===undefined?null:(b.active?1:0),aid).run();return json({ok:true},200,origin)}
+if(path.startsWith("/api/admins/")&&request.method==="DELETE"){if(!canAdmin(actor.role))return json({error:"المالك فقط"},403,origin);await env.DB.prepare("DELETE FROM admin_accounts WHERE id=? AND role!='owner'").bind(path.split("/").pop()!).run();return json({ok:true},200,origin)}
+if(path==="/api/employees"&&request.method==="GET"){if(!canRead(actor.role))return json({error:"غير مصرح"},403,origin);const r=await env.DB.prepare("SELECT * FROM employees ORDER BY name").all();return json(r.results.map(row),200,origin)}
+if(path==="/api/employees"&&request.method==="POST"){if(!canWrite(actor.role))return json({error:"لا تملك صلاحية الكتابة"},403,origin);const b=await request.json() as any;if(!b.jobNumber||!b.name||!b.pin)return json({error:"بيانات الموظف غير مكتملة"},400,origin);const eid=b.id||id();try{await env.DB.prepare("INSERT INTO employees(id,job_number,name,pin_hash,status,device_id,device_label,created_at,schedule_type,rotation_start_date,work_start_time,work_end_time,grace_period_minutes,role,location_id,rotation_days_on,rotation_days_off,specialties_json,work_days_json,avatar) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(eid,b.jobNumber.trim(),b.name.trim(),await passwordHash(b.pin),b.status||"active",b.deviceId||null,b.deviceLabel||null,b.createdAt||now(),b.scheduleType||"ADMIN",b.rotationStartDate||null,b.workStartTime||null,b.workEndTime||null,b.gracePeriodMinutes??10,b.role||"staff",b.locationId||null,b.rotationDaysOn??null,b.rotationDaysOff??null,JSON.stringify(b.specialties||[]),JSON.stringify(b.workDays||[]),b.avatar||null).run();return json({ok:true,employee:row(await env.DB.prepare("SELECT * FROM employees WHERE id=?").bind(eid).first<any>())},201,origin)}catch{return json({error:"الرقم الوظيفي مستخدم مسبقًا"},409,origin)}}
+if(path.startsWith("/api/employees/")&&request.method==="PATCH"){if(!canWrite(actor.role))return json({error:"لا تملك صلاحية الكتابة"},403,origin);const eid=path.split("/").pop()!,b=await request.json() as any;const cur=await env.DB.prepare("SELECT * FROM employees WHERE id=?").bind(eid).first<any>();if(!cur)return json({error:"الموظف غير موجود"},404,origin);if(b.pin)await env.DB.prepare("UPDATE employees SET pin_hash=? WHERE id=?").bind(await passwordHash(b.pin),eid).run();await env.DB.prepare("UPDATE employees SET job_number=COALESCE(?,job_number),name=COALESCE(?,name),status=COALESCE(?,status),device_id=COALESCE(?,device_id),device_label=COALESCE(?,device_label),schedule_type=COALESCE(?,schedule_type),rotation_start_date=COALESCE(?,rotation_start_date),work_start_time=COALESCE(?,work_start_time),work_end_time=COALESCE(?,work_end_time),grace_period_minutes=COALESCE(?,grace_period_minutes),role=COALESCE(?,role),location_id=COALESCE(?,location_id),rotation_days_on=COALESCE(?,rotation_days_on),rotation_days_off=COALESCE(?,rotation_days_off),specialties_json=COALESCE(?,specialties_json),work_days_json=COALESCE(?,work_days_json),avatar=COALESCE(?,avatar) WHERE id=?").bind(b.jobNumber??null,b.name??null,b.status??null,b.deviceId??null,b.deviceLabel??null,b.scheduleType??null,b.rotationStartDate??null,b.workStartTime??null,b.workEndTime??null,b.gracePeriodMinutes??null,b.role??null,b.locationId??null,b.rotationDaysOn??null,b.rotationDaysOff??null,b.specialties?JSON.stringify(b.specialties):null,b.workDays?JSON.stringify(b.workDays):null,b.avatar??null,eid).run();return json({ok:true,employee:row(await env.DB.prepare("SELECT * FROM employees WHERE id=?").bind(eid).first<any>())},200,origin)}
+if(path.startsWith("/api/employees/")&&path.endsWith("/device")&&request.method==="DELETE"){if(!canWrite(actor.role))return json({error:"غير مصرح"},403,origin);await env.DB.prepare("UPDATE employees SET device_id=NULL,device_label=NULL WHERE id=?").bind(path.split("/")[3]).run();return json({ok:true},200,origin)}
+if(path.startsWith("/api/employees/")&&request.method==="DELETE"){if(!canWrite(actor.role))return json({error:"لا تملك صلاحية الحذف"},403,origin);await env.DB.prepare("DELETE FROM employees WHERE id=?").bind(path.split("/").pop()!).run();return json({ok:true},200,origin)}
+if(path==="/api/attendance"&&request.method==="GET"){const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),2000);const r=actor.role==="staff"?await env.DB.prepare("SELECT * FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT ?").bind(actor.id,limit).all():await env.DB.prepare("SELECT * FROM attendance ORDER BY timestamp DESC LIMIT ?").bind(limit).all();return json(r.results,200,origin)}
+if(path==="/api/attendance"&&request.method==="POST"){const b=await request.json() as any;if(actor.role==="staff"&&b.employeeId!==actor.id)return json({error:"غير مصرح"},403,origin);if(actor.role!=="staff"&&!canWrite(actor.role))return json({error:"غير مصرح"},403,origin);const e=await env.DB.prepare("SELECT * FROM employees WHERE id=?").bind(b.employeeId).first<any>();if(!e)return json({error:"الموظف غير موجود"},404,origin);await env.DB.prepare("INSERT INTO attendance(id,employee_id,job_number,employee_name,type,timestamp,lat,lng,distance_meters,device_id,ip,qr_code,location_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id(),e.id,e.job_number,e.name,b.type,b.timestamp||now(),Number(b.lat)||0,Number(b.lng)||0,Number(b.distanceMeters)||0,b.deviceId||e.device_id||"",request.headers.get("CF-Connecting-IP")||"unknown",b.qrCode||"",b.locationId||null).run();return json({ok:true},201,origin)}
+if(path==="/api/requests"&&request.method==="GET"){const r=actor.role==="staff"?await env.DB.prepare("SELECT * FROM requests WHERE employee_id=? ORDER BY created_at DESC").bind(actor.id).all():await env.DB.prepare("SELECT * FROM requests ORDER BY created_at DESC").all();return json(r.results,200,origin)}
+if(path==="/api/requests"&&request.method==="POST"){const b=await request.json() as any;if(actor.role==="staff"&&b.employeeId!==actor.id)return json({error:"غير مصرح"},403,origin);await env.DB.prepare("INSERT INTO requests(id,employee_id,employee_name,job_number,type,reason,status,created_at) VALUES(?,?,?,?,?,?,?,?)").bind(id(),b.employeeId,b.employeeName||actor.name,b.jobNumber,b.type,b.reason||null,"pending",now()).run();return json({ok:true},201,origin)}
+if(path.startsWith("/api/requests/")&&request.method==="PATCH"){if(!canWrite(actor.role))return json({error:"غير مصرح"},403,origin);const b=await request.json() as any;if(!["approved","rejected"].includes(b.status))return json({error:"حالة غير صحيحة"},400,origin);await env.DB.prepare("UPDATE requests SET status=? WHERE id=?").bind(b.status,path.split("/").pop()!).run();return json({ok:true},200,origin)}
+if(path==="/api/audit"&&request.method==="GET"){if(!canRead(actor.role))return json({error:"غير مصرح"},403,origin);const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),2000);const r=await env.DB.prepare("SELECT * FROM audit ORDER BY timestamp DESC LIMIT ?").bind(limit).all();return json(r.results,200,origin)}
+if(path==="/api/settings"&&request.method==="GET"){if(!canRead(actor.role))return json({error:"غير مصرح"},403,origin);const r=await env.DB.prepare("SELECT key,value FROM settings").all();return json(Object.fromEntries(r.results.map((x:any)=>[x.key,JSON.parse(x.value)])),200,origin)}
+if(path==="/api/settings"&&request.method==="PUT"){if(!canWrite(actor.role))return json({error:"غير مصرح"},403,origin);const b=await request.json() as Record<string,unknown>;await env.DB.batch(Object.entries(b).map(([k,v])=>env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(k,JSON.stringify(v))));return json({ok:true},200,origin)}
+if(path==="/api/locations"&&request.method==="GET"){if(!canRead(actor.role))return json({error:"غير مصرح"},403,origin);const r=await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name").all();return json(r.results,200,origin)}
+if(path==="/api/locations"&&request.method==="PUT"){if(!canWrite(actor.role))return json({error:"غير مصرح"},403,origin);const b=await request.json() as any;await env.DB.prepare("INSERT INTO locations(id,name,lat,lng,radius_meters) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,lat=excluded.lat,lng=excluded.lng,radius_meters=excluded.radius_meters").bind(b.id||id(),b.name,Number(b.lat),Number(b.lng),Number(b.radiusMeters)).run();return json({ok:true},200,origin)}
+return json({error:"المسار غير موجود"},404,origin)}catch(error){console.error(error);return json({error:"خطأ داخلي في الخادم"},500,origin)}}};
