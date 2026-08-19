@@ -67,7 +67,7 @@ jobs:
             OWNER_PASSWORD: process.env.OWNER_PASSWORD
           };
           if (Object.values(values).some(v => !v)) throw new Error('Required Worker secret is empty');
-          fs.writeFileSync('.worker-secrets.json', JSON.stringify(values) + '\n', {mode: 0o600});
+          fs.writeFileSync('.worker-secrets.json', JSON.stringify(values) + '\n', {mode:0o600});
           NODE
 
       - name: Validate Worker configuration
@@ -75,6 +75,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --dry-run --secrets-file .worker-secrets.json
+
+      - name: Persist Worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler secret bulk .worker-secrets.json
 
       - name: Deploy Worker with D1 and Worker secrets
         env:
@@ -109,7 +115,7 @@ jobs:
           printf '%s\n' "$URL" > /tmp/hadir-worker-url
           echo "Worker endpoint: $URL"
 
-      - name: Verify deployed API and initialize owner in D1
+      - name: Verify D1 and initialize owner from Worker secrets
         shell: bash
         env:
           OWNER_USERNAME: ${{ secrets.OWNER_USERNAME || secrets.HADIR_OWNER_USERNAME }}
@@ -121,21 +127,14 @@ jobs:
           if [[ -z "$BASE_URL" && -f /tmp/hadir-worker-url ]]; then BASE_URL=$(cat /tmp/hadir-worker-url); fi
           if [[ -z "$BASE_URL" ]]; then echo 'Worker URL was not discovered' >&2; exit 1; fi
           BASE_URL="${BASE_URL%/}"
-          echo "Checking $BASE_URL/api/health"
-          for i in {1..12}; do
-            if curl -fsS --max-time 15 "$BASE_URL/api/health"; then
-              echo
-              break
-            fi
-            if [[ "$i" == "12" ]]; then
-              echo "Worker health check failed" >&2
-              exit 1
-            fi
-            sleep 5
-          done
+
+          echo "Bootstrapping D1 through Worker health endpoint"
+          HEALTH=$(curl -fsS --max-time 20 "$BASE_URL/api/health")
+          echo "$HEALTH"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok || x.database!=="D1" || x.ownerInitialized!==true) { console.error("D1 owner bootstrap was not confirmed"); process.exit(1) }' "$HEALTH"
 
           echo "Checking owner login without printing credentials"
-          HTTP_CODE=$(curl -sS -o /tmp/hadir-login.json -w '%{http_code}' --max-time 15 \
+          HTTP_CODE=$(curl -sS -o /tmp/hadir-login.json -w '%{http_code}' --max-time 20 \
             -H 'content-type: application/json' \
             -d "$(node -e 'process.stdout.write(JSON.stringify({username:process.env.OWNER_USERNAME,password:process.env.OWNER_PASSWORD}))')" \
             "$BASE_URL/api/auth/login")
@@ -144,7 +143,7 @@ jobs:
             cat /tmp/hadir-login.json >&2 || true
             exit 1
           fi
-          node -e 'const x=require("/tmp/hadir-login.json"); if(!x.token || !x.user || x.user.role!=="owner") process.exit(1); console.log("Owner account is present and login works")'
+          node -e 'const x=require("/tmp/hadir-login.json"); if(!x.token || !x.user || x.user.role!=="owner") process.exit(1); console.log("Owner account is present in D1 and login works")'
 
       - name: Remove temporary secrets and deployment response
         if: always()
