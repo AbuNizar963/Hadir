@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { getNotifications, markAsRead as markNotificationAsRead } from "@/lib/notifications";
 import type { AppNotification } from "@/lib/notifications";
 import { getManagerSession, setManagerSession } from "@/lib/storage";
+import { backendLogout } from "@/lib/backend";
 
 const NAV = [
   { to: "/manager", label: "لوحة القيادة", end: true },
@@ -19,7 +20,7 @@ export default function ManagerLayout({title,subtitle,actions,children}:{title:s
   const [notifications,setNotifications]=useState<AppNotification[]>([]); const [showNotifications,setShowNotifications]=useState(false); const [menuOpen,setMenuOpen]=useState(false); const [themeMenuOpen,setThemeMenuOpen]=useState(false); const [theme,setTheme]=useState("system");
   useEffect(()=>{const load=()=>{try{const all=getNotifications();setNotifications(Array.isArray(all)?all.filter(n=>n.userId==="manager"||n.userId==="admin"||n.userId==="all"):[]);}catch(e){console.error(e)}};load();const i=setInterval(load,3000);return()=>clearInterval(i)},[]);
   const unreadCount=notifications.filter(n=>!n.read).length;
-  const logout=()=>{localStorage.removeItem("managerAuth");setManagerSession(null);nav("/manager/login");};
+  const logout=()=>{localStorage.removeItem("managerAuth");backendLogout();setManagerSession(null);nav("/manager/login");};
   const filteredNav=NAV.filter(n=>!n.editRoles||n.editRoles.includes(currentRole));
   useEffect(()=>{if(theme==="system")document.documentElement.classList.toggle("dark",window.matchMedia("(prefers-color-scheme: dark)").matches);else document.documentElement.classList.toggle("dark",theme==="dark")},[theme]);
   return <div className="min-h-screen bg-background text-foreground">
