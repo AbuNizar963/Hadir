@@ -1,89 +1,33 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
-import { getSettings, setManagerSession } from "@/lib/storage";
-import { hash } from "@/lib/hash";
+import { loginManager } from "@/lib/auth";
 
 export default function ManagerLogin() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const submit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setErr(null);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (loading) return;
+
+    setError(null);
     setLoading(true);
 
-    try {
-      const settings = getSettings();
-      const hashedPw = hash(pw);
-      let matchedRole = "";
-      let matchedName = "";
-
-      const inputUser = username.trim();
-
-      // 1. التحقق الذكي والصارم للمالك (سواء أدخل AbuNizar أو اسم المالك المخزن أو كلمة المرور الخاصة بالمالك)
-      if (
-        inputUser === "AbuNizar" ||
-        inputUser === (settings.ownerUsername || "owner") ||
-        hashedPw === settings.ownerPasswordHash ||
-        pw === "963963963"
-      ) {
-        // إذا كان كلمة المرور صحيحة للمالك أو اسم المستخدم AbuNizar
-        if (
-          inputUser === "AbuNizar" ||
-          hashedPw === settings.ownerPasswordHash ||
-          pw === "963963963" ||
-          inputUser === settings.ownerUsername
-        ) {
-          matchedRole = "owner";
-          matchedName = settings.ownerName || "المالك";
-        }
-      }
-
-      // 2. التحقق من حساب المدير العام
-      if (!matchedRole && settings.managerUsername && inputUser === settings.managerUsername) {
-        if (hashedPw === settings.managerPasswordHash || pw === "manager123") {
-          matchedRole = "manager";
-          matchedName = settings.managerName || "مدير عام";
-        }
-      }
-
-      // 3. التحقق من حساب المشرف
-      if (!matchedRole && settings.supervisorUsername && inputUser === settings.supervisorUsername) {
-        if (hashedPw === settings.supervisorPasswordHash || pw === "super123") {
-          matchedRole = "supervisor";
-          matchedName = settings.supervisorName || "المشرف";
-        }
-      }
-
-      // احتياط إضافي: إذا كتب اسم المستخدم AbuNizar بأي شكل نعطيه المالك فوراً
-      if (!matchedRole && inputUser.toLowerCase() === "abunizar") {
-        matchedRole = "owner";
-        matchedName = "المالك";
-      }
-
-      if (matchedRole) {
-        // حفظ جلسة المدير/المالك بنجاح مع ربط رقم المستخدم (jobNumber) لكي يقرأه النظام بدقة
-        setManagerSession({
-          loginAt: new Date().toISOString(),
-          name: matchedName,
-          role: matchedRole,
-          jobNumber: inputUser,
-        } as any);
-        localStorage.setItem("managerAuth", "true");
-        navigate("/manager");
-      } else {
-        setErr("اسم المستخدم أو كلمة المرور غير صحيحة");
-      }
-    } catch (error) {
-      console.error("Manager login error:", error);
-      setErr("حدث خطأ أثناء محاولة تسجيل الدخول. حاول مرة أخرى.");
-    } finally {
+    window.setTimeout(() => {
+      const result = loginManager(password, username);
       setLoading(false);
-    }
+
+      if (!result.success) {
+        setError(result.reason || "اسم المستخدم أو كلمة المرور غير صحيحة");
+        return;
+      }
+
+      navigate("/manager", { replace: true });
+    }, 150);
   };
 
   return (
@@ -91,52 +35,68 @@ export default function ManagerLogin() {
       <header className="p-5">
         <Brand />
       </header>
+
       <main className="flex-1 grid place-items-center px-5 pb-10">
         <div className="w-full max-w-md hud-card p-7">
           <div className="text-xs mono text-muted-foreground">MANAGER · لوحة التحكم</div>
-          <h1 className="text-2xl font-extrabold mt-1">دخول النظام</h1>
+          <h1 className="text-2xl font-extrabold mt-1">دخول الإدارة</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            أدخل اسم المستخدم وكلمة المرور للوصول لصلاحيات الإدارة (مالك، مدير، مشرف).
+            الحسابات الإدارية التي تم تفعيلها فقط يمكنها الدخول إلى لوحة التحكم.
           </p>
+
           <form onSubmit={submit} className="mt-6 space-y-4">
             <div>
-              <label className="block text-sm font-semibold mb-1.5">اسم المستخدم</label>
+              <label className="block text-sm font-semibold mb-1.5" htmlFor="manager-username">
+                اسم المستخدم
+              </label>
               <input
+                id="manager-username"
                 type="text"
+                autoComplete="username"
                 className="input w-full"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(event) => setUsername(event.target.value)}
                 placeholder="أدخل اسم المستخدم"
                 required
               />
             </div>
+
             <div>
-              <label className="block text-sm font-semibold mb-1.5">كلمة المرور</label>
+              <label className="block text-sm font-semibold mb-1.5" htmlFor="manager-password">
+                كلمة المرور
+              </label>
               <input
+                id="manager-password"
                 type="password"
+                autoComplete="current-password"
                 className="input w-full"
-                value={pw}
-                onChange={(e) => setPw(e.target.value)}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
                 placeholder="أدخل كلمة المرور"
                 required
               />
             </div>
 
-            {err && (
+            {error && (
               <div
                 className="rounded-xl border border-destructive/40 bg-destructive/10 text-destructive-foreground p-3 text-sm"
                 role="alert"
               >
-                {err}
+                {error}
               </div>
             )}
-            <button className="btn-primary w-full py-3" disabled={loading}>
-              {loading ? "جاري التحقق..." : "دخول"}
+
+            <button type="submit" className="btn-primary w-full py-3" disabled={loading}>
+              {loading ? "جاري التحقق..." : "دخول الإدارة"}
             </button>
           </form>
-          <div className="mt-5 text-xs text-center">
+
+          <div className="mt-5 text-xs text-center flex justify-between items-center gap-4">
             <Link to="/" className="text-muted-foreground hover:text-foreground">
               ← العودة للرئيسية
+            </Link>
+            <Link to="/login" className="text-primary hover:underline">
+              دخول الموظفين
             </Link>
           </div>
         </div>
