@@ -26,7 +26,7 @@ export async function isLikelyMockedPosition(_pos: GeoPosition): Promise<{ mocke
 export function getCurrentPosition(): Promise<GeoPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("المتصفح لا يدعم تحديد الموقع الجغرافي."));
+      reject(new Error("Geolocation is not supported by your browser."));
       return;
     }
 
@@ -35,7 +35,7 @@ export function getCurrentPosition(): Promise<GeoPosition> {
     const safetyTimer = setTimeout(() => {
       if (!isDone) {
         isDone = true;
-        reject(new Error("انتهت مهلة استجابة الـ GPS. تأكد من تفعيل الموقع."));
+        reject(new Error("GPS request timed out. Please check your location settings."));
       }
     }, 15000);
 
@@ -63,9 +63,9 @@ export function getCurrentPosition(): Promise<GeoPosition> {
             clearTimeout(safetyTimer);
             
             if (err2.code === 1) {
-              reject(new Error("تم رفض صلاحية الموقع. يرجى السماح للمتصفح بالوصول لموقعك."));
+              reject(new Error("Permission denied. Please allow location access."));
             } else {
-              reject(new Error("تعذر تحديد موقعك. تأكد من تفعيل الـ GPS في الجوال."));
+              reject(new Error("Unable to determine location. Please ensure GPS is enabled."));
             }
           },
           { enableHighAccuracy: false, timeout: 7000, maximumAge: 60000 }
