@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
-import { loginManager } from "@/lib/auth";
+import { loginEmployee } from "@/lib/auth";
+import { getSettings } from "@/lib/storage";
 
-export default function ManagerLogin() {
+export default function EmployeeLogin() {
   const nav = useNavigate();
-  const [username, setUsername] = useState("admin");
-  const [pw, setPw] = useState("");
+  const settings = getSettings();
+  const [jobNumber, setJobNumber] = useState("");
+  const [pin, setPin] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -16,15 +18,13 @@ export default function ManagerLogin() {
     setLoading(true);
 
     setTimeout(() => {
-      const success = loginManager(username, pw);
+      const res = loginEmployee(jobNumber, pin);
       setLoading(false);
 
-      if (!success) {
-        setErr("اسم المستخدم أو كلمة المرور غير صحيحة");
+      if (!res.success) {
+        setErr(res.error || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");
       } else {
-        // حفظ حالة الدخول في التخزين المحلي
-        localStorage.setItem("managerAuth", "true");
-        nav("/manager");
+        nav("/employee");
       }
     }, 250);
   };
@@ -36,32 +36,32 @@ export default function ManagerLogin() {
       </header>
       <main className="flex-1 grid place-items-center px-5 pb-10">
         <div className="w-full max-w-md hud-card p-7">
-          <div className="text-xs mono text-muted-foreground">MANAGER · لوحة التحكم</div>
-          <h1 className="text-2xl font-extrabold mt-1">دخول النظام</h1>
+          <div className="text-xs mono text-muted-foreground">{settings.brandName || "HADIR"} · بوابة الموظفين</div>
+          <h1 className="text-2xl font-extrabold mt-1">تسجيل دخول الموظف</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            أدخل اسم المستخدم وكلمة المرور للوصول لصلاحيات الإدارة.
+            أدخل رقمك الوظيفي ورمز الـ PIN الخاص بك للوصول لنظام الحضور.
           </p>
           <form onSubmit={submit} className="mt-6 space-y-4">
             <div>
-              <label className="block text-sm font-semibold mb-1.5">اسم المستخدم</label>
+              <label className="block text-sm font-semibold mb-1.5">الرقم الوظيفي</label>
               <input
                 type="text"
-                className="input w-full"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="أدخل اسم المستخدم"
+                className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm"
+                value={jobNumber}
+                onChange={(e) => setJobNumber(e.target.value)}
+                placeholder="مثال: 1001"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-1.5">كلمة المرور</label>
+              <label className="block text-sm font-semibold mb-1.5">رمز الـ PIN السري</label>
               <input
                 type="password"
-                className="input w-full"
-                value={pw}
-                onChange={(e) => setPw(e.target.value)}
-                placeholder="أدخل كلمة المرور"
+                className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="أدخل رمز الـ PIN"
                 required
               />
             </div>
@@ -71,13 +71,16 @@ export default function ManagerLogin() {
                 {err}
               </div>
             )}
-            <button className="btn-primary w-full py-3" disabled={loading}>
-              {loading ? "جاري التحقق..." : "دخول"}
+            <button className="btn-primary w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl" disabled={loading}>
+              {loading ? "جاري التحقق..." : "دخول الموظف"}
             </button>
           </form>
-          <div className="mt-5 text-xs text-center">
+          <div className="mt-5 text-xs text-center flex justify-between items-center">
             <Link to="/" className="text-muted-foreground hover:text-foreground">
               ← العودة للرئيسية
+            </Link>
+            <Link to="/manager/login" className="text-primary hover:underline">
+              دخول الإدارة ؟
             </Link>
           </div>
         </div>
