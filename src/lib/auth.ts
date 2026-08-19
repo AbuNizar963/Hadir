@@ -28,7 +28,7 @@ export function loginManager(password:string,username:string):LoginResult{
   if(!inputUser||!inputPassword)return{ok:false,success:false,reason:"اسم المستخدم وكلمة المرور مطلوبان"};
   const accounts=settings.adminAccounts||[];
   const matched=accounts.find(a=>a.active&&a.username.trim()===inputUser&&Boolean(a.passwordHash)&&verify(inputPassword,a.passwordHash));
-  const defaultOwnerLogin=inputUser===DEFAULT_OWNER_USERNAME&&inputPassword===DEFAULT_OWNER_PASSWORD;
+  const defaultOwnerLogin=accounts.length===0&&inputUser===DEFAULT_OWNER_USERNAME&&inputPassword===DEFAULT_OWNER_PASSWORD;
   if(!matched&&!defaultOwnerLogin){log({employeeId:null,jobNumber:inputUser,actorName:inputUser,action:"manager-login-failed",result:"rejected",reason:"اسم المستخدم أو كلمة المرور خاطئة"});return{ok:false,success:false,reason:"اسم المستخدم أو كلمة المرور غير صحيحة"};}
   const account=matched||{id:"owner-account",username:DEFAULT_OWNER_USERNAME,passwordHash:hash(DEFAULT_OWNER_PASSWORD),name:"المالك",role:"owner" as const,active:true,createdAt:new Date(0).toISOString()};
   const action=account.role==="owner"?"owner-login":account.role==="supervisor"?"supervisor-login":"manager-login";
