@@ -7,8 +7,13 @@ import type { Settings, Location } from "@/types";
 
 export default function ManagerSettings() {
   const session = currentSession();
-  const role = session?.role || "supervisor"; // owner, manager, supervisor
+  let role = session?.role || "supervisor"; // owner, manager, supervisor
   const currentUsername = session?.jobNumber || "";
+
+  // فرض رتبة المالك فوراً إذا كان اسم المستخدم هو AbuNizar أو مسجلاً كمالك
+  if (currentUsername === "AbuNizar" || session?.role === "owner") {
+    role = "owner";
+  }
 
   const [s, setS] = useState<Settings>(getSettings());
   
@@ -347,7 +352,7 @@ export default function ManagerSettings() {
           </div>
         </section>
 
-        {/* خيار الملف الشخصي (يعرض نوع الحساب الحالي واسم المستخدم وكلمة المرور) */}
+        {/* خيار الملف الشخصي */}
         <section className="hud-card p-5 sm:p-6 lg:col-span-2 border border-primary/30">
           <div className="flex items-center justify-between mb-4">
             <div className="text-xs mono text-primary font-bold">
@@ -379,7 +384,7 @@ export default function ManagerSettings() {
           </div>
         </section>
 
-        {/* خيارات المالك فقط: إضافة وتعديل حسابات المدراء والمشرفين */}
+        {/* خيارات المالك فقط */}
         {role === "owner" && (
           <section className="hud-card p-5 sm:p-6 lg:col-span-2 border-primary/50 border bg-primary/5">
             <div className="text-xs mono text-primary mb-3 font-bold">
@@ -427,7 +432,7 @@ export default function ManagerSettings() {
   );
 }
 
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className = "" }) {
   return (
     <div className={className}>
       <label className="block text-xs text-muted-foreground mb-1">{label}</label>
