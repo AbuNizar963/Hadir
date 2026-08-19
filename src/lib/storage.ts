@@ -54,13 +54,14 @@ export const defaultSettings: Settings = {
   ownerPasswordHash: hash("963963963"),
   ownerName: "المالك",
 
-  managerUsername: "manager",
-  managerPasswordHash: hash("manager123"),
-  managerName: "مدير عام",
+  // جعل خانات المدير والمشرف الافتراضية فارغة تماماً لتجنب أي تداخل
+  managerUsername: "",
+  managerPasswordHash: "",
+  managerName: "",
 
-  supervisorUsername: "supervisor",
-  supervisorPasswordHash: hash("super123"),
-  supervisorName: "المشرف",
+  supervisorUsername: "",
+  supervisorPasswordHash: "",
+  supervisorName: "",
 
   brandName: "حاضِر",
   brandLogo: null,
@@ -185,71 +186,35 @@ export function seedIfEmpty(): void {
   }
 
   const now = new Date().toISOString();
-  const coreRoles: Employee[] = [
-    {
-      id: "demo-manager",
-      jobNumber: "manager",
-      name: "مدير عام",
-      pinHash: hash("manager123"),
-      status: "active",
-      deviceId: null,
-      deviceLabel: null,
-      createdAt: now,
-      scheduleType: "ADMIN",
-      workStartTime: "08:00",
-      workEndTime: "16:00",
-      gracePeriodMinutes: 10,
-      avatar: null,
-      role: "manager",
-      locationId: null,
-      specialties: ["management"],
-    },
-    {
-      id: "demo-owner",
-      jobNumber: "AbuNizar",
-      name: "مالك الشركة",
-      pinHash: hash("963963963"),
-      status: "active",
-      deviceId: null,
-      deviceLabel: null,
-      createdAt: now,
-      scheduleType: "ADMIN",
-      workStartTime: "08:00",
-      workEndTime: "16:00",
-      gracePeriodMinutes: 10,
-      avatar: null,
-      role: "owner",
-      locationId: null,
-      specialties: ["executive"],
-    },
-    {
-      id: "demo-supervisor",
-      jobNumber: "supervisor",
-      name: "المشرف",
-      pinHash: hash("super123"),
-      status: "active",
-      deviceId: null,
-      deviceLabel: null,
-      createdAt: now,
-      scheduleType: "ADMIN",
-      workStartTime: "08:00",
-      workEndTime: "16:00",
-      gracePeriodMinutes: 10,
-      avatar: null,
-      role: "supervisor",
-      locationId: null,
-      specialties: ["support"],
-    },
-  ];
+  
+  // المالك (AbuNizar) هو الحساب الإداري الوحيد المدمج افتراضياً
+  const ownerRole: Employee = {
+    id: "demo-owner",
+    jobNumber: "AbuNizar",
+    name: "مالك الشركة",
+    pinHash: hash("963963963"),
+    status: "active",
+    deviceId: null,
+    deviceLabel: null,
+    createdAt: now,
+    scheduleType: "ADMIN",
+    workStartTime: "08:00",
+    workEndTime: "16:00",
+    gracePeriodMinutes: 10,
+    avatar: null,
+    role: "owner",
+    locationId: null,
+    specialties: ["executive"],
+  };
 
   const existingEmployees = getEmployees();
   if (existingEmployees.length === 0) {
-    // إذا كانت القائمة فارغة تماماً، نضيف الحسابات الأساسية مع موظف تجريبي أول
+    // البدء فقط بالمالك وموظف عادي تجريبي (بدون أي مدير أو مشرف وهمي)
     const initialList: Employee[] = [
       {
         id: generateId(),
         jobNumber: "1001",
-        name: "أحمد المهندس",
+        name: "أحمد الموظف",
         pinHash: hash("1001"),
         status: "active",
         deviceId: null,
@@ -264,17 +229,20 @@ export function seedIfEmpty(): void {
         locationId: null,
         specialties: ["general"],
       },
-      ...coreRoles,
+      ownerRole,
     ];
     saveEmployees(initialList);
   } else {
-    // التأكد من وجود الحسابات السيادية الأساسية فقط دون المساس بالموظفين الجدد الذين أضافهم المدير
+    // التنظيف التام وإزالة أي مدير أو مشرف افتراضي قديم إن وجد، والابقاء على المالك والموظفين فقط
     let updated = [...existingEmployees];
-    for (const core of coreRoles) {
-      const exists = updated.find((e) => e.jobNumber === core.jobNumber || e.role === core.role);
-      if (!exists) {
-        updated.push(core);
-      }
+    
+    // إزالة الحسابات الافتراضية القديمة للمدير والمشرف إن وجدت
+    updated = updated.filter((e) => e.role !== "manager" && e.role !== "supervisor");
+
+    // التأكد من وجود المالك
+    const ownerExists = updated.find((e) => e.jobNumber === "AbuNizar" || e.role === "owner");
+    if (!ownerExists) {
+      updated.push(ownerRole);
     }
     saveEmployees(updated);
   }
