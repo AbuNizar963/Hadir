@@ -1,26 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getSettings, resetAll, saveSettings } from "@/lib/storage";
+import { currentSession } from "@/lib/auth";
 import { hash } from "@/lib/hash";
 import type { Settings, Location } from "@/types";
 
 export default function ManagerSettings() {
+  const session = currentSession();
+  const role = session?.role || "supervisor"; // owner, manager, supervisor
+  const currentUsername = session?.jobNumber || "";
+
   const [s, setS] = useState<Settings>(getSettings());
   
-  // حالات حقول الصلاحيات الجديدة (المالك، المدراء، المشرفين)
-  const [ownerUsername, setOwnerUsername] = useState(s.ownerUsername || "");
-  const [ownerPassword, setOwnerPassword] = useState("");
+  // حالات تعديل الحساب الحالي
+  const [currentPassword, setCurrentPassword] = useState("");
 
-  const [managerUsername, setManagerUsername] = useState(s.managerUsername || "");
-  const [managerPassword, setManagerPassword] = useState("");
-
-  const [supervisorUsername, setSupervisorUsername] = useState(s.supervisorUsername || "");
-  const [supervisorPassword, setSupervisorPassword] = useState("");
+  // حالات إضافة مدير / مشرف جديد (خاصة بالمالك فقط)
+  const [newManagerUser, setNewManagerUser] = useState("");
+  const [newManagerPass, setNewManagerPass] = useState("");
+  const [newSupervisorUser, setNewSupervisorUser] = useState("");
+  const [newSupervisorPass, setNewSupervisorPass] = useState("");
 
   const [saved, setSaved] = useState(false);
-  const [logoError, setLogoError] = useState<string | null>(null);
   const [loginUrl, setLoginUrl] = useState("");
-  const logoInputRef = useRef<HTMLInputElement>(null);
   const printQrRef = useRef<HTMLDivElement>(null);
 
   // حالة إضافة موقع جديد
@@ -35,33 +37,43 @@ export default function ManagerSettings() {
     }
   }, []);
 
-  // دالة الحفظ المحدثة لتشمل بيانات المالك، المدراء، والمشرفين
   const save = (e: React.FormEvent) => {
     e.preventDefault();
     const next: Settings = { ...s };
     
-    // حفظ بيانات المالك
-    if (ownerUsername) next.ownerUsername = ownerUsername;
-    if (ownerPassword) next.ownerPasswordHash = hash(ownerPassword);
+    // تحديث بيانات الحساب الحالي بناءً على دور المستخدم المدمج بالجلسة
+    if (currentPassword) {
+      const hashedPass = hash(currentPassword);
+      if (role === "owner") {
+        next.ownerPasswordHash = hashedPass;
+      } else if (role === "manager") {
+        next.managerPasswordHash = hashedPass;
+      } else if (role === "supervisor") {
+        next.supervisorPasswordHash = hashedPass;
+      }
+    }
 
-    // حفظ بيانات المدير
-    if (managerUsername) next.managerUsername = managerUsername;
-    if (managerPassword) next.managerPasswordHash = hash(managerPassword);
+    // إذا كان المالك أضاف مديراً جديداً
+    if (role === "owner" && newManagerUser) {
+      next.managerUsername = newManagerUser;
+      if (newManagerPass) next.managerPasswordHash = hash(newManagerPass);
+    }
 
-    // حفظ بيانات المشرف
-    if (supervisorUsername) next.supervisorUsername = supervisorUsername;
-    if (supervisorPassword) next.supervisorPasswordHash = hash(supervisorPassword);
+    // إذا كان المالك أضاف مشرفاً جديداً
+    if (role === "owner" && newSupervisorUser) {
+      next.supervisorUsername = newSupervisorUser;
+      if (newSupervisorPass) next.supervisorPasswordHash = hash(newSupervisorPass);
+    }
     
     saveSettings(next);
-    setOwnerPassword("");
-    setManagerPassword("");
-    setSupervisorPassword("");
+    setCurrentPassword("");
+    setNewManagerPass("");
+    setNewSupervisorPass("");
     setSaved(true);
     alert("تم حفظ الإعدادات بنجاح ✅");
     setTimeout(() => setSaved(false), 1800);
   };
 
-  // دالة توليد رمز QR جديد تلقائياً بحسب التاريخ والوقت
   const generateNewQrCode = () => {
     const dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
     const randomStr = Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -86,7 +98,6 @@ export default function ManagerSettings() {
     );
   };
 
-  // إضافة موقع عمل جديد إلى قائمة المواقع
   const addLocation = () => {
     if (!newLocName.trim()) return alert("يرجى إدخال اسم الموقع");
     const newLocation: Location = {
@@ -101,19 +112,15 @@ export default function ManagerSettings() {
     setNewLocName("");
   };
 
-  // حذف موقع عمل من القائمة
   const removeLocation = (id: string) => {
     const updatedLocations = (s.locations || []).filter((loc) => loc.id !== id);
     setS({ ...s, locations: updatedLocations });
   };
 
-  // طباعة بطاقة الـ QR بكتلة كبيرة ملء صفحة A4
   const printQRCode = () => {
     if (!printQrRef.current) return;
-
     const printWindow = window.open("", "_blank", "width=800,height=1000");
     if (!printWindow) return;
-
     const qrCardHtml = printQrRef.current.innerHTML;
 
     printWindow.document.write(`
@@ -123,189 +130,40 @@ export default function ManagerSettings() {
           <title>طباعة بطاقة QR - تسجيل الحضور</title>
           <style>
             * { box-sizing: border-box; }
-            @page {
-              size: A4 portrait;
-              margin: 0;
-            }
-            body {
-              font-family: system-ui, -apple-system, sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              margin: 0;
-              padding: 20px;
-              background-color: #ffffff;
-            }
-            .print-card {
-              border: 4px solid #1e293b;
-              border-radius: 32px;
-              padding: 48px 32px;
-              text-align: center;
-              width: 90%;
-              max-width: 650px;
-              background: #ffffff;
-              box-shadow: none;
-            }
-            .brand-name {
-              font-size: 48px !important;
-              font-weight: 900 !important;
-              color: #0f172a !important;
-              margin-bottom: 32px !important;
-            }
-            .qr-img {
-              width: 380px !important;
-              height: 380px !important;
-              object-fit: contain;
-              margin: 0 auto 32px !important;
-              display: block;
-            }
-            .url-text {
-              font-size: 16px !important;
-              font-family: monospace;
-              color: #475569 !important;
-              word-break: break-all;
-              direction: ltr;
-              margin-bottom: 24px !important;
-            }
-            .instructions {
-              font-size: 24px !important;
-              font-weight: 800 !important;
-              color: #1e293b !important;
-            }
-            @media print {
-              body { 
-                min-height: 100vh; 
-              }
-            }
+            @page { size: A4 portrait; margin: 0; }
+            body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; background: #fff; }
+            .print-card { border: 4px solid #1e293b; border-radius: 32px; padding: 48px 32px; text-align: center; width: 90%; max-width: 650px; background: #fff; }
+            .brand-name { font-size: 48px !important; font-weight: 900 !important; color: #0f172a !important; margin-bottom: 32px !important; }
+            .qr-img { width: 380px !important; height: 380px !important; object-fit: contain; margin: 0 auto 32px !important; display: block; }
+            .url-text { font-size: 16px !important; font-family: monospace; color: #475569 !important; word-break: break-all; direction: ltr; margin-bottom: 24px !important; }
+            .instructions { font-size: 24px !important; font-weight: 800 !important; color: #1e293b !important; }
           </style>
         </head>
         <body>
-          <div class="print-card">
-            ${qrCardHtml}
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              window.close();
-            };
-          </script>
+          <div class="print-card">${qrCardHtml}</div>
+          <script>window.onload = function() { window.print(); window.close(); };</script>
         </body>
       </html>
     `);
-
     printWindow.document.close();
   };
 
   const doReset = () => {
-    if (
-      !confirm(
-        "سيتم مسح جميع البيانات (موظفين، حضور، سجل تدقيق، إعدادات) واستعادة البيانات الأولية."
-      )
-    )
-      return;
+    if (!confirm("سيتم مسح جميع البيانات واستعادة البيانات الأساسية.")) return;
     resetAll();
     setS(getSettings());
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLogoError(null);
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setLogoError("يرجى اختيار ملف صورة صالح.");
-      return;
-    }
-    if (file.size > 500 * 1024) {
-      setLogoError("حجم الشعار يجب أن يكون أقل من 500 كيلوبايت.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setS({ ...s, brandLogo: reader.result as string });
-    };
-    reader.onerror = () => setLogoError("تعذّر قراءة ملف الصورة.");
-    reader.readAsDataURL(file);
-  };
-
-  const removeLogo = () => {
-    setS({ ...s, brandLogo: null });
-    if (logoInputRef.current) logoInputRef.current.value = "";
-  };
-
-  // توليد رابط صورة الـ QR بدقة عالية على أساس قيمة رمز الـ QR اليومي المحفوظة
   const qrDataToEncode = s.qrCode || loginUrl;
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(
-    qrDataToEncode
-  )}`;
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(qrDataToEncode)}`;
 
   return (
     <ManagerLayout
       title="الإعدادات"
-      subtitle="الهوية البصرية، المواقع المتعددة، النطاق، ومولد QR"
+      subtitle="إدارة المواقع، النطاق، مولد QR، والحسابات"
     >
       <form onSubmit={save} className="grid lg:grid-cols-2 gap-5">
-        {/* الهوية البصرية للمنصة */}
-        <section className="hud-card p-5 sm:p-6 lg:col-span-2">
-          <div className="text-xs mono text-muted-foreground mb-3">
-            BRAND · الهوية البصرية للمنصة
-          </div>
-          <div className="grid sm:grid-cols-[auto,1fr,auto] items-center gap-4">
-            <div className="flex items-center gap-3">
-              {s.brandLogo ? (
-                <img
-                  src={s.brandLogo}
-                  alt="شعار الجهة"
-                  className="h-16 w-16 rounded-2xl object-cover border-2 border-primary/40"
-                />
-              ) : (
-                <div className="h-16 w-16 rounded-2xl bg-secondary/60 border-2 border-dashed border-border grid place-items-center">
-                  <LogoIcon />
-                </div>
-              )}
-            </div>
-            <div className="space-y-2 min-w-0">
-              <Field label="اسم الجهة / المنصة">
-                <input
-                  className="input"
-                  value={s.brandName ?? ""}
-                  onChange={(e) => setS({ ...s, brandName: e.target.value })}
-                  placeholder="حاضِر"
-                />
-              </Field>
-              <div className="text-[11px] text-muted-foreground leading-relaxed">
-                يظهر الاسم والشعار في رأس كل صفحات النظام. الحد الأقصى للحجم 500 كيلوبايت.
-              </div>
-              {logoError && (
-                <div className="text-[11px] text-destructive font-semibold">
-                  {logoError}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 shrink-0">
-              <label className="btn-secondary cursor-pointer text-xs text-center">
-                رفع شعار جديد
-                <input
-                  ref={logoInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="hidden"
-                />
-              </label>
-              {s.brandLogo && (
-                <button
-                  type="button"
-                  onClick={removeLogo}
-                  className="text-[11px] text-destructive hover:brightness-125 font-semibold"
-                >
-                  إزالة الشعار
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-
+        
         {/* موقع مقر العمل الرئيسي */}
         <section className="hud-card p-5 sm:p-6">
           <div className="text-xs mono text-muted-foreground mb-3">
@@ -318,9 +176,7 @@ export default function ManagerSettings() {
                 type="number"
                 step="0.000001"
                 value={s.workSiteLat}
-                onChange={(e) =>
-                  setS({ ...s, workSiteLat: +e.target.value })
-                }
+                onChange={(e) => setS({ ...s, workSiteLat: +e.target.value })}
               />
             </Field>
             <Field label="خط الطول">
@@ -329,9 +185,7 @@ export default function ManagerSettings() {
                 type="number"
                 step="0.000001"
                 value={s.workSiteLng}
-                onChange={(e) =>
-                  setS({ ...s, workSiteLng: +e.target.value })
-                }
+                onChange={(e) => setS({ ...s, workSiteLng: +e.target.value })}
               />
             </Field>
             <Field label="نطاق النقطة (متر)">
@@ -341,293 +195,194 @@ export default function ManagerSettings() {
                 min={20}
                 max={2000}
                 value={s.radiusMeters}
-                onChange={(e) =>
-                  setS({ ...s, radiusMeters: +e.target.value })
-                }
+                onChange={(e) => setS({ ...s, radiusMeters: +e.target.value })}
               />
             </Field>
             <div className="flex items-end">
-              <button
-                type="button"
-                onClick={useCurrentLocation}
-                className="btn-secondary w-full text-xs"
-              >
+              <button type="button" onClick={useCurrentLocation} className="btn-secondary w-full text-xs">
                 استخدام موقعي الحالي
               </button>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-3 leading-6">
-            الموقع الافتراضي لتسجيل الحضور.
-          </p>
         </section>
 
-        {/* إدارة مواقع العمل المتعددة */}
+        {/* إضافة مواقع عمل فرعية جديدة */}
         <section className="hud-card p-5 sm:p-6">
           <div className="text-xs mono text-muted-foreground mb-3">
-            LOCATIONS · إدارة الفروع والمواقع المتعددة
+            LOCATIONS · إضافة مواقع ومقرات عمل أخرى
           </div>
           <div className="space-y-3 mb-4">
-            <Field label="اسم الفرع / الموقع الجديد">
+            <Field label="اسم الموقع الجديد">
               <input
                 className="input"
-                placeholder="مثال: الفرع الإقليمي - حلب"
+                placeholder="مثال: فرع الإدارة الجديدة"
                 value={newLocName}
                 onChange={(e) => setNewLocName(e.target.value)}
               />
             </Field>
             <div className="grid grid-cols-3 gap-2">
               <Field label="خط العرض">
-                <input
-                  type="number"
-                  step="0.000001"
-                  className="input mono text-xs"
-                  value={newLocLat}
-                  onChange={(e) => setNewLocLat(+e.target.value)}
-                />
+                <input type="number" step="0.000001" className="input mono text-xs" value={newLocLat} onChange={(e) => setNewLocLat(+e.target.value)} />
               </Field>
               <Field label="خط الطول">
-                <input
-                  type="number"
-                  step="0.000001"
-                  className="input mono text-xs"
-                  value={newLocLng}
-                  onChange={(e) => setNewLocLng(+e.target.value)}
-                />
+                <input type="number" step="0.000001" className="input mono text-xs" value={newLocLng} onChange={(e) => setNewLocLng(+e.target.value)} />
               </Field>
               <Field label="النطاق (متر)">
-                <input
-                  type="number"
-                  className="input mono text-xs"
-                  value={newLocRadius}
-                  onChange={(e) => setNewLocRadius(+e.target.value)}
-                />
+                <input type="number" className="input mono text-xs" value={newLocRadius} onChange={(e) => setNewLocRadius(+e.target.value)} />
               </Field>
             </div>
-            <button
-              type="button"
-              onClick={addLocation}
-              className="btn-secondary w-full text-xs"
-            >
-              + إضافة الموقع إلى القائمة
+            <button type="button" onClick={addLocation} className="btn-secondary w-full text-xs">
+              + إضافة الموقع إلى قائمة المواقع
             </button>
           </div>
 
-          {/* قائمة المواقع المضافة */}
           {s.locations && s.locations.length > 0 && (
-            <div className="border-t border-border pt-3 space-y-2 max-h-40 overflow-y-auto">
-              <div className="text-xs font-semibold text-muted-foreground">الفروع المضافة:</div>
+            <div className="border-t border-border pt-3 space-y-2 max-h-32 overflow-y-auto">
               {s.locations.map((loc) => (
-                <div
-                  key={loc.id}
-                  className="flex items-center justify-between p-2 rounded-lg bg-secondary/40 text-xs"
-                >
+                <div key={loc.id} className="flex items-center justify-between p-2 rounded-lg bg-secondary/40 text-xs">
                   <div>
                     <span className="font-bold">{loc.name}</span>
-                    <span className="text-muted-foreground block text-[10px] mono">
-                      {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)} ({loc.radiusMeters}m)
-                    </span>
+                    <span className="text-muted-foreground block text-[10px] mono">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeLocation(loc.id)}
-                    className="text-destructive font-bold px-2 py-1 hover:bg-destructive/10 rounded"
-                  >
-                    حذف
-                  </button>
+                  <button type="button" onClick={() => removeLocation(loc.id)} className="text-destructive font-bold px-2 py-1">حذف</button>
                 </div>
               ))}
             </div>
           )}
         </section>
 
-        {/* مولد وطباعة رمز QR اليومي */}
+        {/* مولد رمز QR */}
         <section className="hud-card p-5 sm:p-6 lg:col-span-2">
-          <div className="text-xs mono text-muted-foreground mb-3">
-            QR GENERATOR · إدارة ومولد رمز QR اليومي
-          </div>
+          <div className="text-xs mono text-muted-foreground mb-3">QR GENERATOR · مولد رمز QR اليومي</div>
           <div className="grid md:grid-cols-2 gap-6 items-center">
             <div className="space-y-4">
-              <Field label="رمز QR اليومي">
+              <Field label="رمز QR الحالي">
                 <div className="flex gap-2">
                   <input
                     className="input mono text-xs bg-secondary/30 flex-1"
                     value={s.qrCode || ""}
                     onChange={(e) => setS({ ...s, qrCode: e.target.value })}
-                    placeholder="HADIR-SITE-01-STATIC"
                   />
-                  <button
-                    type="button"
-                    onClick={generateNewQrCode}
-                    className="btn-secondary text-xs shrink-0"
-                  >
+                  <button type="button" onClick={generateNewQrCode} className="btn-secondary text-xs shrink-0">
                     🔄 توليد رمز جديد
                   </button>
                 </div>
               </Field>
-              <p className="text-xs text-muted-foreground leading-6">
-                قم بتوليد رمز جديد يومياً لحماية تسجيل الحضور من التلاعب، ثم اضغط على زر التحديث واطبع البطاقة لعرضها في مدخل مقر العمل.
-              </p>
-              <button
-                type="button"
-                onClick={printQRCode}
-                className="btn-primary text-xs w-full md:w-auto"
-              >
+              <button type="button" onClick={printQRCode} className="btn-primary text-xs w-full md:w-auto">
                 🖨️ طباعة بطاقة QR للموقع
               </button>
             </div>
 
-            {/* معاينة بطاقة الطباعة */}
             <div className="flex justify-center">
-              <div
-                ref={printQrRef}
-                className="p-4 bg-white text-black rounded-xl border border-gray-300 flex flex-col items-center gap-2 shadow-sm text-center w-60"
-              >
-                <div className="brand-name text-sm font-extrabold text-gray-800">
-                  {s.brandName || "حاضِر"}
-                </div>
-                <img
-                  src={qrImageUrl}
-                  alt="QR Code"
-                  className="qr-img w-40 h-40 object-contain border p-1 rounded bg-white"
-                />
-                <div className="url-text text-[10px] font-mono text-gray-600 break-all dir-ltr">
-                  {s.qrCode || loginUrl}
-                </div>
-                <div className="instructions text-[10px] text-gray-500 font-bold">
-                  امسح الرمز لتسجيل الحضور والانصراف
-                </div>
+              <div ref={printQrRef} className="p-4 bg-white text-black rounded-xl border border-gray-300 flex flex-col items-center gap-2 w-60 text-center">
+                <div className="brand-name text-sm font-extrabold text-gray-800">حاضِر</div>
+                <img src={qrImageUrl} alt="QR" className="qr-img w-40 h-40 object-contain border p-1 rounded bg-white" />
+                <div className="url-text text-[10px] font-mono text-gray-600 break-all dir-ltr">{s.qrCode || loginUrl}</div>
+                <div className="instructions text-[10px] text-gray-500 font-bold">امسح الرمز لتسجيل الحضور</div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* إعدادات المالك (اسم المستخدم وكلمة المرور) */}
+        {/* 1. حساب المالك أو المدير أو المشرف (حسب الجلسة الحالية) */}
         <section className="hud-card p-5 sm:p-6 lg:col-span-2">
           <div className="text-xs mono text-muted-foreground mb-3">
-            OWNER CONFIG · إعدادات حساب المالك
+            ACCOUNT SETTINGS · إعدادات الحساب الحالي ({role.toUpperCase()})
           </div>
           <div className="grid md:grid-cols-2 gap-4">
-            <Field label="اسم مستخدم المالك">
-              <input
-                className="input"
-                value={ownerUsername}
-                onChange={(e) => setOwnerUsername(e.target.value)}
-                placeholder="أدخل اسم مستخدم المالك"
-              />
+            <Field label="اسم المستخدم الحالي">
+              <input className="input bg-secondary/50" value={currentUsername} disabled />
             </Field>
-            <Field label="كلمة مرور المالك الجديدة">
+            <Field label="تغيير كلمة المرور الجديدة">
               <input
                 type="password"
                 className="input"
-                value={ownerPassword}
-                onChange={(e) => setOwnerPassword(e.target.value)}
-                placeholder="•••••••• (اتركها فارغة للإبقاء عليها)"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="•••••••• (اتركها فارغة إن لمن ترد التغيير)"
               />
             </Field>
           </div>
         </section>
 
-        {/* إعدادات المدراء (صلاحيات المدير) */}
-        <section className="hud-card p-5 sm:p-6 lg:col-span-2">
-          <div className="text-xs mono text-muted-foreground mb-3">
-            MANAGERS CONFIG · إعدادات حسابات المدراء
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="اسم مستخدم المدير">
-              <input
-                className="input"
-                value={managerUsername}
-                onChange={(e) => setManagerUsername(e.target.value)}
-                placeholder="أدخل اسم مستخدم المدير"
-              />
-            </Field>
-            <Field label="كلمة مرور المدير الجديدة">
-              <input
-                type="password"
-                className="input"
-                value={managerPassword}
-                onChange={(e) => setManagerPassword(e.target.value)}
-                placeholder="•••••••• (اتركها فارغة للإبقاء عليها)"
-              />
-            </Field>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">يملك المدير صلاحيات إدارة الموظفين، التقارير، وسجل التدقيق.</p>
-        </section>
+        {/* 2. خيارات المالك فقط: إضافة مدير جديد أو مشرف جديد */}
+        {role === "owner" && (
+          <section className="hud-card p-5 sm:p-6 lg:col-span-2 border-primary/40 border">
+            <div className="text-xs mono text-primary mb-3 font-bold">
+              OWNER EXCLUSIVE · إنشاء وتعديل صلاحيات المدراء والمشرفين
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* إضافة مدير */}
+              <div className="space-y-3 p-4 rounded-xl bg-secondary/20">
+                <div className="text-xs font-bold">إدارة حساب المدير</div>
+                <Field label="اسم مستخدم المدير">
+                  <input
+                    className="input"
+                    value={newManagerUser || s.managerUsername || ""}
+                    onChange={(e) => setNewManagerUser(e.target.value)}
+                    placeholder="اسم المدير الجديد"
+                  />
+                </Field>
+                <Field label="كلمة المرور الجديدة للمدير">
+                  <input
+                    type="password"
+                    className="input"
+                    value={newManagerPass}
+                    onChange={(e) => setNewManagerPass(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </Field>
+              </div>
 
-        {/* إعدادات المشرفين (صلاحيات المشرف) */}
-        <section className="hud-card p-5 sm:p-6 lg:col-span-2">
-          <div className="text-xs mono text-muted-foreground mb-3">
-            SUPERVISORS CONFIG · إعدادات حسابات المشرفين
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="اسم مستخدم المشرف">
-              <input
-                className="input"
-                value={supervisorUsername}
-                onChange={(e) => setSupervisorUsername(e.target.value)}
-                placeholder="أدخل اسم مستخدم المشرف"
-              />
-            </Field>
-            <Field label="كلمة مرور المشرف الجديدة">
-              <input
-                type="password"
-                className="input"
-                value={supervisorPassword}
-                onChange={(e) => setSupervisorPassword(e.target.value)}
-                placeholder="•••••••• (اتركها فارغة للإبقاء عليها)"
-              />
-            </Field>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">يملك المشرف صلاحيات متابعة الحضور والانصراف بصفة إشرافية.</p>
-        </section>
+              {/* إضافة مشرف */}
+              <div className="space-y-3 p-4 rounded-xl bg-secondary/20">
+                <div className="text-xs font-bold">إدارة حساب المشرف</div>
+                <Field label="اسم مستخدم المشرف">
+                  <input
+                    className="input"
+                    value={newSupervisorUser || s.supervisorUsername || ""}
+                    onChange={(e) => setNewSupervisorUser(e.target.value)}
+                    placeholder="اسم المشرف الجديد"
+                  />
+                </Field>
+                <Field label="كلمة المرور الجديدة للمشرف">
+                  <input
+                    type="password"
+                    className="input"
+                    value={newSupervisorPass}
+                    onChange={(e) => setNewSupervisorPass(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </Field>
+              </div>
+            </div>
+          </section>
+        )}
 
-        {/* أزرار الحفظ وإعادة التعيين */}
+        {/* أزرار الحفظ */}
         <div className="lg:col-span-2 flex flex-wrap items-center gap-3">
           <button className="btn-primary">حفظ الإعدادات</button>
           {saved && <span className="text-primary text-sm">تم الحفظ ✓</span>}
-          <div className="flex-1" />
-          <button
-            type="button"
-            onClick={doReset}
-            className="btn-danger text-xs"
-          >
-            إعادة تعيين كل البيانات
-          </button>
+          {role === "owner" && (
+            <>
+              <div className="flex-1" />
+              <button type="button" onClick={doReset} className="btn-danger text-xs">
+                إعادة تعيين كل البيانات
+              </button>
+            </>
+          )}
         </div>
       </form>
     </ManagerLayout>
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
       <label className="block text-xs text-muted-foreground mb-1">{label}</label>
       {children}
     </div>
-  );
-}
-
-function LogoIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-7 w-7 text-muted-foreground"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="3" />
-      <circle cx="9" cy="9" r="2" />
-      <path d="M21 15l-5-5L5 21" />
-    </svg>
   );
 }
