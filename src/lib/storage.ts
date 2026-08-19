@@ -9,12 +9,7 @@ import type {
 import { hash } from "@/lib/hash";
 import { generateId } from "@/lib/utils";
 
-// Re-export types used by callers that import from this module.
 export type { EmployeeRequest, RequestType } from "@/types";
-
-/* ------------------------------------------------------------------ */
-/*  Storage keys                                                       */
-/* ------------------------------------------------------------------ */
 
 const K = {
   EMPLOYEES: "hadir.employees",
@@ -25,10 +20,6 @@ const K = {
   SESSION: "hadir.session",
   MANAGER_SESSION: "hadir.manager_session",
 } as const;
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -50,10 +41,6 @@ function write<T>(key: string, value: T): void {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Settings                                                           */
-/* ------------------------------------------------------------------ */
-
 export const defaultSettings: Settings = {
   qrCode: "HADIR-SITE-01-STATIC",
   workSiteLat: 24.7136,
@@ -63,7 +50,6 @@ export const defaultSettings: Settings = {
   workEnd: "16:00",
   lateGraceMinutes: 10,
   
-  // بيانات المالك الافتراضية الجديدة
   ownerUsername: "AbuNizar",
   ownerPasswordHash: hash("963963963"),
   ownerName: "المالك",
@@ -94,10 +80,6 @@ export function saveSettings(next: Settings): void {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Employees                                                          */
-/* ------------------------------------------------------------------ */
-
 export function getEmployees(): Employee[] {
   return read<Employee[]>(K.EMPLOYEES, []);
 }
@@ -105,10 +87,6 @@ export function getEmployees(): Employee[] {
 export function saveEmployees(list: Employee[]): void {
   write(K.EMPLOYEES, list);
 }
-
-/* ------------------------------------------------------------------ */
-/*  Attendance                                                         */
-/* ------------------------------------------------------------------ */
 
 export function getAttendance(): AttendanceRecord[] {
   return read<AttendanceRecord[]>(K.ATTENDANCE, []);
@@ -120,10 +98,6 @@ export function addAttendance(rec: AttendanceRecord): void {
   write(K.ATTENDANCE, list);
 }
 
-/* ------------------------------------------------------------------ */
-/*  Audit log                                                          */
-/* ------------------------------------------------------------------ */
-
 export function getAudit(): AuditEntry[] {
   return read<AuditEntry[]>(K.AUDIT, []);
 }
@@ -133,10 +107,6 @@ export function addAudit(entry: AuditEntry): void {
   list.unshift(entry);
   write(K.AUDIT, list);
 }
-
-/* ------------------------------------------------------------------ */
-/*  Employee requests                                                   */
-/* ------------------------------------------------------------------ */
 
 export function getRequests(): EmployeeRequest[] {
   return read<EmployeeRequest[]>(K.REQUESTS, []);
@@ -166,10 +136,6 @@ export function updateRequestStatus(
   );
   write(K.REQUESTS, list);
 }
-
-/* ------------------------------------------------------------------ */
-/*  Sessions                                                           */
-/* ------------------------------------------------------------------ */
 
 export interface Session {
   employeeId: string;
@@ -210,52 +176,18 @@ export function setManagerSession(s: ManagerSession | null): void {
   write(K.MANAGER_SESSION, s);
 }
 
-/* ------------------------------------------------------------------ */
-/*  Seed / reset                                                       */
-/* ------------------------------------------------------------------ */
-
 export function seedIfEmpty(): void {
   if (typeof window === "undefined") return;
 
   const currentSettings = read<Settings | null>(K.SETTINGS, null);
   if (!currentSettings) {
     saveSettings({ ...defaultSettings });
-  } else {
-    saveSettings({
-      ...defaultSettings,
-      ...currentSettings,
-      ownerUsername: "AbuNizar",
-      ownerPasswordHash: hash("963963963"),
-      managerUsername: "manager",
-      managerPasswordHash: hash("manager123"),
-      supervisorUsername: "supervisor",
-      supervisorPasswordHash: hash("super123"),
-    });
   }
 
   const now = new Date().toISOString();
-  const demo: Employee[] = [
+  const coreRoles: Employee[] = [
     {
-      id: generateId(),
-      jobNumber: "1001",
-      name: "أحمد المهندس",
-      pinHash: hash("1001"),
-      status: "active",
-      deviceId: null,
-      deviceLabel: null,
-      createdAt: now,
-      scheduleType: "ADMIN",
-      workStartTime: "08:00",
-      workEndTime: "16:00",
-      gracePeriodMinutes: 10,
-      rotationStartDate: null,
-      avatar: null,
-      role: "staff",
-      locationId: null,
-      specialties: ["general"],
-    },
-    {
-      id: generateId(),
+      id: "demo-manager",
       jobNumber: "manager",
       name: "مدير عام",
       pinHash: hash("manager123"),
@@ -273,7 +205,7 @@ export function seedIfEmpty(): void {
       specialties: ["management"],
     },
     {
-      id: generateId(),
+      id: "demo-owner",
       jobNumber: "AbuNizar",
       name: "مالك الشركة",
       pinHash: hash("963963963"),
@@ -291,7 +223,7 @@ export function seedIfEmpty(): void {
       specialties: ["executive"],
     },
     {
-      id: generateId(),
+      id: "demo-supervisor",
       jobNumber: "supervisor",
       name: "المشرف",
       pinHash: hash("super123"),
@@ -312,24 +244,36 @@ export function seedIfEmpty(): void {
 
   const existingEmployees = getEmployees();
   if (existingEmployees.length === 0) {
-    saveEmployees(demo);
+    // إذا كانت القائمة فارغة تماماً، نضيف الحسابات الأساسية مع موظف تجريبي أول
+    const initialList: Employee[] = [
+      {
+        id: generateId(),
+        jobNumber: "1001",
+        name: "أحمد المهندس",
+        pinHash: hash("1001"),
+        status: "active",
+        deviceId: null,
+        deviceLabel: null,
+        createdAt: now,
+        scheduleType: "ADMIN",
+        workStartTime: "08:00",
+        workEndTime: "16:00",
+        gracePeriodMinutes: 10,
+        avatar: null,
+        role: "staff",
+        locationId: null,
+        specialties: ["general"],
+      },
+      ...coreRoles,
+    ];
+    saveEmployees(initialList);
   } else {
+    // التأكد من وجود الحسابات السيادية الأساسية فقط دون المساس بالموظفين الجدد الذين أضافهم المدير
     let updated = [...existingEmployees];
-    for (const d of demo) {
-      const exists = updated.find(
-        (e) => e.role === d.role || e.jobNumber === d.jobNumber
-      );
+    for (const core of coreRoles) {
+      const exists = updated.find((e) => e.jobNumber === core.jobNumber || e.role === core.role);
       if (!exists) {
-        updated.push(d);
-      } else {
-        const index = updated.indexOf(exists);
-        updated[index] = {
-          ...exists,
-          jobNumber: d.jobNumber,
-          name: d.name,
-          pinHash: d.pinHash,
-          role: d.role,
-        };
+        updated.push(core);
       }
     }
     saveEmployees(updated);
@@ -352,10 +296,6 @@ export function resetAll(): void {
   localStorage.removeItem("managerAuth");
   seedIfEmpty();
 }
-
-/* ------------------------------------------------------------------ */
-/*  Additional Helpers                                                 */
-/* ------------------------------------------------------------------ */
 
 export function findEmployeeByJobNumber(jobNumber: string): Employee | undefined {
   const employees = getEmployees();
