@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import AdminAccountsPanel from "@/components/AdminAccountsPanel";
 import { getSettings, resetAll, saveSettings } from "@/lib/storage";
+import { saveBackendSettings, backendEnabled } from "@/lib/backend";
 import { hash } from "@/lib/hash";
 import type { Settings, Location } from "@/types";
 
@@ -10,6 +11,7 @@ function Field({label,children}:{label:string;children:React.ReactNode}){return 
 export default function ManagerSettings(){
   const [s,setS]=useState<Settings>(getSettings());
   const [saved,setSaved]=useState(false);
+  const [error,setError]=useState<string|null>(null);
   const [password,setPassword]=useState("");
   const [showLocation,setShowLocation]=useState(false);
   const [locName,setLocName]=useState("");
@@ -21,10 +23,15 @@ export default function ManagerSettings(){
 
   useEffect(()=>{setLoginUrl(`${window.location.origin}${import.meta.env.BASE_URL}login`);},[]);
 
-  const save=()=>{
+  const save=async()=>{
+    setError(null);
     const next={...s};
     if(password) next.ownerPasswordHash=hash(password);
-    saveSettings(next); setS(next); setPassword(""); setSaved(true); setTimeout(()=>setSaved(false),1800);
+    try{
+      if(backendEnabled) await saveBackendSettings(next);
+      saveSettings(next);
+      setS(next);setPassword("");setSaved(true);setTimeout(()=>setSaved(false),1800);
+    }catch(e){setError(e instanceof Error?e.message:"تعذر حفظ الإعدادات على Cloudflare");}
   };
   const addLocation=()=>{
     if(!locName.trim()) return alert("يرجى إدخال اسم الموقع");
@@ -49,7 +56,6 @@ export default function ManagerSettings(){
   return <ManagerLayout title="الإعدادات" subtitle="إعدادات النظام والصلاحيات — المالك فقط">
     <div className="space-y-5">
       <AdminAccountsPanel />
-
       <section className="hud-card p-5 sm:p-6">
         <div className="text-xs mono text-primary font-bold mb-4">PROFILE · حساب المالك</div>
         <div className="grid md:grid-cols-3 gap-3">
@@ -58,7 +64,6 @@ export default function ManagerSettings(){
           <Field label="كلمة مرور جديدة"><input type="password" className="input mt-1" value={password} onChange={e=>setPassword(e.target.value)} placeholder="اتركها فارغة لعدم التغيير"/></Field>
         </div>
       </section>
-
       <section className="hud-card p-5 sm:p-6">
         <div className="text-xs mono text-muted-foreground mb-4">GPS · الموقع الرئيسي</div>
         <div className="grid md:grid-cols-3 gap-3">
@@ -68,7 +73,6 @@ export default function ManagerSettings(){
         </div>
         <button type="button" className="btn-secondary mt-3" onClick={()=>useGps("main")}>📍 استخدام موقعي الحالي</button>
       </section>
-
       <section className="hud-card p-5 sm:p-6">
         <div className="text-xs mono text-muted-foreground mb-4">LOCATIONS · مواقع العمل</div>
         {!showLocation?<button type="button" className="btn-secondary w-full border-dashed" onClick={()=>{setShowLocation(true);setLocLat(s.workSiteLat);setLocLng(s.workSiteLng)}}>+ إضافة موقع عمل</button>:<div className="space-y-3 p-4 rounded-xl bg-secondary/30">
@@ -78,7 +82,6 @@ export default function ManagerSettings(){
         </div>}
         <div className="mt-3 space-y-2">{(s.locations||[]).map(l=><div key={l.id} className="flex justify-between items-center p-3 rounded-xl bg-secondary/30 text-sm"><span><b>{l.name}</b><span className="block text-[10px] mono text-muted-foreground">{l.lat.toFixed(5)}, {l.lng.toFixed(5)} · {l.radiusMeters}m</span></span><button type="button" className="text-destructive text-xs" onClick={()=>removeLocation(l.id)}>حذف</button></div>)}</div>
       </section>
-
       <section className="hud-card p-5 sm:p-6">
         <div className="text-xs mono text-muted-foreground mb-4">QR · رمز الموقع</div>
         <div className="grid md:grid-cols-2 gap-5 items-center">
@@ -86,7 +89,7 @@ export default function ManagerSettings(){
           <div ref={printRef} className="bg-white text-black rounded-xl p-4 text-center mx-auto"><b className="block text-xl mb-2">حاضِر</b><img src={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(s.qrCode||loginUrl)}`} alt="QR" className="w-48 h-48 mx-auto"/><small>{s.qrCode}</small></div>
         </div>
       </section>
-
+      {error&&<div className="p-3 rounded-xl border border-destructive/40 bg-destructive/10 text-destructive text-sm">{error}</div>}
       <div className="flex flex-wrap gap-3 items-center"><button type="button" className="btn-primary px-6" onClick={save}>حفظ الإعدادات</button>{saved&&<span className="text-primary text-sm">تم الحفظ ✓</span>}<div className="flex-1"/><button type="button" className="btn-danger text-xs" onClick={reset}>إعادة تعيين البيانات</button></div>
     </div>
   </ManagerLayout>;
