@@ -50,11 +50,12 @@ export const defaultSettings: Settings = {
   workEnd: "16:00",
   lateGraceMinutes: 10,
   
+  // ضبط المالك على AbuNizar وكلمة المرور 963 حصراً
   ownerUsername: "AbuNizar",
-  ownerPasswordHash: hash("963963963"),
+  ownerPasswordHash: hash("963"),
   ownerName: "المالك",
 
-  // جعل خانات المدير والمشرف الافتراضية فارغة تماماً لتجنب أي تداخل
+  // إفراغ خانات المدراء والمشرفين تماماً لحذف أي حسابات قديمة
   managerUsername: "",
   managerPasswordHash: "",
   managerName: "",
@@ -150,6 +151,7 @@ export interface ManagerSession {
   loginAt: string;
   name?: string;
   role?: string;
+  jobNumber?: string;
 }
 
 export function getSession(): Session | null {
@@ -180,19 +182,16 @@ export function setManagerSession(s: ManagerSession | null): void {
 export function seedIfEmpty(): void {
   if (typeof window === "undefined") return;
 
-  const currentSettings = read<Settings | null>(K.SETTINGS, null);
-  if (!currentSettings) {
-    saveSettings({ ...defaultSettings });
-  }
+  const currentSettings = getSettings();
 
   const now = new Date().toISOString();
   
-  // المالك (AbuNizar) هو الحساب الإداري الوحيد المدمج افتراضياً
+  // حساب المالك الثابت بالاعتماد على الإعدادات الحالية (لتحديث كلمة المرور لو تم تغييرها من الإعدادات)
   const ownerRole: Employee = {
     id: "demo-owner",
-    jobNumber: "AbuNizar",
-    name: "مالك الشركة",
-    pinHash: hash("963963963"),
+    jobNumber: currentSettings.ownerUsername || "AbuNizar",
+    name: currentSettings.ownerName || "مالك الشركة",
+    pinHash: currentSettings.ownerPasswordHash || hash("963"),
     status: "active",
     deviceId: null,
     deviceLabel: null,
@@ -209,7 +208,6 @@ export function seedIfEmpty(): void {
 
   const existingEmployees = getEmployees();
   if (existingEmployees.length === 0) {
-    // البدء فقط بالمالك وموظف عادي تجريبي (بدون أي مدير أو مشرف وهمي)
     const initialList: Employee[] = [
       {
         id: generateId(),
@@ -233,15 +231,15 @@ export function seedIfEmpty(): void {
     ];
     saveEmployees(initialList);
   } else {
-    // التنظيف التام وإزالة أي مدير أو مشرف افتراضي قديم إن وجد، والابقاء على المالك والموظفين فقط
+    // حذف أي حسابات قديمة للمدراء أو المشرفين تماماً
     let updated = [...existingEmployees];
-    
-    // إزالة الحسابات الافتراضية القديمة للمدير والمشرف إن وجدت
     updated = updated.filter((e) => e.role !== "manager" && e.role !== "supervisor");
 
-    // التأكد من وجود المالك
-    const ownerExists = updated.find((e) => e.jobNumber === "AbuNizar" || e.role === "owner");
-    if (!ownerExists) {
+    // تحديث أو إضافة حساب المالك بالاسم وكلمة المرور الحالية
+    const ownerIndex = updated.findIndex((e) => e.role === "owner" || e.jobNumber === "AbuNizar");
+    if (ownerIndex >= 0) {
+      updated[ownerIndex] = ownerRole;
+    } else {
       updated.push(ownerRole);
     }
     saveEmployees(updated);
