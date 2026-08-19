@@ -10,8 +10,7 @@
     "build:dev": "vite build --mode development",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "deploy:pages": "npx wrangler pages deploy dist --project-name hadir"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -26,9 +25,9 @@
     "@radix-ui/react-dropdown-menu": "^2.1.1",
     "@radix-ui/react-hover-card": "^1.1.1",
     "@radix-ui/react-label": "^2.1.0",
-    "@radix-ui/react-menubar": "^1.1.1",
+    "@radix-ui/react-menubar": "^1.1.0",
     "@radix-ui/react-navigation-menu": "^1.2.0",
-    "@radix-ui/react-popover": "^1.1.1",
+    "@radix-ui/react-popover": "^1.1.2",
     "@radix-ui/react-progress": "^1.1.0",
     "@radix-ui/react-radio-group": "^1.2.0",
     "@radix-ui/react-scroll-area": "^1.1.0",
