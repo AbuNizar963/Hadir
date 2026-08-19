@@ -4,8 +4,7 @@ import {
   getAttendance,
   getSettings,
 } from "@/lib/storage";
-import { getDeviceId } from "@/lib/device";
-import { getClientIpPlaceholder } from "@/lib/device";
+import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
 import { haversineMeters, type GeoPosition, isLikelyMockedPosition } from "@/lib/geo";
 import type { AttendanceRecord } from "@/types";
 import { log } from "@/lib/audit";
@@ -127,7 +126,7 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     if (check.mocked) {
       log({
         employeeId: emp.id,
-        jobNumber: args.jobNumber,
+        jobNumber: emp.jobNumber,
         actorName: emp.name,
         action: args.type,
         result: "rejected",
@@ -254,7 +253,6 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
   // 8. إرسال الإشعارات الفورية
   const actionTitle = args.type === "check-in" ? "تسجيل حضور" : "تسجيل انصراف";
 
-  // إشعار للموظف
   addNotification({
     userId: emp.jobNumber,
     title: `تم ${actionTitle} بنجاح`,
@@ -262,7 +260,6 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     type: "success",
   });
 
-  // إشعار للمدير
   addNotification({
     userId: "admin",
     title: `سجل جديد: ${actionTitle}`,
