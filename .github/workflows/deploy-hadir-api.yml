@@ -128,12 +128,12 @@ jobs:
           if [[ -z "$BASE_URL" ]]; then echo 'Worker URL was not discovered' >&2; exit 1; fi
           BASE_URL="${BASE_URL%/}"
 
-          echo "Bootstrapping D1 through Worker health endpoint"
+          echo "Checking Worker and D1 binding"
           HEALTH=$(curl -fsS --max-time 20 "$BASE_URL/api/health")
           echo "$HEALTH"
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok || x.database!=="D1" || x.ownerInitialized!==true) { console.error("D1 owner bootstrap was not confirmed"); process.exit(1) }' "$HEALTH"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok || x.database!=="D1") { console.error("Worker/D1 health check failed"); process.exit(1) }' "$HEALTH"
 
-          echo "Checking owner login without printing credentials"
+          echo "Initializing/verifying owner account in D1 without printing credentials"
           HTTP_CODE=$(curl -sS -o /tmp/hadir-login.json -w '%{http_code}' --max-time 20 \
             -H 'content-type: application/json' \
             -d "$(node -e 'process.stdout.write(JSON.stringify({username:process.env.OWNER_USERNAME,password:process.env.OWNER_PASSWORD}))')" \
