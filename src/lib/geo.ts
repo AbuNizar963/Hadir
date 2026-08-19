@@ -42,7 +42,11 @@ export function getCurrentPosition(): Promise<GeoPosition> {
             : "انتهت مهلة استجابة الـ GPS.";
         reject(new Error(msg));
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { 
+        enableHighAccuracy: true, 
+        timeout: 30000, // تم رفع المهلة إلى 30 ثانية
+        maximumAge: 60000 // السماح بقبول موقع مخزن مؤقتاً خلال آخر دقيقة لتسريع الاستجابة
+      }
     );
   });
 }
@@ -71,8 +75,6 @@ export async function isLikelyMockedPosition(
       reasons.push("قفزة مكانية غير منطقية بسرعة تفوق سرعة الطيران");
     }
   }
-
-  // ملاحظة: تم إلغاء مقارنة الـ IP هنا لمنع حظر موظفي شبكات الجوال الذين تختلف لديهم مواقع الأبراج.
 
   return { mocked: reasons.length > 0, reasons };
 }
