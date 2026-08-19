@@ -42,6 +42,9 @@ function write<T>(key: string, value: T): void {
   }
 }
 
+const DEFAULT_OWNER_USERNAME = "AbuNizar";
+const DEFAULT_OWNER_PASSWORD = "963963963";
+
 export const defaultSettings: Settings = {
   qrCode: "HADIR-SITE-01-STATIC",
   workSiteLat: 24.7136,
@@ -50,8 +53,8 @@ export const defaultSettings: Settings = {
   workStart: "08:00",
   workEnd: "16:00",
   lateGraceMinutes: 10,
-  ownerUsername: "AbuNizar",
-  ownerPasswordHash: hash("963"),
+  ownerUsername: DEFAULT_OWNER_USERNAME,
+  ownerPasswordHash: hash(DEFAULT_OWNER_PASSWORD),
   ownerName: "المالك",
   managerUsername: "",
   managerPasswordHash: "",
@@ -66,7 +69,15 @@ export const defaultSettings: Settings = {
 
 export function getSettings(): Settings {
   const stored = read<Partial<Settings> | null>(K.SETTINGS, null);
-  return { ...defaultSettings, ...(stored ?? {}) };
+  const settings = { ...defaultSettings, ...(stored ?? {}) };
+
+  // Keep the requested default owner credentials available even for an existing
+  // browser installation that was initialized with the previous default PIN.
+  if (settings.ownerUsername === DEFAULT_OWNER_USERNAME) {
+    settings.ownerPasswordHash = hash(DEFAULT_OWNER_PASSWORD);
+  }
+
+  return settings;
 }
 
 export function saveSettings(next: Settings): void {
@@ -185,9 +196,9 @@ export function seedIfEmpty(): void {
 
   const owner: Employee = {
     id: previousOwner?.id || "owner-account",
-    jobNumber: settings.ownerUsername || "AbuNizar",
+    jobNumber: settings.ownerUsername || DEFAULT_OWNER_USERNAME,
     name: settings.ownerName || "المالك",
-    pinHash: settings.ownerPasswordHash || hash("963"),
+    pinHash: settings.ownerPasswordHash || hash(DEFAULT_OWNER_PASSWORD),
     status: previousOwner?.status || "active",
     deviceId: previousOwner?.deviceId || null,
     deviceLabel: previousOwner?.deviceLabel || null,
