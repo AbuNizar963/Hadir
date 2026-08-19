@@ -8,7 +8,8 @@ export interface ScheduleStatus {
 
 /**
  * Calculate an employee's work/leave status for a local calendar date.
- * ADMIN employees work Sunday through Thursday.
+ * ADMIN employees use their configured workDays when present; legacy ADMIN
+ * employees without workDays keep the default Sunday through Thursday schedule.
  * ROTATION employees use their configured on/off cycle (4/4, 3/3, 2/2, or custom).
  */
 export function getEmployeeScheduleStatus(
@@ -21,11 +22,21 @@ export function getEmployeeScheduleStatus(
 
   if ((employee.scheduleType ?? "ADMIN") === "ADMIN") {
     const day = target.getDay();
-    const isWorkDay = day !== 5 && day !== 6;
+    const configuredDays = Array.isArray(employee.workDays)
+      ? employee.workDays.filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
+      : null;
+    const workDays = configuredDays && configuredDays.length > 0
+      ? [...new Set(configuredDays)].sort((a, b) => a - b)
+      : [0, 1, 2, 3, 4];
+    const isWorkDay = workDays.includes(day);
+    const dayNames = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+    const isDefault = workDays.length === 5 && workDays.every((value, index) => value === index);
     return {
       isWorkDay,
       label: isWorkDay ? "يوم عمل (إداري)" : "إجازة أسبوعية",
-      detail: isWorkDay ? "الدوام من الأحد إلى الخميس" : "الجمعة والسبت إجازة أسبوعية",
+      detail: isDefault
+        ? (isWorkDay ? "الدوام من الأحد إلى الخميس" : "الجمعة والسبت إجازة أسبوعية")
+        : `أيام الدوام: ${workDays.map((value) => dayNames[value]).join("، ")}`,
     };
   }
 
