@@ -18,9 +18,13 @@ const ManagerOnly = ({ children }: { children: React.ReactNode }) => (
   <ProtectedManager>{children}</ProtectedManager>
 );
 
+// Vite builds GitHub Pages under /Hadir/ and Vercel under /.
+// Using the Vite base as the router basename keeps both deployments working.
+const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
+
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <Routes>
         <Route path="/" element={<Landing />} />
 
