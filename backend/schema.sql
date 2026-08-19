@@ -28,66 +28,16 @@ CREATE TABLE IF NOT EXISTS employees (
   location_id TEXT,
   rotation_days_on INTEGER,
   rotation_days_off INTEGER,
-  specialties_json TEXT NOT NULL DEFAULT '[]'
+  specialties_json TEXT NOT NULL DEFAULT '[]',
+  work_days_json TEXT NOT NULL DEFAULT '[]',
+  avatar TEXT
 );
 
-CREATE TABLE IF NOT EXISTS locations (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  lat REAL NOT NULL,
-  lng REAL NOT NULL,
-  radius_meters REAL NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS attendance (
-  id TEXT PRIMARY KEY,
-  employee_id TEXT NOT NULL,
-  job_number TEXT NOT NULL,
-  employee_name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('check-in','check-out')),
-  timestamp TEXT NOT NULL,
-  lat REAL NOT NULL,
-  lng REAL NOT NULL,
-  distance_meters REAL NOT NULL,
-  device_id TEXT NOT NULL,
-  ip TEXT NOT NULL,
-  qr_code TEXT NOT NULL,
-  location_id TEXT,
-  FOREIGN KEY(employee_id) REFERENCES employees(id)
-);
-
-CREATE TABLE IF NOT EXISTS requests (
-  id TEXT PRIMARY KEY,
-  employee_id TEXT NOT NULL,
-  employee_name TEXT NOT NULL,
-  job_number TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('permission','leave','checkout')),
-  reason TEXT,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
-  created_at TEXT NOT NULL,
-  FOREIGN KEY(employee_id) REFERENCES employees(id)
-);
-
-CREATE TABLE IF NOT EXISTS audit (
-  id TEXT PRIMARY KEY,
-  employee_id TEXT,
-  job_number TEXT NOT NULL,
-  actor_name TEXT NOT NULL,
-  action TEXT NOT NULL,
-  result TEXT NOT NULL CHECK (result IN ('success','rejected')),
-  reason TEXT,
-  timestamp TEXT NOT NULL,
-  device_id TEXT NOT NULL,
-  ip TEXT NOT NULL,
-  lat REAL,
-  lng REAL,
-  distance_meters REAL
-);
-
-CREATE TABLE IF NOT EXISTS settings (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
+CREATE TABLE IF NOT EXISTS locations (id TEXT PRIMARY KEY, name TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, radius_meters REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, job_number TEXT NOT NULL, employee_name TEXT NOT NULL, type TEXT NOT NULL CHECK (type IN ('check-in','check-out')), timestamp TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, distance_meters REAL NOT NULL, device_id TEXT NOT NULL, ip TEXT NOT NULL, qr_code TEXT NOT NULL, location_id TEXT);
+CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, employee_name TEXT NOT NULL, job_number TEXT NOT NULL, type TEXT NOT NULL CHECK (type IN ('permission','leave','checkout')), reason TEXT, status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')), created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS audit (id TEXT PRIMARY KEY, employee_id TEXT, job_number TEXT NOT NULL, actor_name TEXT NOT NULL, action TEXT NOT NULL, result TEXT NOT NULL CHECK (result IN ('success','rejected')), reason TEXT, timestamp TEXT NOT NULL, device_id TEXT NOT NULL, ip TEXT NOT NULL, lat REAL, lng REAL, distance_meters REAL);
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 CREATE INDEX IF NOT EXISTS idx_attendance_employee_time ON attendance(employee_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_attendance_time ON attendance(timestamp DESC);
