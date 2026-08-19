@@ -7,83 +7,89 @@ export interface ScheduleStatus {
 }
 
 /**
- * حساب حالة الدوام لموظف في تاريخ معين.
- * - ADMIN: الأحد إلى الخميس أيام عمل، الجمعة والسبت إجازة.
- * - ROTATION: (تاريخ اليوم − rotationStartDate) % 8
- *   أيام 0..3 = عمل (On)، أيام 4..7 = راحة (Off).
+ * Calculate an employee's work/leave status for a local calendar date.
+ * ADMIN employees work Sunday through Thursday.
+ * ROTATION employees use their configured on/off cycle (4/4, 3/3, 2/2, or custom).
  */
 export function getEmployeeScheduleStatus(
-  emp: Employee | null | undefined,
+  employee: Employee | null | undefined,
   target: Date = new Date()
 ): ScheduleStatus {
-  if (!emp) {
+  if (!employee) {
     return { isWorkDay: false, label: "غير محدد" };
   }
 
-  const type = emp.scheduleType ?? "ADMIN";
-
-  if (type === "ADMIN") {
-    // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  if ((employee.scheduleType ?? "ADMIN") === "ADMIN") {
     const day = target.getDay();
-    const isWork = day !== 5 && day !== 6;
+    const isWorkDay = day !== 5 && day !== 6;
     return {
-      isWorkDay: isWork,
-      label: isWork ? "يوم عمل (إداري)" : "إجازة أسبوعية",
-      detail: isWork ? "الدوام من الأحد إلى الخميس" : "الجمعة والسبت إجازة رسمية",
+      isWorkDay,
+      label: isWorkDay ? "يوم عمل (إداري)" : "إجازة أسبوعية",
+      detail: isWorkDay ? "الدوام من الأحد إلى الخميس" : "الجمعة والسبت إجازة أسبوعية",
     };
   }
 
-  // ROTATION
-  const startStr = emp.rotationStartDate;
-  if (!startStr) {
+  const startString = employee.rotationStartDate;
+  if (!startString) {
     return {
       isWorkDay: false,
       label: "لم يتم تحديد بداية الوردية",
-      detail: "يرجى مراجعة المدير لضبط تاريخ بداية أول وردية.",
+      detail: "يرجى تحديد تاريخ بداية أول وردية.",
     };
   }
 
-  const start = parseYYYYMMDD(startStr);
-  const today = new Date(target);
-  today.setHours(0, 0, 0, 0);
-
-  const diffDays = Math.round(
-    (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const start = parseYYYYMMDD(startString);
+  const today = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const diffDays = Math.floor((today.getTime() - start.getTime()) / 86400000);
 
   if (diffDays < 0) {
     return {
       isWorkDay: false,
       label: "لم تبدأ الوردية بعد",
-      detail: `تبدأ الوردية في ${startStr}`,
+      detail: `تبدأ الوردية في ${startString}`,
     };
   }
 
-  const cycleLength = 8;
-  const dayInCycle = ((diffDays % cycleLength) + cycleLength) % cycleLength;
-  const isWork = dayInCycle >= 0 && dayInCycle <= 3;
+  const daysOn = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
+  const daysOff = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
+  const cycleLength = daysOn + daysOff;
 
-  if (isWork) {
+  if (cycleLength <= 0) {
+    return { isWorkDay: false, label: "جدول غير صالح" };
+  }
+
+  const dayInCycle = diffDays % cycleLength;
+  const isWorkDay = dayInCycle < daysOn;
+
+  if (isWorkDay) {
     return {
       isWorkDay: true,
       label: "يوم عمل (تناوبي)",
-      detail: `يوم ${dayInCycle + 1} من 4 في وردية العمل الحالية`,
+      detail: `اليوم ${dayInCycle + 1} من ${daysOn} في الوردية`,
     };
   }
 
   return {
     isWorkDay: false,
-    label: "يوم راحة (Off)",
-    detail: `يوم ${dayInCycle - 3} من 4 في فترة الراحة الحالية`,
+    label: "يوم راحة (تناوبي)",
+    detail: `اليوم ${dayInCycle - daysOn + 1} من ${daysOff} في الراحة`,
   };
 }
 
-function parseYYYYMMDD(str: string): Date {
-  const parts = str.split("-").map(Number);
-  if (parts.length === 3 && parts.every((p) => Number.isFinite(p))) {
-    return new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+function parseYYYYMMDD(value: string): Date {
+  const parts = value.split("-").map(Number);
+  if (
+    parts.length === 3 &&
+    parts.every(Number.isFinite) &&
+    parts[0] >= 1970 &&
+    parts[1] >= 1 &&
+    parts[1] <= 12 &&
+    parts[2] >= 1 &&
+    parts[2] <= 31
+  ) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
   }
-  const d = new Date(str);
-  d.setHours(0, 0, 0, 0);
-  return d;
+
+  const parsed = new Date(value);
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
