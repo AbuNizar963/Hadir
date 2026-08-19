@@ -86,6 +86,7 @@ export default function ManagerSettings() {
     setS((prev) => ({ ...prev, qrCode: newCode }));
   };
 
+  // دالة تحديد الموقع للمقر الرئيسي
   const useCurrentLocation = () => {
     if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع");
     navigator.geolocation.getCurrentPosition(
@@ -95,9 +96,21 @@ export default function ManagerSettings() {
           workSiteLat: p.coords.latitude,
           workSiteLng: p.coords.longitude,
         });
+        alert("تم تحديث إحداثيات الموقع الرئيسي بنجاح 📍");
+      },
+      (err) => alert("تعذر تحديد الموقع: " + err.message),
+      { enableHighAccuracy: true }
+    );
+  };
+
+  // دالة تحديد الموقع المخصص للموقع الجديد
+  const useCurrentLocationForNewLoc = () => {
+    if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
         setNewLocLat(p.coords.latitude);
         setNewLocLng(p.coords.longitude);
-        alert("تم تحديث إحداثيات موقعك الحالي بنجاح بنجاح 📍");
+        alert("تم جلب موقعك الحالي للموقع الجديد بنجاح 📍");
       },
       (err) => alert("تعذر تحديد الموقع: " + err.message),
       { enableHighAccuracy: true }
@@ -171,7 +184,7 @@ export default function ManagerSettings() {
     >
       <form onSubmit={save} className="grid lg:grid-cols-2 gap-5">
         
-        {/* موقع مقر العمل الرئيسي + زر التحديد التلقائي تحته مباشرة */}
+        {/* موقع مقر العمل الرئيسي */}
         <section className="hud-card p-5 sm:p-6">
           <div className="text-xs mono text-muted-foreground mb-3">
             GPS · الموقع الرئيسي لمقر العمل
@@ -206,7 +219,6 @@ export default function ManagerSettings() {
               />
             </Field>
           </div>
-          {/* زر استخدام موقعي الحالي */}
           <button
             type="button"
             onClick={useCurrentLocation}
@@ -216,7 +228,7 @@ export default function ManagerSettings() {
           </button>
         </section>
 
-        {/* إضافة مواقع عمل فرعية (مخفية ولا تظهر إلا عند الضغط على الزر) */}
+        {/* إضافة مواقع عمل فرعية مع زر استخدام الموقع الحالي */}
         <section className="hud-card p-5 sm:p-6">
           <div className="text-xs mono text-muted-foreground mb-3">
             LOCATIONS · الفروع ومقرات العمل الإضافية
@@ -225,7 +237,11 @@ export default function ManagerSettings() {
           {!showAddLocationBox ? (
             <button
               type="button"
-              onClick={() => setShowAddLocationBox(true)}
+              onClick={() => {
+                setShowAddLocationBox(true);
+                setNewLocLat(s.workSiteLat);
+                setNewLocLng(s.workSiteLng);
+              }}
               className="btn-secondary w-full text-xs py-3 border-dashed border-primary/50"
             >
               + إضافة موقع عمل آخر
@@ -242,6 +258,7 @@ export default function ManagerSettings() {
                   إلغاء
                 </button>
               </div>
+              
               <Field label="اسم الموقع الجديد">
                 <input
                   className="input text-xs"
@@ -250,6 +267,7 @@ export default function ManagerSettings() {
                   onChange={(e) => setNewLocName(e.target.value)}
                 />
               </Field>
+
               <div className="grid grid-cols-3 gap-2">
                 <Field label="خط العرض">
                   <input type="number" step="0.000001" className="input mono text-xs" value={newLocLat} onChange={(e) => setNewLocLat(+e.target.value)} />
@@ -261,7 +279,17 @@ export default function ManagerSettings() {
                   <input type="number" className="input mono text-xs" value={newLocRadius} onChange={(e) => setNewLocRadius(+e.target.value)} />
                 </Field>
               </div>
-              <button type="button" onClick={addLocation} className="btn-primary w-full text-xs">
+
+              {/* زر استخدام موقعي الحالي للموقع الجديد */}
+              <button
+                type="button"
+                onClick={useCurrentLocationForNewLoc}
+                className="btn-secondary w-full text-xs py-2"
+              >
+                📍 استخدام موقعي الحالي لهذا الفرع
+              </button>
+
+              <button type="button" onClick={addLocation} className="btn-primary w-full text-xs py-2.5">
                 حفظ وإضافة الموقع للقائمة
               </button>
             </div>
@@ -316,7 +344,7 @@ export default function ManagerSettings() {
           </div>
         </section>
 
-        {/* إعدادات الحساب الحالي (تعديل اسم المستخدم وكلمة المرور بالأسفل بوضوح) */}
+        {/* إعدادات الحساب الحالي */}
         <section className="hud-card p-5 sm:p-6 lg:col-span-2">
           <div className="text-xs mono text-muted-foreground mb-3">
             ACCOUNT SETTINGS · إعدادات الحساب الحالي ({role.toUpperCase()})
@@ -342,7 +370,7 @@ export default function ManagerSettings() {
           </div>
         </section>
 
-        {/* خيارات المالك فقط: إضافة مدير أو مشرف جديد */}
+        {/* خيارات المالك فقط */}
         {role === "owner" && (
           <section className="hud-card p-5 sm:p-6 lg:col-span-2 border-primary/40 border">
             <div className="text-xs mono text-primary mb-3 font-bold">
