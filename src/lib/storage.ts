@@ -359,9 +359,25 @@ export function resetAll(): void {
 
 export function findEmployeeByJobNumber(jobNumber: string): Employee | undefined {
   const employees = getEmployees();
-  return employees.find((e) => e.jobNumber === jobNumber);
+  return employees.find((e) => e.jobNumber.trim() === jobNumber.trim());
 }
 
 export function isShiftOver(): boolean {
   return false;
+}
+
+export function forceCheckInByManager(employeeId: string, type: "checkIn" | "checkOut"): void {
+  const now = new Date().toISOString();
+  const records = getAttendance();
+  records.unshift({
+    id: generateId(),
+    employeeId,
+    timestamp: now,
+    type,
+    method: "manual",
+    lat: 0,
+    lng: 0,
+    status: "ontime",
+  });
+  write(K.ATTENDANCE, records);
 }
