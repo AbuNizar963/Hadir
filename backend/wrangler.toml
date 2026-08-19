@@ -5,6 +5,9 @@ compatibility_date = "2026-08-19"
 [vars]
 APP_ORIGIN = "*"
 
+[secrets]
+required = ["JWT_SECRET", "OWNER_USERNAME", "OWNER_PASSWORD"]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "Hadir"
