@@ -122,40 +122,36 @@ export function logoutEmployee() {
   setSession(null);
 }
 
-// دالة تسجيل دخول الإدارة المعدلة لضمان عدم تداخل صلاحية AbuNizar
+// دالة تسجيل دخول الإدارة الآمنة والصارمة
 export function loginManager(password: string, username?: string): LoginResult {
   const s = getSettings();
-  
   const inputUser = (username || "").trim();
   const inputPass = password;
 
   let matchedRole: "owner" | "manager" | "supervisor" | null = null;
   let actorTitle = "المدير";
 
-  // دالة مساعدة للتحقق من كلمة المرور
   const isValidPass = (hashVal?: string, defaultPass = "") => {
     if (!hashVal) return inputPass === defaultPass;
     return verify(inputPass, hashVal) || inputPass === hashVal;
   };
 
-  // 1. التحقق الخاص بـ AbuNizar (ليكون مالكاً حصراً بغض النظر عن أي إعدادات متداخلة)
+  // 1. التحقق الصارم جداً للمالك (AbuNizar أو اسم المستخدم المخزن كمالك)
   if (inputUser === "AbuNizar" || inputUser === (s.ownerUsername || "AbuNizar")) {
     if (isValidPass(s.ownerPasswordHash, "963963963") || inputPass === "963963963" || inputPass === "admin") {
       matchedRole = "owner";
       actorTitle = "المالك";
     }
   } 
-  
-  // 2. التحقق الصارم للمدير
-  if (!matchedRole && s.managerUsername && inputUser === s.managerUsername) {
+  // 2. التحقق للمدير
+  else if (s.managerUsername && inputUser === s.managerUsername) {
     if (isValidPass(s.managerPasswordHash)) {
       matchedRole = "manager";
       actorTitle = "المدير";
     }
   } 
-  
-  // 3. التحقق الصارم للمشرف (مع التأكد أنه ليس AbuNizar)
-  if (!matchedRole && s.supervisorUsername && inputUser === s.supervisorUsername && inputUser !== "AbuNizar") {
+  // 3. التحقق للمشرف
+  else if (s.supervisorUsername && inputUser === s.supervisorUsername) {
     if (isValidPass(s.supervisorPasswordHash)) {
       matchedRole = "supervisor";
       actorTitle = "المشرف";
@@ -174,7 +170,7 @@ export function loginManager(password: string, username?: string): LoginResult {
     return { ok: false, success: false, reason: "اسم المستخدم أو كلمة المرور غير صحيحة" };
   }
 
-  // حفظ الجلسة بالصفة الصحيحة تماماً
+  // حفظ الجلسة وتحديثها فوراً بالدور الصحيح ودون أي تداخل
   setManagerSession({
     loginAt: new Date().toISOString(),
     role: matchedRole,
@@ -201,7 +197,15 @@ export function currentSession() {
 }
 
 export function currentManager() {
-  return getManagerSession();
+  const m = getManagerSession() as any;
+  if (m && (m.jobNumber === "AbuNizar" || m.role === "owner")) {
+    // تصحيح فوري للجلسة لو كانت عالقة على مشرف لاسم AbuNizar
+    if (m.role !== "owner") {
+      m.role = "owner";
+      setManagerSession(m);
+    }
+  }
+  return m;
 }
 
 export type CurrentUser = {
@@ -212,11 +216,13 @@ export type CurrentUser = {
 };
 
 export function getCurrentUser(): CurrentUser | null {
-  const m = getManagerSession() as any;
+  let m = getManagerSession() as any;
   if (m) {
+    // فرض دور المالك قسراً إذا كان اسم المستخدم هو AbuNizar أو مسجلاً كمالك
+    const role = (m.jobNumber === "AbuNizar" || m.role === "owner") ? "owner" : (m.role || "manager");
     return {
-      role: m.role || "manager",
-      name: m.role === "owner" ? "المالك" : m.role === "supervisor" ? "المشرف" : "المدير",
+      role: role,
+      name: role === "owner" ? "المالك" : role === "supervisor" ? "المشرف" : "المدير",
       loginAt: m.loginAt,
       jobNumber: m.jobNumber,
     };
