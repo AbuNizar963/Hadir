@@ -1,9 +1,9 @@
 import {
+  getEmployees,
   getManagerSession,
   getSession,
   getSettings,
   saveEmployees,
-  getEmployees,
   setManagerSession,
   setSession,
 } from "@/lib/storage";
@@ -18,27 +18,30 @@ export interface LoginResult {
   needsDeviceBinding?: boolean;
 }
 
+function normalize(value: string): string {
+  return value.trim();
+}
+
 export function loginEmployee(jobNumber: string, pin: string): LoginResult {
-  const trimmedJobNum = jobNumber.trim();
+  const username = normalize(jobNumber);
   const employees = getEmployees();
-  
   const emp = employees.find(
-    (e) => String(e.jobNumber).trim() === trimmedJobNum || String(e.id) === trimmedJobNum
+    (employee) => employee.jobNumber.trim() === username || employee.id === username
   );
 
   if (!emp) {
     log({
       employeeId: null,
-      jobNumber,
+      jobNumber: username,
       actorName: "-",
       action: "login-failed",
       result: "rejected",
       reason: "الرقم الوظيفي غير موجود",
     });
-    return { ok: false, success: false, reason: "الرقم الوظيفي أو كلمة المرور غير صحيحة" };
+    return { ok: false, success: false, reason: "الرقم الوظيفي أو رمز الدخول غير صحيح" };
   }
 
-  if (emp.status && emp.status !== "active") {
+  if (emp.status !== "active") {
     log({
       employeeId: emp.id,
       jobNumber: emp.jobNumber,
@@ -50,41 +53,40 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
     return { ok: false, success: false, reason: "الحساب موقوف. يرجى مراجعة الإدارة" };
   }
 
-  const isPinValid =
-    verify(pin, emp.pinHash) ||
-    pin === emp.pinHash ||
-    pin === (emp as any).pin ||
-    pin === (emp as any).password;
-
-  if (!isPinValid) {
+  // Never accept a stored hash, legacy plaintext field, or a hard-coded password as the PIN.
+  if (!pin || !emp.pinHash || !verify(pin, emp.pinHash)) {
     log({
       employeeId: emp.id,
       jobNumber: emp.jobNumber,
       actorName: emp.name,
       action: "login-failed",
       result: "rejected",
-      reason: "كلمة المرور خاطئة",
+      reason: "رمز الدخول خاطئ",
     });
-    return { ok: false, success: false, reason: "الرقم الوظيفي أو كلمة المرور غير صحيحة" };
+    return { ok: false, success: false, reason: "الرقم الوظيفي أو رمز الدخول غير صحيح" };
   }
 
   const deviceId = getDeviceId();
+  const deviceLabel = getDeviceLabel();
 
   if (!emp.deviceId) {
-    const list = getEmployees();
-    const idx = list.findIndex((e) => e.id === emp.id);
-    if (idx >= 0) {
-      list[idx].deviceId = deviceId;
-      list[idx].deviceLabel = getDeviceLabel();
-      saveEmployees(list);
+    const index = employees.findIndex((employee) => employee.id === emp.id);
+    if (index >= 0) {
+      employees[index] = {
+        ...employees[index],
+        deviceId,
+        deviceLabel,
+      };
+      saveEmployees(employees);
     }
+
     log({
       employeeId: emp.id,
       jobNumber: emp.jobNumber,
       actorName: emp.name,
       action: "device-bound",
       result: "success",
-      reason: `تم ربط الجهاز: ${getDeviceLabel()}`,
+      reason: `تم ربط الجهاز: ${deviceLabel}`,
     });
   } else if (emp.deviceId !== deviceId) {
     log({
@@ -107,7 +109,9 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
     jobNumber: emp.jobNumber,
     name: emp.name,
     loginAt: new Date().toISOString(),
+    role: emp.role,
   });
+
   log({
     employeeId: emp.id,
     jobNumber: emp.jobNumber,
@@ -115,51 +119,62 @@ export function loginEmployee(jobNumber: string, pin: string): LoginResult {
     action: "login",
     result: "success",
   });
+
   return { ok: true, success: true };
 }
 
-export function logoutEmployee() {
+export function logoutEmployee(): void {
   setSession(null);
 }
 
-// دالة تسجيل دخول الإدارة مع فرض وتصحيح رتبة المالك فورياً
-export function loginManager(password: string, username?: string): LoginResult {
-  const s = getSettings();
-  const inputUser = (username || "").trim();
-  const inputPass = password;
+export function loginManager(password: string, username: string): LoginResult {
+  const settings = getSettings();
+  const inputUser = normalize(username);
+  const inputPassword = password;
 
-  let matchedRole: "owner" | "manager" | "supervisor" | null = null;
-  let actorTitle = "المدير";
-
-  const isValidPass = (hashVal?: string, defaultPass = "") => {
-    if (!hashVal) return inputPass === defaultPass;
-    return verify(inputPass, hashVal) || inputPass === hashVal;
-  };
-
-  if (inputUser === "AbuNizar" || inputUser === (s.ownerUsername || "AbuNizar")) {
-    if (isValidPass(s.ownerPasswordHash, "963963963") || inputPass === "963963963" || inputPass === "admin") {
-      matchedRole = "owner";
-      actorTitle = "المالك";
-    }
-  } 
-  else if (s.managerUsername && inputUser === s.managerUsername) {
-    if (isValidPass(s.managerPasswordHash)) {
-      matchedRole = "manager";
-      actorTitle = "المدير";
-    }
-  } 
-  else if (s.supervisorUsername && inputUser === s.supervisorUsername) {
-    if (isValidPass(s.supervisorPasswordHash)) {
-      matchedRole = "supervisor";
-      actorTitle = "المشرف";
-    }
+  if (!inputUser || !inputPassword) {
+    return { ok: false, success: false, reason: "اسم المستخدم وكلمة المرور مطلوبان" };
   }
 
-  if (!matchedRole) {
+  const candidates: Array<{
+    username?: string;
+    passwordHash?: string;
+    role: "owner" | "manager" | "supervisor";
+    name: string;
+  }> = [
+    {
+      username: settings.ownerUsername,
+      passwordHash: settings.ownerPasswordHash,
+      role: "owner",
+      name: settings.ownerName || "المالك",
+    },
+    {
+      username: settings.managerUsername,
+      passwordHash: settings.managerPasswordHash,
+      role: "manager",
+      name: settings.managerName || "المدير",
+    },
+    {
+      username: settings.supervisorUsername,
+      passwordHash: settings.supervisorPasswordHash,
+      role: "supervisor",
+      name: settings.supervisorName || "المشرف",
+    },
+  ];
+
+  const matched = candidates.find(
+    (candidate) =>
+      Boolean(candidate.username) &&
+      candidate.username!.trim() === inputUser &&
+      Boolean(candidate.passwordHash) &&
+      verify(inputPassword, candidate.passwordHash!)
+  );
+
+  if (!matched) {
     log({
       employeeId: null,
-      jobNumber: "-",
-      actorName: inputUser || "إدارة",
+      jobNumber: inputUser,
+      actorName: inputUser,
       action: "manager-login-failed",
       result: "rejected",
       reason: "اسم المستخدم أو كلمة المرور خاطئة",
@@ -167,32 +182,17 @@ export function loginManager(password: string, username?: string): LoginResult {
     return { ok: false, success: false, reason: "اسم المستخدم أو كلمة المرور غير صحيحة" };
   }
 
-  // تصحيح صلاحية الموظف في جدول الموظفين نفسه إن وُجد باسم AbuNizar لكي لا يعود مشرفاً أبداً
-  if (matchedRole === "owner") {
-    const employees = getEmployees();
-    let updated = false;
-    const list = employees.map((e) => {
-      if (e.jobNumber === "AbuNizar" || e.role === "owner") {
-        if (e.role !== "owner") updated = true;
-        return { ...e, role: "owner" as const };
-      }
-      return e;
-    });
-    if (updated) {
-      saveEmployees(list);
-    }
-  }
-
   setManagerSession({
     loginAt: new Date().toISOString(),
-    role: matchedRole,
+    name: matched.name,
+    role: matched.role,
     jobNumber: inputUser,
   });
 
   log({
     employeeId: null,
     jobNumber: inputUser,
-    actorName: actorTitle,
+    actorName: matched.name,
     action: "manager-login",
     result: "success",
   });
@@ -200,7 +200,7 @@ export function loginManager(password: string, username?: string): LoginResult {
   return { ok: true, success: true };
 }
 
-export function logoutManager() {
+export function logoutManager(): void {
   setManagerSession(null);
 }
 
@@ -209,14 +209,7 @@ export function currentSession() {
 }
 
 export function currentManager() {
-  const m = getManagerSession() as any;
-  if (m && (m.jobNumber === "AbuNizar" || m.role === "owner")) {
-    if (m.role !== "owner") {
-      m.role = "owner";
-      setManagerSession(m);
-    }
-  }
-  return m;
+  return getManagerSession();
 }
 
 export type CurrentUser = {
@@ -227,17 +220,28 @@ export type CurrentUser = {
 };
 
 export function getCurrentUser(): CurrentUser | null {
-  let m = getManagerSession() as any;
-  if (m) {
-    const role = (m.jobNumber === "AbuNizar" || m.role === "owner") ? "owner" : (m.role || "manager");
+  const manager = getManagerSession();
+  if (manager) {
+    const role = manager.role === "owner" || manager.role === "manager" || manager.role === "supervisor"
+      ? manager.role
+      : "manager";
     return {
-      role: role,
-      name: role === "owner" ? "المالك" : role === "supervisor" ? "المشرف" : "المدير",
-      loginAt: m.loginAt,
-      jobNumber: m.jobNumber,
+      role,
+      name: manager.name,
+      loginAt: manager.loginAt,
+      jobNumber: manager.jobNumber,
     };
   }
-  const s = getSession();
-  if (s) return { role: "staff", name: s.name, loginAt: s.loginAt, jobNumber: s.jobNumber };
+
+  const employee = getSession();
+  if (employee) {
+    return {
+      role: "staff",
+      name: employee.name,
+      loginAt: employee.loginAt,
+      jobNumber: employee.jobNumber,
+    };
+  }
+
   return null;
 }
