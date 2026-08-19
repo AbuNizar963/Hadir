@@ -7,8 +7,8 @@ APP_ORIGIN = "*"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "hadir"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_name = "Hadir"
+database_id = "c9a96776-fcaa-4ae0-befa-b8c5a9345ebe"
 
 [observability]
 enabled = true
