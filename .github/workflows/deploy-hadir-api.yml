@@ -61,37 +61,25 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler d1 migrations apply Hadir --remote
 
-      - name: Deploy Worker with D1 binding
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy --secrets-file .worker-secrets.json
-
-      - name: Ensure workers.dev endpoint
+      - name: Deploy Worker and capture workers.dev URL
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          API="https://api.cloudflare.com/client/v4"
-          AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
-          ACCOUNT="$CLOUDFLARE_ACCOUNT_ID"
-          WORKER="hadir-api"
-          account_json=$(curl -fsS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}" || true)
-          subdomain=$(node -e 'const x=JSON.parse(process.argv[1]||"{}");if(x.success&&x.result?.subdomain)process.stdout.write(x.result.subdomain);' "$account_json")
-          if [[ -z "$subdomain" ]]; then
-            create_json=$(curl -fsS --max-time 20 -X PUT "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}" -d '{"subdomain":"abunizar963"}')
-            subdomain=$(node -e 'const x=JSON.parse(process.argv[1]);if(!x.success||!x.result?.subdomain){console.error(JSON.stringify(x.errors||x));process.exit(1)}process.stdout.write(x.result.subdomain);' "$create_json")
+          npx wrangler deploy --secrets-file .worker-secrets.json 2>&1 | tee /tmp/hadir-deploy.log
+          URL=$(grep -Eo 'https://hadir-api\.[A-Za-z0-9.-]+\.workers\.dev' /tmp/hadir-deploy.log | tail -1 || true)
+          if [[ -z "$URL" ]]; then
+            URL=$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' /tmp/hadir-deploy.log | tail -1 || true)
           fi
-          worker_json=$(curl -sS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}" || true)
-          enabled=$(node -e 'const x=JSON.parse(process.argv[1]||"{}");process.stdout.write(String(Boolean(x.success&&x.result?.enabled)));' "$worker_json")
-          if [[ "$enabled" != "true" ]]; then
-            enable_json=$(curl -fsS --max-time 20 -X POST "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}" -d '{"enabled":true}')
-            node -e 'const x=JSON.parse(process.argv[1]);if(!x.success||x.result?.enabled!==true){console.error(JSON.stringify(x.errors||x));process.exit(1)}' "$enable_json"
+          if [[ -z "$URL" ]]; then
+            echo 'Cloudflare deployed the Worker but Wrangler did not return a workers.dev URL.' >&2
+            echo 'Set HADIR_API_URL to the Worker URL only if the account has a custom route/domain.' >&2
+            exit 1
           fi
-          printf 'https://%s.%s.workers.dev\n' "$WORKER" "$subdomain" > /tmp/hadir-worker-url
-          cat /tmp/hadir-worker-url
+          printf '%s\n' "$URL" > /tmp/hadir-worker-url
+          echo "Worker URL: $URL"
 
       - name: Verify Worker and D1
         shell: bash
@@ -110,4 +98,4 @@ jobs:
 
       - name: Remove temporary files
         if: always()
-        run: rm -f .worker-secrets.json /tmp/hadir-worker-url
+        run: rm -f .worker-secrets.json /tmp/hadir-worker-url /tmp/hadir-deploy.log
