@@ -4,6 +4,7 @@ import Brand from "@/components/Brand";
 import { cn } from "@/lib/utils";
 import { getNotifications, markAsRead as markNotificationAsRead } from "@/lib/notifications";
 import type { AppNotification } from "@/lib/notifications";
+import { getManagerSession, setManagerSession } from "@/lib/storage";
 
 const NAV = [
   { to: "/manager", label: "لوحة القيادة", end: true },
@@ -32,6 +33,10 @@ export default function ManagerLayout({
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [theme, setTheme] = useState("system"); // system | light | dark
 
+  // جلب جلسة المدير الحالية لمعرفة الصلاحيات والدور
+  const managerSession = getManagerSession();
+  const currentRole = managerSession?.role || "manager"; // owner, manager, supervisor
+
   useEffect(() => {
     const loadNotifs = () => {
       try {
@@ -59,6 +64,7 @@ export default function ManagerLayout({
 
   const logout = () => {
     localStorage.removeItem("managerAuth");
+    setManagerSession(null);
     nav("/manager/login");
   };
 
@@ -77,16 +83,29 @@ export default function ManagerLayout({
     }
   }, [theme]);
 
+  // تصفية الروابط بحيث تظهر الإعدادات فقط للمالك والمدير العام
+  const filteredNav = NAV.filter((n) => {
+    if (n.managerOnly) {
+      return currentRole === "owner" || currentRole === "manager";
+    }
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* الشريط الجانبي */}
       <aside className="fixed top-0 right-0 bottom-0 w-64 border-l border-border/70 bg-sidebar/95 backdrop-blur-md hidden lg:flex flex-col z-40">
-        <div className="p-5 border-b border-border/60">
+        <div className="p-5 border-b border-border/60 flex items-center justify-between">
           <Brand />
         </div>
+        {managerSession && (
+          <div className="px-5 py-2.5 border-b border-border/40 text-xs text-muted-foreground bg-secondary/30">
+            مرحباً، <span className="font-bold text-foreground">{managerSession.name || currentRole}</span>
+          </div>
+        )}
 
         <nav className="flex-1 p-3 space-y-1">
-          {NAV.map((n) => (
+          {filteredNav.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -131,12 +150,15 @@ export default function ManagerLayout({
                   >
                     🔔 الإشعارات {unreadCount > 0 && `(${unreadCount})`}
                   </button>
-                  <button
-                    onClick={goSettings}
-                    className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
-                  >
-                    ⚙️ الإعدادات
-                  </button>
+                  
+                  {(currentRole === "owner" || currentRole === "manager") && (
+                    <button
+                      onClick={goSettings}
+                      className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"
+                    >
+                      ⚙️ الإعدادات
+                    </button>
+                  )}
 
                   {/* خيار الوضع */}
                   <div className="relative">
@@ -182,7 +204,7 @@ export default function ManagerLayout({
           </div>
 
           <div className="px-2 pb-2 flex gap-1 overflow-x-auto">
-            {NAV.map((n) => (
+            {filteredNav.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
@@ -206,7 +228,7 @@ export default function ManagerLayout({
         <header className="px-5 lg:px-10 pt-6 pb-4 border-b border-border/40 mb-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-xs text-muted-foreground mono">MANAGER</div>
+              <div className="text-xs text-muted-foreground mono">MANAGER · {currentRole.toUpperCase()}</div>
               <h1 className="text-2xl md:text-3xl font-extrabold mt-1">{title}</h1>
               {subtitle && <div className="text-sm text-muted-foreground mt-1">{subtitle}</div>}
             </div>
