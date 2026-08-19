@@ -2,8 +2,7 @@ name: Deploy Hadir API
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'backend/**'
       - '.github/workflows/deploy-hadir-api.yml'
@@ -15,11 +14,9 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-
     defaults:
       run:
         working-directory: backend
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,7 +26,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate required deployment secrets
+      - name: Validate deployment secrets
         shell: bash
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -46,49 +43,14 @@ jobs:
             exit 1
           fi
 
-      - name: Configure first-owner bootstrap
-        shell: bash
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require('fs');
-          const path = 'src/index.ts';
-          let s = fs.readFileSync(path, 'utf8');
-
-          const oldOwner = 'async function owner(env:Env){if(!env.OWNER_USERNAME||!env.OWNER_PASSWORD)return;const existing=await env.DB.prepare("SELECT id,username FROM admin_accounts WHERE role=\'owner\' LIMIT 1\").first<any>();if(!existing){await env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)").bind(id(),env.OWNER_USERNAME,await passwordHash(env.OWNER_PASSWORD),"المالك","owner",1,now()).run();}}';
-          if (s.includes(oldOwner)) {
-            s = s.replace(oldOwner, 'async function owner(_env:Env){}');
-          }
-
-          const oldSecret = 'function jwtSecret(env:Env){return env.JWT_SECRET||env.OWNER_PASSWORD||""}';
-          if (s.includes(oldSecret)) {
-            s = s.replace(oldSecret, 'function jwtSecret(env:Env){return env.JWT_SECRET||""}');
-          }
-
-          const marker = 'const a=await env.DB.prepare("SELECT * FROM admin_accounts WHERE username=? LIMIT 1").bind(username).first<any>();if(a&&a.active&&await passwordVerify(password,a.password_hash))';
-          const replacement = `const ownerExists=await env.DB.prepare("SELECT id FROM admin_accounts WHERE role='owner' LIMIT 1").first<any>();if(!ownerExists){if(!username||!password)return json({error:"في أول تشغيل يجب إدخال اسم مستخدم المالك وكلمة المرور لإنشاء حساب المالك في D1"},400,origin);try{const ownerId=id();await env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)").bind(ownerId,username,await passwordHash(password),"المالك","owner",1,now()).run();const actor:Actor={id:ownerId,username,name:"المالك",role:"owner"};await log(env,req,"المالك","owner-first-login","success",null,username);return json({token:await sign(actor,secret),user:actor,kind:"admin",firstSetup:true},201,origin)}catch(e){console.error("Owner first-login bootstrap failed",e);const race=await env.DB.prepare("SELECT id FROM admin_accounts WHERE role='owner' LIMIT 1").first<any>();if(!race)return json({error:"تعذر إنشاء حساب المالك في قاعدة D1"},500,origin)}}const a=await env.DB.prepare("SELECT * FROM admin_accounts WHERE username=? LIMIT 1").bind(username).first<any>();if(a&&a.active&&await passwordVerify(password,a.password_hash))`;
-          if (!s.includes(replacement)) {
-            if (!s.includes(marker)) throw new Error('Login marker not found; refusing to deploy an unpatched Worker');
-            s = s.replace(marker, replacement);
-          }
-
-          fs.writeFileSync(path, s);
-          console.log('First-owner bootstrap patch applied');
-          NODE
-
-      - name: Prepare Worker JWT secret
+      - name: Prepare JWT secret
         shell: bash
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET || secrets.HADIR_JWT_SECRET }}
         run: |
           set -euo pipefail
           umask 077
-          node <<'NODE'
-          const fs = require('fs');
-          const value = process.env.JWT_SECRET;
-          if (!value) throw new Error('JWT_SECRET is empty');
-          fs.writeFileSync('.worker-secrets.json', JSON.stringify({JWT_SECRET:value}) + '\n', {mode:0o600});
-          NODE
+          node -e 'const fs=require("fs"); const v=process.env.JWT_SECRET; if(!v) throw new Error("JWT_SECRET is empty"); fs.writeFileSync(".worker-secrets.json",JSON.stringify({JWT_SECRET:v})+"\n",{mode:0o600});'
 
       - name: Validate Worker configuration
         env:
@@ -102,7 +64,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --secrets-file .worker-secrets.json
 
-      - name: Ensure workers.dev endpoint and discover public URL
+      - name: Ensure workers.dev endpoint
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -113,22 +75,19 @@ jobs:
           AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
           ACCOUNT="$CLOUDFLARE_ACCOUNT_ID"
           WORKER="hadir-api"
-
           account_json=$(curl -sS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}" || true)
           subdomain=$(node -e 'const x=JSON.parse(process.argv[1]||"{}");if(x.success&&x.result?.subdomain)process.stdout.write(x.result.subdomain);' "$account_json")
           if [[ -z "$subdomain" ]]; then
-            echo "No workers.dev account subdomain found; creating one"
+            echo "No workers.dev subdomain configured; requesting one"
             create_json=$(curl -fsS --max-time 20 -X PUT "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}" -d '{"subdomain":"abunizar963"}')
             subdomain=$(node -e 'const x=JSON.parse(process.argv[1]);if(!x.success||!x.result?.subdomain){console.error(JSON.stringify(x.errors||x));process.exit(1)}process.stdout.write(x.result.subdomain);' "$create_json")
           fi
-
           worker_json=$(curl -sS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}" || true)
           enabled=$(node -e 'const x=JSON.parse(process.argv[1]||"{}");process.stdout.write(String(Boolean(x.success&&x.result?.enabled)));' "$worker_json")
           if [[ "$enabled" != "true" ]]; then
             enable_json=$(curl -fsS --max-time 20 -X POST "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}" -d '{"enabled":true}')
             node -e 'const x=JSON.parse(process.argv[1]);if(!x.success||x.result?.enabled!==true){console.error(JSON.stringify(x.errors||x));process.exit(1)}' "$enable_json"
           fi
-
           URL="https://${WORKER}.${subdomain}.workers.dev"
           printf '%s\n' "$URL" > /tmp/hadir-worker-url
           echo "Worker endpoint: $URL"
@@ -143,11 +102,12 @@ jobs:
           if [[ -z "$BASE_URL" && -f /tmp/hadir-worker-url ]]; then BASE_URL=$(cat /tmp/hadir-worker-url); fi
           [[ -n "$BASE_URL" ]] || { echo 'Worker URL was not discovered' >&2; exit 1; }
           BASE_URL="${BASE_URL%/}"
+          echo "Checking $BASE_URL/api/health"
           HEALTH=$(curl -fsS --max-time 20 "$BASE_URL/api/health")
           echo "$HEALTH"
-          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"||!x.secrets?.jwt){console.error("Worker/D1 health check failed");process.exit(1)}' "$HEALTH"
-          echo "D1 is connected. Owner credentials are intentionally created on the first owner login and are not stored in GitHub Secrets."
+          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"||x.ownerInitialized===undefined||!x.secrets?.jwt){console.error("Worker/D1 health check failed");process.exit(1)}' "$HEALTH"
+          echo "Worker and D1 binding are healthy. Owner account is created by the first login when ownerInitialized=false."
 
-      - name: Remove temporary deployment files
+      - name: Remove temporary files
         if: always()
-        run: rm -f .worker-secrets.json /tmp/hadir-login.json /tmp/hadir-subdomain.json /tmp/hadir-worker-url
+        run: rm -f .worker-secrets.json /tmp/hadir-worker-url
