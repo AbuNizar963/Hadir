@@ -76,12 +76,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --dry-run --secrets-file .worker-secrets.json
 
-      - name: Persist Worker secrets
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler secret bulk .worker-secrets.json
-
       - name: Deploy Worker with D1 and Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -100,15 +94,40 @@ jobs:
           ACCOUNT="$CLOUDFLARE_ACCOUNT_ID"
           WORKER="hadir-api"
 
-          account_json=$(curl -fsS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}")
-          subdomain=$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.success || !x.result?.subdomain) process.exit(1); process.stdout.write(x.result.subdomain)' "$account_json")
+          # The account-level workers.dev subdomain may not exist yet.
+          # Cloudflare uses GET to read it and PUT to create it.
+          account_json=$(curl -sS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}" || true)
+          subdomain=$(node -e '
+            const x=JSON.parse(process.argv[1]||"{}");
+            if (x.success && x.result?.subdomain) process.stdout.write(x.result.subdomain);
+          ' "$account_json")
+
+          if [[ -z "$subdomain" ]]; then
+            echo "No workers.dev account subdomain found; creating one"
+            # Use the Worker name as the account subdomain when available.
+            create_json=$(curl -fsS --max-time 20 -X PUT "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}" -d '{"subdomain":"abunizar963"}')
+            subdomain=$(node -e '
+              const x=JSON.parse(process.argv[1]);
+              if(!x.success || !x.result?.subdomain) { console.error(JSON.stringify(x.errors||x)); process.exit(1); }
+              process.stdout.write(x.result.subdomain);
+            ' "$create_json")
+          fi
+
           echo "Workers.dev subdomain: ${subdomain}.workers.dev"
 
-          worker_json=$(curl -fsS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}")
-          enabled=$(node -e 'const x=JSON.parse(process.argv[1]); process.stdout.write(String(Boolean(x.result?.enabled)))' "$worker_json")
+          worker_json=$(curl -sS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}" || true)
+          enabled=$(node -e '
+            const x=JSON.parse(process.argv[1]||"{}");
+            process.stdout.write(String(Boolean(x.success && x.result?.enabled)));
+          ' "$worker_json")
+
           if [[ "$enabled" != "true" ]]; then
             echo "Enabling ${WORKER} on workers.dev"
-            curl -fsS --max-time 20 -X POST "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}" -d '{"enabled":true}' >/tmp/hadir-subdomain.json
+            enable_json=$(curl -fsS --max-time 20 -X POST "${API}/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain" "${AUTH[@]}" -d '{"enabled":true}')
+            node -e '
+              const x=JSON.parse(process.argv[1]);
+              if(!x.success || x.result?.enabled!==true) { console.error(JSON.stringify(x.errors||x)); process.exit(1); }
+            ' "$enable_json"
           fi
 
           URL="https://${WORKER}.${subdomain}.workers.dev"
