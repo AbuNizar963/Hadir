@@ -4,6 +4,19 @@ export type GeoPosition = {
   accuracy?: number;
 };
 
+export function isValidGeoPosition(position: GeoPosition): boolean {
+  return (
+    Number.isFinite(position.lat) &&
+    Number.isFinite(position.lng) &&
+    position.lat >= -90 &&
+    position.lat <= 90 &&
+    position.lng >= -180 &&
+    position.lng <= 180 &&
+    (position.accuracy === undefined ||
+      (Number.isFinite(position.accuracy) && position.accuracy >= 0))
+  );
+}
+
 export function haversineMeters(p1: { lat: number; lng: number }, p2: { lat: number; lng: number }): number {
   const R = 6371e3;
   const φ1 = (p1.lat * Math.PI) / 180;
@@ -25,7 +38,7 @@ export async function isLikelyMockedPosition(_pos: GeoPosition): Promise<{ mocke
 
 export function getCurrentPosition(): Promise<GeoPosition> {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
       reject(new Error("Geolocation is not supported by your browser."));
       return;
     }
@@ -41,27 +54,34 @@ export function getCurrentPosition(): Promise<GeoPosition> {
 
     const onSuccess = (p: GeolocationPosition) => {
       if (isDone) return;
-      isDone = true;
-      clearTimeout(safetyTimer);
-      resolve({
+      const position: GeoPosition = {
         lat: p.coords.latitude,
         lng: p.coords.longitude,
         accuracy: p.coords.accuracy,
-      });
+      };
+      if (!isValidGeoPosition(position)) {
+        isDone = true;
+        clearTimeout(safetyTimer);
+        reject(new Error("تعذر الحصول على إحداثيات موقع صالحة."));
+        return;
+      }
+      isDone = true;
+      clearTimeout(safetyTimer);
+      resolve(position);
     };
 
     navigator.geolocation.getCurrentPosition(
       onSuccess,
       () => {
         if (isDone) return;
-        
+
         navigator.geolocation.getCurrentPosition(
           onSuccess,
           (err2) => {
             if (isDone) return;
             isDone = true;
             clearTimeout(safetyTimer);
-            
+
             if (err2.code === 1) {
               reject(new Error("Permission denied. Please allow location access."));
             } else {
