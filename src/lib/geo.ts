@@ -1,14 +1,12 @@
-// src/lib/geo.ts
-
 export type GeoPosition = {
   lat: number;
   lng: number;
   accuracy?: number;
 };
 
-// دالة حساب المسافة بالمتر بين نقطتين (Haversine Formula)
+// دالة حساب المسافة بالمتر بين نقطتين
 export function haversineMeters(p1: { lat: number; lng: number }, p2: { lat: number; lng: number }): number {
-  const R = 6371e3; // نصف قطر الأرض بالمتر
+  const R = 6371e3;
   const φ1 = (p1.lat * Math.PI) / 180;
   const φ2 = (p2.lat * Math.PI) / 180;
   const Δφ = ((p2.lat - p1.lat) * Math.PI) / 180;
@@ -22,14 +20,12 @@ export function haversineMeters(p1: { lat: number; lng: number }, p2: { lat: num
   return Math.round(R * c);
 }
 
-// دالة التحقق من التزييف (Mock Location Check)
+// دالة التحقق من التزييف
 export async function isLikelyMockedPosition(_pos: GeoPosition): Promise<{ mocked: boolean; reasons: string[] }> {
-  // يمكنك تطوير منطق الفحص هنا مستقبلاً
-  // حالياً تعيد false لضمان عدم حظر المستخدمين النظاميين
   return { mocked: false, reasons: [] };
 }
 
-// دالة جلب الموقع الجغرافي الحالية مع دعم تدرج الدقة (High Accuracy Fallback)
+// دالة جلب الموقع الجغرافي الحالية مع دعم تدرج الدقة
 export function getCurrentPosition(): Promise<GeoPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -39,7 +35,6 @@ export function getCurrentPosition(): Promise<GeoPosition> {
 
     let isDone = false;
 
-    // مؤقت أمان في حال علق الـ GPS
     const safetyTimer = setTimeout(() => {
       if (!isDone) {
         isDone = true;
@@ -58,13 +53,11 @@ export function getCurrentPosition(): Promise<GeoPosition> {
       });
     };
 
-    // المحاولة الأولى (دقة عالية)
     navigator.geolocation.getCurrentPosition(
       onSuccess,
       () => {
         if (isDone) return;
         
-        // المحاولة الثانية (دقة عادية في حال فشل الأولى)
         navigator.geolocation.getCurrentPosition(
           onSuccess,
           (err2) => {
@@ -73,7 +66,7 @@ export function getCurrentPosition(): Promise<GeoPosition> {
             clearTimeout(safetyTimer);
             
             if (err2.code === 1) {
-              reject(new Error("تم رفض صلاحية الموقع. يرجى السماح للمتصفح بالوصول لموقعك."));
+              reject(new Error("تم رفض الصلاحية. يرجى السماح للمتصفح بالوصول لموقعك."));
             } else {
               reject(new Error("تعذر تحديد موقعك. تأكد من تفعيل الـ GPS في الجوال."));
             }
@@ -84,19 +77,4 @@ export function getCurrentPosition(): Promise<GeoPosition> {
       { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
     );
   });
-}
-
-// دالة لجلب معرف الجهاز (لاستخدامها في نظام التدقيق)
-export function getDeviceId(): string {
-  let id = localStorage.getItem("hadir.device_id");
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem("hadir.device_id", id);
-  }
-  return id;
-}
-
-// دالة placeholder لعنوان IP (يتم استبدالها برابط API حقيقي عند الحاجة)
-export function getClientIpPlaceholder(): string {
-  return "127.0.0.1";
 }
