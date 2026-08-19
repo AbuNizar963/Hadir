@@ -28,7 +28,6 @@ export function getSettings():Settings {
   const ownerHash=settings.ownerPasswordHash||hash(DEFAULT_OWNER_PASSWORD);
   if(!accounts.some(a=>a.role==="owner")) accounts.unshift({id:"owner-account",username:ownerUsername,passwordHash:ownerHash,name:settings.ownerName||"المالك",role:"owner",active:true,createdAt:new Date(0).toISOString()});
   else accounts=accounts.map(a=>a.role==="owner"?{...a,username:ownerUsername,passwordHash:ownerHash,name:settings.ownerName||a.name}:a);
-  // Migrate the old single manager/supervisor fields into the new account list.
   if(settings.managerUsername && settings.managerPasswordHash && !accounts.some(a=>a.role==="manager"&&a.username===settings.managerUsername)) accounts.push({id:"manager-legacy",username:settings.managerUsername,passwordHash:settings.managerPasswordHash,name:settings.managerName||"المدير",role:"manager",active:true,createdAt:new Date().toISOString()});
   if(settings.supervisorUsername && settings.supervisorPasswordHash && !accounts.some(a=>a.role==="supervisor"&&a.username===settings.supervisorUsername)) accounts.push({id:"supervisor-legacy",username:settings.supervisorUsername,passwordHash:settings.supervisorPasswordHash,name:settings.supervisorName||"المشرف",role:"supervisor",active:true,createdAt:new Date().toISOString()});
   settings.adminAccounts=accounts;
@@ -54,10 +53,13 @@ export function setManagerSession(session:ManagerSession|null):void{if(session==
 export function seedIfEmpty():void{
   if(typeof window==="undefined")return;
   const settings=getSettings(); saveSettings(settings); const now=new Date().toISOString(); const existing=getEmployees();
-  const previousOwner=existing.find(e=>e.role==="owner"||e.jobNumber===settings.ownerUsername);
-  const owner:Employee={id:previousOwner?.id||"owner-account",jobNumber:settings.ownerUsername||DEFAULT_OWNER_USERNAME,name:settings.ownerName||"المالك",pinHash:settings.ownerPasswordHash||hash(DEFAULT_OWNER_PASSWORD),status:previousOwner?.status||"active",deviceId:previousOwner?.deviceId||null,deviceLabel:previousOwner?.deviceLabel||null,createdAt:previousOwner?.createdAt||now,scheduleType:"ADMIN",workStartTime:settings.workStart,workEndTime:settings.workEnd,gracePeriodMinutes:settings.lateGraceMinutes,rotationStartDate:null,avatar:previousOwner?.avatar||null,role:"owner",locationId:previousOwner?.locationId||null,specialties:["executive"]};
-  if(existing.length===0){saveEmployees([{id:generateId(),jobNumber:"1001",name:"أحمد الموظف",pinHash:hash("1001"),status:"active",deviceId:null,deviceLabel:null,createdAt:now,scheduleType:"ADMIN",workStartTime:settings.workStart,workEndTime:settings.workEnd,gracePeriodMinutes:settings.lateGraceMinutes,rotationStartDate:null,role:"staff",locationId:null,specialties:["general"]},owner]);}
-  else {const list=existing.filter(e=>e.id!==previousOwner?.id&&e.role!=="owner");saveEmployees([...list,owner]);}
+  if(existing.length===0){
+    const owner:Employee={id:"owner-account",jobNumber:settings.ownerUsername||DEFAULT_OWNER_USERNAME,name:settings.ownerName||"المالك",pinHash:settings.ownerPasswordHash||hash(DEFAULT_OWNER_PASSWORD),status:"active",deviceId:null,deviceLabel:null,createdAt:now,scheduleType:"ADMIN",workStartTime:settings.workStart,workEndTime:settings.workEnd,gracePeriodMinutes:settings.lateGraceMinutes,rotationStartDate:null,avatar:null,role:"owner",locationId:null,specialties:["executive"]};
+    saveEmployees([{id:generateId(),jobNumber:"1001",name:"أحمد الموظف",pinHash:hash("1001"),status:"active",deviceId:null,deviceLabel:null,createdAt:now,scheduleType:"ADMIN",workStartTime:settings.workStart,workEndTime:settings.workEnd,gracePeriodMinutes:settings.lateGraceMinutes,rotationStartDate:null,avatar:null,role:"staff",locationId:null,specialties:["general"]},owner]);
+  } else if(!existing.some(e=>e.role==="owner")) {
+    const owner:Employee={id:"owner-account",jobNumber:settings.ownerUsername||DEFAULT_OWNER_USERNAME,name:settings.ownerName||"المالك",pinHash:settings.ownerPasswordHash||hash(DEFAULT_OWNER_PASSWORD),status:"active",deviceId:null,deviceLabel:null,createdAt:now,scheduleType:"ADMIN",workStartTime:settings.workStart,workEndTime:settings.workEnd,gracePeriodMinutes:settings.lateGraceMinutes,rotationStartDate:null,avatar:null,role:"owner",locationId:null,specialties:["executive"]};
+    saveEmployees([...existing,owner]);
+  }
   if(!localStorage.getItem(K.ATTENDANCE))write<AttendanceRecord[]>(K.ATTENDANCE,[]); if(!localStorage.getItem(K.AUDIT))write<AuditEntry[]>(K.AUDIT,[]); if(!localStorage.getItem(K.REQUESTS))write<EmployeeRequest[]>(K.REQUESTS,[]);
 }
 export function resetAll():void{if(typeof window==="undefined")return;Object.values(K).forEach(key=>localStorage.removeItem(key));seedIfEmpty();}
