@@ -36,7 +36,7 @@ export default function EmployeeScan() {
   const [qrInput, setQrInput] = useState("");
   const [result, setResult] = useState<{ time: string; late?: number; timeNote?: string } | null>(null);
 
-  // حالة الكاميرا الحقيقية
+  // تعريفات الكاميرا الحقيقية
   const [isCameraActive, setIsCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -67,7 +67,7 @@ export default function EmployeeScan() {
     };
   }, [targetLat, targetLng, targetRadius, locationName]);
 
-  // تشغيل الكاميرا الفعلية
+  // دالة تشغيل الكاميرا
   const startCamera = async () => {
     setIsCameraActive(true);
     try {
@@ -86,7 +86,7 @@ export default function EmployeeScan() {
     }
   };
 
-  // إيقاف الكاميرا
+  // دالة إيقاف الكاميرا
   const stopCamera = () => {
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -95,7 +95,7 @@ export default function EmployeeScan() {
     setIsCameraActive(false);
   };
 
-  // التقاط القيمة بنجاح (سواء تلقائياً أو عبر المحاكاة السريعة)
+  // التقاط القيمة (سواء عبر الكاميرا أو المحاكاة)
   const captureCode = () => {
     setQrInput(settings.qrCode);
     stopCamera();
@@ -144,7 +144,7 @@ export default function EmployeeScan() {
           </div>
         </section>
 
-        {/* GPS card مع رادار نابض بالحياة */}
+        {/* GPS card مع رادار نابض */}
         <section className="hud-card p-6">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-bold">١. التحقق من الموقع</div>
@@ -160,13 +160,13 @@ export default function EmployeeScan() {
           </div>
         </section>
 
-        {/* QR card مع تشغيل الكاميرا الحقيقية */}
+        {/* QR card مع الكاميرا الحقيقية */}
         <section className={`hud-card p-6 ${step === "gps" ? "opacity-50" : ""}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-bold">٢. مسح رمز QR</div>
             <StepBadge state={qrInput ? "done" : step === "scan" ? "active" : "idle"} />
           </div>
-          
+
           <div className="rounded-xl border border-dashed border-border/70 bg-secondary/30 p-6 text-center overflow-hidden">
             {isCameraActive ? (
               <div className="relative mx-auto h-48 w-full max-w-xs rounded-xl overflow-hidden bg-black border border-primary/50 shadow-inner">
@@ -192,7 +192,7 @@ export default function EmployeeScan() {
                 </p>
                 <div className="flex justify-center gap-2 mt-4">
                   <button onClick={startCamera} className="btn-primary text-xs shadow" disabled={step !== "scan"}>
-                    📷 فتح الكاميرا للمسح
+                    📷 فتح الكاميرا
                   </button>
                   <button onClick={captureCode} className="btn-secondary text-xs" disabled={step !== "scan"}>
                     محاكاة المسح
