@@ -4,6 +4,7 @@ import Brand from "@/components/Brand";
 import { currentSession } from "@/lib/auth";
 import { getCurrentPosition, haversineMeters, type GeoPosition } from "@/lib/geo";
 import { findEmployeeByJobNumber, getSettings } from "@/lib/storage";
+import { getBackendEmployeeLocation } from "@/lib/backend";
 import { recordAttendance } from "@/lib/attendance";
 import { formatTime } from "@/lib/utils";
 import type { Settings } from "@/types";
@@ -19,7 +20,7 @@ export default function EmployeeScan() {
   const session = currentSession();
   const emp = session ? findEmployeeByJobNumber(session.jobNumber) : undefined;
   const action = type === "check-out" ? "check-out" : "check-in";
-  const [settings] = useState<Settings>(() => getSettings());
+  const [settings, setSettings] = useState<Settings>(() => getSettings());
   const [pos, setPos] = useState<GeoPosition | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
   const [step, setStep] = useState<Step>("gps");
@@ -32,6 +33,23 @@ export default function EmployeeScan() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
   const scanningRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getBackendEmployeeLocation().then(({ location }) => {
+      if (cancelled || !location) return;
+      setSettings((current) => ({
+        ...current,
+        workSiteLat: Number(location.lat),
+        workSiteLng: Number(location.lng),
+        radiusMeters: Number(location.radiusMeters),
+        locations: [{ ...location }],
+      }));
+    }).catch((e) => {
+      if (!cancelled) console.warn("تعذر تحميل إعدادات موقع الحضور من D1، سيتم استخدام الإعداد المحلي مؤقتًا:", e);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const assignedLocation = settings.locations?.find((location) => location.id === emp?.locationId);
   const targetLat = Number(assignedLocation?.lat ?? settings.workSiteLat);
@@ -62,7 +80,6 @@ export default function EmployeeScan() {
           setStep("error");
           return;
         }
-        // The local radius may be stale. Do not block here; recordAttendance performs the final check.
         setStep("scan");
       } catch (e) {
         if (cancelled) return;
@@ -127,8 +144,8 @@ export default function EmployeeScan() {
           <div className="rounded-xl border border-border/60 bg-secondary/20 p-4 text-center">
             <div className="text-xs text-muted-foreground">المسافة الحالية</div>
             <div className="text-3xl font-extrabold mono mt-1">{distance !== null ? `${distance} م` : "…"}</div>
-            <div className="text-xs text-muted-foreground mt-2">النطاق المحفوظ على هذا الجهاز: <span className="font-bold">{Number.isFinite(targetRadius) ? `${targetRadius} م` : "…"}</span></div>
-            <div className="text-[10px] text-muted-foreground mt-1">التحقق النهائي من صلاحية النطاق يتم داخل مسار تسجيل الحضور.</div>
+            <div className="text-xs text-muted-foreground mt-2">النطاق القادم من قاعدة البيانات: <span className="font-bold">{Number.isFinite(targetRadius) ? `${targetRadius} م` : "…"}</span></div>
+            <div className="text-[10px] text-muted-foreground mt-1">تم تحميل إعدادات الموقع والنطاق من D1 عند فتح صفحة الحضور.</div>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center mt-4 text-xs"><Cell label="خط العرض" value={pos ? pos.lat.toFixed(5) : "…"} /><Cell label="خط الطول" value={pos ? pos.lng.toFixed(5) : "…"} /><Cell label="المسافة" value={distance !== null ? `${distance} م` : "…"} /></div>
         </section>
