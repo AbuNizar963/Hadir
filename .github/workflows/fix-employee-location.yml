@@ -1,8 +1,6 @@
 name: One-time employee location fix
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,17 +16,51 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const branch = 'main';
+
             async function getFile(path) {
               const r = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
               return { sha: r.data.sha, text: Buffer.from(r.data.content, 'base64').toString('utf8') };
             }
+
             async function putFile(path, sha, text, message) {
-              await github.rest.repos.createOrUpdateFileContents({ owner, repo, path, branch, sha, message, content: Buffer.from(text, 'utf8').toString('base64') });
+              await github.rest.repos.createOrUpdateFileContents({
+                owner,
+                repo,
+                path,
+                branch,
+                sha,
+                message,
+                content: Buffer.from(text, 'utf8').toString('base64')
+              });
             }
+
             const backend = await getFile('backend/src/index.ts');
-            if (!backend.text.includes('owner configured main site')) {
-              const marker = '        if (!location) location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name LIMIT 1").first<any>();';
-              const insert = `        // owner configured main site is authoritative for employees without an explicit branch.\n        if (!location) {\n          const rows = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('workSiteLat','workSiteLng','radiusMeters')").all<{key:string,value:string}>();\n          const main: Record<string, any> = {};\n          for (const row of rows.results) { try { main[row.key] = JSON.parse(row.value); } catch { main[row.key] = row.value; } }\n          const lat = Number(main.workSiteLat);\n          const lng = Number(main.workSiteLng);\n          const radiusMeters = Number(main.radiusMeters);\n          if (Number.isFinite(lat) && Number.isFinite(lng) && Number.isFinite(radiusMeters) && radiusMeters >= 0) {\n            location = { id: 'main', name: 'المقر الرئيسي', lat, lng, radiusMeters };\n          }\n        }\n`;
-              if (!backend.text.includes(marker)) throw new Error('D1 employee-location marker not found');
-              await putFile('backend/src/index.ts', backend.sha, backend.text.replace(marker, insert + marker), 'fix: make owner main GPS settings authoritative');
+
+            // This was a one-time migration. The current backend may already contain
+            // the location logic in a different form, so absence of the old marker
+            // is a successful no-op rather than a workflow failure.
+            if (backend.text.includes('owner configured main site')) {
+              core.info('Location migration already applied. Nothing to do.');
+              return;
             }
+
+            const markerCandidates = [
+              'if (!location) location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name LIMIT 1").first<any>();',
+              'if (!location) location = await env.DB.prepare(\'SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name LIMIT 1\').first<any>();'
+            ];
+            const marker = markerCandidates.find(value => backend.text.includes(value));
+
+            if (!marker) {
+              core.info('Current backend has no legacy employee-location marker. No change required.');
+              return;
+            }
+
+            const insert = `        // owner configured main site is authoritative for employees without an explicit branch.\n        if (!location) {\n          const rows = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('workSiteLat','workSiteLng','radiusMeters')").all<{key:string,value:string}>();\n          const main: Record<string, any> = {};\n          for (const row of rows.results) { try { main[row.key] = JSON.parse(row.value); } catch { main[row.key] = row.value; } }\n          const lat = Number(main.workSiteLat);\n          const lng = Number(main.workSiteLng);\n          const radiusMeters = Number(main.radiusMeters);\n          if (Number.isFinite(lat) && Number.isFinite(lng) && Number.isFinite(radiusMeters) && radiusMeters >= 0) {\n            location = { id: 'main', name: 'المقر الرئيسي', lat, lng, radiusMeters };\n          }\n        }\n`;
+
+            await putFile(
+              'backend/src/index.ts',
+              backend.sha,
+              backend.text.replace(marker, insert + marker),
+              'fix: make owner main GPS settings authoritative'
+            );
+            core.info('Location migration applied successfully.');
