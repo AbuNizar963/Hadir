@@ -15,6 +15,14 @@ export default function EmployeeLogin() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (loading) return;
+
+    const normalizedJobNumber = jobNumber.trim();
+    const normalizedPin = pin.trim();
+    if (!normalizedJobNumber || !normalizedPin) {
+      setError("أدخل الرقم الوظيفي ورمز الدخول.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -23,18 +31,26 @@ export default function EmployeeLogin() {
         throw new Error("خدمة تسجيل دخول الموظفين غير مفعلة. تحقق من إعداد Cloudflare Worker.");
       }
 
-      const employee = await backendEmployeeLogin(jobNumber.trim(), pin);
+      // Authentication is authoritative in D1. The login endpoint returns the
+      // employee identity and JWT; EmployeeHome subsequently reloads the same
+      // employee record from D1 rather than trusting a local employee object.
+      const employee = await backendEmployeeLogin(normalizedJobNumber, normalizedPin);
+      const session: Employee = employee;
+
       setSession({
-        employeeId: employee.id,
-        jobNumber: employee.jobNumber,
-        name: employee.name,
+        employeeId: session.id,
+        jobNumber: session.jobNumber,
+        name: session.name,
         loginAt: new Date().toISOString(),
-        role: employee.role,
+        role: session.role,
       });
       window.dispatchEvent(new Event("hadir:session-changed"));
       navigate("/employee", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "تعذر تسجيل الدخول");
+      const message = err instanceof Error ? err.message : "تعذر تسجيل الدخول";
+      setError(message.includes("404") || message.includes("المسار غير موجود")
+        ? "خدمة الموظفين غير متاحة حاليًا. تحقق من نشر Cloudflare Worker ثم حاول مرة أخرى."
+        : message);
     } finally {
       setLoading(false);
     }
