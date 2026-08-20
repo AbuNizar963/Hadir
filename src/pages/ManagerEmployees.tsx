@@ -1,6 +1,7 @@
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getEmployees, saveEmployees, getAttendance, getSettings, forceCheckInByManager, getRequests, updateRequestStatus, EmployeeRequest } from "@/lib/storage";
+import { backendEnabled, getBackendEmployees, resetBackendEmployeeDevice } from "@/lib/backend";
 import { generateId } from "@/lib/utils";
 import { hash } from "@/lib/hash";
 import type { Employee, EmployeeStatus, ScheduleType } from "@/types";
@@ -20,6 +21,23 @@ export default function ManageEmployees() {
   const [adminPreset, setAdminPreset] = useState<AdminPreset>("SUN_THU"); const [adminDays, setAdminDays] = useState<number[]>([0,1,2,3,4]); const [adminDaysCount, setAdminDaysCount] = useState(5);
   const [editingId, setEditingId] = useState<string | null>(null); const [error, setError] = useState<string | null>(null); const [success, setSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null); const attendance = useMemo(() => getAttendance(), [employees]);
+
+  const refreshEmployeesFromD1 = async () => {
+    if (!backendEnabled) return;
+    try {
+      const remote = await getBackendEmployees();
+      setEmployees(remote);
+      try { localStorage.setItem("hadir.employees", JSON.stringify(remote)); } catch {}
+    } catch (error) { console.warn("Hadir manager D1 employee refresh failed:", error); }
+  };
+
+  useEffect(() => {
+    void refreshEmployeesFromD1();
+    const refresh = () => void refreshEmployeesFromD1();
+    window.addEventListener("hadir:cloud-data-changed", refresh);
+    window.addEventListener("focus", refresh);
+    return () => { window.removeEventListener("hadir:cloud-data-changed", refresh); window.removeEventListener("focus", refresh); };
+  }, []);
 
   const showSuccess = (message: string) => { setSuccess(message); window.setTimeout(() => setSuccess(null), 3000); };
   const resetForm = () => { setName(""); setJobNumber(""); setPin(""); setDeviceLabel(""); setAvatar(null); setLocationId(""); setScheduleType("ADMIN"); setWorkStartTime("08:00"); setWorkEndTime("16:00"); setGracePeriodMinutes(15); setRotationStartDate(""); setRotationPreset("4/4"); setRotationDaysOn(4); setRotationDaysOff(4); setAdminPreset("SUN_THU"); setAdminDays([0,1,2,3,4]); setAdminDaysCount(5); setEditingId(null); setError(null); if (fileInputRef.current) fileInputRef.current.value = ""; };
@@ -44,7 +62,7 @@ export default function ManageEmployees() {
 
   const handleEdit=(emp:Employee)=>{setEditingId(emp.id);setName(emp.name);setJobNumber(emp.jobNumber);setPin("");setDeviceLabel(emp.deviceLabel||"");setAvatar(emp.avatar||null);setLocationId(emp.locationId||"");setScheduleType(emp.scheduleType||"ADMIN");setWorkStartTime(emp.workStartTime||"08:00");setWorkEndTime(emp.workEndTime||"16:00");setGracePeriodMinutes(emp.gracePeriodMinutes??15);setRotationStartDate(emp.rotationStartDate||"");setRotationDaysOn(emp.rotationDaysOn??4);setRotationDaysOff(emp.rotationDaysOff??4);const days=emp.workDays?.length?emp.workDays:[0,1,2,3,4];setAdminDays(days);setAdminDaysCount(days.length);setAdminPreset(days.join(",")==="0,1,2,3,4"?"SUN_THU":days.join(",")==="0,1,2,3"?"SUN_WED":"CUSTOM");setError(null);window.scrollTo({top:0,behavior:"smooth"});};
   const handleDelete=(id:string)=>{if(!confirm("هل أنت متأكد من حذف هذا الموظف؟ سيتم إلغاء توثيق جهازه تلقائياً."))return;const updated=employees.filter(e=>e.id!==id);setEmployees(updated);saveEmployees(updated);showSuccess("تم حذف الموظف بنجاح");};
-  const handleResetDevice=(id:string)=>{if(!confirm("هل تريد إعادة تعيين جهاز هذا الموظف؟ سيتمكن من تسجيل الدخول من جهاز جديد."))return;const updated=employees.map(e=>e.id===id?{...e,deviceId:null,deviceLabel:null}:e);setEmployees(updated);saveEmployees(updated);showSuccess("تم فك ربط جهاز الموظف بنجاح");};
+  const handleResetDevice=async(id:string)=>{if(!confirm("هل تريد إعادة تعيين جهاز هذا الموظف؟ سيتمكن من تسجيل الدخول من جهاز جديد."))return;setError(null);try{if(backendEnabled){await resetBackendEmployeeDevice(id);await refreshEmployeesFromD1();}else{const updated=employees.map(e=>e.id===id?{...e,deviceId:null,deviceLabel:null}:e);setEmployees(updated);saveEmployees(updated);}showSuccess("تم فك ربط جهاز الموظف من D1 بنجاح");}catch(error){setError(error instanceof Error?error.message:"تعذر فك ربط الجهاز");}};
   const toggleStatus=(id:string)=>{const updated=employees.map(e=>e.id===id?{...e,status:(e.status==="active"?"suspended":"active") as EmployeeStatus}:e);setEmployees(updated);saveEmployees(updated);showSuccess("تم تحديث حالة الموظف بنجاح");};
   const handleForceCheckIn=(emp:Employee)=>{const checkIn=confirm(`اضغط "موافق" لتسجيل حضور الموظف ${emp.name}\nأو "إلغاء" لتسجيل الانصراف.`);const type=checkIn?"check-in":"check-out";forceCheckInByManager(emp,type);addNotification({userId:emp.jobNumber,title:"تحديث حضور وانصراف",body:`قام المدير بتسجيل ${type==="check-in"?"حضورك":"انصرافك"} يدوياً.`,type:"info"});showSuccess(`تم تسجيل ${type==="check-in"?"حضور":"انصراف"} الموظف ${emp.name} بنجاح`);};
   const handleUpdateRequest=(req:EmployeeRequest,status:"approved"|"rejected")=>{updateRequestStatus(req.id,status);setRequests(getRequests());const ok=status==="approved";const text=req.type==="permission"?"استئذان الخروج المبكر":req.type==="leave"?"طلب الإجازة":"طلب الانصراف المباشر";addNotification({userId:req.jobNumber,title:ok?"تمت الموافقة على طلبك":"تم رفض طلبك",body:`تمت ${ok?"الموافقة على":"رفض"} ${text}.`,type:ok?"success":"error"});showSuccess(ok?"تمت الموافقة على الطلب":"تم رفض الطلب");};
