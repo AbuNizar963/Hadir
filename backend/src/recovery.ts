@@ -26,6 +26,13 @@ function json(data: unknown, status: number, origin: string) {
   }});
 }
 
+async function ensureRecoveryTables(db: D1Database) {
+  await db.batch([
+    db.prepare("CREATE TABLE IF NOT EXISTS admin_accounts (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
+  ]);
+}
+
 async function recovery(req: Request, env: Env, origin: string) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,OPTIONS" } });
   if (req.method !== "POST") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
@@ -44,54 +51,40 @@ async function recovery(req: Request, env: Env, origin: string) {
   for (let i = 0; i < code.length; i++) diff |= code.charCodeAt(i) ^ env.OWNER_RECOVERY_CODE.charCodeAt(i);
   if (diff !== 0) return json({ error: "رمز الاستعادة غير صحيح" }, 401, origin);
 
-  await env.DB.prepare("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)").run();
-  const used = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_used'").first<{ value: string }>();
-  if (used) return json({ error: "تم استخدام رمز استعادة المالك مسبقًا. أنشئ رمزًا جديدًا ثم احذف حالة الاستعادة من D1." }, 409, origin);
+  try {
+    await ensureRecoveryTables(env.DB);
 
-  const owner = await env.DB.prepare("SELECT id,username,name FROM admin_accounts WHERE role='owner' LIMIT 1").first<{ id: string; username: string; name: string }>();
+    const used = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_used'").first<{ value: string }>();
+    if (used) return json({ error: "تم استخدام رمز استعادة المالك مسبقًا. أنشئ رمزًا جديدًا ثم أعد المحاولة." }, 409, origin);
 
-  if (!owner) {
-    if (!name || !username) return json({ error: "لم يتم العثور على حساب مالك. أدخل اسم المالك واسم المستخدم لإنشاء حساب المالك الأول." }, 404, origin);
-    if (username.length < 3 || username.length > 64) return json({ error: "اسم المستخدم يجب أن يكون بين 3 و64 حرفًا" }, 400, origin);
-    if (!/^[A-Za-z0-9_.@-]+$/.test(username)) return json({ error: "اسم المستخدم يحتوي على أحرف غير مدعومة" }, 400, origin);
+    const owner = await env.DB.prepare("SELECT id,username,name FROM admin_accounts WHERE role='owner' LIMIT 1").first<{ id: string; username: string; name: string }>();
 
-    const passwordHash = await hashPassword(password);
-    const existing = await env.DB.prepare("SELECT id,role FROM admin_accounts WHERE username=? LIMIT 1").bind(username).first<{ id: string; role: string }>();
+    if (!owner) {
+      if (!name || !username) return json({ error: "لم يتم العثور على حساب مالك. أدخل اسم المالك واسم المستخدم لإنشاء حساب المالك الأول." }, 404, origin);
+      if (username.length < 3 || username.length > 64) return json({ error: "اسم المستخدم يجب أن يكون بين 3 و64 حرفًا" }, 400, origin);
+      if (!/^[A-Za-z0-9_.@-]+$/.test(username)) return json({ error: "اسم المستخدم يحتوي على أحرف غير مدعومة" }, 400, origin);
 
-    try {
+      const passwordHash = await hashPassword(password);
+      const existing = await env.DB.prepare("SELECT id FROM admin_accounts WHERE username=? LIMIT 1").bind(username).first<{ id: string }>();
+      const timestamp = new Date().toISOString();
+
       if (existing) {
-        // The recovery code is already the authorization boundary. Reuse an existing
-        // administrative username instead of failing on the UNIQUE username constraint.
-        await env.DB.batch([
-          env.DB.prepare("UPDATE admin_accounts SET password_hash=?,name=?,role='owner',active=1 WHERE id=?").bind(passwordHash, name, existing.id),
-          env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?)").bind(new Date().toISOString()),
-        ]);
-        return json({ ok: true, username, message: "تم تحويل الحساب الإداري إلى مالك وإعادة تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن." }, 200, origin);
+        await env.DB.prepare("UPDATE admin_accounts SET password_hash=?,name=?,role='owner',active=1 WHERE id=?").bind(passwordHash, name, existing.id).run();
+      } else {
+        await env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(), username, passwordHash, name, "owner", 1, timestamp).run();
       }
 
-      const id = crypto.randomUUID();
-      await env.DB.batch([
-        env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)").bind(id, username, passwordHash, name, "owner", 1, new Date().toISOString()),
-        env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?)").bind(new Date().toISOString()),
-      ]);
-      return json({ ok: true, username, message: "تم إنشاء حساب المالك الأول بنجاح. يمكنك تسجيل الدخول الآن." }, 201, origin);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      return json({ error: "تعذر إنشاء حساب المالك في قاعدة البيانات", detail }, 500, origin);
+      await env.DB.prepare("INSERT OR REPLACE INTO settings(key,value) VALUES('owner_recovery_used',?)").bind(timestamp).run();
+      return json({ ok: true, username, message: "تم إنشاء حساب المالك الأول بنجاح. يمكنك تسجيل الدخول الآن." }, existing ? 200 : 201, origin);
     }
-  }
 
-  try {
-    await env.DB.batch([
-      env.DB.prepare("UPDATE admin_accounts SET password_hash=?,active=1 WHERE id=? AND role='owner'").bind(await hashPassword(password), owner.id),
-      env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?)").bind(new Date().toISOString()),
-    ]);
+    await env.DB.prepare("UPDATE admin_accounts SET password_hash=?,active=1 WHERE id=? AND role='owner'").bind(await hashPassword(password), owner.id).run();
+    await env.DB.prepare("INSERT OR REPLACE INTO settings(key,value) VALUES('owner_recovery_used',?)").bind(new Date().toISOString()).run();
+    return json({ ok: true, username: owner.username, message: "تمت إعادة تعيين كلمة مرور المالك. استخدم اسم المستخدم نفسه لتسجيل الدخول." }, 200, origin);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    return json({ error: "تعذر إعادة تعيين كلمة مرور المالك في قاعدة البيانات", detail }, 500, origin);
+    return json({ error: "تعذر إنشاء/إعادة تعيين حساب المالك في قاعدة البيانات", detail }, 500, origin);
   }
-
-  return json({ ok: true, username: owner.username, message: "تمت إعادة تعيين كلمة مرور المالك. استخدم اسم المستخدم نفسه لتسجيل الدخول." }, 200, origin);
 }
 
 export default {
