@@ -18,15 +18,26 @@ export default function EmployeeLogin(){
   if(loading)return;
   setError(null);
   setLoading(true);
+  const number=jobNumber.trim();
   try{
    if(backendEnabled){
-    const employee=await backendEmployeeLogin(jobNumber.trim(),pin),e=employee as Employee;
-    setSession({employeeId:e.id,jobNumber:e.jobNumber,name:e.name,loginAt:new Date().toISOString(),role:e.role});
-    try{await hydrateLocalData()}catch{}
-    navigate("/employee",{replace:true});
-    return;
+    try{
+     const employee=await backendEmployeeLogin(number,pin),e=employee as Employee;
+     setSession({employeeId:e.id,jobNumber:e.jobNumber,name:e.name,loginAt:new Date().toISOString(),role:e.role});
+     try{await hydrateLocalData()}catch{}
+     navigate("/employee",{replace:true});
+     return;
+    }catch(backendError){
+     const localResult=loginEmployee(number,pin);
+     if(localResult.success){
+      window.dispatchEvent(new Event("hadir:session-changed"));
+      navigate("/employee",{replace:true});
+      return;
+     }
+     throw backendError;
+    }
    }
-   const result=loginEmployee(jobNumber.trim(),pin);
+   const result=loginEmployee(number,pin);
    if(!result.success){
     setError(result.reason||"الرقم الوظيفي أو رمز الدخول غير صحيح");
     return;
