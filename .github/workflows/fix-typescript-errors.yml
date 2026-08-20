@@ -1,0 +1,69 @@
+name: Fix TypeScript errors
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, 'fix: TypeScript build errors')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply safe TypeScript fixes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          def edit(path, fn):
+              p=Path(path); s=p.read_text(); n=fn(s); p.write_text(n)
+              if s==n: print(f'no change: {path}')
+              else: print(f'updated: {path}')
+
+          edit('src/pages/ManagerSettings.tsx', lambda s: s.replace('.replaceAll("-","")', '.replace(/-/g, "")'))
+
+          edit('src/pages/ManagerEmployees.tsx', lambda s: s.replace('getBackendLocations, saveBackendLocation, createBackendEmployee, updateBackendEmployee, deleteBackendEmployee, resetBackendEmployeeDevice', 'getBackendLocations, saveBackendLocation, createBackendEmployee, updateBackendEmployee, deleteBackendEmployee, resetBackendEmployeeDevice, updateBackendRequest, getBackendRequests'))
+          edit('src/pages/ManagerEmployees.tsx', lambda s: re.sub(r'await \(async\(\)=>\{try\{return await import\("@/lib/backend"\)\.then\(m=>m\.getBackendRequests\(\)\)\}catch\{return getRequests\(\)\}\}\)\(\)', 'await getBackendRequests()', s))
+
+          def audit(s):
+              marker='  "manager-login-failed": "دخول مدير فاشل",\n'
+              additions='  "manager-login-failed": "دخول مدير فاشل",\n  "supervisor-login": "دخول مشرف",\n  "supervisor-login-failed": "دخول مشرف فاشل",\n  "owner-login": "دخول مالك",\n  "owner-login-failed": "دخول مالك فاشل",\n  "admin-login": "دخول إداري",\n  "admin-login-failed": "دخول إداري فاشل",\n'
+              return s.replace(marker, additions) if '"supervisor-login"' not in s else s
+          edit('src/pages/ManagerAudit.tsx', audit)
+
+          edit('src/pages/EmployeeScan.tsx', lambda s: s.replace('step === "submit"', 'step === "submitting"'))
+          edit('src/pages/EmployeeLogin.tsx', lambda s: s.replace('import { loginEmployee } from "@/lib/auth";', 'import { loginEmployee } from "@/lib/auth";\nimport { backendEmployeeLogin, backendEnabled } from "@/lib/backend";'))
+
+          def login(s):
+              old='''    setTimeout(() => {\n      const res = loginEmployee(jobNumber, pin);\n      setLoading(false);\n\n      if (!res.success) {\n        setErr(res.error || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");\n      } else {\n        nav("/employee");\n      }\n    }, 250);'''
+              new='''    void (async () => {\n      try {\n        if (backendEnabled) {\n          const user = await backendEmployeeLogin(jobNumber, pin);\n          const { setSession } = await import("@/lib/storage");\n          setSession({ employeeId: user.id, jobNumber: user.jobNumber, name: user.name, loginAt: new Date().toISOString(), role: user.role });\n        } else {\n          const res = loginEmployee(jobNumber, pin);\n          if (!res.success) throw new Error(res.reason || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");\n        }\n        nav("/employee");\n      } catch (error) {\n        setErr(error instanceof Error ? error.message : "الرقم الوظيفي أو رمز الـ PIN غير صحيح");\n      } finally {\n        setLoading(false);\n      }\n    })();'''
+              return s.replace(old,new)
+          edit('src/pages/EmployeeLogin.tsx', login)
+
+          edit('src/pages/EmployeeHome.tsx', lambda s: s.replace('r.type === "check-in" || r.type === "in"', 'r.type === "check-in"').replace('r.type === "check-out" || r.type === "out"', 'r.type === "check-out"').replace('const shiftEnded = isShiftOver(emp);', 'const shiftEnded = emp ? isShiftOver(emp) : false;'))
+          edit('src/components/layout/ManagerLayout.tsx', lambda s: s.replace('{n.title||n.message}', '{n.title || n.body}'))
+          PY
+
+      - name: Verify TypeScript
+        run: npx tsc --noEmit
+      - name: Verify production build
+        run: npm run build
+
+      - name: Commit verified fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src
+          if git diff --cached --quiet; then echo 'No source changes'; exit 0; fi
+          git commit -m 'fix: TypeScript build errors'
+          git push
