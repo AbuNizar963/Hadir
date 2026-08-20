@@ -196,8 +196,7 @@ export default {
         if (employee.location_id) {
           location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id=? LIMIT 1").bind(employee.location_id).first<any>();
         }
-        // For employees without an explicitly assigned branch, the owner
-        // configured main site is the authoritative attendance location.
+        // owner configured main site is authoritative for employees without an explicit branch.
         if (!location) {
           const rows = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('workSiteLat','workSiteLng','radiusMeters')").all<{key:string,value:string}>();
           const main: Record<string, any> = {};
