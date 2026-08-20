@@ -10,6 +10,6 @@
     "migrate": "wrangler d1 migrations apply Hadir --remote"
   },
   "devDependencies": {
-    "wrangler": "latest"
+    "wrangler": "4.123.0"
   }
 }
