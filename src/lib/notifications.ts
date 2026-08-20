@@ -1,119 +1,31 @@
-// نظام الإشعارات المخزّن محلياً في المتصفح
-// يوفر واجهة موحدة لإضافة/جلب/تحديث/حذف الإشعارات لكل مستخدم
-
 export type NotificationType = "info" | "success" | "warning" | "error";
-
-export interface AppNotification {
-  id: string;
-  userId: string; // "admin" للمدير، أو jobNumber للموظف
-  title: string;
-  body: string;
-  type: NotificationType;
-  read: boolean;
-  createdAt: string;
-}
-
+export interface AppNotification { id: string; userId: string; title: string; body: string; type: NotificationType; read: boolean; createdAt: string; }
 const K_NOTIFICATIONS = "hadir.notifications";
 const EVT_CHANGED = "hadir:notifications-changed";
-
-function readAll(): AppNotification[] {
+const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+const token = () => typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token") || "";
+function readAll(): AppNotification[] { try { const raw = localStorage.getItem(K_NOTIFICATIONS); return raw ? JSON.parse(raw) : []; } catch { return []; } }
+function writeAll(list: AppNotification[]) { try { localStorage.setItem(K_NOTIFICATIONS, JSON.stringify(list.slice(0, 200))); } catch {} if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVT_CHANGED)); }
+function headers() { const h = new Headers({ "content-type": "application/json" }); const t = token(); if (t) h.set("authorization", `Bearer ${t}`); return h; }
+async function syncFromD1() {
+  const t = token(); if (!t) return;
   try {
-    const raw = localStorage.getItem(K_NOTIFICATIONS);
-    if (!raw) return [];
-    return JSON.parse(raw) as AppNotification[];
-  } catch {
-    return [];
-  }
+    const r = await fetch(`${API_URL}/api/notifications`, { headers: headers() });
+    if (!r.ok) return;
+    const rows = await r.json() as any[];
+    writeAll(rows.map(n => ({ id:n.id, userId:n.userId, title:n.title, body:n.message, type:n.type, read:Boolean(n.readAt), createdAt:n.createdAt })));
+  } catch {}
 }
-
-function writeAll(list: AppNotification[]) {
-  localStorage.setItem(K_NOTIFICATIONS, JSON.stringify(list));
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(EVT_CHANGED));
-  }
-}
-
-/**
- * إضافة إشعار جديد إلى قائمة إشعارات مستخدم محدد
- */
-export function addNotification(
-  n: Omit<AppNotification, "id" | "read" | "createdAt">
-): AppNotification {
-  const list = readAll();
-  const notif: AppNotification = {
-    ...n,
-    id: crypto.randomUUID(),
-    read: false,
-    createdAt: new Date().toISOString(),
-  };
-  list.unshift(notif);
-  // الاحتفاظ بأحدث 200 إشعار فقط لتفادي امتلاء التخزين المحلي
-  const capped = list.slice(0, 200);
-  writeAll(capped);
+export function addNotification(n: Omit<AppNotification,"id"|"read"|"createdAt">): AppNotification {
+  const notif = { ...n, id: crypto.randomUUID(), read:false, createdAt:new Date().toISOString() };
+  writeAll([notif, ...readAll()]);
+  const t = token(); if (t) void fetch(`${API_URL}/api/notifications`, { method:"POST", headers:headers(), body:JSON.stringify({ title:n.title, message:n.body, type:n.type }) }).catch(()=>{});
   return notif;
 }
-
-/**
- * جلب إشعارات مستخدم محدد (أو الكل إذا لم يُحدَّد المستخدم)
- */
-export function getNotifications(userId?: string): AppNotification[] {
-  const list = readAll();
-  if (!userId) return list;
-  return list.filter((n) => n.userId === userId);
-}
-
-/**
- * عدد الإشعارات غير المقروءة للمستخدم
- */
-export function getUnreadCount(userId?: string): number {
-  return getNotifications(userId).filter((n) => !n.read).length;
-}
-
-/**
- * تعليم إشعار كمقروء
- */
-export function markAsRead(id: string) {
-  const list = readAll();
-  const idx = list.findIndex((n) => n.id === id);
-  if (idx >= 0) {
-    list[idx].read = true;
-    writeAll(list);
-  }
-}
-
-/**
- * تعليم كل إشعارات المستخدم كمقروءة
- */
-export function markAllAsRead(userId?: string) {
-  const list = readAll();
-  let changed = false;
-  for (const n of list) {
-    if ((!userId || n.userId === userId) && !n.read) {
-      n.read = true;
-      changed = true;
-    }
-  }
-  if (changed) writeAll(list);
-}
-
-/**
- * حذف إشعار محدد
- */
-export function removeNotification(id: string) {
-  const list = readAll().filter((n) => n.id !== id);
-  writeAll(list);
-}
-
-/**
- * حذف كل إشعارات المستخدم (أو الكل)
- */
-export function clearNotifications(userId?: string) {
-  if (!userId) {
-    writeAll([]);
-    return;
-  }
-  const list = readAll().filter((n) => n.userId !== userId);
-  writeAll(list);
-}
-
+export function getNotifications(userId?: string): AppNotification[] { void syncFromD1(); const list=readAll(); return userId ? list.filter(n=>n.userId===userId || !n.userId) : list; }
+export function getUnreadCount(userId?: string): number { return getNotifications(userId).filter(n=>!n.read).length; }
+export function markAsRead(id: string) { const list=readAll().map(n=>n.id===id?{...n,read:true}:n); writeAll(list); const t=token(); if(t) void fetch(`${API_URL}/api/notifications/read`,{method:"POST",headers:headers(),body:JSON.stringify({id})}).catch(()=>{}); }
+export function markAllAsRead(userId?: string) { const list=readAll().map(n=>(!userId||n.userId===userId)?{...n,read:true}:n); writeAll(list); const t=token(); if(t) void fetch(`${API_URL}/api/notifications/read`,{method:"POST",headers:headers(),body:"{}"}).catch(()=>{}); }
+export function removeNotification(id: string) { writeAll(readAll().filter(n=>n.id!==id)); }
+export function clearNotifications(userId?: string) { writeAll(userId?readAll().filter(n=>n.userId!==userId):[]); }
 export const NOTIFICATIONS_CHANGED_EVENT = EVT_CHANGED;
