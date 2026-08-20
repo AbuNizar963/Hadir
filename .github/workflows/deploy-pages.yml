@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -31,8 +31,14 @@ jobs:
 
       - name: Configure API URL
         env:
-          HADIR_API_URL: ${{ secrets.HADIR_API_URL }}
-        run: echo "VITE_API_URL=${HADIR_API_URL:-https://hadir-api.abunizar963.workers.dev}" >> "$GITHUB_ENV"
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: |
+          set -euo pipefail
+          API_URL="${VITE_API_URL:-https://hadir-api.abunizar963.workers.dev}"
+          API_URL="${API_URL%/}"
+          [[ "$API_URL" == https://* ]] || { echo 'ERROR: VITE_API_URL must use HTTPS.' >&2; exit 1; }
+          echo "VITE_API_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "Using configured API origin: $API_URL"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
