@@ -1,16 +1,6 @@
-import { backendEnabled, getBackendAttendance, getBackendRequests, getBackendAudit, getBackendEmployees, getBackendSettings, getBackendLocations, getBackendAdmins } from "@/lib/backend";
-import { setD1View } from "@/lib/d1View";
-let syncTimer:number|null=null; let syncing=false;
-const safe=<T,>(promise:Promise<T>,fallback:T)=>promise.catch(()=>fallback);
+import { backendEnabled, getBackendAttendance, getBackendRequests, getBackendAudit } from "@/lib/backend";
+
 export async function hydrateLocalData(){
-  if(!backendEnabled||typeof window==="undefined"||syncing)return; syncing=true;
-  try{
-    const [employees,attendance,requests,audit,settings,locations,admins]=await Promise.all([
-      safe(getBackendEmployees(),[]),safe(getBackendAttendance(2000),[]),safe(getBackendRequests(),[]),safe(getBackendAudit(2000),[]),
-      safe(getBackendSettings(),null),safe(getBackendLocations(),[]),safe(getBackendAdmins(),[]),
-    ]);
-    setD1View({employees,attendance,requests,audit,settings,locations,admins:admins as any});
-  }finally{syncing=false;}
+  if(!backendEnabled||typeof window==="undefined")return;
+  try{const [attendance,requests,audit]=await Promise.all([getBackendAttendance(2000),getBackendRequests(),getBackendAudit(2000)]);localStorage.setItem("hadir.attendance",JSON.stringify(attendance));localStorage.setItem("hadir.requests",JSON.stringify(requests));localStorage.setItem("hadir.audit",JSON.stringify(audit));window.dispatchEvent(new Event("hadir:cloud-data-changed"));}catch(error){console.warn("Hadir cloud data hydration deferred:",error)}
 }
-export function startCloudDataSync(intervalMs=15000){if(!backendEnabled||typeof window==="undefined"||syncTimer!==null)return;void hydrateLocalData();syncTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void hydrateLocalData();},intervalMs);const refresh=()=>void hydrateLocalData();window.addEventListener("focus",refresh);document.addEventListener("visibilitychange",refresh);}
-startCloudDataSync();
