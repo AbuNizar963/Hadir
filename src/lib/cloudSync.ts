@@ -15,7 +15,37 @@ function localWrite(list: Employee[]) {
   try {
     localStorage.setItem(KEY, JSON.stringify(list));
     window.dispatchEvent(new Event("hadir:employees-changed"));
+    window.dispatchEvent(new Event("hadir:cloud-data-changed"));
   } catch {}
+}
+
+function scheduleFields(employee: Employee) {
+  const rotation = employee.scheduleType === "ROTATION";
+  return {
+    scheduleType: rotation ? "ROTATION" : "ADMIN",
+    rotationStartDate: rotation ? (employee.rotationStartDate || null) : null,
+    workStartTime: rotation ? "00:00" : (employee.workStartTime || "08:00"),
+    workEndTime: rotation ? "00:00" : (employee.workEndTime || "16:00"),
+    rotationDaysOn: rotation ? Math.max(1, Math.floor(employee.rotationDaysOn ?? 4)) : null,
+    rotationDaysOff: rotation ? Math.max(0, Math.floor(employee.rotationDaysOff ?? 4)) : null,
+    workDays: rotation ? undefined : employee.workDays,
+  };
+}
+
+async function persistEmployeeSchedule(id: string, employee: Employee) {
+  const fields = scheduleFields(employee);
+  const result = await updateBackendEmployee(id, fields);
+  const server = result.employee;
+  // Never accept an ADMIN response when the manager explicitly selected ROTATION.
+  // This protects against stale workers/API deployments and makes the mismatch retryable.
+  if (employee.scheduleType === "ROTATION" && server?.scheduleType !== "ROTATION") {
+    const retry = await updateBackendEmployee(id, fields);
+    if (retry.employee?.scheduleType !== "ROTATION") {
+      throw new Error("تعذر حفظ نظام الدوام التناوبي في قاعدة D1");
+    }
+    return retry.employee;
+  }
+  return server;
 }
 
 async function pushEmployees(local: Employee[], pins?: Record<string, string>) {
@@ -33,10 +63,16 @@ async function pushEmployees(local: Employee[], pins?: Record<string, string>) {
           if (!merged.some(e => e.id === employee.id || e.jobNumber === employee.jobNumber)) merged.push(employee);
           continue;
         }
-        const result = await createBackendEmployee({ ...employee, pin });
-        // Use the server representation when available, so the ID and schedule
-        // stored locally are exactly the same record as D1.
-        merged.push(result.employee || employee);
+        const result = await createBackendEmployee({
+          ...employee,
+          ...scheduleFields(employee),
+          pin,
+        });
+        let serverEmployee = result.employee || employee;
+        if (employee.scheduleType === "ROTATION" && serverEmployee.scheduleType !== "ROTATION") {
+          serverEmployee = await persistEmployeeSchedule(serverEmployee.id, employee);
+        }
+        merged.push(serverEmployee);
         continue;
       }
 
@@ -46,31 +82,34 @@ async function pushEmployees(local: Employee[], pins?: Record<string, string>) {
         status: employee.status,
         deviceId: employee.deviceId,
         deviceLabel: employee.deviceLabel,
-        scheduleType: employee.scheduleType,
-        rotationStartDate: employee.rotationStartDate,
-        workStartTime: employee.workStartTime,
-        workEndTime: employee.workEndTime,
+        ...scheduleFields(employee),
         gracePeriodMinutes: employee.gracePeriodMinutes,
         role: employee.role,
         locationId: employee.locationId,
-        rotationDaysOn: employee.rotationDaysOn,
-        rotationDaysOff: employee.rotationDaysOff,
         specialties: employee.specialties,
-        workDays: employee.workDays,
         avatar: employee.avatar,
       };
       const pin = pins?.[employee.id];
       if (pin) input.pin = pin;
 
       const result = await updateBackendEmployee(existing.id, input);
-      if (employee.deviceId === null) await resetBackendEmployeeDevice(existing.id);
-      const serverEmployee = result.employee || { ...existing, ...employee, id: existing.id };
+      let serverEmployee = result.employee || { ...existing, ...employee, id: existing.id };
+      if (employee.scheduleType === "ROTATION" && serverEmployee.scheduleType !== "ROTATION") {
+        serverEmployee = await persistEmployeeSchedule(existing.id, employee);
+      }
       const index = merged.findIndex(e => e.id === existing.id);
       if (index >= 0) merged[index] = serverEmployee;
       else merged.push(serverEmployee);
     } catch (error) {
       console.warn("Hadir employee cloud sync failed; keeping local copy:", error);
-      if (!merged.some(e => e.id === employee.id || e.jobNumber === employee.jobNumber)) merged.push(employee);
+      const index = merged.findIndex(e => e.id === employee.id || e.jobNumber === employee.jobNumber);
+      if (index >= 0) {
+        // Keep the manager's selected schedule locally instead of replacing it with
+        // a stale ADMIN copy when the cloud write has not completed yet.
+        merged[index] = { ...merged[index], ...employee };
+      } else {
+        merged.push(employee);
+      }
     }
   }
   localWrite(merged);
@@ -104,8 +143,6 @@ export async function pullEmployeesFromCloud() {
     const local = localRead();
     const localById = new Map(local.map(e => [e.id, e]));
     const localByJob = new Map(local.map(e => [e.jobNumber, e]));
-    // D1 is authoritative for employee profile/schedule data. Keep only the
-    // local PIN hash because it is intentionally never returned by the API.
     const merged = remote.map(r => {
       const cached = localById.get(r.id) || localByJob.get(r.jobNumber);
       return cached?.pinHash ? { ...r, pinHash: cached.pinHash } : r;
