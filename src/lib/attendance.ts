@@ -6,6 +6,7 @@ import {
   getSettings,
   saveEmployees,
 } from "@/lib/storage";
+import { getBackendSettings, backendEnabled } from "@/lib/backend";
 import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
 import { haversineMeters, isValidGeoPosition, type GeoPosition, isLikelyMockedPosition } from "@/lib/geo";
 import type { AttendanceRecord } from "@/types";
@@ -58,7 +59,25 @@ function formatMinutesToText(totalMinutes: number): string {
 }
 
 export async function recordAttendance(args: RecordArgs): Promise<RecordResult> {
-  const settings = getSettings();
+  // Attendance devices may have an old localStorage copy of the settings.
+  // Always prefer the authoritative D1 settings when the backend is enabled,
+  // otherwise a device can compare its GPS against stale/default coordinates.
+  let settings = getSettings();
+  if (backendEnabled) {
+    try {
+      const cloudSettings = await getBackendSettings();
+      settings = {
+        ...settings,
+        ...cloudSettings,
+        adminAccounts: Array.isArray(cloudSettings.adminAccounts)
+          ? cloudSettings.adminAccounts
+          : settings.adminAccounts,
+      };
+    } catch (error) {
+      console.warn("تعذر تحميل إعدادات الموقع من Cloudflare D1، سيتم استخدام النسخة المحلية:", error);
+    }
+  }
+
   const employee = findEmployeeByJobNumber(args.jobNumber);
   const deviceId = getDeviceId();
 
@@ -148,9 +167,14 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
   }
 
   const assignedLocation = settings.locations?.find((location) => location.id === employee.locationId);
-  const targetLat = assignedLocation?.lat ?? settings.workSiteLat;
-  const targetLng = assignedLocation?.lng ?? settings.workSiteLng;
-  const targetRadius = assignedLocation?.radiusMeters ?? settings.radiusMeters;
+  const targetLat = Number(assignedLocation?.lat ?? settings.workSiteLat);
+  const targetLng = Number(assignedLocation?.lng ?? settings.workSiteLng);
+  const targetRadius = Number(assignedLocation?.radiusMeters ?? settings.radiusMeters);
+
+  if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng) || !Number.isFinite(targetRadius) || targetRadius < 0) {
+    return { ok: false, reason: "إعدادات موقع العمل غير صالحة. يرجى مراجعة إعدادات GPS في لوحة الإدارة." };
+  }
+
   const distance = haversineMeters(args.position, { lat: targetLat, lng: targetLng });
 
   if (!Number.isFinite(distance) || distance > targetRadius) {
