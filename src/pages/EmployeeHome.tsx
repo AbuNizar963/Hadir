@@ -10,7 +10,7 @@ import {
   addRequest,
   type RequestType,
 } from "@/lib/storage";
-import { pullEmployeesFromCloud } from "@/lib/cloudSync";
+import { getBackendEmployees, getBackendLocations, getBackendRequests, createBackendRequest } from "@/lib/backend";
 import { getEmployeeScheduleStatus } from "@/lib/schedule";
 import { formatTime, formatDurationMinutes, todayKey, minutesBetween } from "@/lib/utils";
 
@@ -19,6 +19,8 @@ export default function EmployeeHome() {
   const session = currentSession();
   const [now, setNow] = useState(new Date());
   const [, setCloudVersion] = useState(0);
+  const [d1Employee, setD1Employee] = useState<typeof findEmployeeByJobNumber extends never ? never : any>(null);
+  const [d1Locations, setD1Locations] = useState<any[]>([]);
 
   useEffect(() => {
     if (!session) {
@@ -38,8 +40,9 @@ export default function EmployeeHome() {
       if (refreshing || disposed) return;
       refreshing = true;
       try {
-        await pullEmployeesFromCloud();
-        if (!disposed) setCloudVersion((v) => v + 1);
+        const [remoteEmployees, remoteLocations] = await Promise.all([getBackendEmployees(), getBackendLocations()]);
+        const remote = remoteEmployees.find((employee) => employee.jobNumber === session.jobNumber || employee.id === session.employeeId) || null;
+        if (!disposed) { setD1Employee(remote); setD1Locations(remoteLocations); setCloudVersion((v) => v + 1); }
       } finally {
         refreshing = false;
       }
@@ -81,12 +84,12 @@ export default function EmployeeHome() {
 
   if (!session) return null;
 
-  const emp = findEmployeeByJobNumber(session.jobNumber);
+  const emp = d1Employee || findEmployeeByJobNumber(session.jobNumber);
   const settings = getSettings();
 
   const assignedLocation = useMemo(() => {
-    if (emp?.locationId && settings.locations) {
-      return settings.locations.find((loc) => loc.id === emp.locationId);
+    if (emp?.locationId) {
+      return d1Locations.find((loc) => loc.id === emp.locationId) || settings.locations?.find((loc) => loc.id === emp.locationId);
     }
     return null;
   }, [emp, settings]);
@@ -142,12 +145,15 @@ export default function EmployeeHome() {
     e.preventDefault();
     if (!emp) return;
 
-    addRequest({
+    void createBackendRequest({
       employeeId: emp.id,
       employeeName: emp.name,
       jobNumber: emp.jobNumber,
       type: requestType,
       reason,
+    }).then(() => setRequestSent(true)).catch((error) => {
+      console.error(error);
+      setRequestSent(false);
     });
 
     setRequestSent(true);
