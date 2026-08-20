@@ -15,19 +15,45 @@ const ACTIONS: Record<AuditEntry["action"], string> = {
   "manager-login-failed": "دخول مدير فاشل",
 };
 
+function safeAudit(): AuditEntry[] {
+  try {
+    const value = getAudit();
+    if (!Array.isArray(value)) return [];
+    return value.filter((entry): entry is AuditEntry => Boolean(entry && typeof entry === "object"));
+  } catch (error) {
+    console.error("Failed to load audit log", error);
+    return [];
+  }
+}
+
+function actionLabel(action: AuditEntry["action"]): string {
+  return ACTIONS[action] ?? String(action ?? "عملية غير معروفة");
+}
+
+function safeDate(value: unknown): string {
+  try {
+    return value ? formatDateTime(String(value)) : "—";
+  } catch {
+    return "—";
+  }
+}
+
 export default function ManagerAudit() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "success" | "rejected">("all");
   const [action, setAction] = useState<"all" | AuditEntry["action"]>("all");
 
-  const data = getAudit();
+  const data = useMemo(() => safeAudit(), []);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     return data.filter((a) => {
       if (filter !== "all" && a.result !== filter) return false;
       if (action !== "all" && a.action !== action) return false;
-      if (s && !(`${a.actorName} ${a.jobNumber} ${a.reason ?? ""}`.toLowerCase().includes(s))) return false;
+      if (
+        s &&
+        !(`${a.actorName ?? ""} ${a.jobNumber ?? ""} ${a.reason ?? ""}`.toLowerCase().includes(s))
+      ) return false;
       return true;
     });
   }, [data, q, filter, action]);
@@ -47,14 +73,14 @@ export default function ManagerAudit() {
       "المسافة (م)",
     ];
     const body: CsvCell[][] = filtered.map((a) => [
-      formatDateTime(a.timestamp),
-      a.actorName,
-      a.jobNumber,
-      ACTIONS[a.action],
+      safeDate(a.timestamp),
+      a.actorName ?? "",
+      a.jobNumber ?? "",
+      actionLabel(a.action),
       a.result === "success" ? "نجاح" : "رفض",
       a.reason ?? "",
-      a.deviceId,
-      a.ip,
+      a.deviceId ?? "",
+      a.ip ?? "",
       a.lat ?? "",
       a.lng ?? "",
       a.distanceMeters ?? "",
@@ -75,12 +101,12 @@ export default function ManagerAudit() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <select className="input" value={filter} onChange={(e) => setFilter(e.target.value as any)}>
+        <select className="input" value={filter} onChange={(e) => setFilter(e.target.value as "all" | "success" | "rejected")}>
           <option value="all">كل النتائج</option>
           <option value="success">ناجحة فقط</option>
           <option value="rejected">مرفوضة فقط</option>
         </select>
-        <select className="input" value={action} onChange={(e) => setAction(e.target.value as any)}>
+        <select className="input" value={action} onChange={(e) => setAction(e.target.value as "all" | AuditEntry["action"])}>
           <option value="all">كل العمليات</option>
           {Object.entries(ACTIONS).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
@@ -103,37 +129,38 @@ export default function ManagerAudit() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((a) => (
-                <tr key={a.id} className="border-t border-border/50 align-top">
-                  <Td className="mono text-xs whitespace-nowrap">{formatDateTime(a.timestamp)}</Td>
-                  <Td>
-                    <div className="font-semibold">{a.actorName}</div>
-                    <div className="mono text-xs text-muted-foreground">{a.jobNumber}</div>
-                  </Td>
-                  <Td className="text-xs">{ACTIONS[a.action]}</Td>
-                  <Td>
-                    {a.result === "success" ? (
-                      <span className="badge bg-primary/15 text-primary">نجاح</span>
-                    ) : (
-                      <span className="badge bg-destructive/15 text-destructive">رفض</span>
-                    )}
-                  </Td>
-                  <Td className="text-xs max-w-[220px]">{a.reason ?? "—"}</Td>
-                  <Td className="mono text-[11px]">
-                    {a.lat !== undefined ? (
-                      <>
-                        {a.lat.toFixed(4)}, {a.lng!.toFixed(4)}
-                        {a.distanceMeters !== undefined && (
-                          <div className="text-muted-foreground">{a.distanceMeters} م</div>
-                        )}
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </Td>
-                  <Td className="mono text-[10px] text-muted-foreground max-w-[140px] break-all">{a.deviceId}</Td>
-                </tr>
-              ))}
+              {filtered.map((a, index) => {
+                const hasLocation = typeof a.lat === "number" && Number.isFinite(a.lat) && typeof a.lng === "number" && Number.isFinite(a.lng);
+                return (
+                  <tr key={a.id ?? `audit-${index}`} className="border-t border-border/50 align-top">
+                    <Td className="mono text-xs whitespace-nowrap">{safeDate(a.timestamp)}</Td>
+                    <Td>
+                      <div className="font-semibold">{a.actorName ?? "غير معروف"}</div>
+                      <div className="mono text-xs text-muted-foreground">{a.jobNumber ?? "—"}</div>
+                    </Td>
+                    <Td className="text-xs">{actionLabel(a.action)}</Td>
+                    <Td>
+                      {a.result === "success" ? (
+                        <span className="badge bg-primary/15 text-primary">نجاح</span>
+                      ) : (
+                        <span className="badge bg-destructive/15 text-destructive">رفض</span>
+                      )}
+                    </Td>
+                    <Td className="text-xs max-w-[220px]">{a.reason ?? "—"}</Td>
+                    <Td className="mono text-[11px]">
+                      {hasLocation ? (
+                        <>
+                          {a.lat!.toFixed(4)}, {a.lng!.toFixed(4)}
+                          {typeof a.distanceMeters === "number" && (
+                            <div className="text-muted-foreground">{a.distanceMeters} م</div>
+                          )}
+                        </>
+                      ) : "—"}
+                    </Td>
+                    <Td className="mono text-[10px] text-muted-foreground max-w-[140px] break-all">{a.deviceId ?? "—"}</Td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && (
                 <tr>
                   <Td colSpan={7} className="text-center text-muted-foreground py-8">
