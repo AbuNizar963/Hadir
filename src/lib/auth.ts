@@ -29,7 +29,7 @@ export function loginManager(password:string,username:string):LoginResult{
   const accounts=settings.adminAccounts||[];
   const matched=accounts.find(a=>a.active&&a.username.trim()===inputUser&&Boolean(a.passwordHash)&&verify(inputPassword,a.passwordHash));
   const defaultOwnerLogin=accounts.length===0&&inputUser===DEFAULT_OWNER_USERNAME&&inputPassword===DEFAULT_OWNER_PASSWORD;
-  if(!matched&&!defaultOwnerLogin){log({employeeId:null,jobNumber:inputUser,actorName:inputUser,action:"manager-login-failed",result:"rejected",reason:"اسم المستخدم أو كلمة المرور خاطئة"});return{ok:false,success:false,reason:"اسم المستخدم أو كلمة المرور غير صحيحة"};}
+  if(!matched&&!defaultOwnerLogin){log({employeeId:null,jobNumber:inputUser,actorName:inputUser,action:"manager-login-failed",result:"rejected",reason:"اسم المستخدم أو كلمة المرور خاطئة"});return{ok:false,success:false,reason:"اسم المستخدم وكلمة المرور غير صحيحة"};}
   const account=matched||{id:"owner-account",username:DEFAULT_OWNER_USERNAME,passwordHash:hash(DEFAULT_OWNER_PASSWORD),name:"المالك",role:"owner" as const,active:true,createdAt:new Date(0).toISOString()};
   const action=account.role==="owner"?"owner-login":account.role==="supervisor"?"supervisor-login":"manager-login";
   setManagerSession({loginAt:new Date().toISOString(),name:account.name,role:account.role,jobNumber:account.username,accountId:account.id});
@@ -37,13 +37,30 @@ export function loginManager(password:string,username:string):LoginResult{
   return{ok:true,success:true};
 }
 export function logoutManager(){setManagerSession(null);}
-export function currentSession(){return getSession();}
+
+/**
+ * A browser session is not a permanent authorization token.
+ * Revalidate it against the current employee list so deleting or deactivating
+ * an employee immediately invalidates the local session on the next render.
+ */
+export function currentSession(){
+  const session=getSession();
+  if(!session) return null;
+  const employees=getEmployees();
+  const emp=employees.find(e=>e.id===session.employeeId || e.jobNumber.trim()===session.jobNumber.trim());
+  if(!emp || emp.status!=="active"){
+    setSession(null);
+    return null;
+  }
+  return session;
+}
+
 export function currentManager(){return getManagerSession();}
 export type CurrentUser={role:"owner"|"manager"|"supervisor"|"staff";name?:string;loginAt?:string;jobNumber?:string;};
 export function getCurrentUser():CurrentUser|null{
   const manager=getManagerSession();
   if(manager){const role=manager.role==="owner"||manager.role==="manager"||manager.role==="supervisor"?manager.role:"manager";return{role,name:manager.name,loginAt:manager.loginAt,jobNumber:manager.jobNumber};}
-  const employee=getSession();
+  const employee=currentSession();
   if(employee)return{role:"staff",name:employee.name,loginAt:employee.loginAt,jobNumber:employee.jobNumber};
   return null;
 }
