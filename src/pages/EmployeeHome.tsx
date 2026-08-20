@@ -10,6 +10,7 @@ import {
   addRequest,
   type RequestType,
 } from "@/lib/storage";
+import { pullEmployeesFromCloud } from "@/lib/cloudSync";
 import { getEmployeeScheduleStatus } from "@/lib/schedule";
 import { formatTime, formatDurationMinutes, todayKey, minutesBetween } from "@/lib/utils";
 
@@ -17,15 +18,57 @@ export default function EmployeeHome() {
   const nav = useNavigate();
   const session = currentSession();
   const [now, setNow] = useState(new Date());
+  const [, setCloudVersion] = useState(0);
 
-  // حماية ضد الشاشة السوداء في حال لم تكن الجلسة موجودة
   useEffect(() => {
     if (!session) {
       nav("/login", { replace: true });
     }
   }, [session, nav]);
 
-  // حالة النافذة المنبثقة للطلبات (استئذان / إجازة)
+  // D1 هو المصدر الموثوق لبيانات الموظف. نعيد السحب سريعاً حتى تظهر
+  // تغييرات المدير (الدوام، الموقع، نظام التناوب...) بدون تسجيل خروج.
+  useEffect(() => {
+    if (!session) return;
+
+    let disposed = false;
+    let refreshing = false;
+
+    const refreshFromCloud = async () => {
+      if (refreshing || disposed) return;
+      refreshing = true;
+      try {
+        await pullEmployeesFromCloud();
+        if (!disposed) setCloudVersion((v) => v + 1);
+      } finally {
+        refreshing = false;
+      }
+    };
+
+    void refreshFromCloud();
+    const interval = window.setInterval(() => void refreshFromCloud(), 5000);
+
+    const onEmployeesChanged = () => {
+      if (!disposed) setCloudVersion((v) => v + 1);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refreshFromCloud();
+    };
+    const onFocus = () => void refreshFromCloud();
+
+    window.addEventListener("hadir:employees-changed", onEmployeesChanged);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      window.removeEventListener("hadir:employees-changed", onEmployeesChanged);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [session?.employeeId, session?.jobNumber, nav]);
+
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestType, setRequestType] = useState<RequestType>("permission");
   const [reason, setReason] = useState("");
@@ -36,14 +79,11 @@ export default function EmployeeHome() {
     return () => clearInterval(t);
   }, []);
 
-  if (!session) {
-    return null; // إرجاع فارغ لحين التحويل لصفحة تسجيل الدخول
-  }
+  if (!session) return null;
 
   const emp = findEmployeeByJobNumber(session.jobNumber);
   const settings = getSettings();
 
-  // تحديد الموقع المحدد للموظف إن وجد، أو استخدام الموقع الرئيسي
   const assignedLocation = useMemo(() => {
     if (emp?.locationId && settings.locations) {
       return settings.locations.find((loc) => loc.id === emp.locationId);
@@ -51,7 +91,6 @@ export default function EmployeeHome() {
     return null;
   }, [emp, settings]);
 
-  // حالة الدوام تحسب حسب نوع جدول الموظف
   const scheduleStatus = useMemo(
     () => getEmployeeScheduleStatus(emp, now),
     [emp, now]
@@ -65,7 +104,7 @@ export default function EmployeeHome() {
           r.employeeId === session.employeeId &&
           r.timestamp.startsWith(todayKey())
       ),
-    [session, now]
+    [session.employeeId, now]
   );
   const checkIn = todays.find((r) => r.type === "check-in" || r.type === "in");
   const checkOut = todays.find((r) => r.type === "check-out" || r.type === "out");
@@ -89,7 +128,6 @@ export default function EmployeeHome() {
     lateMinutes = Math.max(0, diff - grace);
   }
 
-  // التحقق هل انتهى الدوام الفعلي للموظف
   const shiftEnded = isShiftOver(emp);
 
   const logout = () => {
@@ -124,76 +162,41 @@ export default function EmployeeHome() {
     <div className="min-h-screen">
       <header className="max-w-xl mx-auto px-4 sm:px-5 py-4 sm:py-5 flex items-center justify-between">
         <Brand />
-        <button onClick={logout} className="btn-ghost text-xs">
-          خروج
-        </button>
+        <button onClick={logout} className="btn-ghost text-xs">خروج</button>
       </header>
 
       <main className="max-w-xl mx-auto px-4 sm:px-5 pb-16 space-y-4 sm:space-y-5">
-        {/* بطاقة معلومات الموظف */}
         <section className="hud-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               {emp?.avatar ? (
-                <img
-                  src={emp.avatar}
-                  alt={session.name}
-                  className="h-14 w-14 sm:h-16 sm:w-16 rounded-full object-cover border-2 border-primary/40 shrink-0"
-                />
+                <img src={emp.avatar} alt={session.name} className="h-14 w-14 sm:h-16 sm:w-16 rounded-full object-cover border-2 border-primary/40 shrink-0" />
               ) : (
                 <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-primary/15 grid place-items-center border-2 border-primary/30 shrink-0">
-                  <span className="text-primary font-extrabold text-lg sm:text-xl">
-                    {session.name ? session.name.charAt(0) : "م"}
-                  </span>
+                  <span className="text-primary font-extrabold text-lg sm:text-xl">{session.name ? session.name.charAt(0) : "م"}</span>
                 </div>
               )}
               <div className="min-w-0">
                 <div className="text-[10px] text-muted-foreground mono">EMPLOYEE</div>
-                <div className="text-base sm:text-xl font-extrabold mt-0.5 truncate">
-                  {session.name}
-                </div>
-                <div className="text-[11px] sm:text-xs text-muted-foreground mono mt-0.5">
-                  رقم وظيفي: {session.jobNumber}
-                </div>
+                <div className="text-base sm:text-xl font-extrabold mt-0.5 truncate">{session.name}</div>
+                <div className="text-[11px] sm:text-xs text-muted-foreground mono mt-0.5">رقم وظيفي: {session.jobNumber}</div>
               </div>
             </div>
             <div className="text-left shrink-0">
-              <div className="mono text-xl sm:text-3xl font-extrabold tabular-nums">
-                {now.toLocaleTimeString("ar-EG", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                })}
-              </div>
-              <div className="text-[10px] sm:text-xs text-muted-foreground mono">
-                {now.toLocaleDateString("ar-EG", {
-                  weekday: "long",
-                  day: "2-digit",
-                  month: "2-digit",
-                })}
-              </div>
+              <div className="mono text-xl sm:text-3xl font-extrabold tabular-nums">{now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", hour12: false })}</div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground mono">{now.toLocaleDateString("ar-EG", { weekday: "long", day: "2-digit", month: "2-digit" })}</div>
             </div>
           </div>
 
           <div className="mt-4 sm:mt-5 grid grid-cols-3 gap-2 text-center">
-            <Stat
-              label="الحضور"
-              value={checkIn ? formatTime(checkIn.timestamp) : "—"}
-            />
-            <Stat
-              label="الانصراف"
-              value={checkOut ? formatTime(checkOut.timestamp) : "—"}
-            />
-            <Stat
-              label="ساعات العمل"
-              value={formatDurationMinutes(workedMinutes)}
-            />
+            <Stat label="الحضور" value={checkIn ? formatTime(checkIn.timestamp) : "—"} />
+            <Stat label="الانصراف" value={checkOut ? formatTime(checkOut.timestamp) : "—"} />
+            <Stat label="ساعات العمل" value={formatDurationMinutes(workedMinutes)} />
           </div>
 
           {!isWorkDay && (
             <div className="mt-4 rounded-xl border border-accent/40 bg-accent/10 p-3 text-xs sm:text-sm text-accent font-semibold flex items-center gap-2">
-              <RestIcon />
-              <span>{scheduleStatus.label} — استمتع بيومك بلا التزامات دوام.</span>
+              <RestIcon /><span>{scheduleStatus.label} — استمتع بيومك بلا التزامات دوام.</span>
             </div>
           )}
 
@@ -204,148 +207,70 @@ export default function EmployeeHome() {
           )}
         </section>
 
-        {/* أزرار الحضور والانصراف */}
         <section className="grid grid-cols-2 gap-3">
-          <Link
-            to="/employee/scan/check-in"
-            aria-disabled={!canCheckIn}
-            className={`hud-card p-4 sm:p-5 text-center transition ${
-              !canCheckIn ? "opacity-40 pointer-events-none" : "hover:brightness-110"
-            }`}
-          >
-            <div className="mx-auto h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-primary/15 grid place-items-center mb-2 signal-ring">
-              <ArrowIn />
-            </div>
+          <Link to="/employee/scan/check-in" aria-disabled={!canCheckIn} className={`hud-card p-4 sm:p-5 text-center transition ${!canCheckIn ? "opacity-40 pointer-events-none" : "hover:brightness-110"}`}>
+            <div className="mx-auto h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-primary/15 grid place-items-center mb-2 signal-ring"><ArrowIn /></div>
             <div className="font-extrabold text-sm sm:text-lg">تسجيل حضور</div>
-            <div className="text-[11px] sm:text-xs text-muted-foreground mt-1 leading-relaxed">
-              {!isWorkDay
-                ? "أنت في يوم راحة (Off)"
-                : checkIn
-                ? "تم بالفعل اليوم"
-                : "امسح رمز QR داخل المقر"}
-            </div>
+            <div className="text-[11px] sm:text-xs text-muted-foreground mt-1 leading-relaxed">{!isWorkDay ? "أنت في يوم راحة (Off)" : checkIn ? "تم بالفعل اليوم" : "امسح رمز QR داخل المقر"}</div>
           </Link>
 
-          {/* زر الانصراف المشروط بالوقت */}
           {shiftEnded ? (
-            <Link
-              to="/employee/scan/check-out"
-              aria-disabled={!canCheckOut}
-              className={`hud-card p-4 sm:p-5 text-center transition ${
-                !canCheckOut ? "opacity-40 pointer-events-none" : "hover:brightness-110"
-              }`}
-            >
-              <div className="mx-auto h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-accent/15 grid place-items-center mb-2">
-                <ArrowOut />
-              </div>
+            <Link to="/employee/scan/check-out" aria-disabled={!canCheckOut} className={`hud-card p-4 sm:p-5 text-center transition ${!canCheckOut ? "opacity-40 pointer-events-none" : "hover:brightness-110"}`}>
+              <div className="mx-auto h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-accent/15 grid place-items-center mb-2"><ArrowOut /></div>
               <div className="font-extrabold text-sm sm:text-lg">تسجيل انصراف</div>
-              <div className="text-[11px] sm:text-xs text-muted-foreground mt-1 leading-relaxed">
-                {checkOut ? "تم بالفعل اليوم" : "انتهى الدوام، امسح QR للانصراف"}
-              </div>
+              <div className="text-[11px] sm:text-xs text-muted-foreground mt-1 leading-relaxed">{checkOut ? "تم بالفعل اليوم" : "انتهى الدوام، امسح QR للانصراف"}</div>
             </Link>
           ) : (
-            <button
-              onClick={() => setShowRequestModal(true)}
-              className="hud-card p-4 sm:p-5 text-center transition hover:brightness-110 border-dashed border-accent/40"
-            >
-              <div className="mx-auto h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-accent/10 grid place-items-center mb-2">
-                <ArrowOut />
-              </div>
+            <button onClick={() => setShowRequestModal(true)} className="hud-card p-4 sm:p-5 text-center transition hover:brightness-110 border-dashed border-accent/40">
+              <div className="mx-auto h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-accent/10 grid place-items-center mb-2"><ArrowOut /></div>
               <div className="font-extrabold text-sm sm:text-lg text-accent">طلب استئذان / إجازة</div>
-              <div className="text-[11px] sm:text-xs text-muted-foreground mt-1 leading-relaxed">
-                الدوام لم ينتهِ بعد، اضغط لإرسال طلب للمدير
-              </div>
+              <div className="text-[11px] sm:text-xs text-muted-foreground mt-1 leading-relaxed">الدوام لم ينتهِ بعد، اضغط لإرسال طلب للمدير</div>
             </button>
           )}
         </section>
 
-        {/* بطاقة حالة الجهاز والدوام */}
         <section className="hud-card p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3 gap-2">
             <div className="text-sm font-bold">حالة الجهاز والدوام</div>
-            <span
-              className={`badge ${
-                isWorkDay
-                  ? "bg-primary/15 text-primary"
-                  : "bg-accent/15 text-accent"
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  isWorkDay ? "bg-primary" : "bg-accent"
-                }`}
-              />
+            <span className={`badge ${isWorkDay ? "bg-primary/15 text-primary" : "bg-accent/15 text-accent"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${isWorkDay ? "bg-primary" : "bg-accent"}`} />
               {isWorkDay ? "يوم عمل" : "يوم راحة"}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:gap-3 text-[11px] sm:text-xs">
-            <Row
-              label="نوع الدوام"
-              value={emp?.scheduleType === "ROTATION" ? "تناوبي" : "إداري ثابت"}
-            />
+            <Row label="نوع الدوام" value={emp?.scheduleType === "ROTATION" ? "تناوبي" : "إداري ثابت"} />
             <Row label="حالة اليوم" value={scheduleStatus.label} />
-            <Row
-              label="الجهاز الموثّق"
-              value={emp?.deviceLabel ?? "لم يُربَط بعد"}
-            />
-            <Row
-              label="فرع / موقع العمل"
-              value={assignedLocation ? assignedLocation.name : "المقر الرئيسي"}
-            />
-            <Row label="بداية الدوام" value={emp?.workStartTime || settings.workStart} />
-            <Row label="نهاية الدوام" value={emp?.workEndTime || settings.workEnd} />
+            <Row label="الجهاز الموثّق" value={emp?.deviceLabel ?? "لم يُربَط بعد"} />
+            <Row label="فرع / موقع العمل" value={assignedLocation ? assignedLocation.name : "المقر الرئيسي"} />
+            <Row label="بداية الدوام" value={emp?.scheduleType === "ROTATION" ? "24 ساعة" : (emp?.workStartTime || settings.workStart || "08:00")} />
+            <Row label="نهاية الدوام" value={emp?.scheduleType === "ROTATION" ? "24 ساعة" : (emp?.workEndTime || settings.workEnd || "16:00")} />
           </div>
+          <div className="mt-3 text-[10px] text-muted-foreground text-center">آخر مزامنة: {now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}</div>
         </section>
 
-        {/* النافذة المنبثقة لتقديم طلب إذن أو إجازة للمدير */}
         {showRequestModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm grid place-items-center p-4">
             <div className="hud-card w-full max-w-md p-6 space-y-4 relative bg-background">
               <h3 className="text-lg font-bold text-center">تقديم طلب إلى المدير</h3>
-
               {requestSent ? (
-                <div className="p-4 bg-primary/20 text-primary border border-primary/40 rounded-xl text-center font-bold">
-                  تم إرسال الطلب بنجاح وهو قيد انتظار موافقة المدير.
-                </div>
+                <div className="p-4 bg-primary/20 text-primary border border-primary/40 rounded-xl text-center font-bold">تم إرسال الطلب بنجاح وهو قيد انتظار موافقة المدير.</div>
               ) : (
                 <form onSubmit={handleSendRequest} className="space-y-4">
                   <div>
                     <label className="text-xs text-muted-foreground block mb-1">نوع الطلب</label>
-                    <select
-                      value={requestType}
-                      onChange={(e) => setRequestType(e.target.value as RequestType)}
-                      className="w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm"
-                    >
+                    <select value={requestType} onChange={(e) => setRequestType(e.target.value as RequestType)} className="w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm">
                       <option value="permission">استئذان خروج مبكر</option>
                       <option value="leave">طلب إجازة</option>
                       <option value="checkout">انصراف بدون كود QR</option>
                     </select>
                   </div>
-
                   <div>
                     <label className="text-xs text-muted-foreground block mb-1">السبب (اختياري)</label>
-                    <textarea
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="اكتب سبب الطلب هنا..."
-                      className="w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm h-24 resize-none"
-                    />
+                    <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="اكتب سبب الطلب هنا..." className="w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm h-24 resize-none" />
                   </div>
-
                   <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm"
-                    >
-                      إرسال الطلب
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowRequestModal(false)}
-                      className="px-4 py-2.5 btn-ghost rounded-xl text-sm"
-                    >
-                      إلغاء
-                    </button>
+                    <button type="submit" className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm">إرسال الطلب</button>
+                    <button type="button" onClick={() => setShowRequestModal(false)} className="px-4 py-2.5 btn-ghost rounded-xl text-sm">إلغاء</button>
                   </div>
                 </form>
               )}
@@ -358,49 +283,21 @@ export default function EmployeeHome() {
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-secondary/40 border border-border/50 p-2 sm:p-3">
-      <div className="text-[10px] text-muted-foreground mono">{label}</div>
-      <div className="font-extrabold mt-0.5 mono tabular-nums text-sm sm:text-lg">
-        {value}
-      </div>
-    </div>
-  );
+  return <div className="rounded-xl bg-secondary/40 border border-border/50 p-2 sm:p-3"><div className="text-[10px] text-muted-foreground mono">{label}</div><div className="font-extrabold mt-0.5 mono tabular-nums text-sm sm:text-lg">{value}</div></div>;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-secondary/30 border border-border/50 p-2 sm:p-2.5">
-      <div className="text-muted-foreground truncate">{label}</div>
-      <div className="font-semibold mt-0.5 truncate">{value}</div>
-    </div>
-  );
+  return <div className="rounded-xl bg-secondary/30 border border-border/50 p-2 sm:p-2.5"><div className="text-muted-foreground truncate">{label}</div><div className="font-semibold mt-0.5 truncate">{value}</div></div>;
 }
 
 function ArrowIn() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-      <path d="M10 17l5-5-5-5" />
-      <path d="M15 12H3" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>;
 }
 
 function ArrowOut() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6 text-accent" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <path d="M16 17l5-5-5-5" />
-      <path d="M21 12H9" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6 text-accent" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>;
 }
 
 function RestIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>;
 }
