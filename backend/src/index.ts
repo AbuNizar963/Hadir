@@ -188,6 +188,19 @@ export default {
       if (!actor) return json({ error: "غير مصرح" }, 401, origin);
       if (path === "/api/me" && req.method === "GET") return json({ user: actor }, 200, origin);
 
+      if (path === "/api/employee-location" && req.method === "GET") {
+        if (actor.role !== "staff") return json({ error: "هذا المسار مخصص للموظفين" }, 403, origin);
+        const employee = await env.DB.prepare("SELECT location_id FROM employees WHERE id=? AND status='active' LIMIT 1").bind(actor.id).first<{ location_id: string | null }>();
+        if (!employee) return json({ error: "الموظف غير موجود" }, 404, origin);
+        let location: any = null;
+        if (employee.location_id) {
+          location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id=? LIMIT 1").bind(employee.location_id).first<any>();
+        }
+        if (!location) location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name LIMIT 1").first<any>();
+        if (!location) return json({ error: "لا يوجد موقع حضور مضبوط في قاعدة البيانات" }, 404, origin);
+        return json({ location }, 200, origin);
+      }
+
       if (path === "/api/admins" && req.method === "GET") {
         if (!isAdmin(actor.role)) return json({ error: "غير مصرح" }, 403, origin);
         const rows = await env.DB.prepare("SELECT id,username,name,role,active,created_at AS createdAt FROM admin_accounts ORDER BY name").all<any>();
