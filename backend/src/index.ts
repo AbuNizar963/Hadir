@@ -34,7 +34,7 @@ if(boundDeviceId){if(incomingDeviceId!==boundDeviceId)return json({error:"هذا
 }
 const actor:Actor={id:employee.id,username:employee.job_number,name:employee.name,role:"staff"};await audit(env,req,employee.name,"login","success",employee.id,employee.job_number);const fresh=await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(employee.id).first<any>();const loginUser=employeeOut(fresh||{...employee,device_id:boundDeviceId,device_label:boundDeviceLabel});return json({token:await sign(actor,env.JWT_SECRET||""),user:{...loginUser,deviceId:boundDeviceId,deviceLabel:boundDeviceLabel},kind:"employee"},200,origin);}
 const actor=await readToken(req,env);if(!actor)return json({error:"غير مصرح"},401,origin);if(path==="/api/me"&&req.method==="GET")return json({user:actor},200,origin);
-if(path==="/api/employee/profile"&&req.method==="GET"){
+if((path==="/api/employee/profile"||path==="/api/employee/me")&&req.method==="GET"){
   if(actor.role!=="staff")return json({error:"هذا المسار مخصص للموظفين"},403,origin);
   const row=await env.DB.prepare("SELECT * FROM employees WHERE id=? AND status='active' LIMIT 1").bind(actor.id).first<any>();
   if(!row)return json({error:"حساب الموظف غير موجود أو غير نشط"},404,origin);
