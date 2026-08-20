@@ -5,15 +5,19 @@ const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.
 export const backendEnabled = Boolean(API_URL);
 function token() { return typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token") || ""; }
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers); headers.set("content-type", "application/json"); const t=token(); if(t)headers.set("authorization",`Bearer ${t}`); const device=getDeviceId(); if(device)headers.set("x-device-id",device);
+  const headers = new Headers(init.headers); headers.set("content-type", "application/json");
+  const t=token(); if(t)headers.set("authorization",`Bearer ${t}`);
+  const device=await getPersistentFingerprintId().catch(()=>getDeviceId());
+  if(device)headers.set("x-device-id",device);
   let response:Response; try{response=await fetch(`${API_URL}${path}`,{...init,headers});}catch{throw new Error("تعذر الاتصال بخادم حاضر. تحقق من اتصال Cloudflare Worker.");}
   const data=await response.json().catch(()=>({})); if(!response.ok)throw new Error((data as any).error||`فشل الاتصال بالخادم (${response.status})`); return data as T;
 }
-export async function backendLogin(username:string,password:string){const data=await request<{token:string;user:any;kind:"admin"|"employee"}>("/api/auth/login",{method:"POST",body:JSON.stringify({username,password,deviceId:getDeviceId()})});if(data.kind!=="admin")throw new Error("هذا الحساب موظف وليس حساب إدارة");localStorage.setItem("hadir.api.token",data.token);return data.user;}
+export async function backendLogin(username:string,password:string){const data=await request<{token:string;user:any;kind:"admin"|"employee"}>("/api/auth/login",{method:"POST",body:JSON.stringify({username,password,deviceId:await getPersistentFingerprintId()})});if(data.kind!=="admin")throw new Error("هذا الحساب موظف وليس حساب إدارة");localStorage.setItem("hadir.api.token",data.token);return data.user;}
 export async function backendEmployeeLogin(username:string,password:string){
   const fingerprintId=await getPersistentFingerprintId();
-  const data=await request<{token:string;user:any;kind:"admin"|"employee"}>("/api/auth/login",{method:"POST",body:JSON.stringify({username,password,deviceId:fingerprintId,fingerprintId})});
-  if(data.kind!=="employee")throw new Error("هذا الحساب إداري وليس حساب موظف");localStorage.setItem("hadir.api.token",data.token);return data.user as Employee;
+  const data=await request<{token:string;user:any;kind:"admin"|"employee"}>("/api/auth/login",{method:"POST",body:JSON.stringify({username,password,deviceId:fingerprintId,fingerprintId,deviceLabel:getDeviceLabel()})});
+  if(data.kind!=="employee")throw new Error("هذا الحساب إداري وليس حساب موظف");
+  localStorage.setItem("hadir.api.token",data.token);return data.user as Employee;
 }
 export async function bootstrapBackend(){const data=await request<{token:string;bootstrap:boolean}>("/api/bootstrap");if(!data.bootstrap)throw new Error("تم إعداد حساب المالك مسبقًا");localStorage.setItem("hadir.api.token",data.token);return data;}
 export async function createBootstrapOwner(input:{name:string;username:string;password:string}){const data=await request<{token:string;user:any;kind:"admin"}>("/api/bootstrap/owner",{method:"POST",body:JSON.stringify(input)});localStorage.setItem("hadir.api.token",data.token);return data.user;}
