@@ -1,0 +1,123 @@
+name: Unify employee D1 source
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/pages/EmployeeHome.tsx'
+      - 'src/lib/backend.ts'
+      - '.github/workflows/unify-employee-d1-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  unify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Patch employee dashboard
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/EmployeeHome.tsx')
+          s = p.read_text()
+
+          s = s.replace(
+              'getAttendance,\n  getSettings,\n  findEmployeeByJobNumber,',
+              'findEmployeeByJobNumber,'
+          )
+          s = s.replace(
+              'backendLogout, getBackendEmployeeProfile, getBackendLocations, getBackendRequests, createBackendRequest',
+              'backendLogout, getBackendEmployeeProfile, getBackendLocations, getBackendSettings, getBackendAttendance, getBackendRequests, createBackendRequest'
+          )
+          s = s.replace(
+              'const [d1Locations, setD1Locations] = useState<any[]>([]);\n  const [cloudReady',
+              'const [d1Locations, setD1Locations] = useState<any[]>([]);\n  const [d1Settings, setD1Settings] = useState<any>(null);\n  const [d1Attendance, setD1Attendance] = useState<any[]>([]);\n  const [cloudReady'
+          )
+
+          old = '''        const remote = await getBackendEmployeeProfile();
+        let remoteLocations = [];
+        try { remoteLocations = await getBackendLocations(); } catch (locationError) { console.warn("Employee location enrichment failed", locationError); }
+        if (disposed) return;
+        setD1Employee(remote);
+        setD1Locations(remoteLocations);
+        setCloudReady(true);'''
+          new = '''        const remote = await getBackendEmployeeProfile();
+        if (!remote || remote.status !== "active") {
+          backendLogout();
+          logoutEmployee();
+          nav("/login", { replace: true, state: { reason: "employee-removed" } });
+          return;
+        }
+        const [remoteLocations, remoteSettings, remoteAttendance] = await Promise.allSettled([
+          getBackendLocations(),
+          getBackendSettings(),
+          getBackendAttendance(2000),
+        ]);
+        if (disposed) return;
+        setD1Employee(remote);
+        setD1Locations(remoteLocations.status === "fulfilled" ? remoteLocations.value : []);
+        setD1Settings(remoteSettings.status === "fulfilled" ? remoteSettings.value : null);
+        setD1Attendance(remoteAttendance.status === "fulfilled" ? remoteAttendance.value : []);
+        setCloudReady(true);'''
+          if old not in s:
+              raise SystemExit('EmployeeHome cloud refresh block not found')
+          s = s.replace(old, new)
+
+          old2 = '''        // D1 is authoritative. A deleted or deactivated employee must be logged out immediately.
+        if (!remote || remote.status !== "active") {
+          backendLogout();
+          logoutEmployee();
+          nav("/login", { replace: true, state: { reason: "employee-removed" } });
+        }'''
+          s = s.replace(old2, '')
+
+          s = s.replace('  const settings = getSettings();', '  const settings = d1Settings || { workStart: "08:00", workEnd: "16:00", lateGraceMinutes: 10 };')
+          s = s.replace('    () => getAttendance().filter((r) => r.employeeId === emp.id && r.timestamp.startsWith(todayKey())),', '    () => d1Attendance.filter((r) => r.employeeId === emp.id && r.timestamp.startsWith(todayKey())),')
+
+          old3 = '''      } catch (error) {
+        console.error("Employee D1 refresh failed", error); setCloudReady(false); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1");
+      }'''
+          new3 = '''      } catch (error) {
+        const message = error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1";
+        if (message.includes("حساب الموظف غير موجود") || message.includes("غير نشط")) {
+          backendLogout();
+          logoutEmployee();
+          nav("/login", { replace: true, state: { reason: "employee-removed" } });
+          return;
+        }
+        console.error("Employee D1 refresh failed", error);
+        setCloudReady(false);
+        setCloudError(message);
+      }'''
+          if old3 not in s:
+              raise SystemExit('EmployeeHome error block not found')
+          s = s.replace(old3, new3)
+
+          p.write_text(s)
+          PY
+
+      - name: Typecheck
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npx tsc --noEmit
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/pages/EmployeeHome.tsx
+          if git diff --cached --quiet; then
+            echo 'No source changes were necessary.'
+            exit 0
+          fi
+          git commit -m 'refactor: read employee dashboard data directly from D1'
+          git push
