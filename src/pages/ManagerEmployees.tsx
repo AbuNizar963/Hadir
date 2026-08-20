@@ -24,15 +24,7 @@ export default function ManageEmployees() {
   const showSuccess = (message: string) => { setSuccess(message); window.setTimeout(() => setSuccess(null), 3000); };
   const resetForm = () => { setName(""); setJobNumber(""); setPin(""); setDeviceLabel(""); setAvatar(null); setLocationId(""); setScheduleType("ADMIN"); setWorkStartTime("08:00"); setWorkEndTime("16:00"); setGracePeriodMinutes(15); setRotationStartDate(""); setRotationPreset("4/4"); setRotationDaysOn(4); setRotationDaysOff(4); setAdminPreset("SUN_THU"); setAdminDays([0,1,2,3,4]); setAdminDaysCount(5); setEditingId(null); setError(null); if (fileInputRef.current) fileInputRef.current.value = ""; };
   const handleAdminPresetChange = (v: AdminPreset) => { setAdminPreset(v); if(v === "SUN_THU"){setAdminDays([0,1,2,3,4]);setAdminDaysCount(5);} if(v === "SUN_WED"){setAdminDays([0,1,2,3]);setAdminDaysCount(4);} if(v === "CUSTOM"){setAdminDays([]);setAdminDaysCount(0);} };
-  const toggleAdminDay = (day: number) => {
-    setAdminDays(prev => {
-      const next = prev.includes(day)
-        ? prev.filter(d => d !== day)
-        : [...prev, day].sort((a, b) => a - b);
-      setAdminDaysCount(next.length);
-      return next;
-    });
-  };
+  const toggleAdminDay = (day: number) => { setAdminDays(prev => { const next = prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort((a, b) => a - b); setAdminDaysCount(next.length); return next; }); };
   const handleAvatarUpload = (e:React.ChangeEvent<HTMLInputElement>) => { const file=e.target.files?.[0]; if(!file)return; if(!file.type.startsWith("image/"))return setError("يرجى اختيار ملف صورة صالح (JPG/PNG/WEBP)."); if(file.size>500*1024)return setError("حجم الصورة يجب أن يكون أقل من 500 كيلوبايت."); const reader=new FileReader(); reader.onload=()=>{setAvatar(reader.result as string);setError(null);}; reader.onerror=()=>setError("تعذّر قراءة ملف الصورة."); reader.readAsDataURL(file); };
 
   const handleSubmit = (e:React.FormEvent) => {
@@ -45,8 +37,8 @@ export default function ManageEmployees() {
     if(scheduleType==="ADMIN"&&adminDays.length!==adminDaysCount)return setError("يرجى تحديد أيام الدوام الإداري كاملة.");
     const existing=editingId?employees.find(emp=>emp.id===editingId):undefined; const effectivePin=pin.trim()||(existing?"":cleanJob);
     const common={name:cleanName,jobNumber:cleanJob,status:(existing?.status??"active") as EmployeeStatus,deviceId:existing?.deviceId??null,deviceLabel:deviceLabel.trim()||null,scheduleType,workStartTime,workEndTime,gracePeriodMinutes,rotationStartDate:scheduleType==="ROTATION"?rotationStartDate:null,rotationDaysOn:scheduleType==="ROTATION"?rotationDaysOn:undefined,rotationDaysOff:scheduleType==="ROTATION"?rotationDaysOff:undefined,workDays:scheduleType==="ADMIN"?adminDays:undefined,avatar,role:"staff" as const,locationId:locationId||null,specialties:["general"]};
-    if(editingId&&existing){ const updatedEmployee:Employee={...existing,...common,pinHash:effectivePin?hash(effectivePin):existing.pinHash}; const updated=employees.map(emp=>emp.id===editingId?updatedEmployee:emp); setEmployees(updated);saveEmployees(updated);resetForm();showSuccess("تم تعديل بيانات الموظف بنجاح");return; }
-    const newEmp:Employee={id:generateId(),pinHash:hash(effectivePin||cleanJob),createdAt:new Date().toISOString(),...common}; const updated=[newEmp,...employees]; setEmployees(updated);saveEmployees(updated);resetForm();showSuccess(`تمت إضافة الموظف "${newEmp.name}" بنجاح`);
+    if(editingId&&existing){ const updatedEmployee:Employee={...existing,...common,pinHash:effectivePin?hash(effectivePin):existing.pinHash}; const updated=employees.map(emp=>emp.id===editingId?updatedEmployee:emp); setEmployees(updated);saveEmployees(updated,effectivePin?{[updatedEmployee.id]:effectivePin}:undefined);resetForm();showSuccess("تم تعديل بيانات الموظف بنجاح");return; }
+    const newEmp:Employee={id:generateId(),pinHash:hash(effectivePin||cleanJob),createdAt:new Date().toISOString(),...common}; const updated=[newEmp,...employees]; setEmployees(updated);saveEmployees(updated,{[newEmp.id]:effectivePin||cleanJob});resetForm();showSuccess(`تمت إضافة الموظف "${newEmp.name}" بنجاح`);
   };
 
   const handleEdit=(emp:Employee)=>{setEditingId(emp.id);setName(emp.name);setJobNumber(emp.jobNumber);setPin("");setDeviceLabel(emp.deviceLabel||"");setAvatar(emp.avatar||null);setLocationId(emp.locationId||"");setScheduleType(emp.scheduleType||"ADMIN");setWorkStartTime(emp.workStartTime||"08:00");setWorkEndTime(emp.workEndTime||"16:00");setGracePeriodMinutes(emp.gracePeriodMinutes??15);setRotationStartDate(emp.rotationStartDate||"");setRotationDaysOn(emp.rotationDaysOn??4);setRotationDaysOff(emp.rotationDaysOff??4);const days=emp.workDays?.length?emp.workDays:[0,1,2,3,4];setAdminDays(days);setAdminDaysCount(days.length);setAdminPreset(days.join(",")==="0,1,2,3,4"?"SUN_THU":days.join(",")==="0,1,2,3"?"SUN_WED":"CUSTOM");setError(null);window.scrollTo({top:0,behavior:"smooth"});};
