@@ -51,7 +51,7 @@ export default function EmployeeHome() {
           nav("/login", { replace: true, state: { reason: "employee-removed" } });
         }
       } catch (error) {
-        console.error("Employee D1 refresh failed", error); setCloudReady(false); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1"); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1"); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1"); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1");
+        console.error("Employee D1 refresh failed", error); setCloudReady(false); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1"); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1"); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1"); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1"); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1");
       } finally {
         refreshing = false;
       }
