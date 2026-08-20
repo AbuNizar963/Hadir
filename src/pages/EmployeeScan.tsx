@@ -3,8 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import Brand from "@/components/Brand";
 import { currentSession } from "@/lib/auth";
 import { getCurrentPosition, haversineMeters, type GeoPosition } from "@/lib/geo";
-import { findEmployeeByJobNumber, getSettings } from "@/lib/storage";
-import { getBackendEmployeeLocation } from "@/lib/backend";
+import { getSettings } from "@/lib/storage";
+import { getBackendSettings } from "@/lib/backend";
 import { recordAttendance } from "@/lib/attendance";
 import { formatTime } from "@/lib/utils";
 import type { Settings } from "@/types";
@@ -18,7 +18,6 @@ export default function EmployeeScan() {
   const { type } = useParams<{ type: "check-in" | "check-out" }>();
   const nav = useNavigate();
   const session = currentSession();
-  const emp = session ? findEmployeeByJobNumber(session.jobNumber) : undefined;
   const action = type === "check-out" ? "check-out" : "check-in";
   const [settings, setSettings] = useState<Settings>(() => getSettings());
   const [pos, setPos] = useState<GeoPosition | null>(null);
@@ -34,28 +33,25 @@ export default function EmployeeScan() {
   const scanTimerRef = useRef<number | null>(null);
   const scanningRef = useRef(false);
 
+  // D1 main GPS settings are authoritative for employee attendance.
+  // Do not use stale local/assigned-location values here; those previously caused
+  // the employee screen to show an old 100m radius and wrong coordinates.
   useEffect(() => {
     let cancelled = false;
-    void getBackendEmployeeLocation().then(({ location }) => {
-      if (cancelled || !location) return;
-      setSettings((current) => ({
-        ...current,
-        workSiteLat: Number(location.lat),
-        workSiteLng: Number(location.lng),
-        radiusMeters: Number(location.radiusMeters),
-        locations: [{ ...location }],
-      }));
+    void getBackendSettings().then((cloud) => {
+      if (cancelled) return;
+      const merged = { ...getSettings(), ...cloud } as Settings;
+      setSettings(merged);
     }).catch((e) => {
-      if (!cancelled) console.warn("تعذر تحميل إعدادات موقع الحضور من D1، سيتم استخدام الإعداد المحلي مؤقتًا:", e);
+      if (!cancelled) console.warn("تعذر تحميل إعدادات GPS من D1، سيتم استخدام النسخة المحلية مؤقتًا:", e);
     });
     return () => { cancelled = true; };
   }, []);
 
-  const assignedLocation = settings.locations?.find((location) => location.id === emp?.locationId);
-  const targetLat = Number(assignedLocation?.lat ?? settings.workSiteLat);
-  const targetLng = Number(assignedLocation?.lng ?? settings.workSiteLng);
-  const targetRadius = Number(assignedLocation?.radiusMeters ?? settings.radiusMeters);
-  const locationName = assignedLocation?.name ?? "المقر الرئيسي";
+  const targetLat = Number(settings.workSiteLat);
+  const targetLng = Number(settings.workSiteLng);
+  const targetRadius = Number(settings.radiusMeters);
+  const locationName = "المقر الرئيسي";
 
   const stopCamera = () => {
     scanningRef.current = false;
@@ -70,16 +66,17 @@ export default function EmployeeScan() {
     let cancelled = false;
     (async () => {
       try {
+        if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng) || !Number.isFinite(targetRadius) || targetRadius < 0) {
+          setError("إعدادات موقع العمل غير صالحة. يرجى مراجعة إعدادات GPS في لوحة الإدارة.");
+          setStep("error");
+          return;
+        }
+        setStep("gps");
         const position = await getCurrentPosition();
         if (cancelled) return;
         const currentDistance = haversineMeters(position, { lat: targetLat, lng: targetLng });
         setPos(position);
         setDistance(currentDistance);
-        if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng) || !Number.isFinite(targetRadius)) {
-          setError("إعدادات موقع العمل غير صالحة. يرجى مراجعة إعدادات GPS في لوحة الإدارة.");
-          setStep("error");
-          return;
-        }
         setStep("scan");
       } catch (e) {
         if (cancelled) return;
@@ -89,6 +86,8 @@ export default function EmployeeScan() {
     })();
     return () => { cancelled = true; stopCamera(); };
   }, [targetLat, targetLng, targetRadius]);
+
+  const inRange = distance !== null && Number.isFinite(distance) && distance <= targetRadius;
 
   const startCamera = async () => {
     setError(null);
@@ -122,6 +121,11 @@ export default function EmployeeScan() {
 
   const submit = () => {
     if (!pos || !session || !qrInput.trim()) return;
+    if (!inRange) {
+      setError(`أنت خارج نطاق مقر العمل. المسافة الحالية: ${distance ?? "غير معروفة"} م (الحد المسموح: ${targetRadius} م)`);
+      setStep("error");
+      return;
+    }
     setError(null); setStep("submitting");
     void (async () => {
       const response = await recordAttendance({ jobNumber: session.jobNumber, type: action, position: pos, qrCode: qrInput.trim() });
@@ -132,6 +136,7 @@ export default function EmployeeScan() {
   };
 
   const title = action === "check-in" ? "تسجيل الحضور" : "تسجيل الانصراف";
+  const statusText = step === "gps" ? "جاري التحقق من الموقع" : step === "error" ? "تعذر التحقق من الموقع" : inRange ? "تم التحقق من الموقع" : "خارج نطاق الموقع";
 
   return (
     <div className="min-h-screen">
@@ -139,35 +144,48 @@ export default function EmployeeScan() {
       <main className="max-w-xl mx-auto px-5 pb-16 space-y-5">
         <section className="hud-card p-6"><div className="text-xs text-muted-foreground mono">ACTION</div><h1 className="text-2xl font-extrabold mt-0.5">{title}</h1><div className="text-sm text-muted-foreground mt-1">{session?.name ?? "الموظف"} · <span className="mono">{session?.jobNumber ?? "-"}</span> · <span className="text-primary font-semibold">{locationName}</span></div></section>
 
-        <section className="hud-card p-6">
-          <div className="flex items-center justify-between mb-2"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "gps" ? "active" : step === "error" ? "fail" : "done"} /></div>
-          <div className="rounded-xl border border-border/60 bg-secondary/20 p-4 text-center">
-            <div className="text-xs text-muted-foreground">المسافة الحالية</div>
-            <div className="text-3xl font-extrabold mono mt-1">{distance !== null ? `${distance} م` : "…"}</div>
-            <div className="text-xs text-muted-foreground mt-2">النطاق القادم من قاعدة البيانات: <span className="font-bold">{Number.isFinite(targetRadius) ? `${targetRadius} م` : "…"}</span></div>
-            <div className="text-[10px] text-muted-foreground mt-1">تم تحميل إعدادات الموقع والنطاق من D1 عند فتح صفحة الحضور.</div>
+        <section className="hud-card p-5 sm:p-6">
+          <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "gps" ? "active" : step === "error" ? "fail" : "done"} /></div>
+          <div className="relative mx-auto w-full max-w-sm aspect-square rounded-full border border-primary/20 bg-primary/[0.03] overflow-hidden grid place-items-center">
+            <div className="absolute inset-[10%] rounded-full border border-primary/20" />
+            <div className="absolute inset-[22%] rounded-full border border-primary/25" />
+            <div className="absolute inset-[35%] rounded-full border border-primary/30" />
+            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-primary/15" />
+            <div className="absolute top-1/2 left-0 right-0 h-px bg-primary/15" />
+            <div className="absolute inset-0 radar-sweep" />
+            <div className="relative z-10 h-4 w-4 rounded-full bg-destructive shadow-[0_0_0_7px_hsl(var(--destructive)/.12),0_0_25px_hsl(var(--destructive)/.65)] animate-pulse" />
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center mt-4 text-xs"><Cell label="خط العرض" value={pos ? pos.lat.toFixed(5) : "…"} /><Cell label="خط الطول" value={pos ? pos.lng.toFixed(5) : "…"} /><Cell label="المسافة" value={distance !== null ? `${distance} م` : "…"} /></div>
+          <div className="text-center mt-4">
+            <div className="text-base font-extrabold animate-pulse">{statusText}</div>
+            <div className="text-xs text-muted-foreground mt-1">{step === "gps" ? "جاري تحديد موقع جهازك والتحقق من قربه من مقر الشركة..." : "تم تحميل موقع الشركة والنطاق من قاعدة بيانات D1."}</div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-center mt-4 text-xs">
+            <Cell label="المسافة الحالية" value={distance !== null ? `${distance} م` : "…"} />
+            <Cell label="النطاق المسموح" value={Number.isFinite(targetRadius) ? `${targetRadius} م` : "…"} />
+            <Cell label="خط العرض" value={pos ? pos.lat.toFixed(5) : "…"} />
+            <Cell label="خط الطول" value={pos ? pos.lng.toFixed(5) : "…"} />
+          </div>
+          {distance !== null && !inRange && <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center text-xs text-destructive font-semibold">الموقع خارج النطاق؛ لن يتم السماح بتسجيل الحضور.</div>}
         </section>
 
-        <section className={`hud-card p-6 ${step === "gps" ? "opacity-50" : ""}`}>
-          <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">٢. مسح رمز QR</div><StepBadge state={qrInput ? "done" : step === "scan" ? "active" : "idle"} /></div>
+        <section className={`hud-card p-6 ${!inRange ? "opacity-60" : ""}`}>
+          <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">٢. مسح رمز QR</div><StepBadge state={qrInput ? "done" : step === "scan" && inRange ? "active" : "idle"} /></div>
           <div className="rounded-xl border border-dashed border-border/70 bg-secondary/30 p-6 text-center overflow-hidden">
-            {isCameraActive ? <div className="relative mx-auto h-56 w-full max-w-xs rounded-xl overflow-hidden bg-black border border-primary/50"><video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted playsInline /><div className="absolute inset-0 grid place-items-center pointer-events-none"><div className="h-32 w-32 border-2 border-dashed border-white/90 rounded-xl" /></div><div className="absolute bottom-3 inset-x-3 flex items-center justify-between gap-2"><span className="px-3 py-1.5 bg-black/70 text-white text-[11px] rounded-full">{scannerSupported ? "وجّه الكاميرا نحو QR" : "المسح التلقائي غير مدعوم"}</span><button type="button" onClick={stopCamera} className="px-3 py-1.5 bg-destructive text-white text-xs font-bold rounded-full">إغلاق</button></div></div> : <><div className="mx-auto h-24 w-24 rounded-2xl bg-background grid place-items-center mb-3 border border-border/60 shadow-inner"><QrIcon /></div><p className="text-xs text-muted-foreground max-w-xs mx-auto leading-6">امسح رمز QR المخصص لـ{locationName}.</p><div className="flex justify-center gap-2 mt-4"><button type="button" onClick={() => void startCamera()} className="btn-primary text-xs shadow" disabled={step !== "scan"}>📷 فتح الكاميرا</button><button type="button" onClick={() => setQrInput(settings.qrCode || "")} className="btn-secondary text-xs" disabled={step !== "scan" || !settings.qrCode}>إدخال القيمة يدويًا</button></div></>}
+            {isCameraActive ? <div className="relative mx-auto h-56 w-full max-w-xs rounded-xl overflow-hidden bg-black border border-primary/50"><video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted playsInline /><div className="absolute inset-0 grid place-items-center pointer-events-none"><div className="h-32 w-32 border-2 border-dashed border-white/90 rounded-xl" /></div><div className="absolute bottom-3 inset-x-3 flex items-center justify-between gap-2"><span className="px-3 py-1.5 bg-black/70 text-white text-[11px] rounded-full">{scannerSupported ? "وجّه الكاميرا نحو QR" : "المسح التلقائي غير مدعوم"}</span><button type="button" onClick={stopCamera} className="px-3 py-1.5 bg-destructive text-white text-xs font-bold rounded-full">إغلاق</button></div></div> : <><div className="mx-auto h-24 w-24 rounded-2xl bg-background grid place-items-center mb-3 border border-border/60 shadow-inner"><QrIcon /></div><p className="text-xs text-muted-foreground max-w-xs mx-auto leading-6">امسح رمز QR المخصص لـ{locationName}.</p><div className="flex justify-center gap-2 mt-4"><button type="button" onClick={() => void startCamera()} className="btn-primary text-xs shadow" disabled={step !== "scan" || !inRange}>📷 فتح الكاميرا</button><button type="button" onClick={() => setQrInput(settings.qrCode || "")} className="btn-secondary text-xs" disabled={step !== "scan" || !inRange || !settings.qrCode}>إدخال القيمة يدويًا</button></div></>}
           </div>
-          <div className="mt-4"><label className="block text-xs text-muted-foreground mb-1" htmlFor="qr-code">قيمة QR</label><input id="qr-code" className="input mono text-sm" placeholder="أدخل القيمة المطبوعة على QR" value={qrInput} onChange={(e) => setQrInput(e.target.value)} disabled={step === "gps" || step === "submitting"} autoComplete="off" /></div>
+          <div className="mt-4"><label className="block text-xs text-muted-foreground mb-1" htmlFor="qr-code">قيمة QR</label><input id="qr-code" className="input mono text-sm" placeholder="أدخل القيمة المطبوعة على QR" value={qrInput} onChange={(e) => setQrInput(e.target.value)} disabled={step !== "scan" || !inRange || step === "submitting"} autoComplete="off" /></div>
         </section>
 
         <section className="hud-card p-6">
           {step === "error" && <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm mb-4"><div className="font-semibold text-destructive">فشل التحقق</div><div className="text-xs text-muted-foreground mt-1">{error}</div></div>}
           {step === "success" && result && <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm mb-4"><div className="font-extrabold text-primary text-lg">تمت العملية بنجاح</div><div className="text-xs text-muted-foreground mt-1">{title} في {formatTime(result.time)}{result.timeNote ? ` · ${result.timeNote}` : ""}</div></div>}
-          <div className="flex gap-3"><button className="btn-primary flex-1 py-3" onClick={submit} disabled={step !== "scan" || !qrInput.trim() || !pos}>{step === "submitting" ? "جاري التسجيل..." : `تأكيد ${title}`}</button>{(step === "success" || step === "error") && <button onClick={() => { stopCamera(); nav("/employee"); }} className="btn-secondary">عودة</button>}</div>
+          <div className="flex gap-3"><button className="btn-primary flex-1 py-3" onClick={submit} disabled={step !== "scan" || !inRange || !qrInput.trim() || !pos}>{step === "submitting" ? "جاري التسجيل..." : `تأكيد ${title}`}</button>{(step === "success" || step === "error") && <button onClick={() => { stopCamera(); nav("/employee"); }} className="btn-secondary">عودة</button>}</div>
         </section>
       </main>
     </div>
   );
 }
 
-function StepBadge({ state }: { state: "idle" | "active" | "done" | "fail" }) { const map = { idle: { c: "bg-secondary text-muted-foreground", t: "في الانتظار" }, active: { c: "bg-accent/15 text-accent animate-pulse", t: "جارٍ..." }, done: { c: "bg-primary/15 text-primary", t: "تم" }, fail: { c: "bg-destructive/15 text-destructive", t: "فشل" } } as const; const status = map[state]; return <span className={`badge ${status.c}`}>{status.t}</span>; }
+function StepBadge({ state }: { state: "idle" | "active" | "done" | "fail" }) { const map = { idle: { c: "bg-secondary text-muted-foreground", t: "في الانتظار" }, active: { c: "bg-accent/15 text-accent animate-pulse", t: "جاري..." }, done: { c: "bg-primary/15 text-primary", t: "تم" }, fail: { c: "bg-destructive/15 text-destructive", t: "فشل" } } as const; const status = map[state]; return <span className={`badge ${status.c}`}>{status.t}</span>; }
 function Cell({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-secondary/40 border border-border/50 p-2"><div className="text-[10px] text-muted-foreground mono">{label}</div><div className="font-semibold mono mt-0.5">{value}</div></div>; }
 function QrIcon() { return <svg viewBox="0 0 24 24" className="w-10 h-10 text-primary" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v6h-6v-2h4zM14 18h2v2h-2z" /></svg>; }
