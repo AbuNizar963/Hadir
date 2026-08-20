@@ -9,7 +9,8 @@ import { recordAttendance } from "@/lib/attendance";
 import { formatTime } from "@/lib/utils";
 import type { Settings } from "@/types";
 
-type Step = "gps" | "scan" | "submitting" | "success" | "error";
+type Step = "loading-location" | "gps" | "scan" | "submitting" | "success" | "error";
+type LocationConfig = { id: string; name: string; lat: number; lng: number; radiusMeters: number };
 type BarcodeDetectorLike = { detect(source: CanvasImageSource): Promise<Array<{ rawValue?: string }>> };
 type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
 declare global { interface Window { BarcodeDetector?: BarcodeDetectorConstructor } }
@@ -19,10 +20,11 @@ export default function EmployeeScan() {
   const nav = useNavigate();
   const session = currentSession();
   const action = type === "check-out" ? "check-out" : "check-in";
-  const [settings, setSettings] = useState<Settings>(() => getSettings());
+  const [settings] = useState<Settings>(() => getSettings());
+  const [location, setLocation] = useState<LocationConfig | null>(null);
   const [pos, setPos] = useState<GeoPosition | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
-  const [step, setStep] = useState<Step>("gps");
+  const [step, setStep] = useState<Step>("loading-location");
   const [error, setError] = useState<string | null>(null);
   const [qrInput, setQrInput] = useState("");
   const [result, setResult] = useState<{ time: string; timeNote?: string } | null>(null);
@@ -33,28 +35,39 @@ export default function EmployeeScan() {
   const scanTimerRef = useRef<number | null>(null);
   const scanningRef = useRef(false);
 
-  // Employee-safe D1 endpoint is authoritative. It returns the owner's main
-  // site settings for staff without exposing the owner-only /api/settings endpoint.
+  // Location is deliberately NOT read from localStorage. The employee must use
+  // the authoritative location/radius returned by D1 through the staff-safe API.
   useEffect(() => {
     let cancelled = false;
-    void getBackendEmployeeLocation().then(({ location }) => {
+    setStep("loading-location");
+    setError(null);
+    void getBackendEmployeeLocation().then(({ location: remote }) => {
       if (cancelled) return;
-      setSettings((prev) => ({
-        ...prev,
-        workSiteLat: Number(location.lat),
-        workSiteLng: Number(location.lng),
-        radiusMeters: Number(location.radiusMeters),
-      }));
+      const next = {
+        id: String(remote.id || "main"),
+        name: String(remote.name || "المقر الرئيسي"),
+        lat: Number(remote.lat),
+        lng: Number(remote.lng),
+        radiusMeters: Number(remote.radiusMeters),
+      };
+      if (![next.lat, next.lng, next.radiusMeters].every(Number.isFinite) || next.radiusMeters < 0) {
+        throw new Error("بيانات موقع العمل القادمة من قاعدة البيانات غير صالحة");
+      }
+      setLocation(next);
+      setStep("gps");
     }).catch((e) => {
-      if (!cancelled) console.warn("تعذر تحميل موقع الحضور من D1، سيتم استخدام النسخة المحلية مؤقتًا:", e);
+      if (cancelled) return;
+      setLocation(null);
+      setError(e instanceof Error ? e.message : "تعذر تحميل موقع العمل من قاعدة البيانات");
+      setStep("error");
     });
     return () => { cancelled = true; };
   }, []);
 
-  const targetLat = Number(settings.workSiteLat);
-  const targetLng = Number(settings.workSiteLng);
-  const targetRadius = Number(settings.radiusMeters);
-  const locationName = "المقر الرئيسي";
+  const targetLat = location?.lat ?? NaN;
+  const targetLng = location?.lng ?? NaN;
+  const targetRadius = location?.radiusMeters ?? NaN;
+  const locationName = location?.name || "المقر الرئيسي";
 
   const stopCamera = () => {
     scanningRef.current = false;
@@ -66,13 +79,12 @@ export default function EmployeeScan() {
 
   useEffect(() => {
     setScannerSupported(typeof window !== "undefined" && "BarcodeDetector" in window);
+    if (!location) return;
     let cancelled = false;
     (async () => {
       try {
         if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng) || !Number.isFinite(targetRadius) || targetRadius < 0) {
-          setError("إعدادات موقع العمل غير صالحة. يرجى مراجعة إعدادات GPS في لوحة الإدارة.");
-          setStep("error");
-          return;
+          throw new Error("إعدادات موقع العمل غير صالحة في قاعدة البيانات");
         }
         setStep("gps");
         const position = await getCurrentPosition();
@@ -88,7 +100,7 @@ export default function EmployeeScan() {
       }
     })();
     return () => { cancelled = true; stopCamera(); };
-  }, [targetLat, targetLng, targetRadius]);
+  }, [location, targetLat, targetLng, targetRadius]);
 
   const inRange = distance !== null && Number.isFinite(distance) && distance <= targetRadius;
 
@@ -139,7 +151,7 @@ export default function EmployeeScan() {
   };
 
   const title = action === "check-in" ? "تسجيل الحضور" : "تسجيل الانصراف";
-  const statusText = step === "gps" ? "جاري التحقق من الموقع" : step === "error" ? "تعذر التحقق من الموقع" : inRange ? "تم التحقق من الموقع" : "خارج نطاق الموقع";
+  const statusText = step === "loading-location" ? "جاري تحميل موقع الشركة" : step === "gps" ? "جاري التحقق من الموقع" : step === "error" ? "تعذر التحقق من الموقع" : inRange ? "تم التحقق من الموقع" : "خارج نطاق الموقع";
 
   return (
     <div className="min-h-screen">
@@ -148,23 +160,26 @@ export default function EmployeeScan() {
         <section className="hud-card p-6"><div className="text-xs text-muted-foreground mono">ACTION</div><h1 className="text-2xl font-extrabold mt-0.5">{title}</h1><div className="text-sm text-muted-foreground mt-1">{session?.name ?? "الموظف"} · <span className="mono">{session?.jobNumber ?? "-"}</span> · <span className="text-primary font-semibold">{locationName}</span></div></section>
 
         <section className="hud-card p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "gps" ? "active" : step === "error" ? "fail" : "done"} /></div>
-          <div className="relative mx-auto w-full max-w-sm aspect-square rounded-full border border-primary/20 bg-primary/[0.03] overflow-hidden grid place-items-center">
-            <div className="absolute inset-[10%] rounded-full border border-primary/20" />
-            <div className="absolute inset-[22%] rounded-full border border-primary/25" />
-            <div className="absolute inset-[35%] rounded-full border border-primary/30" />
-            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-primary/15" />
-            <div className="absolute top-1/2 left-0 right-0 h-px bg-primary/15" />
-            <div className="absolute inset-0 radar-sweep" />
-            <div className="relative z-10 h-4 w-4 rounded-full bg-destructive shadow-[0_0_0_7px_hsl(var(--destructive)/.12),0_0_25px_hsl(var(--destructive)/.65)] animate-pulse" />
+          <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "loading-location" || step === "gps" ? "active" : step === "error" ? "fail" : "done"} /></div>
+          <div className="relative mx-auto w-full max-w-[250px] aspect-square rounded-full border border-primary/25 bg-primary/[0.035] overflow-hidden grid place-items-center shadow-[0_0_40px_hsl(var(--primary)/.08)]">
+            <div className="absolute inset-[8%] rounded-full border border-primary/15" />
+            <div className="absolute inset-[20%] rounded-full border border-primary/20" />
+            <div className="absolute inset-[33%] rounded-full border border-primary/25" />
+            <div className="absolute inset-[44%] rounded-full border border-primary/30" />
+            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-primary/10" />
+            <div className="absolute top-1/2 left-0 right-0 h-px bg-primary/10" />
+            <div className="absolute inset-0 radar-sweep opacity-80" />
+            <div className="absolute h-7 w-7 rounded-full border border-destructive/30 animate-ping" />
+            <div className="relative z-10 h-3.5 w-3.5 rounded-full bg-destructive shadow-[0_0_0_6px_hsl(var(--destructive)/.12),0_0_22px_hsl(var(--destructive)/.7)] animate-pulse" />
+            <div className="absolute bottom-5 rounded-full bg-background/80 border border-border/50 px-3 py-1 text-[10px] mono text-muted-foreground backdrop-blur">GPS · D1</div>
           </div>
           <div className="text-center mt-4">
             <div className="text-base font-extrabold animate-pulse">{statusText}</div>
-            <div className="text-xs text-muted-foreground mt-1">{step === "gps" ? "جاري تحديد موقع جهازك والتحقق من قربه من مقر الشركة..." : "تم تحميل موقع الشركة والنطاق من قاعدة بيانات D1."}</div>
+            <div className="text-xs text-muted-foreground mt-1">{step === "loading-location" ? "يتم تحميل إحداثيات الشركة والنطاق من قاعدة البيانات..." : step === "gps" ? "جاري تحديد موقع جهازك والتحقق من قربه من مقر الشركة..." : "تم تحميل موقع الشركة والنطاق من قاعدة بيانات D1."}</div>
           </div>
           <div className="grid grid-cols-2 gap-2 text-center mt-4 text-xs">
-            <Cell label="المسافة الحالية" value={distance !== null ? `${distance} م` : "…"} />
-            <Cell label="النطاق المسموح" value={Number.isFinite(targetRadius) ? `${targetRadius} م` : "…"} />
+            <Cell label="المسافة الحالية" value={distance !== null ? `${Math.round(distance)} م` : "…"} />
+            <Cell label="النطاق المسموح" value={Number.isFinite(targetRadius) ? `${Math.round(targetRadius)} م` : "…"} />
             <Cell label="خط العرض" value={pos ? pos.lat.toFixed(5) : "…"} />
             <Cell label="خط الطول" value={pos ? pos.lng.toFixed(5) : "…"} />
           </div>
