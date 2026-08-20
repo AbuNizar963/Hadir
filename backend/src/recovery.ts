@@ -34,6 +34,8 @@ async function recovery(req: Request, env: Env, origin: string) {
   const input = await req.json().catch(() => ({})) as Record<string, unknown>;
   const code = String(input.recoveryCode || "");
   const password = String(input.newPassword || "");
+  const name = String(input.ownerName || "").trim();
+  const username = String(input.ownerUsername || "").trim();
   if (!code || !password) return json({ error: "رمز الاستعادة وكلمة المرور الجديدة مطلوبان" }, 400, origin);
   if (password.length < 12) return json({ error: "كلمة المرور الجديدة يجب أن تكون 12 حرفًا على الأقل" }, 400, origin);
   if (code.length !== env.OWNER_RECOVERY_CODE.length) return json({ error: "رمز الاستعادة غير صحيح" }, 401, origin);
@@ -47,7 +49,23 @@ async function recovery(req: Request, env: Env, origin: string) {
   if (used) return json({ error: "تم استخدام رمز استعادة المالك مسبقًا. أنشئ رمزًا جديدًا ثم احذف حالة الاستعادة من D1." }, 409, origin);
 
   const owner = await env.DB.prepare("SELECT id,username,name FROM admin_accounts WHERE role='owner' LIMIT 1").first<{ id: string; username: string; name: string }>();
-  if (!owner) return json({ error: "لا يوجد حساب مالك في قاعدة البيانات" }, 404, origin);
+
+  if (!owner) {
+    if (!name || !username) return json({ error: "لم يتم العثور على حساب مالك. أدخل اسم المالك واسم المستخدم لإنشاء حساب المالك الأول." }, 404, origin);
+    if (username.length < 3 || username.length > 64) return json({ error: "اسم المستخدم يجب أن يكون بين 3 و64 حرفًا" }, 400, origin);
+    if (!/^[A-Za-z0-9_.@-]+$/.test(username)) return json({ error: "اسم المستخدم يحتوي على أحرف غير مدعومة" }, 400, origin);
+
+    try {
+      const id = crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)")
+        .bind(id, username, await hashPassword(password), name, "owner", 1, new Date().toISOString()).run();
+      await env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?)")
+        .bind(new Date().toISOString()).run();
+      return json({ ok: true, username, message: "تم إنشاء حساب المالك الأول بنجاح. يمكنك تسجيل الدخول الآن." }, 201, origin);
+    } catch (error) {
+      return json({ error: "تعذر إنشاء حساب المالك في قاعدة البيانات", detail: error instanceof Error ? error.message : String(error) }, 500, origin);
+    }
+  }
 
   await env.DB.prepare("UPDATE admin_accounts SET password_hash=?,active=1 WHERE id=? AND role='owner'")
     .bind(await hashPassword(password), owner.id).run();
