@@ -1,0 +1,62 @@
+name: Fix employee D1 profile loading
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[employee-d1-bot]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fix employee profile refresh
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/EmployeeHome.tsx')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace(
+            'import { backendLogout, getBackendEmployeeProfile, getBackendLocations, getBackendRequests, createBackendRequest } from "@/lib/backend";',
+            'import { backendLogout, getBackendEmployeeProfile, getBackendLocations, getBackendRequests, createBackendRequest } from "@/lib/backend";'
+          )
+          s = s.replace(
+            '  const [cloudReady, setCloudReady] = useState(false);',
+            '  const [cloudReady, setCloudReady] = useState(false);\n  const [cloudError, setCloudError] = useState<string | null>(null);'
+          )
+          old = '''        const [remote, remoteLocations] = await Promise.all([getBackendEmployeeProfile(), getBackendLocations()]);\n        if (disposed) return;\n        setD1Employee(remote);\n        setD1Locations(remoteLocations);\n        setCloudReady(true);\n        setCloudVersion((v) => v + 1);\n        // D1 is authoritative. A deleted or deactivated employee must be logged out immediately.\n        if (!remote || remote.status !== "active") {\n          backendLogout();\n          logoutEmployee();\n          nav("/login", { replace: true, state: { reason: "employee-removed" } });\n        }'''
+          new = '''        // The employee profile is the authoritative request. Locations are optional enrichment.\n        // Never let a forbidden/admin-only locations request block the employee page.\n        const remote = await getBackendEmployeeProfile();\n        if (disposed) return;\n        if (!remote || remote.status !== "active") {\n          backendLogout();\n          logoutEmployee();\n          nav("/login", { replace: true, state: { reason: "employee-removed" } });\n          return;\n        }\n        setD1Employee(remote);\n        setCloudReady(true);\n        setCloudError(null);\n        setCloudVersion((v) => v + 1);\n        try {\n          const remoteLocations = await getBackendLocations();\n          if (!disposed) setD1Locations(remoteLocations);\n        } catch (locationError) {\n          // Location enrichment must never prevent the employee profile from rendering.\n          console.warn("Employee location enrichment failed", locationError);\n        }'''
+          if old not in s:
+              raise SystemExit('employee D1 refresh block not found')
+          s = s.replace(old, new, 1)
+          old_error = '''      } catch (error) {\n        console.error("Employee D1 refresh failed", error); setCloudReady(false);\n      } finally {'''
+          new_error = '''      } catch (error) {\n        console.error("Employee D1 refresh failed", error);\n        setCloudReady(false);\n        setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1");\n      } finally {'''
+          if old_error not in s:
+              raise SystemExit('employee D1 error block not found')
+          s = s.replace(old_error, new_error, 1)
+          old_view = '''  if (!cloudReady || !emp) {\n    return <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">جاري تحميل بيانات الموظف من D1...</div>;\n  }'''
+          new_view = '''  if (!cloudReady || !emp) {\n    return (\n      <div className="min-h-screen grid place-items-center p-6 text-sm text-muted-foreground">\n        <div className="hud-card w-full max-w-md p-6 text-center space-y-3">\n          <div>{cloudError || "جاري تحميل بيانات الموظف من D1..."}</div>\n          {cloudError && <button className="btn-primary px-5 py-2" onClick={() => window.location.reload()}>إعادة المحاولة</button>}\n        </div>\n      </div>\n    );\n  }'''
+          if old_view not in s:
+              raise SystemExit('employee loading view not found')
+          s = s.replace(old_view, new_view, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Verify
+        run: |
+          git diff --check
+          if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
+          npx tsc --noEmit --pretty false
+
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+users.noreply.github.com'
+          git add src/pages/EmployeeHome.tsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'fix: unblock employee D1 profile loading [employee-d1-bot]'
+          git push
