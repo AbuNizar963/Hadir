@@ -55,22 +55,41 @@ async function recovery(req: Request, env: Env, origin: string) {
     if (username.length < 3 || username.length > 64) return json({ error: "اسم المستخدم يجب أن يكون بين 3 و64 حرفًا" }, 400, origin);
     if (!/^[A-Za-z0-9_.@-]+$/.test(username)) return json({ error: "اسم المستخدم يحتوي على أحرف غير مدعومة" }, 400, origin);
 
+    const passwordHash = await hashPassword(password);
+    const existing = await env.DB.prepare("SELECT id,role FROM admin_accounts WHERE username=? LIMIT 1").bind(username).first<{ id: string; role: string }>();
+
     try {
+      if (existing) {
+        // The recovery code is already the authorization boundary. Reuse an existing
+        // administrative username instead of failing on the UNIQUE username constraint.
+        await env.DB.batch([
+          env.DB.prepare("UPDATE admin_accounts SET password_hash=?,name=?,role='owner',active=1 WHERE id=?").bind(passwordHash, name, existing.id),
+          env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?)").bind(new Date().toISOString()),
+        ]);
+        return json({ ok: true, username, message: "تم تحويل الحساب الإداري إلى مالك وإعادة تعيين كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن." }, 200, origin);
+      }
+
       const id = crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)")
-        .bind(id, username, await hashPassword(password), name, "owner", 1, new Date().toISOString()).run();
-      await env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?)")
-        .bind(new Date().toISOString()).run();
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)").bind(id, username, passwordHash, name, "owner", 1, new Date().toISOString()),
+        env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?)").bind(new Date().toISOString()),
+      ]);
       return json({ ok: true, username, message: "تم إنشاء حساب المالك الأول بنجاح. يمكنك تسجيل الدخول الآن." }, 201, origin);
     } catch (error) {
-      return json({ error: "تعذر إنشاء حساب المالك في قاعدة البيانات", detail: error instanceof Error ? error.message : String(error) }, 500, origin);
+      const detail = error instanceof Error ? error.message : String(error);
+      return json({ error: "تعذر إنشاء حساب المالك في قاعدة البيانات", detail }, 500, origin);
     }
   }
 
-  await env.DB.prepare("UPDATE admin_accounts SET password_hash=?,active=1 WHERE id=? AND role='owner'")
-    .bind(await hashPassword(password), owner.id).run();
-  await env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?)")
-    .bind(new Date().toISOString()).run();
+  try {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE admin_accounts SET password_hash=?,active=1 WHERE id=? AND role='owner'").bind(await hashPassword(password), owner.id),
+      env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?)").bind(new Date().toISOString()),
+    ]);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return json({ error: "تعذر إعادة تعيين كلمة مرور المالك في قاعدة البيانات", detail }, 500, origin);
+  }
 
   return json({ ok: true, username: owner.username, message: "تمت إعادة تعيين كلمة مرور المالك. استخدم اسم المستخدم نفسه لتسجيل الدخول." }, 200, origin);
 }
