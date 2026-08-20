@@ -77,6 +77,20 @@ jobs:
           fi
           printf '%s' "$CONFIGURED_JWT_SECRET" | npx wrangler secret put JWT_SECRET
 
+      - name: Configure owner recovery secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CONFIGURED_OWNER_RECOVERY_CODE: ${{ secrets.OWNER_RECOVERY_CODE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$CONFIGURED_OWNER_RECOVERY_CODE" ]]; then
+            echo 'Missing OWNER_RECOVERY_CODE GitHub secret.' >&2
+            exit 1
+          fi
+          printf '%s' "$CONFIGURED_OWNER_RECOVERY_CODE" | npx wrangler secret put OWNER_RECOVERY_CODE
+
       - name: Deploy Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
