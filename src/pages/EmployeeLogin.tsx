@@ -1,9 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
-import { loginEmployee } from "@/lib/auth";
 import { backendEnabled, backendEmployeeLogin } from "@/lib/backend";
-import { hydrateLocalData } from "@/lib/cloudDataSync";
 import { setSession } from "@/lib/storage";
 import type { Employee } from "@/types";
 
@@ -20,27 +18,9 @@ export default function EmployeeLogin(){
   const number=jobNumber.trim();
   const code=pin.trim();
   try{
-   if(backendEnabled){
-    try{
-     const emp=await backendEmployeeLogin(number,code) as Employee;
-     setSession({employeeId:emp.id,jobNumber:emp.jobNumber,name:emp.name,loginAt:new Date().toISOString(),role:emp.role});
-     await hydrateLocalData().catch(()=>undefined);
-     window.dispatchEvent(new Event("hadir:session-changed"));
-     navigate("/employee",{replace:true});
-     return;
-    }catch(err){
-     const local=loginEmployee(number,code);
-     if(local.success){
-      window.dispatchEvent(new Event("hadir:session-changed"));
-      navigate("/employee",{replace:true});
-      return;
-     }
-     const msg=err instanceof Error?err.message:"فشل الاتصال بقاعدة البيانات";
-     throw new Error(msg);
-    }
-   }
-   const result=loginEmployee(number,code);
-   if(!result.success){setError(result.reason||"الرقم الوظيفي أو رمز الدخول غير صحيح");return;}
+   if(!backendEnabled) throw new Error("خدمة تسجيل دخول الموظفين غير مفعلة. تحقق من إعداد Cloudflare Worker.");
+   const emp=await backendEmployeeLogin(number,code) as Employee;
+   setSession({employeeId:emp.id,jobNumber:emp.jobNumber,name:emp.name,loginAt:new Date().toISOString(),role:emp.role});
    window.dispatchEvent(new Event("hadir:session-changed"));
    navigate("/employee",{replace:true});
   }catch(err){
