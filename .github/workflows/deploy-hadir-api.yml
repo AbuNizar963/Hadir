@@ -39,6 +39,18 @@ jobs:
       - name: Install Wrangler
         run: npm install --no-save --no-package-lock wrangler@4.123.0
 
+      - name: Authenticate with Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler whoami
+
+      - name: Verify D1 is reachable
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 list
+
       - name: Validate Worker bundle
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -55,16 +67,15 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CONFIGURED_JWT_SECRET: ${{ secrets.JWT_SECRET || secrets.HADIR_JWT_SECRET }}
+          CONFIGURED_JWT_SECRET: ${{ secrets.JWT_SECRET }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -n "$CONFIGURED_JWT_SECRET" ]]; then
-            printf '%s' "$CONFIGURED_JWT_SECRET" | npx wrangler secret put JWT_SECRET
-          else
-            echo 'JWT_SECRET is not configured; generating a strong deployment secret.'
-            node -e "const c=require('crypto'); process.stdout.write(c.randomBytes(48).toString('base64url'))" | npx wrangler secret put JWT_SECRET
+          if [[ -z "$CONFIGURED_JWT_SECRET" ]]; then
+            echo 'Missing JWT_SECRET GitHub secret.' >&2
+            exit 1
           fi
+          printf '%s' "$CONFIGURED_JWT_SECRET" | npx wrangler secret put JWT_SECRET
 
       - name: Deploy Worker
         env:
@@ -72,21 +83,22 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
 
-      - name: Verify Worker and D1
+      - name: Verify deployed Worker and D1
         env:
-          HADIR_API_URL: ${{ secrets.HADIR_API_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         shell: bash
         run: |
           set -euo pipefail
-          BASE_URL="${HADIR_API_URL:-}"
-          if [[ -z "$BASE_URL" ]]; then
-            echo 'Missing HADIR_API_URL. Set it to the deployed Worker URL (for example https://hadir-api.<subdomain>.workers.dev).' >&2
-            exit 1
-          fi
+          BASE_URL="${VITE_API_URL:-}"
+          [[ -n "$BASE_URL" ]] || { echo 'Missing VITE_API_URL GitHub secret.' >&2; exit 1; }
           BASE_URL="${BASE_URL%/}"
-          HEALTH=$(curl -fsS --max-time 20 "$BASE_URL/api/health")
+          [[ "$BASE_URL" == https://* ]] || { echo 'VITE_API_URL must use HTTPS.' >&2; exit 1; }
+
+          echo "Checking $BASE_URL/api/health"
+          HEALTH=$(curl -fsS --retry 3 --retry-delay 2 --max-time 20 "$BASE_URL/api/health")
           echo "$HEALTH"
-          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"){console.error("Worker/D1 health check failed");process.exit(1)}console.log("Worker and D1 are healthy")' "$HEALTH"
-          BOOT=$(curl -fsS --max-time 20 "$BASE_URL/api/bootstrap")
+          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"){console.error("Worker/D1 health check failed");process.exit(1)}console.log("Worker and D1 are healthy; ownerInitialized="+x.ownerInitialized)' "$HEALTH"
+
+          BOOT=$(curl -fsS --retry 3 --retry-delay 2 --max-time 20 "$BASE_URL/api/bootstrap")
           echo "$BOOT"
           node -e 'const x=JSON.parse(process.argv[1]);if(typeof x.bootstrap!=="boolean"){console.error("Bootstrap endpoint invalid");process.exit(1)}console.log("Bootstrap endpoint OK")' "$BOOT"
