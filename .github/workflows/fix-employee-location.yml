@@ -10,17 +10,15 @@ permissions:
 
 jobs:
   fix-location:
-    if: github.actor == 'AbuNizar963'
     runs-on: ubuntu-latest
     steps:
       - name: Patch location source and UI
-        uses: actions/github-script@v8
+        uses: actions/github-script@v7
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const branch = 'main';
-
             async function getFile(path) {
               const r = await github.rest.repos.getContent({ owner, repo, path, ref: branch });
               if (Array.isArray(r.data)) throw new Error(`${path} is a directory`);
@@ -29,18 +27,16 @@ jobs:
             async function putFile(path, sha, text, message) {
               await github.rest.repos.createOrUpdateFileContents({ owner, repo, path, branch, sha, message, content: Buffer.from(text, 'utf8').toString('base64') });
             }
-
             {
               const path = 'backend/src/index.ts';
               const f = await getFile(path);
               if (!f.text.includes('owner configured main site')) {
                 const re = /        let location: any = null;\n        if \(employee\.location_id\) \{[\s\S]*?        return json\(\{ location \}, 200, origin\);/;
-                const replacement = `        let location: any = null;\n        if (employee.location_id) {\n          location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id=? LIMIT 1").bind(employee.location_id).first<any>();\n        }\n        // owner configured main site is authoritative for employees without an explicit branch.\n        if (!location) {\n          const rows = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('workSiteLat','workSiteLng','radiusMeters')").all<{key:string,value:string}>();\n          const main: Record<string, any> = {};\n          for (const row of rows.results) { try { main[row.key] = JSON.parse(row.value); } catch { main[row.key] = row.value; } }\n          const lat = Number(main.workSiteLat);\n          const lng = Number(main.workSiteLng);\n          const radiusMeters = Number(main.radiusMeters);\n          if (Number.isFinite(lat) && Number.isFinite(lng) && Number.isFinite(radiusMeters) && radiusMeters >= 0) {\n            location = { id: 'main', name: 'المقر الرئيسي', lat, lng, radiusMeters };\n          }\n        }\n        if (!location) location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name LIMIT 1").first<any>();\n        if (!location) return json({ error: "لا يوجد موقع حضور مضبوط في قاعدة البيانات" }, 404, origin);\n        return json({ location }, 200, origin);`;
+                const replacement = `        let location: any = null;\n        if (employee.location_id) {\n          location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id=? LIMIT 1").bind(employee.location_id).first<any>();\n        }\n        // owner configured main site is authoritative for employees without an explicit branch.\n        if (!location) {\n          const rows = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('workSiteLat','workSiteLng','radiusMeters')").all<{key:string,value:string}>();\n          const main: Record<string, any> = {};\n          for (const row of rows.results) { try { main[row.key] = JSON.parse(row.value); } catch { main[row.key] = row.value; } }\n          const lat = Number(main.workSiteLat);\n          const lng = Number(main.workSiteLng);\n          const radiusMeters = Number(main.radiusMeters);\n          if (Number.isFinite(lat) && Number.isFinite(lng) && Number.isFinite(radiusMeters) && radiusMeters >= 0) location = { id: 'main', name: 'المقر الرئيسي', lat, lng, radiusMeters };\n        }\n        if (!location) location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name LIMIT 1").first<any>();\n        if (!location) return json({ error: "لا يوجد موقع حضور مضبوط في قاعدة البيانات" }, 404, origin);\n        return json({ location }, 200, origin);`;
                 if (!re.test(f.text)) throw new Error('Backend location block not found');
                 await putFile(path, f.sha, f.text.replace(re, replacement), 'fix: make main D1 GPS settings authoritative for employees');
               }
             }
-
             {
               const path = 'src/pages/EmployeeScan.tsx';
               const f = await getFile(path);
