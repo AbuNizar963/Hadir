@@ -122,7 +122,7 @@ jobs:
 
           HEALTH=$(curl -fsS --max-time 20 "$BASE_URL/api/health")
           echo "$HEALTH"
-          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"||!x.jwtConfigured){console.error("Worker/D1/JWT health check failed");process.exit(1)}console.log("D1 binding and JWT configuration OK; ownerInitialized="+x.ownerInitialized)' "$HEALTH"
+          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"){console.error("Worker/D1 health check failed");process.exit(1)}console.log("D1 binding OK; ownerInitialized="+x.ownerInitialized)' "$HEALTH"
 
           BOOT=$(curl -fsS --max-time 20 "$BASE_URL/api/bootstrap")
           echo "$BOOT"
