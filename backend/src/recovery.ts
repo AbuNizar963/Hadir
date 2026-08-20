@@ -2,6 +2,7 @@ type Env = { DB: D1Database; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_REC
 
 const original = (await import("./index")).default;
 const encoder = new TextEncoder();
+const PASSWORD_ITERATIONS = 100000;
 
 function b64(data: ArrayBuffer | Uint8Array) {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -13,8 +14,8 @@ function b64(data: ArrayBuffer | Uint8Array) {
 async function hashPassword(password: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 150000, hash: "SHA-256" }, key, 256);
-  return `pbkdf2$150000$${b64(salt)}$${b64(bits)}`;
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: PASSWORD_ITERATIONS, hash: "SHA-256" }, key, 256);
+  return `pbkdf2$${PASSWORD_ITERATIONS}$${b64(salt)}$${b64(bits)}`;
 }
 
 function json(data: unknown, status: number, origin: string) {
