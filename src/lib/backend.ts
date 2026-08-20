@@ -80,5 +80,6 @@ export async function getBackendSettings() { return request<Settings>("/api/sett
 export async function saveBackendSettings(settings: Partial<Settings> & { ownerPassword?: string }) { return request<{ ok: boolean }>("/api/settings", { method: "PUT", body: JSON.stringify(settings) }); }
 export async function getBackendLocations() { return request<Location[]>("/api/locations"); }
 export async function saveBackendLocation(location: Location) { return request<{ ok: boolean }>("/api/locations", { method: "PUT", body: JSON.stringify(location) }); }
+export async function getBackendEmployeeLocation() { return request<{ location: Location }>("/api/employee-location"); }
 export async function backendHealth() { return request<{ ok: boolean; database?: string; ownerInitialized?: boolean }>("/api/health"); }
 export type { AdminAccount };
