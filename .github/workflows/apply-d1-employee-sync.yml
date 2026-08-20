@@ -9,58 +9,31 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[d1-sync-bot]') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Patch employee and manager D1 synchronization
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@v5
+      - name: Apply safe employee D1 view patch
         run: |
           python3 <<'PY'
           from pathlib import Path
-
           p = Path('src/pages/EmployeeHome.tsx')
-          s = p.read_text()
-          s = s.replace('import { pullEmployeesFromCloud } from "@/lib/cloudSync";', 'import { getBackendEmployees, getBackendLocations, getBackendRequests, createBackendRequest } from "@/lib/backend";')
-          s = s.replace('  const [, setCloudVersion] = useState(0);', '  const [, setCloudVersion] = useState(0);\n  const [d1Employee, setD1Employee] = useState<typeof findEmployeeByJobNumber extends never ? never : any>(null);\n  const [d1Locations, setD1Locations] = useState<any[]>([]);')
-          old = '''      try {\n        await pullEmployeesFromCloud();\n        if (!disposed) setCloudVersion((v) => v + 1);\n      } finally {'''
-          new = '''      try {\n        const [remoteEmployees, remoteLocations] = await Promise.all([getBackendEmployees(), getBackendLocations()]);\n        const remote = remoteEmployees.find((employee) => employee.jobNumber === session.jobNumber || employee.id === session.employeeId) || null;\n        if (!disposed) { setD1Employee(remote); setD1Locations(remoteLocations); setCloudVersion((v) => v + 1); }\n      } finally {'''
-          if old not in s: raise SystemExit('EmployeeHome refresh block not found')
-          s = s.replace(old, new)
-          s = s.replace('  const emp = findEmployeeByJobNumber(session.jobNumber);', '  const emp = d1Employee || findEmployeeByJobNumber(session.jobNumber);')
-          old2 = '''    if (emp?.locationId && settings.locations) {\n      return settings.locations.find((loc) => loc.id === emp.locationId);\n    }'''
-          new2 = '''    if (emp?.locationId) {\n      return d1Locations.find((loc) => loc.id === emp.locationId) || settings.locations?.find((loc) => loc.id === emp.locationId);\n    }'''
-          if old2 not in s: raise SystemExit('EmployeeHome location block not found')
-          s = s.replace(old2, new2)
-          old3 = '''    addRequest({\n      employeeId: emp.id,\n      employeeName: emp.name,\n      jobNumber: emp.jobNumber,\n      type: requestType,\n      reason,\n    });\n\n    setRequestSent(true);'''
-          new3 = '''    void createBackendRequest({\n      employeeId: emp.id,\n      employeeName: emp.name,\n      jobNumber: emp.jobNumber,\n      type: requestType,\n      reason,\n    }).then(() => setRequestSent(true)).catch((error) => {\n      console.error(error);\n      setRequestSent(false);\n    });\n\n    setRequestSent(true);'''
-          if old3 in s: s = s.replace(old3, new3)
-          p.write_text(s)
-
-          p = Path('src/pages/ManagerEmployees.tsx')
-          s = p.read_text()
-          s = s.replace('getRequests, updateRequestStatus, EmployeeRequest', 'getRequests, updateRequestStatus, EmployeeRequest')
-          s = s.replace('import { backendEnabled, getBackendEmployees, getBackendLocations, resetBackendEmployeeDevice, createBackendEmployee, updateBackendEmployee, deleteBackendEmployee } from "@/lib/backend";', 'import { backendEnabled, getBackendEmployees, getBackendLocations, getBackendRequests, updateBackendRequest, resetBackendEmployeeDevice, createBackendEmployee, updateBackendEmployee, deleteBackendEmployee } from "@/lib/backend";')
-          marker = '  const [requests, setRequests] = useState<EmployeeRequest[]>(getRequests());'
-          if marker in s:
-            s = s.replace(marker, marker + '\n  const [d1Requests, setD1Requests] = useState<EmployeeRequest[]>([]);')
-          old = '  const refreshLocationsFromD1 = async () => { if (!backendEnabled) return; try { setLocations(await getBackendLocations()); } catch (error) { console.warn("Hadir manager D1 location refresh failed:", error); } };'
-          new = old + '\n  const refreshRequestsFromD1 = async () => { if (!backendEnabled) return; try { const remote = await getBackendRequests(); setD1Requests(remote); setRequests(remote); } catch (error) { console.warn("Hadir manager D1 request refresh failed:", error); } };'
-          if old in s: s = s.replace(old, new)
-          s = s.replace('useEffect(() => { void refreshEmployeesFromD1(); void refreshLocationsFromD1();', 'useEffect(() => { void refreshEmployeesFromD1(); void refreshLocationsFromD1(); void refreshRequestsFromD1();')
-          s = s.replace('const refresh=()=>{void refreshEmployeesFromD1();void refreshLocationsFromD1();};', 'const refresh=()=>{void refreshEmployeesFromD1();void refreshLocationsFromD1();void refreshRequestsFromD1();};')
-          old = '  const handleUpdateRequest=(req:EmployeeRequest,status:"approved"|"rejected")=>{updateRequestStatus(req.id,status);setRequests(getRequests());'
-          new = '  const handleUpdateRequest=async(req:EmployeeRequest,status:"approved"|"rejected")=>{if(backendEnabled){await updateBackendRequest(req.id,status);await refreshRequestsFromD1();}else{updateRequestStatus(req.id,status);setRequests(getRequests());}'
-          if old in s: s = s.replace(old, new)
-          p.write_text(s)
+          s = p.read_text(encoding='utf-8')
+          replacements = {
+            'value={emp?.scheduleType === "ROTATION" ? "24 ساعة" : (emp?.workStartTime || settings.workStart || "08:00")}': 'value={emp?.workStartTime || settings.workStart || "08:00"}',
+            'value={emp?.scheduleType === "ROTATION" ? "24 ساعة" : (emp?.workEndTime || settings.workEnd || "16:00")}': 'value={emp?.workEndTime || settings.workEnd || "16:00"}',
+          }
+          for old, new in replacements.items():
+              s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
           PY
-      - name: Verify changed files
+      - name: Verify
         run: |
           git diff --check
-          npx --yes tsc --noEmit --pretty false || true
+          if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
+          npx tsc --noEmit --pretty false
       - name: Commit patch
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/pages/EmployeeHome.tsx src/pages/ManagerEmployees.tsx
-          git diff --cached --quiet && exit 0
-          git commit -m 'fix: make employee and manager views read directly from D1 [d1-sync-bot]'
+          git add src/pages/EmployeeHome.tsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'fix: preserve D1 employee rotation hours [d1-sync-bot]'
           git push
