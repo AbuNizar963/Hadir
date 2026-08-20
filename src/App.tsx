@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Landing from "@/pages/Landing";
 import EmployeeLogin from "@/features/auth/employee/EmployeeLogin";
@@ -7,7 +6,7 @@ import EmployeeHistory from "@/pages/EmployeeHistory";
 import EmployeeScan from "@/pages/EmployeeScan";
 import ManagerLogin from "@/pages/ManagerLogin";
 import ManagerDashboard from "@/pages/ManagerDashboard";
-import ManagerEmployees from "@/pages/ManagerEmployeesD1";
+import ManagerEmployees from "@/pages/ManagerEmployees";
 import ManagerRequests from "@/pages/ManagerRequests";
 import ManagerAudit from "@/pages/ManagerAudit";
 import ManagerSettings from "@/pages/ManagerSettings";
@@ -19,8 +18,7 @@ import RequireManagerRole from "@/components/RequireManagerRole";
 
 const ManagerOnly=({children}:{children:React.ReactNode})=><ProtectedManager>{children}</ProtectedManager>;
 const basename=import.meta.env.BASE_URL.replace(/\/$/,"")||undefined;
-function D1ViewBoundary({children}:{children:React.ReactNode}){const[,setVersion]=useState(0);useEffect(()=>{const refresh=()=>setVersion(v=>v+1);window.addEventListener("hadir:d1-view-changed",refresh);return()=>window.removeEventListener("hadir:d1-view-changed",refresh);},[]);return <>{children}</>;}
-export default function App(){return <BrowserRouter basename={basename}><D1ViewBoundary><Routes>
+export default function App(){return <BrowserRouter basename={basename}><Routes>
 <Route path="/" element={<Landing/>}/><Route path="/login" element={<EmployeeLogin/>}/><Route path="/employee" element={<ProtectedEmployee><EmployeeHome/></ProtectedEmployee>}/><Route path="/employee/history" element={<ProtectedEmployee><EmployeeHistory/></ProtectedEmployee>}/><Route path="/employee/scan/:type" element={<ProtectedEmployee><EmployeeScan/></ProtectedEmployee>}/>
 <Route path="/manager/login" element={<ManagerLogin/>}/><Route path="/manager" element={<ManagerOnly><ManagerDashboard/></ManagerOnly>}/><Route path="/manager/employees" element={<ManagerOnly><RequireManagerRole roles={["owner","manager"]}><ManagerEmployees/></RequireManagerRole></ManagerOnly>}/><Route path="/manager/requests" element={<ManagerOnly><RequireManagerRole roles={["owner","manager"]}><ManagerRequests/></RequireManagerRole></ManagerOnly>}/><Route path="/manager/audit" element={<ManagerOnly><RequireManagerRole roles={["owner","manager","supervisor"]}><ManagerAudit/></RequireManagerRole></ManagerOnly>}/><Route path="/manager/reports" element={<ManagerOnly><RequireManagerRole roles={["owner","manager"]}><ManagerReports/></RequireManagerRole></ManagerOnly>}/><Route path="/manager/settings" element={<ManagerOnly><RequireManagerRole roles={["owner"]}><ManagerSettings/></RequireManagerRole></ManagerOnly>}/><Route path="/manager-home" element={<Navigate to="/manager" replace/>}/><Route path="*" element={<NotFound/>}/>
-</Routes></D1ViewBoundary></BrowserRouter>;}
+</Routes></BrowserRouter>;}
