@@ -23,7 +23,7 @@ function json(data: unknown, status: number, origin: string) {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": origin,
     "access-control-allow-headers": "content-type, authorization, x-device-id",
-    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
   }});
 }
 
@@ -31,11 +31,33 @@ async function ensureRecoveryTables(db: D1Database) {
   await db.batch([
     db.prepare("CREATE TABLE IF NOT EXISTS admin_accounts (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)"),
     db.prepare("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS locations (id TEXT PRIMARY KEY, name TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, radius_meters REAL NOT NULL)"),
   ]);
 }
 
+async function syncMainLocation(db: D1Database, settings: Record<string, unknown>) {
+  const lat = Number(settings.workSiteLat);
+  const lng = Number(settings.workSiteLng);
+  const radiusMeters = Number(settings.radiusMeters);
+  if (![lat, lng, radiusMeters].every(Number.isFinite) || radiusMeters < 0) return false;
+  await db.prepare("INSERT INTO locations(id,name,lat,lng,radius_meters) VALUES('main',?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,lat=excluded.lat,lng=excluded.lng,radius_meters=excluded.radius_meters")
+    .bind(lat, lng, radiusMeters).run();
+  return true;
+}
+
+async function recoverLocationFromSettings(db: D1Database) {
+  const rows = await db.prepare("SELECT key,value FROM settings WHERE key IN ('workSiteLat','workSiteLng','radiusMeters')").all<{key:string,value:string}>();
+  const settings: Record<string, unknown> = {};
+  for (const row of rows.results) {
+    try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
+  }
+  const synced = await syncMainLocation(db, settings);
+  if (!synced) return null;
+  return await db.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id='main' LIMIT 1").first<any>();
+}
+
 async function recovery(req: Request, env: Env, origin: string) {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,OPTIONS" } });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,OPTIONS" } });
   if (req.method !== "POST") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
   if (!env.OWNER_RECOVERY_CODE) return json({ error: "استعادة المالك غير مفعلة على الخادم" }, 503, origin);
 
@@ -54,7 +76,6 @@ async function recovery(req: Request, env: Env, origin: string) {
 
   try {
     await ensureRecoveryTables(env.DB);
-
     const used = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_used'").first<{ value: string }>();
     if (used) return json({ error: "تم استخدام رمز استعادة المالك مسبقًا. أنشئ رمزًا جديدًا ثم أعد المحاولة." }, 409, origin);
 
@@ -87,7 +108,6 @@ async function recovery(req: Request, env: Env, origin: string) {
 
     const created = await env.DB.prepare("SELECT id,username,name FROM admin_accounts WHERE username=? AND role='owner' AND active=1 LIMIT 1").bind(username).first();
     if (!created) throw new Error("تم تنفيذ عملية قاعدة البيانات لكن لم يظهر حساب المالك عند التحقق");
-
     await env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(timestamp).run();
     return json({ ok: true, username, message: "تم إنشاء حساب المالك الأول بنجاح. يمكنك تسجيل الدخول الآن." }, existing ? 200 : 201, origin);
   } catch (error) {
@@ -101,6 +121,41 @@ export default {
     const url = new URL(req.url);
     const origin = env.APP_ORIGIN || "*";
     if (url.pathname.replace(/\/$/, "") === "/api/auth/recover-owner") return recovery(req, env, origin);
+
+    // Keep the settings table and the employee-facing locations table in sync.
+    // The manager UI writes GPS settings through /api/settings; this wrapper
+    // mirrors the authoritative main site into locations in the same D1 database.
+    if (url.pathname.replace(/\/$/, "") === "/api/settings" && req.method === "PUT") {
+      const copy = req.clone();
+      const response = await original.fetch(req, env, ctx);
+      if (response.ok) {
+        try {
+          const settings = await copy.json() as Record<string, unknown>;
+          await ensureRecoveryTables(env.DB);
+          await syncMainLocation(env.DB, settings);
+        } catch (error) {
+          console.error("تعذر مزامنة موقع المقر الرئيسي مع D1:", error);
+        }
+      }
+      return response;
+    }
+
+    // Employee location is always resolved from the same D1 database. If the
+    // older core handler cannot find a location, repair it from saved settings
+    // and return the repaired D1 row instead of exposing a misleading 404.
+    if (url.pathname.replace(/\/$/, "") === "/api/employee-location" && req.method === "GET") {
+      const response = await original.fetch(req, env, ctx);
+      if (response.status !== 404) return response;
+      try {
+        await ensureRecoveryTables(env.DB);
+        const location = await recoverLocationFromSettings(env.DB);
+        if (location) return json({ location }, 200, origin);
+      } catch (error) {
+        console.error("تعذر استرجاع موقع الموظف من D1:", error);
+      }
+      return response;
+    }
+
     return original.fetch(req, env, ctx);
   },
 };
