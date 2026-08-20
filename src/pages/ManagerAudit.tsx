@@ -13,6 +13,12 @@ const ACTIONS: Record<AuditEntry["action"], string> = {
   "device-bound": "ربط جهاز",
   "manager-login": "دخول مدير",
   "manager-login-failed": "دخول مدير فاشل",
+  "supervisor-login": "دخول مشرف",
+  "supervisor-login-failed": "دخول مشرف فاشل",
+  "owner-login": "دخول مالك",
+  "owner-login-failed": "دخول مالك فاشل",
+  "admin-login": "دخول إداري",
+  "admin-login-failed": "دخول إداري فاشل",
 };
 
 function safeAudit(): AuditEntry[] {

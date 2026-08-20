@@ -22,7 +22,7 @@ export default function EmployeeLogin() {
       setLoading(false);
 
       if (!res.success) {
-        setErr(res.error || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");
+        setErr(res.reason || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");
       } else {
         nav("/employee");
       }

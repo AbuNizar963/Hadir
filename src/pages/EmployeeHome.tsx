@@ -69,14 +69,14 @@ export default function EmployeeHome() {
   const scheduleStatus = useMemo(() => getEmployeeScheduleStatus(emp, now), [emp, now]);
   const isWorkDay = scheduleStatus.isWorkDay;
   const todays = useMemo(() => attendance.filter((r) => r.employeeId === emp?.id && r.timestamp.startsWith(todayKey())), [attendance, emp]);
-  const checkIn = todays.find((r) => r.type === "check-in" || r.type === "in");
-  const checkOut = todays.find((r) => r.type === "check-out" || r.type === "out");
+  const checkIn = todays.find((r) => r.type === "check-in");
+  const checkOut = todays.find((r) => r.type === "check-out");
   const workedMinutes = checkIn ? minutesBetween(checkIn.timestamp, checkOut?.timestamp ?? new Date().toISOString()) : 0;
   const workStartTime = emp?.workStartTime || settings.workStart || "08:00";
   const [hh, mm] = workStartTime.split(":").map(Number);
   let lateMinutes = 0;
   if (checkIn) { const scheduled = new Date(checkIn.timestamp); scheduled.setHours(hh, mm, 0, 0); const diff = Math.round((new Date(checkIn.timestamp).getTime() - scheduled.getTime()) / 60000); const grace = emp?.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10; lateMinutes = Math.max(0, diff - grace); }
-  const shiftEnded = isShiftOver(emp);
+  const shiftEnded = emp ? isShiftOver(emp) : false;
   const logout = () => { logoutEmployee(); nav("/login"); };
   const canCheckIn = isWorkDay && !checkIn;
   const canCheckOut = isWorkDay && !!checkIn && !checkOut && shiftEnded;
