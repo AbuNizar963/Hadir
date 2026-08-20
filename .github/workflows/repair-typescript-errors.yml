@@ -1,0 +1,86 @@
+name: Repair TypeScript errors
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply deterministic source fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              if old not in s:
+                  print(f'NOT FOUND: {path}: {old!r}')
+                  return False
+              p.write_text(s.replace(old, new, 1))
+              print(f'FIXED: {path}')
+              return True
+
+          replace('src/pages/ManagerSettings.tsx',
+                  '.replaceAll("-","")',
+                  '.replace(/-/g,"")')
+
+          replace('src/pages/ManagerEmployees.tsx',
+                  'deleteBackendEmployee, resetBackendEmployeeDevice }',
+                  'deleteBackendEmployee, resetBackendEmployeeDevice, updateBackendRequest, getBackendRequests }')
+
+          replace('src/pages/ManagerAudit.tsx',
+                  '  "manager-login-failed": "دخول مدير فاشل",\n};',
+                  '  "manager-login-failed": "دخول مدير فاشل",\n  "supervisor-login": "دخول مشرف",\n  "supervisor-login-failed": "دخول مشرف فاشل",\n  "owner-login": "دخول مالك",\n  "owner-login-failed": "دخول مالك فاشل",\n  "admin-login": "دخول إداري",\n  "admin-login-failed": "دخول إداري فاشل",\n};')
+
+          replace('src/pages/EmployeeScan.tsx',
+                  'disabled={step !== "scan" || !inRange || !qrInput.trim() || !pos || step === "submitting"}',
+                  'disabled={step !== "scan" || !inRange || !qrInput.trim() || !pos}')
+
+          replace('src/pages/EmployeeLogin.tsx',
+                  'setErr(res.error || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");',
+                  'setErr(res.reason || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");')
+
+          replace('src/pages/EmployeeHome.tsx',
+                  'const checkIn = todays.find((r) => r.type === "check-in" || r.type === "in");',
+                  'const checkIn = todays.find((r) => r.type === "check-in");')
+          replace('src/pages/EmployeeHome.tsx',
+                  'const checkOut = todays.find((r) => r.type === "check-out" || r.type === "out");',
+                  'const checkOut = todays.find((r) => r.type === "check-out");')
+          replace('src/pages/EmployeeHome.tsx',
+                  'const shiftEnded = isShiftOver(emp);',
+                  'const shiftEnded = emp ? isShiftOver(emp) : false;')
+
+          replace('src/components/layout/ManagerLayout.tsx',
+                  '{n.title||n.message}',
+                  '{n.title || n.body}')
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Production build
+        run: npm run build
+      - name: Commit source fixes
+        run: |
+          if git diff --quiet; then
+            echo "No source changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src
+          git commit -m "fix: resolve TypeScript build errors"
+          git push
