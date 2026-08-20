@@ -4,7 +4,7 @@ import Brand from "@/components/Brand";
 import { currentSession } from "@/lib/auth";
 import { getCurrentPosition, haversineMeters, type GeoPosition } from "@/lib/geo";
 import { getSettings } from "@/lib/storage";
-import { getBackendSettings } from "@/lib/backend";
+import { getBackendEmployeeLocation } from "@/lib/backend";
 import { recordAttendance } from "@/lib/attendance";
 import { formatTime } from "@/lib/utils";
 import type { Settings } from "@/types";
@@ -33,17 +33,20 @@ export default function EmployeeScan() {
   const scanTimerRef = useRef<number | null>(null);
   const scanningRef = useRef(false);
 
-  // D1 main GPS settings are authoritative for employee attendance.
-  // Do not use stale local/assigned-location values here; those previously caused
-  // the employee screen to show an old 100m radius and wrong coordinates.
+  // Employee-safe D1 endpoint is authoritative. It returns the owner's main
+  // site settings for staff without exposing the owner-only /api/settings endpoint.
   useEffect(() => {
     let cancelled = false;
-    void getBackendSettings().then((cloud) => {
+    void getBackendEmployeeLocation().then(({ location }) => {
       if (cancelled) return;
-      const merged = { ...getSettings(), ...cloud } as Settings;
-      setSettings(merged);
+      setSettings((prev) => ({
+        ...prev,
+        workSiteLat: Number(location.lat),
+        workSiteLng: Number(location.lng),
+        radiusMeters: Number(location.radiusMeters),
+      }));
     }).catch((e) => {
-      if (!cancelled) console.warn("تعذر تحميل إعدادات GPS من D1، سيتم استخدام النسخة المحلية مؤقتًا:", e);
+      if (!cancelled) console.warn("تعذر تحميل موقع الحضور من D1، سيتم استخدام النسخة المحلية مؤقتًا:", e);
     });
     return () => { cancelled = true; };
   }, []);
