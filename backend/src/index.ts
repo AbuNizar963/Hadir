@@ -196,6 +196,19 @@ export default {
         if (employee.location_id) {
           location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id=? LIMIT 1").bind(employee.location_id).first<any>();
         }
+        // For employees without an explicitly assigned branch, the owner
+        // configured main site is the authoritative attendance location.
+        if (!location) {
+          const rows = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN ('workSiteLat','workSiteLng','radiusMeters')").all<{key:string,value:string}>();
+          const main: Record<string, any> = {};
+          for (const row of rows.results) { try { main[row.key] = JSON.parse(row.value); } catch { main[row.key] = row.value; } }
+          const lat = Number(main.workSiteLat);
+          const lng = Number(main.workSiteLng);
+          const radiusMeters = Number(main.radiusMeters);
+          if (Number.isFinite(lat) && Number.isFinite(lng) && Number.isFinite(radiusMeters) && radiusMeters >= 0) {
+            location = { id: 'main', name: 'المقر الرئيسي', lat, lng, radiusMeters };
+          }
+        }
         if (!location) location = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name LIMIT 1").first<any>();
         if (!location) return json({ error: "لا يوجد موقع حضور مضبوط في قاعدة البيانات" }, 404, origin);
         return json({ location }, 200, origin);
