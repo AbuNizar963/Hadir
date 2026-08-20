@@ -10,7 +10,7 @@ import {
   addRequest,
   type RequestType,
 } from "@/lib/storage";
-import { backendLogout, getBackendEmployees, getBackendLocations, getBackendRequests, createBackendRequest } from "@/lib/backend";
+import { backendLogout, getBackendEmployeeProfile, getBackendLocations, getBackendRequests, createBackendRequest } from "@/lib/backend";
 import { getEmployeeScheduleStatus } from "@/lib/schedule";
 import { formatTime, formatDurationMinutes, todayKey, minutesBetween } from "@/lib/utils";
 
@@ -35,8 +35,7 @@ export default function EmployeeHome() {
       if (refreshing || disposed) return;
       refreshing = true;
       try {
-        const [remoteEmployees, remoteLocations] = await Promise.all([getBackendEmployees(), getBackendLocations()]);
-        const remote = remoteEmployees.find((employee) => employee.jobNumber === session.jobNumber || employee.id === session.employeeId) || null;
+        const [remote, remoteLocations] = await Promise.all([getBackendEmployeeProfile(), getBackendLocations()]);
         if (disposed) return;
         setD1Employee(remote);
         setD1Locations(remoteLocations);
@@ -49,7 +48,7 @@ export default function EmployeeHome() {
           nav("/login", { replace: true, state: { reason: "employee-removed" } });
         }
       } catch (error) {
-        console.error("Employee D1 refresh failed", error);
+        console.error("Employee D1 refresh failed", error); setCloudReady(false);
       } finally {
         refreshing = false;
       }
