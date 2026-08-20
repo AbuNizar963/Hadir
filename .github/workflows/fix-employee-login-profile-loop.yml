@@ -1,0 +1,90 @@
+name: Fix employee login and D1 profile loop
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch employee authentication and profile loading
+        shell: python
+        run: |
+          from pathlib import Path
+
+          login = Path('src/pages/EmployeeLogin.tsx')
+          text = login.read_text(encoding='utf-8')
+          text = text.replace('import { loginEmployee } from "@/lib/auth";', 'import { setSession } from "@/lib/storage";\nimport { backendEmployeeLogin } from "@/lib/backend";')
+          text = text.replace('    setTimeout(() => {\n      const res = loginEmployee(jobNumber, pin);\n      setLoading(false);\n\n      if (!res.success) {\n        setErr(res.error || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");\n      } else {\n        nav("/employee");\n      }\n    }, 250);', '''    let cancelled = false;
+          const run = async () => {
+            try {
+              const employee = await backendEmployeeLogin(jobNumber, pin);
+              if (cancelled) return;
+              setSession({
+                employeeId: employee.id,
+                jobNumber: employee.jobNumber,
+                name: employee.name,
+                loginAt: new Date().toISOString(),
+                role: employee.role,
+              });
+              nav("/employee", { replace: true });
+            } catch (error) {
+              if (cancelled) return;
+              setErr(error instanceof Error ? error.message : "تعذر تسجيل الدخول. حاول مرة أخرى.");
+            } finally {
+              if (!cancelled) setLoading(false);
+            }
+          };
+          void run();
+          return () => { cancelled = true; };
+''')
+          login.write_text(text, encoding='utf-8')
+
+          home = Path('src/pages/EmployeeHome.tsx')
+          text = home.read_text(encoding='utf-8')
+          old = '''  useEffect(() => {
+    if (!session) { nav("/login", { replace: true }); return; }
+    let cancelled = false;'''
+          new = '''  const sessionEmployeeId = session?.employeeId ?? "";
+  const sessionJobNumber = session?.jobNumber ?? "";
+
+  useEffect(() => {
+    if (!sessionEmployeeId) { nav("/login", { replace: true }); return; }
+    let cancelled = false;'''
+          if old not in text:
+              raise SystemExit('EmployeeHome: expected session effect header not found')
+          text = text.replace(old, new, 1)
+          text = text.replace('    if (session) return;\n', '    if (session) return;\n', 0)
+          text = text.replace('  }, [session, nav]);', '  }, [sessionEmployeeId, sessionJobNumber, nav]);', 1)
+          old2 = '''        const profile = await getBackendEmployeeProfile();
+        if (cancelled) return;'''
+          new2 = '''        const profile = await getBackendEmployeeProfile();
+        if (cancelled) return;
+        if (!profile || profile.status !== "active") {
+          logoutEmployee();
+          nav("/login", { replace: true });
+          return;
+        }'''
+          if old2 not in text:
+              raise SystemExit('EmployeeHome: expected profile fetch block not found')
+          text = text.replace(old2, new2, 1)
+          home.write_text(text, encoding='utf-8')
+
+      - name: Validate changed files
+        run: |
+          grep -n "backendEmployeeLogin\|sessionEmployeeId\|getBackendEmployeeProfile" src/pages/EmployeeLogin.tsx src/pages/EmployeeHome.tsx
+
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/EmployeeLogin.tsx src/pages/EmployeeHome.tsx
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "fix: connect employee login to D1 profile and stop loading loop"
+          git push origin main
