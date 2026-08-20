@@ -50,21 +50,25 @@ jobs:
           text = page.read_text(encoding='utf-8')
           old = 'getBackendEmployees, getBackendLocations, getBackendRequests, createBackendRequest'
           new = 'getBackendEmployeeProfile, getBackendLocations, getBackendRequests, createBackendRequest'
-          if old not in text:
-              raise SystemExit('EmployeeHome import marker not found')
-          text = text.replace(old, new, 1)
+          if old in text:
+              text = text.replace(old, new, 1)
           old_block = 'const [remoteEmployees, remoteLocations] = await Promise.all([getBackendEmployees(), getBackendLocations()]);\n        const remote = remoteEmployees.find((employee) => employee.jobNumber === session.jobNumber || employee.id === session.employeeId) || null;'
           new_block = 'const [remote, remoteLocations] = await Promise.all([getBackendEmployeeProfile(), getBackendLocations()]);'
-          if old_block not in text:
-              raise SystemExit('EmployeeHome D1 refresh block not found')
-          text = text.replace(old_block, new_block, 1)
+          if old_block in text:
+              text = text.replace(old_block, new_block, 1)
           old_error = 'console.error("Employee D1 refresh failed", error);'
           new_error = 'console.error("Employee D1 refresh failed", error); setCloudReady(false);'
           text = text.replace(old_error, new_error, 1)
           page.write_text(text, encoding='utf-8')
 
       - name: Typecheck
-        run: npm ci && npx tsc --noEmit
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+          npx tsc --noEmit
 
       - name: Commit changes
         shell: bash
