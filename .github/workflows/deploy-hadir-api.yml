@@ -25,8 +25,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: backend/package.json
 
       - name: Validate Cloudflare secrets
         shell: bash
@@ -86,20 +84,17 @@ jobs:
           AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
           ACCOUNT="$CLOUDFLARE_ACCOUNT_ID"
           SCRIPT="hadir-api"
-
           account_json=$(curl -fsS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}" || true)
           if [[ -z "$account_json" ]]; then
             desired="${HADIR_WORKERS_SUBDOMAIN:-abunizar963}"
             account_json=$(curl -fsS --max-time 20 -X PUT "${API}/accounts/${ACCOUNT}/workers/subdomain" "${AUTH[@]}" -d "{\"subdomain\":\"${desired}\"}")
           fi
           subdomain=$(node -e 'const x=JSON.parse(process.argv[1]);if(!x.success||!x.result?.subdomain){console.error(JSON.stringify(x.errors||x));process.exit(1)}process.stdout.write(x.result.subdomain)' "$account_json")
-
           worker_json=$(curl -fsS --max-time 20 "${API}/accounts/${ACCOUNT}/workers/scripts/${SCRIPT}/subdomain" "${AUTH[@]}")
           enabled=$(node -e 'const x=JSON.parse(process.argv[1]);if(!x.success){console.error(JSON.stringify(x.errors||x));process.exit(1)}process.stdout.write(String(Boolean(x.result?.enabled)))' "$worker_json")
           if [[ "$enabled" != "true" ]]; then
             curl -fsS --max-time 20 -X POST "${API}/accounts/${ACCOUNT}/workers/scripts/${SCRIPT}/subdomain" "${AUTH[@]}" -d '{"enabled":true}' >/dev/null
           fi
-
           echo "https://${SCRIPT}.${subdomain}.workers.dev" > /tmp/hadir-worker-url
 
       - name: Verify Worker and D1
@@ -112,11 +107,9 @@ jobs:
           if [[ -z "$BASE_URL" && -f /tmp/hadir-worker-url ]]; then BASE_URL=$(cat /tmp/hadir-worker-url); fi
           [[ -n "$BASE_URL" ]] || { echo 'Worker URL was not resolved' >&2; exit 1; }
           BASE_URL="${BASE_URL%/}"
-
           HEALTH=$(curl -fsS --max-time 20 "$BASE_URL/api/health")
           echo "$HEALTH"
           node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"){console.error("Worker/D1 health check failed");process.exit(1)}console.log("D1 binding OK; ownerInitialized="+x.ownerInitialized)' "$HEALTH"
-
           BOOT=$(curl -fsS --max-time 20 "$BASE_URL/api/bootstrap")
           echo "$BOOT"
           node -e 'const x=JSON.parse(process.argv[1]);if(typeof x.bootstrap!=="boolean"){console.error("Bootstrap endpoint invalid");process.exit(1)}console.log("Bootstrap endpoint OK")' "$BOOT"
