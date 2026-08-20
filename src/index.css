@@ -73,8 +73,8 @@
 @layer components {
   .hud-card {
     @apply relative rounded-2xl border border-border/70 bg-card/80 backdrop-blur-sm shadow-lg shadow-black/20;
-    overflow: visible; /* prevent clipping of child content during transitions */
-    will-change: transform, opacity; /* hint browser for smooth animations */
+    overflow: visible;
+    will-change: transform, opacity;
   }
   .hud-card::before {
     content: "";
@@ -121,4 +121,21 @@
       0 0 0 6px hsl(var(--primary) / 0.15),
       0 0 40px hsl(var(--primary) / 0.35);
   }
+
+  .radar-sweep {
+    width: 50%;
+    height: 50%;
+    left: 50%;
+    top: 50%;
+    transform-origin: 0% 0%;
+    background: conic-gradient(from 0deg, hsl(var(--primary) / 0.0), hsl(var(--primary) / 0.24), hsl(var(--primary) / 0.0) 28%);
+    animation: radar-sweep 2.2s linear infinite;
+    border-top-right-radius: 100%;
+    pointer-events: none;
+  }
+}
+
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
