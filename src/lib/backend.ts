@@ -3,6 +3,17 @@ import { getPersistentFingerprintId, getDeviceLabel } from "@/lib/device";
 
 const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
 export const backendEnabled = Boolean(API_URL);
+export const MAX_AVATAR_BYTES = 10 * 1024 * 1024;
+export function validateAvatarDataUrl(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string" || !value.startsWith("data:image/")) throw new Error("صورة الموظف غير صالحة.");
+  const comma = value.indexOf(",");
+  if (comma < 0) throw new Error("صيغة صورة الموظف غير صالحة.");
+  const base64 = value.slice(comma + 1);
+  const bytes = Math.floor(base64.length * 3 / 4) - (base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0);
+  if (bytes > MAX_AVATAR_BYTES) throw new Error("حجم صورة الموظف يجب ألا يتجاوز 10 ميغابايت.");
+  return value;
+}
 function token() { return typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token") || localStorage.getItem("hadir.auth.token") || ""; }
 function persistToken(value: string) { localStorage.setItem("hadir.api.token", value); localStorage.setItem("hadir.auth.token", value); }
 
@@ -38,8 +49,8 @@ export async function getBackendAdmins(){return request<Array<{id:string;usernam
 export async function createBackendAdmin(input:{name:string;username:string;password:string;role:"manager"|"supervisor"}){return request<{ok:boolean}>("/api/admins",{method:"POST",body:JSON.stringify(input)});}
 export async function updateBackendAdmin(id:string,input:{name?:string;active?:boolean;password?:string}){return request<{ok:boolean}>(`/api/admins/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(input)});}
 export async function deleteBackendAdmin(id:string){return request<{ok:boolean}>(`/api/admins/${encodeURIComponent(id)}`,{method:"DELETE"});}
-export async function getBackendEmployees(){return request<Employee[]>("/api/employees");} export async function createBackendEmployee(input:any){return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify(input)});}
-export async function updateBackendEmployee(id:string,input:any){return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(input)});}
+export async function getBackendEmployees(){return request<Employee[]>("/api/employees");} export async function createBackendEmployee(input:any){validateAvatarDataUrl(input.avatar);return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify(input)});}
+export async function updateBackendEmployee(id:string,input:any){validateAvatarDataUrl(input.avatar);return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(input)});}
 export async function deleteBackendEmployee(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}`,{method:"DELETE"});}
 export async function resetBackendEmployeeDevice(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}/device`,{method:"DELETE"});}
 export async function getBackendAttendance(limit=500){return request<AttendanceRecord[]>(`/api/attendance?limit=${Math.min(limit,2000)}`);} export async function createBackendAttendance(record:Omit<AttendanceRecord,"id"|"ip">){return request<{ok:boolean}>("/api/attendance",{method:"POST",body:JSON.stringify(record)});}
