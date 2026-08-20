@@ -9,50 +9,46 @@ on:
   workflow_dispatch:
 
 jobs:
-  patch-and-deploy:
+  patch-and-validate:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 22
-      - name: Patch profile endpoint compatibility
+          node-version: 24
+
+      - name: Ensure employee profile aliases exist
         shell: python
         run: |
           from pathlib import Path
           p = Path('backend/src/index.ts')
           s = p.read_text(encoding='utf-8')
-          old = '''if(path==="/api/employee/profile"&&req.method==="GET"){
-  if(actor.role!=="staff")return json({error:"هذا المسار مخصص للموظفين"},403,origin);
-  const row=await env.DB.prepare("SELECT * FROM employees WHERE id=? AND status='active' LIMIT 1").bind(actor.id).first<any>();
-  if(!row)return json({error:"حساب الموظف غير موجود أو غير نشط"},404,origin);
-  return json(employeeOut(row),200,origin);
-}'''
-          new = '''if((path==="/api/employee/profile"||path==="/api/employee/me")&&req.method==="GET"){
-  if(actor.role!=="staff")return json({error:"هذا المسار مخصص للموظفين"},403,origin);
-  const row=await env.DB.prepare("SELECT * FROM employees WHERE id=? AND status='active' LIMIT 1").bind(actor.id).first<any>();
-  if(!row)return json({error:"حساب الموظف غير موجود أو غير نشط"},404,origin);
-  return json(employeeOut(row),200,origin);
-}'''
-          if old in s:
+          old = 'if(path==="/api/employee/profile"&&req.method==="GET"){'
+          new = 'if((path==="/api/employee/profile"||path==="/api/employee/me")&&req.method==="GET"){'
+          if new in s:
+              print('Employee profile aliases already present.')
+          elif old in s:
               p.write_text(s.replace(old, new, 1), encoding='utf-8')
-          elif 'path==="/api/employee/me"' in s:
-              print('Employee profile aliases already present; no patch needed.')
+              print('Added /api/employee/me compatibility alias.')
           else:
-              raise SystemExit('Expected employee profile route was not found; refusing an unsafe patch.')
+              raise SystemExit('Employee profile route was not found; refusing an unsafe patch.')
+
       - name: Install Wrangler
         working-directory: backend
         run: npm install --no-save --no-package-lock wrangler@4.123.0
+
       - name: Validate Worker bundle
         working-directory: backend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --dry-run
+
       - name: Commit route fix
         shell: bash
         run: |
@@ -60,17 +56,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add backend/src/index.ts
-          git diff --cached --quiet && { echo 'No changes to commit'; exit 0; }
-          git commit -m "fix: support employee profile route aliases"
+          if git diff --cached --quiet; then
+            echo 'No backend route change required.'
+            exit 0
+          fi
+          git commit -m "fix: expose employee profile route aliases"
           git push
-      - name: Wait for API deployment
-        run: sleep 30
-      - name: Verify production health
-        shell: bash
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: |
-          set -euo pipefail
-          BASE_URL="${VITE_API_URL%/}"
-          [[ -n "$BASE_URL" ]] || { echo 'Missing VITE_API_URL' >&2; exit 1; }
-          curl -fsS --retry 5 --retry-delay 5 --max-time 20 "$BASE_URL/api/health"
+
+      - name: Confirm deploy workflow is triggered by backend change
+        run: echo 'Backend changes are handled by Deploy Hadir API workflow.'
