@@ -1,0 +1,90 @@
+name: Fix reported TypeScript build errors
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fix-ts-build-errors.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply deterministic TypeScript fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"Expected text not found in {path}: {old[:120]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          replace('src/pages/ManagerSettings.tsx',
+                  '.toISOString().slice(0,10).replaceAll("-","")',
+                  '.toISOString().slice(0,10).split("-").join("")')
+
+          replace('src/pages/ManagerEmployees.tsx',
+                  'resetBackendEmployeeDevice } from "@/lib/backend";',
+                  'resetBackendEmployeeDevice, updateBackendRequest } from "@/lib/backend";')
+
+          replace('src/pages/ManagerAudit.tsx',
+                  '  "manager-login-failed": "دخول مدير فاشل",\n};',
+                  '  "manager-login-failed": "دخول مدير فاشل",\n  "supervisor-login": "دخول مشرف",\n  "supervisor-login-failed": "دخول مشرف فاشل",\n  "owner-login": "دخول مالك",\n  "owner-login-failed": "دخول مالك فاشل",\n  "admin-login": "دخول إداري",\n  "admin-login-failed": "دخول إداري فاشل",\n};')
+
+          replace('src/pages/EmployeeScan.tsx',
+                  'disabled={step !== "scan" || !inRange || !settings.qrCode}>إدخال القيمة يدويًا</button>',
+                  'disabled={step !== "scan" || !inRange || !settings.qrCode}>إدخال القيمة يدويًا</button>')
+          # Remove the redundant contradictory narrowing check from the QR input.
+          replace('src/pages/EmployeeScan.tsx',
+                  'disabled={step !== "scan" || !inRange || step === "submitting"} autoComplete="off"',
+                  'disabled={step !== "scan" || !inRange} autoComplete="off"')
+
+          replace('src/pages/EmployeeLogin.tsx',
+                  'res.error || "الرقم الوظيفي أو رمز الـ PIN غير صحيح"',
+                  'res.reason || "الرقم الوظيفي أو رمز الـ PIN غير صحيح"')
+
+          p = Path('src/pages/EmployeeHome.tsx')
+          text = p.read_text()
+          text2 = text.replace('r.type === "check-in" || r.type === "in"', 'r.type === "check-in"', 1)
+          text2 = text2.replace('r.type === "check-out" || r.type === "out"', 'r.type === "check-out"', 1)
+          text2 = text2.replace('isShiftOver(emp)', 'isShiftOver(emp!)', 1)
+          if text2 == text:
+              raise SystemExit('Expected EmployeeHome changes were not found')
+          p.write_text(text2)
+
+          replace('src/components/layout/ManagerLayout.tsx',
+                  '{n.title||n.message}',
+                  '{n.title||n.body}')
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerSettings.tsx src/pages/ManagerEmployees.tsx src/pages/ManagerAudit.tsx src/pages/EmployeeScan.tsx src/pages/EmployeeLogin.tsx src/pages/EmployeeHome.tsx src/components/layout/ManagerLayout.tsx
+          git diff --cached --quiet && echo "No changes to commit" || git commit -m "fix: resolve reported TypeScript errors"
+          git push
