@@ -22,6 +22,7 @@ export default function EmployeeHome() {
   const [d1Employee, setD1Employee] = useState<typeof findEmployeeByJobNumber extends never ? never : any>(null);
   const [d1Locations, setD1Locations] = useState<any[]>([]);
   const [cloudReady, setCloudReady] = useState(false);
+  const [cloudError, setCloudError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) nav("/login", { replace: true });
@@ -35,7 +36,9 @@ export default function EmployeeHome() {
       if (refreshing || disposed) return;
       refreshing = true;
       try {
-        const [remote, remoteLocations] = await Promise.all([getBackendEmployeeProfile(), getBackendLocations()]);
+        const remote = await getBackendEmployeeProfile();
+        let remoteLocations = [];
+        try { remoteLocations = await getBackendLocations(); } catch (locationError) { console.warn("Employee location enrichment failed", locationError); }
         if (disposed) return;
         setD1Employee(remote);
         setD1Locations(remoteLocations);
@@ -48,7 +51,7 @@ export default function EmployeeHome() {
           nav("/login", { replace: true, state: { reason: "employee-removed" } });
         }
       } catch (error) {
-        console.error("Employee D1 refresh failed", error); setCloudReady(false);
+        console.error("Employee D1 refresh failed", error); setCloudReady(false); setCloudError(error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1");
       } finally {
         refreshing = false;
       }
@@ -86,7 +89,7 @@ export default function EmployeeHome() {
   const emp = d1Employee;
   const settings = getSettings();
   if (!cloudReady || !emp) {
-    return <div className="min-h-screen grid place-items-center text-sm text-muted-foreground">جاري تحميل بيانات الموظف من D1...</div>;
+    return <div className="min-h-screen grid place-items-center p-6 text-sm text-muted-foreground"><div className="hud-card w-full max-w-md p-6 text-center space-y-3"><div>{cloudError || "جاري تحميل بيانات الموظف من D1..."}</div>{cloudError && <button className="btn-primary px-5 py-2" onClick={() => window.location.reload()}>إعادة المحاولة</button>}</div></div>;
   }
 
   const assignedLocation = useMemo(() => {
