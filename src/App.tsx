@@ -6,7 +6,7 @@ import EmployeeHistory from "@/pages/EmployeeHistory";
 import EmployeeScan from "@/pages/EmployeeScan";
 import ManagerLogin from "@/pages/ManagerLogin";
 import ManagerDashboard from "@/pages/ManagerDashboard";
-import ManagerEmployees from "@/pages/ManagerEmployees";
+import ManagerEmployees from "@/pages/ManagerEmployeesD1";
 import ManagerRequests from "@/pages/ManagerRequests";
 import ManagerAudit from "@/pages/ManagerAudit";
 import ManagerSettings from "@/pages/ManagerSettings";
