@@ -248,8 +248,8 @@ export default function EmployeeHome() {
             <Row label="حالة اليوم" value={scheduleStatus.label} />
             <Row label="الجهاز الموثّق" value={emp?.deviceLabel ?? "لم يُربَط بعد"} />
             <Row label="فرع / موقع العمل" value={assignedLocation ? assignedLocation.name : "المقر الرئيسي"} />
-            <Row label="بداية الدوام" value={emp?.scheduleType === "ROTATION" ? "24 ساعة" : (emp?.workStartTime || settings.workStart || "08:00")} />
-            <Row label="نهاية الدوام" value={emp?.scheduleType === "ROTATION" ? "24 ساعة" : (emp?.workEndTime || settings.workEnd || "16:00")} />
+            <Row label="بداية الدوام" value={emp?.workStartTime || settings.workStart || "08:00"} />
+            <Row label="نهاية الدوام" value={emp?.workEndTime || settings.workEnd || "16:00"} />
           </div>
           <div className="mt-3 text-[10px] text-muted-foreground text-center">آخر مزامنة: {now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}</div>
         </section>
