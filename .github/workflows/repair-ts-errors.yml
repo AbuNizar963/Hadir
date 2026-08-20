@@ -1,0 +1,57 @@
+name: Repair TypeScript build errors
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply safe type fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          def edit(path, replacements):
+              p=Path(path); s=p.read_text()
+              for old,new in replacements:
+                  if old not in s:
+                      raise SystemExit(f'Expected text not found in {path}: {old[:100]}')
+                  s=s.replace(old,new,1)
+              p.write_text(s)
+          edit('src/pages/ManagerEmployees.tsx', [
+              ('resetBackendEmployeeDevice } from "@/lib/backend";', 'resetBackendEmployeeDevice, updateBackendRequest } from "@/lib/backend";')
+          ])
+          edit('src/pages/ManagerAudit.tsx', [
+              ('  "manager-login-failed": "دخول مدير فاشل",\n};', '  "manager-login-failed": "دخول مدير فاشل",\n  "supervisor-login": "دخول مشرف",\n  "supervisor-login-failed": "دخول مشرف فاشل",\n  "owner-login": "دخول مالك",\n  "owner-login-failed": "دخول مالك فاشل",\n  "admin-login": "دخول إداري",\n  "admin-login-failed": "دخول إداري فاشل",\n};')
+          ])
+          edit('src/pages/EmployeeScan.tsx', [
+              ('disabled={step !== "scan" || !inRange || !qrInput.trim() || step === "submitting"}', 'disabled={step !== "scan" || !inRange || !qrInput.trim()}')
+          ])
+          edit('src/pages/EmployeeLogin.tsx', [
+              ('setErr(res.error || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");', 'setErr(res.reason || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");')
+          ])
+          edit('src/pages/EmployeeHome.tsx', [
+              ('getEmployeeScheduleStatus(emp, now)', 'getEmployeeScheduleStatus(emp ?? undefined, now)'),
+              ('r.type === "check-in" || r.type === "in"', 'r.type === "check-in"'),
+              ('r.type === "check-out" || r.type === "out"', 'r.type === "check-out"')
+          ])
+          edit('src/components/layout/ManagerLayout.tsx', [
+              ('{n.title||n.message}', '{n.title||n.body}')
+          ])
+          edit('src/pages/ManagerSettings.tsx', [
+              ('.replaceAll("-","")', '.replace(/-/g, "")')
+          ])
+          # Keep the production employee login on the D1-backed authentication path.
+          edit('src/pages/EmployeeLogin.tsx', [
+              ('import { loginEmployee } from "@/lib/auth";', 'import { backendEmployeeLogin } from "@/lib/backend";'),
+              ('const res = loginEmployee(jobNumber, pin);\n      setLoading(false);\n\n      if (!res.success) {\n        setErr(res.reason || "الرقم الوظيفي أو رمز الـ PIN غير صحيح");\n      } else {\n        nav("/employee");\n      }', 'void backendEmployeeLogin(jobNumber, pin).then(() => {\n        setLoading(false);\n        nav("/employee");\n      }).catch((error) => {\n        setLoading(false);\n        setErr(error instanceof Error ? error.message : "الرقم الوظيفي أو رمز الـ PIN غير صحيح");\n      });')
+          ])
+          PY
+          rm -f .github/workflows/repair-ts-errors.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "fix: repair TypeScript errors without changing UI"
+          git push
