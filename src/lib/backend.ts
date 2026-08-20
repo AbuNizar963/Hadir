@@ -1,5 +1,4 @@
 import type { AdminAccount, Employee, AttendanceRecord, EmployeeRequest, Settings, Location } from "@/types";
-import { getDeviceId, getDeviceLabel } from "@/lib/device";
 
 const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
 export const backendEnabled = Boolean(API_URL);
@@ -13,8 +12,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   headers.set("content-type", "application/json");
   const t = token();
   if (t) headers.set("authorization", `Bearer ${t}`);
-  const device = getDeviceId();
-  if (device) headers.set("x-device-id", device);
 
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 15000);
@@ -37,20 +34,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export async function backendLogin(username: string, password: string) {
   const data = await request<{ token: string; user: any; kind: "admin" | "employee" }>("/api/auth/login", {
-    method: "POST", body: JSON.stringify({ username, password, deviceId: getDeviceId(), deviceLabel: getDeviceLabel() })
+    method: "POST", body: JSON.stringify({ username, password })
   });
   if (data.kind !== "admin") throw new Error("هذا الحساب موظف وليس حساب إدارة");
   localStorage.setItem("hadir.api.token", data.token);
   return data.user;
 }
 
+/** Employee authentication is authoritative in Cloudflare D1. No browser/device binding is used. */
 export async function backendEmployeeLogin(username: string, password: string) {
-  // Do not wait for FingerprintJS here. Third-party fingerprint loading can be blocked
-  // by privacy extensions/mobile networks and previously made the login button appear stuck.
-  const deviceId = getDeviceId();
   const data = await request<{ token: string; user: any; kind: "admin" | "employee" }>("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ username, password, deviceId, deviceLabel: getDeviceLabel() })
+    body: JSON.stringify({ username: username.trim(), password })
   });
   if (data.kind !== "employee") throw new Error("هذا الحساب إداري وليس حساب موظف");
   localStorage.setItem("hadir.api.token", data.token);
