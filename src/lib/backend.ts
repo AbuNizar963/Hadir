@@ -1,6 +1,7 @@
 import type { AdminAccount, Employee, AttendanceRecord, EmployeeRequest, Settings, Location } from "@/types";
 import { getPersistentFingerprintId, getDeviceLabel } from "@/lib/device";
 import { compressProfileImageDataUrl } from "@/lib/imageCompression";
+import { getSettings } from "@/lib/storage";
 
 const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
 export const backendEnabled = Boolean(API_URL);
@@ -79,18 +80,35 @@ export async function getBackendSettings(){return request<Settings>("/api/settin
 export async function saveBackendSettings(settings:Partial<Settings>&{ownerPassword?:string}){return request<{ok:boolean}>("/api/settings",{method:"PUT",body:JSON.stringify(settings)});}
 export async function getBackendLocations(){return request<Location[]>("/api/locations");} export async function saveBackendLocation(location:Location){return request<{ok:boolean}>("/api/locations",{method:"PUT",body:JSON.stringify(location)});}
 
-/** Employee attendance uses the same D1 settings source as ManagerSettings. */
+/**
+ * Employee attendance must not call /api/settings because that endpoint is
+ * intentionally protected for management accounts. The employee already has
+ * an authenticated D1 profile, while storage.getSettings() is backed by the
+ * synchronized D1 view (see storage.ts/d1View.ts). Use the employee's assigned
+ * location first, then the main location, and finally the main GPS settings.
+ */
 export async function getBackendEmployeeLocation(): Promise<{location: Location}> {
-  const settings = await getBackendSettings();
+  const employee = await getBackendEmployeeProfile();
+  const settings = getSettings();
   const locations = Array.isArray(settings.locations) ? settings.locations : [];
+  const assigned = employee.locationId ? locations.find((item) => item.id === employee.locationId) : undefined;
   const main = locations.find((item) => item.id === "main") || locations[0];
-  const lat = Number(settings.workSiteLat);
-  const lng = Number(settings.workSiteLng);
-  const radiusMeters = Number(settings.radiusMeters);
+  const candidate = assigned || main;
+  const lat = Number(candidate?.lat ?? settings.workSiteLat);
+  const lng = Number(candidate?.lng ?? settings.workSiteLng);
+  const radiusMeters = Number(candidate?.radiusMeters ?? settings.radiusMeters);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radiusMeters) || radiusMeters < 0) {
-    throw new Error("بيانات موقع العمل في إعدادات النظام غير صالحة.");
+    throw new Error("بيانات موقع العمل غير متاحة أو غير صالحة في إعدادات النظام.");
   }
-  return { location: { id: String(main?.id || "main"), name: String(main?.name || "المقر الرئيسي"), lat, lng, radiusMeters } };
+  return {
+    location: {
+      id: String(candidate?.id || employee.locationId || "main"),
+      name: String(candidate?.name || "المقر الرئيسي"),
+      lat,
+      lng,
+      radiusMeters,
+    },
+  };
 }
 
 export async function backendHealth(){return request<{ok:boolean;database?:string;ownerInitialized?:boolean}>("/api/health");} export type {AdminAccount};
