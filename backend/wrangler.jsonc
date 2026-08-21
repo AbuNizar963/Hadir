@@ -7,7 +7,7 @@
   "workers_dev": true,
   "preview_urls": false,
   "vars": {
-    "APP_ORIGIN": "*"
+    "APP_ORIGIN": "https://abunizar963.github.io"
   },
   "account_id": "7c2f371786ada855f514d223e48daa72",
   "d1_databases": [
