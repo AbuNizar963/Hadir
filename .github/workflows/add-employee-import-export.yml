@@ -1,60 +1,221 @@
-name: Add employee import and export
+name: Ensure employee import and export
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  patch:
+  repair:
     if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Patch employee page
+      - name: Restore employee page when missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="src/pages/ManagerEmployees.tsx"
+          if [ ! -s "$file" ]; then
+            echo "ManagerEmployees.tsx is empty; restoring known-good employee page."
+            git show 0a22e45b3245cfc59dad769a7e7fdbeb7042ccd2:"$file" > "$file"
+          fi
+
+      - name: Verify import and export controls
         shell: python
         run: |
           from pathlib import Path
-          p = Path('src/pages/ManagerEmployees.tsx')
-          s = p.read_text(encoding='utf-8')
+          p = Path("src/pages/ManagerEmployees.tsx")
+          s = p.read_text(encoding="utf-8")
+
           marker = 'const IMPORT_HEADERS = ["name", "jobNumber", "pin", "scheduleType", "workStartTime", "workEndTime", "gracePeriodMinutes", "rotationStartDate", "rotationDaysOn", "rotationDaysOff", "workDays", "locationId", "status", "deviceLabel"] as const;'
-          if marker in s:
-              print('Employee import/export already installed')
+          if marker in s and "استيراد ملف" in s and "تصدير ملف" in s:
+              print("Import/export controls already present.")
               raise SystemExit(0)
 
-          s = s.replace(
-              'const MAX_AVATAR_BYTES = 10 * 1024 * 1024;\n',
-              '''const MAX_AVATAR_BYTES = 10 * 1024 * 1024;\nconst IMPORT_HEADERS = ["name", "jobNumber", "pin", "scheduleType", "workStartTime", "workEndTime", "gracePeriodMinutes", "rotationStartDate", "rotationDaysOn", "rotationDaysOff", "workDays", "locationId", "status", "deviceLabel"] as const;\n\nfunction csvEscape(value: unknown): string {\n  const text = value == null ? "" : String(value);\n  return /[",\\n\\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;\n}\nfunction parseCsv(text: string): string[][] {\n  const rows: string[][] = []; let row: string[] = [], cell = "", quoted = false;\n  for (let i = 0; i < text.length; i++) {\n    const ch = text[i];\n    if (quoted) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') quoted = false; else cell += ch; }\n    else if (ch === '"' && cell.length === 0) quoted = true;\n    else if (ch === ',') { row.push(cell); cell = ""; }\n    else if (ch === '\\n') { row.push(cell.replace(/\\r$/, "")); rows.push(row); row = []; cell = ""; }\n    else cell += ch;\n  }\n  if (cell.length || row.length) { row.push(cell.replace(/\\r$/, "")); rows.push(row); }\n  return rows.filter(r => r.some(v => v.trim() !== ""));\n}\nfunction downloadCsv(filename: string, rows: string[][]) {\n  const csv = "\\uFEFF" + rows.map(row => row.map(csvEscape).join(",")).join("\\r\\n");\n  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });\n  const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);\n}\n'''
-          )
+          if marker not in s:
+              s = s.replace(
+                  'const MAX_AVATAR_BYTES = 10 * 1024 * 1024;\n',
+                  'const MAX_AVATAR_BYTES = 10 * 1024 * 1024;\n' +
+                  marker + '\n\n' +
+                  'function csvEscape(value: unknown): string {\n' +
+                  '  const text = value == null ? "" : String(value);\n' +
+                  '  return /[",\\n\\r]/.test(text) ? `"${text.replace(/"/g, \'""\')}"` : text;\n' +
+                  '}\n' +
+                  'function parseCsv(text: string): string[][] {\n' +
+                  '  const rows: string[][] = []; let row: string[] = [], cell = "", quoted = false;\n' +
+                  '  for (let i = 0; i < text.length; i++) {\n' +
+                  '    const ch = text[i];\n' +
+                  '    if (quoted) { if (ch === \'"\' && text[i + 1] === \'"\') { cell += \'"\'; i++; } else if (ch === \'"\') quoted = false; else cell += ch; }\n' +
+                  '    else if (ch === \'"\' && cell.length === 0) quoted = true;\n' +
+                  '    else if (ch === \',\') { row.push(cell); cell = ""; }\n' +
+                  '    else if (ch === \'\\n\') { row.push(cell.replace(/\\r$/, "")); rows.push(row); row = []; cell = ""; }\n' +
+                  '    else cell += ch;\n' +
+                  '  }\n' +
+                  '  if (cell.length || row.length) { row.push(cell.replace(/\\r$/, "")); rows.push(row); }\n' +
+                  '  return rows.filter(r => r.some(v => v.trim() !== ""));\n' +
+                  '}\n' +
+                  'function downloadCsv(filename: string, rows: string[][]) {\n' +
+                  '  const csv = "\\uFEFF" + rows.map(row => row.map(csvEscape).join(",")).join("\\r\\n");\n' +
+                  '  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });\n' +
+                  '  const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);\n' +
+                  '}\n'
+              )
+
           s = s.replace(
               'const fileInputRef = useRef<HTMLInputElement>(null); const attendance = useMemo(() => getAttendance(), [employees]);',
               'const fileInputRef = useRef<HTMLInputElement>(null); const importInputRef = useRef<HTMLInputElement>(null); const [importing, setImporting] = useState(false); const attendance = useMemo(() => getAttendance(), [employees]);'
           )
-          anchor = '  const handleUpdateRequest=async(req:EmployeeRequest,status:"approved"|"rejected")=>{'
-          start = s.index(anchor)
-          end = s.index('\n\n  return <ManagerLayout', start)
-          handlers = '''\n\n  const exportEmployees = () => {\n    const rows: string[][] = [\n      [...IMPORT_HEADERS],\n      ...employees.map(emp => [emp.name, emp.jobNumber, "", emp.scheduleType, emp.workStartTime || "", emp.workEndTime || "", String(emp.gracePeriodMinutes ?? 15), emp.rotationStartDate || "", String(emp.rotationDaysOn ?? ""), String(emp.rotationDaysOff ?? ""), (emp.workDays || []).join("|"), emp.locationId || "", emp.status || "active", emp.deviceLabel || ""])\n    ];\n    downloadCsv(`hadir-employees-${new Date().toISOString().slice(0,10)}.csv`, rows);\n    showSuccess("تم تصدير قائمة الموظفين بنجاح");\n  };\n\n  const importEmployees = async (event: React.ChangeEvent<HTMLInputElement>) => {\n    const file = event.target.files?.[0]; if (!file) return; setImporting(true); setError(null);\n    try {\n      if (!/\\.csv$/i.test(file.name) && file.type && !file.type.includes("csv") && !file.type.includes("text")) throw new Error("يرجى اختيار ملف CSV صالح.");\n      const rows = parseCsv(await file.text()); if (rows.length < 2) throw new Error("الملف لا يحتوي على موظفين للاستيراد.");\n      const headers = rows[0].map(h => h.trim());\n      const index = (key: string) => headers.findIndex(h => h.toLowerCase() === key.toLowerCase());\n      if (index("name") < 0 || index("jobNumber") < 0) throw new Error("يجب أن يحتوي الملف على عمودي name و jobNumber.");\n      const imported = rows.slice(1).map((row, n) => {\n        const get = (key: string) => { const i = index(key); return i >= 0 ? (row[i] || "").trim() : ""; };\n        const nameValue = get("name"), jobValue = get("jobNumber"); if (!nameValue || !jobValue) throw new Error(`السطر ${n + 2}: الاسم والرقم الوظيفي مطلوبان.`);\n        const type = get("scheduleType") === "ROTATION" ? "ROTATION" : "ADMIN";\n        return { name:nameValue, jobNumber:jobValue, pin:get("pin") || jobValue, scheduleType:type, workStartTime:get("workStartTime") || "08:00", workEndTime:get("workEndTime") || "16:00", gracePeriodMinutes:Number(get("gracePeriodMinutes")) || 15, rotationStartDate:get("rotationStartDate") || null, rotationDaysOn:type === "ROTATION" ? Number(get("rotationDaysOn")) || 4 : undefined, rotationDaysOff:type === "ROTATION" ? Number(get("rotationDaysOff")) : undefined, workDays:type === "ADMIN" ? (get("workDays") ? get("workDays").split("|").map(Number).filter(Number.isInteger) : [0,1,2,3,4]) : undefined, locationId:get("locationId") || locations.find(l => l.id === "main")?.id || locations[0]?.id || "", status:get("status") === "suspended" ? "suspended" : "active", deviceLabel:get("deviceLabel") || null };\n      });\n      const seen = new Set<string>(); const duplicate = imported.find(x => seen.has(x.jobNumber) || (seen.add(x.jobNumber), false)); if (duplicate) throw new Error(`الرقم الوظيفي مكرر داخل الملف: ${duplicate.jobNumber}`);\n      const fresh = imported.filter(x => !employees.some(e => e.jobNumber === x.jobNumber));\n      const conflicts = imported.length - fresh.length; if (conflicts && !confirm(`يوجد ${conflicts} موظفاً موجوداً مسبقاً. سيتم تجاهلهم واستيراد الموظفين الجدد فقط. هل تريد المتابعة؟`)) return;\n      if (!fresh.length) { showSuccess("لا توجد سجلات جديدة للاستيراد."); return; }\n      for (const item of fresh) {\n        const payload = { name:item.name, jobNumber:item.jobNumber, pin:item.pin, status:item.status as EmployeeStatus, deviceId:null, deviceLabel:item.deviceLabel, scheduleType:item.scheduleType as ScheduleType, workStartTime:item.workStartTime, workEndTime:item.workEndTime, gracePeriodMinutes:item.gracePeriodMinutes, rotationStartDate:item.rotationStartDate, rotationDaysOn:item.rotationDaysOn, rotationDaysOff:item.rotationDaysOff, workDays:item.workDays, avatar:null, role:"staff" as const, locationId:item.locationId, specialties:["general"] };\n        if (backendEnabled) await createBackendEmployee(payload);\n        else { const local: Employee = { id:generateId(), pinHash:hash(item.pin), createdAt:new Date().toISOString(), ...payload }; setEmployees(prev => { const next=[local,...prev]; saveEmployees(next,{[local.id]:item.pin}); return next; }); }\n      }\n      if (backendEnabled) await refreshEmployeesFromD1(); showSuccess(`تم استيراد ${fresh.length} موظف بنجاح`);\n    } catch (err) { setError(err instanceof Error ? err.message : "تعذر استيراد الملف."); }\n    finally { setImporting(false); if (importInputRef.current) importInputRef.current.value = ""; }\n  };'''
-          s = s[:end] + handlers + s[end:]
-          old = '<section className="hud-card p-4 sm:p-5"><div className="flex items-center justify-between gap-3 mb-4"><h2 className="text-sm font-bold">قائمة الموظفين الحاليين ({employees.length})</h2><button type="button" onClick={()=>{void refreshEmployeesFromD1();void refreshLocationsFromD1();}} className="btn-secondary text-xs" disabled={loadingD1}>{loadingD1?"جاري القراءة…":"تحديث من D1"}</button></div>'
-          new = '<section className="hud-card p-4 sm:p-5"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4"><h2 className="text-sm font-bold">قائمة الموظفين الحاليين ({employees.length})</h2><div className="flex flex-wrap gap-2"><input ref={importInputRef} type="file" accept=".csv,text/csv" onChange={importEmployees} className="hidden"/><button type="button" onClick={()=>importInputRef.current?.click()} className="btn-secondary text-xs" disabled={importing}>{importing?"جاري الاستيراد…":"استيراد ملف"}</button><button type="button" onClick={exportEmployees} className="btn-secondary text-xs" disabled={!employees.length}>تصدير ملف</button><button type="button" onClick={()=>{void refreshEmployeesFromD1();void refreshLocationsFromD1();}} className="btn-secondary text-xs" disabled={loadingD1}>{loadingD1?"جاري القراءة…":"تحديث من الخادم"}</button></div></div><div className="text-[11px] text-muted-foreground mb-3">صيغة الاستيراد: CSV. الأعمدة الأساسية: <span className="mono">name, jobNumber</span>، ويمكن إضافة بيانات الدوام والمقر والحالة.</div>'
-          if old not in s: raise SystemExit('employee list toolbar anchor not found')
-          s = s.replace(old, new, 1)
+
+          if "const exportEmployees = () =>" not in s:
+              anchor = '  const handleUpdateRequest=async(req:EmployeeRequest,status:"approved"|"rejected")=>{'
+              start = s.index(anchor)
+              end = s.index('\n\n  return <ManagerLayout', start)
+              handlers = r'''
+
+  const exportEmployees = () => {
+    const rows: string[][] = [
+      [...IMPORT_HEADERS],
+      ...employees.map(emp => [emp.name, emp.jobNumber, "", emp.scheduleType, emp.workStartTime || "", emp.workEndTime || "", String(emp.gracePeriodMinutes ?? 15), emp.rotationStartDate || "", String(emp.rotationDaysOn ?? ""), String(emp.rotationDaysOff ?? ""), (emp.workDays || []).join("|"), emp.locationId || "", emp.status || "active", emp.deviceLabel || ""]),
+    ];
+    downloadCsv(`hadir-employees-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    showSuccess("تم تصدير قائمة الموظفين بنجاح");
+  };
+
+  const importEmployees = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setError(null);
+    try {
+      if (!/\.csv$/i.test(file.name) && file.type && !file.type.includes("csv") && !file.type.includes("text")) {
+        throw new Error("يرجى اختيار ملف CSV صالح.");
+      }
+      const rows = parseCsv(await file.text());
+      if (rows.length < 2) throw new Error("الملف لا يحتوي على موظفين للاستيراد.");
+      const headers = rows[0].map(h => h.trim());
+      const index = (key: string) => headers.findIndex(h => h.toLowerCase() === key.toLowerCase());
+      if (index("name") < 0 || index("jobNumber") < 0) {
+        throw new Error("يجب أن يحتوي الملف على عمودي name و jobNumber.");
+      }
+      const imported = rows.slice(1).map((row, n) => {
+        const get = (key: string) => {
+          const i = index(key);
+          return i >= 0 ? (row[i] || "").trim() : "";
+        };
+        const nameValue = get("name");
+        const jobValue = get("jobNumber");
+        if (!nameValue || !jobValue) throw new Error(`السطر ${n + 2}: الاسم والرقم الوظيفي مطلوبان.`);
+        const type = get("scheduleType") === "ROTATION" ? "ROTATION" : "ADMIN";
+        return {
+          name: nameValue,
+          jobNumber: jobValue,
+          pin: get("pin") || jobValue,
+          scheduleType: type,
+          workStartTime: get("workStartTime") || "08:00",
+          workEndTime: get("workEndTime") || "16:00",
+          gracePeriodMinutes: Number(get("gracePeriodMinutes")) || 15,
+          rotationStartDate: get("rotationStartDate") || null,
+          rotationDaysOn: type === "ROTATION" ? Number(get("rotationDaysOn")) || 4 : undefined,
+          rotationDaysOff: type === "ROTATION" ? Number(get("rotationDaysOff")) : undefined,
+          workDays: type === "ADMIN" ? (get("workDays") ? get("workDays").split("|").map(Number).filter(Number.isInteger) : [0, 1, 2, 3, 4]) : undefined,
+          locationId: get("locationId") || locations.find(l => l.id === "main")?.id || locations[0]?.id || "",
+          status: get("status") === "suspended" ? "suspended" : "active",
+          deviceLabel: get("deviceLabel") || null,
+        };
+      });
+
+      const seen = new Set<string>();
+      const duplicate = imported.find(x => seen.has(x.jobNumber) || (seen.add(x.jobNumber), false));
+      if (duplicate) throw new Error(`الرقم الوظيفي مكرر داخل الملف: ${duplicate.jobNumber}`);
+
+      const fresh = imported.filter(x => !employees.some(e => e.jobNumber === x.jobNumber));
+      const conflicts = imported.length - fresh.length;
+      if (conflicts && !confirm(`يوجد ${conflicts} موظفاً موجوداً مسبقاً. سيتم تجاهلهم واستيراد الموظفين الجدد فقط. هل تريد المتابعة؟`)) return;
+      if (!fresh.length) {
+        showSuccess("لا توجد سجلات جديدة للاستيراد.");
+        return;
+      }
+
+      for (const item of fresh) {
+        const payload = {
+          name: item.name,
+          jobNumber: item.jobNumber,
+          pin: item.pin,
+          status: item.status as EmployeeStatus,
+          deviceId: null,
+          deviceLabel: item.deviceLabel,
+          scheduleType: item.scheduleType as ScheduleType,
+          workStartTime: item.workStartTime,
+          workEndTime: item.workEndTime,
+          gracePeriodMinutes: item.gracePeriodMinutes,
+          rotationStartDate: item.rotationStartDate,
+          rotationDaysOn: item.rotationDaysOn,
+          rotationDaysOff: item.rotationDaysOff,
+          workDays: item.workDays,
+          avatar: null,
+          role: "staff" as const,
+          locationId: item.locationId,
+          specialties: ["general"],
+        };
+        if (backendEnabled) await createBackendEmployee(payload);
+        else {
+          const local: Employee = { id: generateId(), pinHash: hash(item.pin), createdAt: new Date().toISOString(), ...payload };
+          setEmployees(prev => {
+            const next = [local, ...prev];
+            saveEmployees(next, { [local.id]: item.pin });
+            return next;
+          });
+        }
+      }
+      if (backendEnabled) await refreshEmployeesFromD1();
+      showSuccess(`تم استيراد ${fresh.length} موظف بنجاح`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر استيراد الملف.");
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };'''
+              s = s[:end] + handlers + s[end:]
+
+          old = 'قائمة الموظفين الحاليين ({employees.length})</h2><button type="button" onClick={()=>{void refreshEmployeesFromD1();void refreshLocationsFromD1();}} className="btn-secondary text-xs" disabled={loadingD1}>{loadingD1?"جاري القراءة…":"تحديث من D1"}</button>'
+          if old in s:
+              new = 'قائمة الموظفين الحاليين ({employees.length})</h2><div className="flex flex-wrap gap-2"><input ref={importInputRef} type="file" accept=".csv,text/csv" onChange={importEmployees} className="hidden"/><button type="button" onClick={()=>importInputRef.current?.click()} className="btn-secondary text-xs" disabled={importing}>{importing?"جاري الاستيراد…":"استيراد ملف"}</button><button type="button" onClick={exportEmployees} className="btn-secondary text-xs" disabled={!employees.length}>تصدير ملف</button><button type="button" onClick={()=>{void refreshEmployeesFromD1();void refreshLocationsFromD1();}} className="btn-secondary text-xs" disabled={loadingD1}>{loadingD1?"جاري القراءة…":"تحديث من الخادم"}</button></div>'
+              s = s.replace(old, new, 1)
           s = s.replace('جاري تحميل بيانات الموظفين من D1…', 'جاري تحميل بيانات الموظفين من الخادم…')
           s = s.replace('تعذر قراءة بيانات الموظفين من D1.', 'تعذر قراءة بيانات الموظفين من الخادم.')
           s = s.replace('تم فك ربط جهاز الموظف من D1 بنجاح', 'تم فك ربط جهاز الموظف بنجاح')
           s = s.replace('تحفظ في D1', 'تحفظ في الخادم')
           s = s.replace('مباشرة في D1', 'مباشرة في الخادم')
-          p.write_text(s, encoding='utf-8')
-      - name: Commit patch
+          p.write_text(s, encoding="utf-8")
+
+      - name: Validate controls
+        shell: bash
         run: |
-          if git diff --quiet -- src/pages/ManagerEmployees.tsx; then exit 0; fi
+          set -euo pipefail
+          grep -q 'استيراد ملف' src/pages/ManagerEmployees.tsx
+          grep -q 'تصدير ملف' src/pages/ManagerEmployees.tsx
+          grep -q 'تحديث من الخادم' src/pages/ManagerEmployees.tsx
+
+      - name: Commit repair
+        run: |
+          if git diff --quiet -- src/pages/ManagerEmployees.tsx; then
+            echo "No employee page changes required."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/pages/ManagerEmployees.tsx
-          git commit -m "feat: add employee file import and export"
+          git commit -m "fix: publish employee import export controls"
           git push
