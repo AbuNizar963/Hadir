@@ -26,6 +26,7 @@ export default function EmployeeScan() {
   const [distance, setDistance] = useState<number | null>(null);
   const [step, setStep] = useState<Step>("loading-location");
   const [error, setError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   const [qrInput, setQrInput] = useState("");
   const [result, setResult] = useState<{ time: string; timeNote?: string } | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -37,13 +38,20 @@ export default function EmployeeScan() {
 
   useEffect(() => {
     let cancelled = false;
-    setStep("loading-location"); setError(null);
+    setStep("loading-location");
+    setError(null);
     void getBackendEmployeeLocation().then(({ location: remote }) => {
       if (cancelled) return;
       const next = { id: String(remote.id || "main"), name: String(remote.name || "المقر الرئيسي"), lat: Number(remote.lat), lng: Number(remote.lng), radiusMeters: Number(remote.radiusMeters) };
-      if (![next.lat, next.lng, next.radiusMeters].every(Number.isFinite) || next.radiusMeters < 0) throw new Error("بيانات موقع العمل القادمة من قاعدة البيانات غير صالحة");
-      setLocation(next); setStep("gps");
-    }).catch((e) => { if (cancelled) return; setLocation(null); setError(e instanceof Error ? e.message : "تعذر تحميل موقع العمل من قاعدة البيانات"); setStep("error"); });
+      if (![next.lat, next.lng, next.radiusMeters].every(Number.isFinite) || next.radiusMeters <= 0) throw new Error("بيانات موقع العمل القادمة من قاعدة بيانات D1 غير صالحة");
+      setLocation(next);
+      setStep("gps");
+    }).catch((e) => {
+      if (cancelled) return;
+      setLocation(null);
+      setError(e instanceof Error ? e.message : "تعذر تحميل موقع العمل من قاعدة بيانات D1");
+      setStep("error");
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -61,21 +69,41 @@ export default function EmployeeScan() {
     setIsCameraActive(false);
   };
 
+  const refreshGps = async () => {
+    if (!location) {
+      setError("لم يتم تحميل موقع العمل من قاعدة بيانات D1 بعد.");
+      return;
+    }
+    if (![targetLat, targetLng, targetRadius].every(Number.isFinite) || targetRadius <= 0) {
+      setError("إعدادات موقع العمل في قاعدة بيانات D1 غير صالحة.");
+      setStep("error");
+      return;
+    }
+    setIsLocating(true);
+    setError(null);
+    setStep("gps");
+    try {
+      const position = await getCurrentPosition();
+      const nextDistance = haversineMeters(position, { lat: targetLat, lng: targetLng });
+      setPos(position);
+      setDistance(nextDistance);
+      if (nextDistance > targetRadius) {
+        setError(`أنت خارج نطاق مقر العمل. المسافة الحالية: ${nextDistance} م (الحد المسموح: ${targetRadius} م)`);
+        setStep("error");
+        return;
+      }
+      setStep("scan");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر الحصول على موقعك الحالي");
+      setStep("error");
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
   useEffect(() => {
     setScannerSupported(typeof window !== "undefined" && "BarcodeDetector" in window);
-    if (!location) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        if (![targetLat, targetLng, targetRadius].every(Number.isFinite) || targetRadius < 0) throw new Error("إعدادات موقع العمل غير صالحة في قاعدة البيانات");
-        setStep("gps");
-        const position = await getCurrentPosition();
-        if (cancelled) return;
-        setPos(position); setDistance(haversineMeters(position, { lat: targetLat, lng: targetLng })); setStep("scan");
-      } catch (e) { if (cancelled) return; setError(e instanceof Error ? e.message : "تعذر الحصول على الموقع"); setStep("error"); }
-    })();
-    return () => { cancelled = true; stopCamera(); };
-  }, [location, targetLat, targetLng, targetRadius]);
+  }, []);
 
   const inRange = distance !== null && Number.isFinite(distance) && distance <= targetRadius;
 
@@ -90,8 +118,6 @@ export default function EmployeeScan() {
     } catch (e) { console.error("تعذر فتح الكاميرا:", e); setError("تعذر فتح الكاميرا. تأكد من منح صلاحية الكاميرا واستخدام HTTPS، أو أدخل قيمة QR يدويًا."); stopCamera(); }
   };
 
-  // Attach the stream after React mounts the video element. Previously the stream
-  // was assigned immediately after setState, before videoRef existed, causing a black preview.
   useEffect(() => {
     if (!isCameraActive || !mediaStreamRef.current || !videoRef.current) return;
     let cancelled = false;
@@ -131,7 +157,7 @@ export default function EmployeeScan() {
   };
 
   const title = action === "check-in" ? "تسجيل الحضور" : "تسجيل الانصراف";
-  const statusText = step === "loading-location" ? "جاري تحميل موقع الشركة" : step === "gps" ? "جاري التحقق من الموقع" : step === "error" ? "تعذر التحقق من الموقع" : inRange ? "تم التحقق من الموقع" : "خارج نطاق الموقع";
+  const statusText = step === "loading-location" ? "جاري تحميل موقع الشركة" : isLocating ? "جاري تحديد موقعك..." : step === "error" ? "تعذر التحقق من الموقع" : step === "gps" ? "اضغط لتحديد موقعك" : inRange ? "تم التحقق من الموقع" : "خارج نطاق الموقع";
 
   return (
     <div className="min-h-screen">
@@ -139,13 +165,16 @@ export default function EmployeeScan() {
       <main className="max-w-xl mx-auto px-5 pb-16 space-y-5">
         <section className="hud-card p-6"><div className="text-xs text-muted-foreground mono">ACTION</div><h1 className="text-2xl font-extrabold mt-0.5">{title}</h1><div className="text-sm text-muted-foreground mt-1">{session?.name ?? "الموظف"} · <span className="mono">{session?.jobNumber ?? "-"}</span> · <span className="text-primary font-semibold">{locationName}</span></div></section>
         <section className="hud-card p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "loading-location" || step === "gps" ? "active" : step === "error" ? "fail" : "done"} /></div>
+          <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "loading-location" || step === "gps" || isLocating ? "active" : step === "error" ? "fail" : "done"} /></div>
           <div className="relative mx-auto w-full max-w-[250px] aspect-square rounded-full border border-primary/25 bg-primary/[0.035] overflow-hidden grid place-items-center shadow-[0_0_40px_hsl(var(--primary)/.08)]">
             <div className="absolute inset-[8%] rounded-full border border-primary/15" /><div className="absolute inset-[20%] rounded-full border border-primary/20" /><div className="absolute inset-[33%] rounded-full border border-primary/25" /><div className="absolute inset-[44%] rounded-full border border-primary/30" />
             <div className="absolute left-1/2 top-0 bottom-0 w-px bg-primary/10" /><div className="absolute top-1/2 left-0 right-0 h-px bg-primary/10" /><div className="absolute inset-0 radar-sweep opacity-80" />
             <div className="radar-core" /><div className="absolute bottom-5 rounded-full bg-background/80 border border-border/50 px-3 py-1 text-[10px] mono text-muted-foreground backdrop-blur">LIVE LOCATION</div>
           </div>
-          <div className="text-center mt-4"><div className="text-base font-extrabold radar-status">{statusText}</div><div className="text-xs text-muted-foreground mt-1">{step === "loading-location" ? "يتم تحميل إحداثيات الشركة والنطاق من قاعدة البيانات..." : step === "gps" ? "جاري تحديد موقع جهازك والتحقق من قربه من مقر الشركة..." : "تم تحميل موقع الشركة والنطاق من قاعدة بيانات D1."}</div></div>
+          <div className="text-center mt-4"><div className="text-base font-extrabold radar-status">{statusText}</div><div className="text-xs text-muted-foreground mt-1">{step === "loading-location" ? "يتم تحميل إحداثيات الشركة والنطاق من قاعدة بيانات D1..." : isLocating ? "اسمح للمتصفح بالوصول إلى موقعك الحالي..." : step === "gps" || step === "error" ? "اضغط الزر لتحديد موقعك ومقارنته بموقع العمل المحفوظ في D1." : "تم التحقق من موقع جهازك ومقارنته بموقع العمل."}</div></div>
+          <button type="button" onClick={() => void refreshGps()} disabled={isLocating || !location} className="btn-primary w-full mt-4 py-3 flex items-center justify-center gap-2">
+            {isLocating ? <><span className="animate-spin">⟳</span> جاري تحديد موقعي...</> : <>📍 تحديد موقعي الحالي</>}
+          </button>
           <div className="grid grid-cols-2 gap-2 text-center mt-4 text-xs"><Cell label="المسافة الحالية" value={distance !== null ? `${Math.round(distance)} م` : "…"} /><Cell label="النطاق المسموح" value={Number.isFinite(targetRadius) ? `${Math.round(targetRadius)} م` : "…"} /><Cell label="خط العرض" value={pos ? pos.lat.toFixed(5) : "…"} /><Cell label="خط الطول" value={pos ? pos.lng.toFixed(5) : "…"} /></div>
           {distance !== null && !inRange && <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center text-xs text-destructive font-semibold">الموقع خارج النطاق؛ لن يتم السماح بتسجيل الحضور.</div>}
         </section>
