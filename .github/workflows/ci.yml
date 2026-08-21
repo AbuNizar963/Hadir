@@ -28,6 +28,9 @@ jobs:
       - name: Typecheck frontend
         run: bun run typecheck
 
+      - name: Lint frontend
+        run: bun run lint
+
       - name: Build frontend
         run: bun run build
 
@@ -35,9 +38,11 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: backend/package.json
+
+      - name: Install Worker dependencies
+        working-directory: backend
+        run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Validate Worker bundle
         working-directory: backend
-        run: npx --yes wrangler@4.123.0 deploy --dry-run
+        run: npm exec -- wrangler@4.123.0 deploy --dry-run
