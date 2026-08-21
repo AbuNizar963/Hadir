@@ -11,7 +11,9 @@ export interface Employee {
   id: string; jobNumber: string; name: string; pinHash: string; status: EmployeeStatus;
   deviceId: string | null; deviceLabel: string | null; createdAt: string;
   scheduleType?: ScheduleType; rotationStartDate?: string | null; avatar?: string | null;
-  workStartTime?: string; workEndTime?: string; gracePeriodMinutes?: number;
+  workStartTime?: string; workEndTime?: string;
+  rotationStartTime?: string; rotationEndTime?: string;
+  gracePeriodMinutes?: number;
   role?: UserRole; locationId?: string | null; rotationDaysOn?: number; rotationDaysOff?: number;
   workDays?: number[];
   specialties?: string[];
@@ -25,11 +27,4 @@ export interface AuditEntry {
   result: AuditResult; reason?: string; timestamp: string; deviceId: string; ip: string; lat?: number; lng?: number; distanceMeters?: number;
 }
 
-export interface Settings {
-  qrCode: string; workSiteLat: number; workSiteLng: number; radiusMeters: number; workStart: string; workEnd: string; lateGraceMinutes: number;
-  ownerUsername?: string; ownerPasswordHash?: string; ownerName?: string;
-  managerUsername?: string; managerPasswordHash: string; managerName?: string;
-  supervisorUsername?: string; supervisorPasswordHash?: string; supervisorName?: string;
-  adminAccounts?: AdminAccount[];
-  brandLogo?: string | null; brandName?: string; locations?: Location[];
-}
+export interface Settings { qrCode: string; workSiteLat: number; workSiteLng: number; radiusMeters: number; workStart: string; workEnd: string; lateGraceMinutes: number; ownerUsername?: string; ownerPasswordHash?: string; ownerName?: string; managerUsername?: string; managerPasswordHash: string; managerName?: string; supervisorUsername?: string; supervisorPasswordHash?: string; supervisorName?: string; adminAccounts?: AdminAccount[]; brandLogo?: string | null; brandName?: string; locations?: Location[]; }
