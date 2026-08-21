@@ -1,5 +1,14 @@
-/** Stable local device identity. FingerprintJS is optional enrichment, never a login dependency. */
-const DEVICE_ID_KEY = "hadir.deviceId";
+/**
+ * Browser/device identity used by Hadir employee authentication.
+ *
+ * Browsers intentionally do not expose IMEI, serial number, or other
+ * hardware identifiers to normal web applications. We therefore use a
+ * cryptographically random browser identity stored locally and combine it
+ * with a human-readable browser/device label. The server stores the random
+ * identity in D1 and enforces the binding; clearing browser storage or using
+ * another browser creates a different identity and requires an admin reset.
+ */
+const DEVICE_ID_KEY = "hadir.device.id";
 const DEVICE_LABEL_KEY = "hadir.deviceLabel";
 const FINGERPRINT_KEY = "hadir.fingerprintId";
 
@@ -24,9 +33,9 @@ export function getDeviceId(): string {
 }
 
 /**
- * Returns immediately. The employee login must never wait for a third-party
- * fingerprint CDN. FingerprintJS, when available, is only an optional
- * secondary identifier and is not required for attendance.
+ * Kept as a compatibility API. The binding identity itself is the random
+ * browser credential above; we do not make login depend on a third-party
+ * fingerprinting CDN.
  */
 export async function getPersistentFingerprintId(): Promise<string> {
   const deviceId = getDeviceId();
@@ -44,14 +53,27 @@ export function getDeviceLabel(): string {
     if (stored) return stored;
   } catch {}
 
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
-  let label = "متصفح الهاتف";
-  if (/iPhone/i.test(ua)) label = "iPhone";
-  else if (/iPad/i.test(ua)) label = "iPad";
-  else if (/Android/i.test(ua)) label = "Android";
-  else if (/Windows/i.test(ua)) label = "Windows PC";
-  else if (/Mac OS X|Macintosh/i.test(ua)) label = "Mac";
-  else if (/Linux/i.test(ua)) label = "Linux";
+  const nav = typeof navigator !== "undefined" ? navigator : undefined;
+  const ua = nav?.userAgent || "";
+  const platform = nav?.platform || "";
+  let device = "متصفح الهاتف";
+  if (/iPhone/i.test(ua)) device = "iPhone";
+  else if (/iPad/i.test(ua)) device = "iPad";
+  else if (/Android/i.test(ua)) device = "Android";
+  else if (/Windows/i.test(ua) || /Win/i.test(platform)) device = "Windows PC";
+  else if (/Mac OS X|Macintosh/i.test(ua) || /Mac/i.test(platform)) device = "Mac";
+  else if (/Linux/i.test(ua)) device = "Linux";
+
+  const browser = /Edg\//i.test(ua)
+    ? "Edge"
+    : /Chrome\//i.test(ua)
+      ? "Chrome"
+      : /Firefox\//i.test(ua)
+        ? "Firefox"
+        : /Safari\//i.test(ua) && !/Chrome\//i.test(ua)
+          ? "Safari"
+          : "Browser";
+  const label = `${device} · ${browser}`;
 
   try { localStorage.setItem(DEVICE_LABEL_KEY, label); } catch {}
   return label;
