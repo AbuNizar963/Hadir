@@ -40,9 +40,17 @@ export function loginManager(password:string,username:string):LoginResult{
 export function logoutManager(){setManagerSession(null);}
 
 /** Local UI session only. The employee record and credentials remain authoritative in D1. */
+let cachedSession: ReturnType<typeof getSession> | null | undefined;
+let cachedSessionKey = "";
 export function currentSession(){
   const session=getSession();
-  if(!session) return null;
+  if(!session) { cachedSession=null; cachedSessionKey=""; return null; }
+  // Keep the same object reference while the persisted session identity is unchanged.
+  // This prevents React effects that depend on currentSession() from restarting on every render.
+  const key=`${session.employeeId}|${session.jobNumber}|${session.loginAt}|${session.role||""}`;
+  if(cachedSession !== undefined && cachedSessionKey===key) return cachedSession;
+  cachedSession=session;
+  cachedSessionKey=key;
   return session;
 }
 
