@@ -1,0 +1,88 @@
+import app from "./app";
+import { HadirRealtime } from "./realtime";
+
+type Env = {
+  REALTIME: DurableObjectNamespace;
+  DB: D1Database;
+  JWT_SECRET?: string;
+  APP_ORIGIN?: string;
+  OWNER_RECOVERY_CODE?: string;
+  PROFILE_IMAGES?: R2Bucket;
+};
+
+const cors = (origin: string) => ({
+  "access-control-allow-origin": origin,
+  "access-control-allow-headers": "content-type, authorization, x-device-id",
+  "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
+});
+
+function actorIdFromToken(request: Request): string | null {
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const padded = payload.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((payload.length + 3) % 4);
+    const raw = atob(padded);
+    const actor = JSON.parse(raw) as { id?: string; exp?: number };
+    if (!actor.id || !actor.exp || actor.exp < Math.floor(Date.now() / 1000)) return null;
+    return actor.id;
+  } catch {
+    return null;
+  }
+}
+
+function realtimeId(env: Env) {
+  return env.REALTIME.idFromName("hadir-global");
+}
+
+async function broadcast(env: Env, payload: Record<string, unknown>) {
+  if (!env.REALTIME) return;
+  const stub = env.REALTIME.get(realtimeId(env));
+  await stub.fetch("https://realtime/broadcast", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch(() => undefined);
+}
+
+export { HadirRealtime };
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    const origin = env.APP_ORIGIN || "*";
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: cors(origin) });
+    }
+
+    if (url.pathname === "/api/realtime" && request.method === "GET") {
+      const userId = actorIdFromToken(request);
+      if (!userId) return new Response("غير مصرح", { status: 401, headers: cors(origin) });
+      if (!env.REALTIME) return new Response("Realtime غير مفعّل", { status: 503, headers: cors(origin) });
+
+      const stub = env.REALTIME.get(realtimeId(env));
+      const connectUrl = new URL("https://realtime/connect");
+      connectUrl.searchParams.set("userId", userId);
+      const response = await stub.fetch(connectUrl, { method: "GET" });
+      if (response.status !== 101) return response;
+
+      return response;
+    }
+
+    const mutation = ["POST", "PUT", "PATCH", "DELETE"].includes(request.method) && url.pathname.startsWith("/api/");
+    const response = await app.fetch(request, env, ctx);
+
+    if (mutation && response.ok) {
+      ctx.waitUntil(broadcast(env, {
+        type: "cloud-data-changed",
+        timestamp: new Date().toISOString(),
+        path: url.pathname,
+        method: request.method,
+      }));
+    }
+
+    return response;
+  },
+};
