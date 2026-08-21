@@ -5,9 +5,13 @@ const SESSION_COOKIE = "hadir_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 365 * 5;
 const json = (data: unknown, status = 200, origin = "*") => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS", "cache-control": "no-store" } });
 function requestOrigin(req: Request, env: Env) { const configured = String(env.APP_ORIGIN || "").trim().replace(/\/$/, ""); const incoming = String(req.headers.get("origin") || "").trim().replace(/\/$/, ""); return configured || incoming || "*"; }
-function withSessionCookie(response: Response, token: string | null): Response {
+function withSessionCookie(response: Response, token: string | null, origin = "*"): Response {
   const headers = new Headers(response.headers);
   headers.set("cache-control", "no-store");
+  headers.set("access-control-allow-origin", origin);
+  headers.set("access-control-allow-credentials", "true");
+  headers.set("access-control-allow-headers", "content-type, authorization, x-device-id");
+  headers.set("access-control-allow-methods", "GET,POST,PATCH,PUT,DELETE,OPTIONS");
   if (token) headers.set("set-cookie", `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${SESSION_MAX_AGE}; HttpOnly; Secure; SameSite=None`);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
@@ -35,8 +39,8 @@ export default { async fetch(req: Request, env: Env, ctx: ExecutionContext) {
  const origin=requestOrigin(req,env); if(req.method==="OPTIONS")return new Response(null,{status:204,headers:{"access-control-allow-origin":origin,"access-control-allow-credentials":"true","access-control-allow-headers":"content-type, authorization, x-device-id","access-control-allow-methods":"GET,POST,PATCH,PUT,DELETE,OPTIONS","access-control-max-age":"86400"}});
  if(!env.DB)return json({ok:false,error:"D1 binding DB غير موجود"},503,origin);
  await ensureWorkflowSchema(env.DB); const url=new URL(req.url); const path=url.pathname.replace(/\/$/,"")||"/"; const actor=await actorFromOriginal(req,env);
- if(path==="/api/auth/login"&&req.method==="POST"){const response=await original.fetch(req,env,ctx);const clone=response.clone();const data=await clone.json().catch(()=>({})) as any;return withSessionCookie(response, response.ok&&typeof data.token==="string"?data.token:null);}
- if(path==="/api/bootstrap/owner"&&req.method==="POST"){const response=await original.fetch(req,env,ctx);const clone=response.clone();const data=await clone.json().catch(()=>({})) as any;return withSessionCookie(response, response.ok&&typeof data.token==="string"?data.token:null);}
+ if(path==="/api/auth/login"&&req.method==="POST"){const response=await original.fetch(req,env,ctx);const clone=response.clone();const data=await clone.json().catch(()=>({})) as any;return withSessionCookie(response, response.ok&&typeof data.token==="string"?data.token:null, origin);}
+ if(path==="/api/bootstrap/owner"&&req.method==="POST"){const response=await original.fetch(req,env,ctx);const clone=response.clone();const data=await clone.json().catch(()=>({})) as any;return withSessionCookie(response, response.ok&&typeof data.token==="string"?data.token:null, origin);}
  const avatarMatch=path.match(/^\/api\/employees\/([^/]+)\/avatar$/);
  if(avatarMatch && req.method==="POST") {
    if(!env.PROFILE_IMAGES)return json({ok:false,error:"R2 binding PROFILE_IMAGES غير موجود"},503,origin);
