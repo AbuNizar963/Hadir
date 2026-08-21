@@ -17,6 +17,7 @@ concurrency:
 
 env:
   VITE_BASE_PATH: /Hadir/
+  VITE_API_URL: https://hadir-api.abunizar963.workers.dev
 
 jobs:
   build:
@@ -33,16 +34,13 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Configure API URL
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      - name: Validate API origin
         run: |
           set -euo pipefail
-          API_URL="${VITE_API_URL:-https://hadir-api.abunizar963.workers.dev}"
-          API_URL="${API_URL%/}"
-          [[ "$API_URL" == https://* ]] || { echo 'ERROR: VITE_API_URL must use HTTPS.' >&2; exit 1; }
-          echo "VITE_API_URL=$API_URL" >> "$GITHUB_ENV"
-          echo "Using configured API origin: $API_URL"
+          case "$VITE_API_URL" in
+            https://hadir-api.abunizar963.workers.dev) echo "Using canonical Hadir API: $VITE_API_URL" ;;
+            *) echo "Unexpected API origin: $VITE_API_URL" >&2; exit 1 ;;
+          esac
 
       - name: Install dependencies
         run: bun install
