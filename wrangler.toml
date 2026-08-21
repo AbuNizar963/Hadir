@@ -1,5 +1,13 @@
 name = "hadir"
+compatibility_date = "2026-08-21"
+
 pages_build_output_dir = "dist"
 
-# Static Cloudflare Pages configuration.
-# GitHub Pages remains the primary deployment target.
+[[d1_databases]]
+binding = "DB"
+database_name = "hadir"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "PROFILE_IMAGES"
+bucket_name = "hadir-profile-images"
