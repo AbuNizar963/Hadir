@@ -1,24 +1,85 @@
-/** Persistent browser/device identity for employee binding. */
+/** Stable local device identity. FingerprintJS is optional enrichment, never a login dependency. */
 const DEVICE_ID_KEY = "hadir.deviceId";
 const DEVICE_LABEL_KEY = "hadir.deviceLabel";
 const FINGERPRINT_KEY = "hadir.fingerprintId";
-const DB_NAME = "hadir-device-store";
-const DB_VERSION = 1;
-const STORE = "identity";
-function generateDeviceId(): string { const rand = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36); return `dev-${rand}`; }
-function localFingerprint(): string | null { try { return localStorage.getItem(FINGERPRINT_KEY); } catch { return null; } }
-function saveLocalFingerprint(value: string) { try { localStorage.setItem(FINGERPRINT_KEY, value); } catch {} }
-function openIdentityDb(): Promise<IDBDatabase | null> { if (typeof indexedDB === "undefined") return Promise.resolve(null); return new Promise(resolve => { try { const req=indexedDB.open(DB_NAME,DB_VERSION); req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(STORE))req.result.createObjectStore(STORE)}; req.onsuccess=()=>resolve(req.result); req.onerror=()=>resolve(null); } catch { resolve(null); } }); }
-async function readIndexedFingerprint(): Promise<string | null> { const db=await openIdentityDb(); if(!db)return null; return new Promise(resolve=>{try{const req=db.transaction(STORE,"readonly").objectStore(STORE).get(FINGERPRINT_KEY);req.onsuccess=()=>{const v=typeof req.result==="string"?req.result:null;db.close();resolve(v)};req.onerror=()=>{db.close();resolve(null)}}catch{db.close();resolve(null)}}); }
-async function writeIndexedFingerprint(value:string):Promise<void>{const db=await openIdentityDb();if(!db)return;await new Promise<void>(resolve=>{try{const req=db.transaction(STORE,"readwrite").objectStore(STORE).put(value,FINGERPRINT_KEY);req.onsuccess=()=>{db.close();resolve()};req.onerror=()=>{db.close();resolve()}}catch{db.close();resolve()}})}
-let fingerprintPromise: Promise<string> | null = null;
-export async function getPersistentFingerprintId(): Promise<string> { const cached=localFingerprint()||await readIndexedFingerprint(); if(cached){saveLocalFingerprint(cached);return cached;} if(fingerprintPromise)return fingerprintPromise; fingerprintPromise=(async()=>{try{const w=window as Window & {FingerprintJS?:any}; if(!w.FingerprintJS){await new Promise<void>((resolve,reject)=>{const existing=document.querySelector('script[data-hadir-fingerprint="1"]') as HTMLScriptElement|null;if(existing){existing.addEventListener("load",()=>resolve(),{once:true});existing.addEventListener("error",()=>reject(new Error("FingerprintJS failed to load")),{once:true});return;}const script=document.createElement("script");script.src="https://openfpcdn.io/fingerprintjs/v4/iife.min.js";script.async=true;script.dataset.hadirFingerprint="1";script.onload=()=>resolve();script.onerror=()=>reject(new Error("FingerprintJS failed to load"));document.head.appendChild(script);});} const agent=await w.FingerprintJS.load();const result=await agent.get();const visitorId=String(result.visitorId||"");if(!visitorId)throw new Error("FingerprintJS returned no visitorId");saveLocalFingerprint(visitorId);await writeIndexedFingerprint(visitorId);return visitorId;}catch{const fallback=getDeviceId();saveLocalFingerprint(fallback);await writeIndexedFingerprint(fallback);return fallback;}finally{fingerprintPromise=null;}})(); return fingerprintPromise; }
-export function getDeviceId(): string { if(typeof window==="undefined")return "server-side"; const fingerprint=localFingerprint();if(fingerprint)return fingerprint; try{const existing=localStorage.getItem(DEVICE_ID_KEY);if(existing)return existing;const id=generateDeviceId();localStorage.setItem(DEVICE_ID_KEY,id);return id;}catch{return generateDeviceId();} }
-export function getDeviceLabel(): string { if(typeof window==="undefined")return "server"; try{const stored=localStorage.getItem(DEVICE_LABEL_KEY);if(stored)return stored;}catch{} const ua=typeof navigator!=="undefined"?navigator.userAgent||"":"";let label="جهاز غير معروف"; if(/iPhone/i.test(ua))label="iPhone";else if(/iPad/i.test(ua))label="iPad";else if(/Android/i.test(ua))label="Android";else if(/Windows/i.test(ua))label="Windows PC";else if(/Mac OS X|Macintosh/i.test(ua))label="Mac";else if(/Linux/i.test(ua))label="Linux"; try{localStorage.setItem(DEVICE_LABEL_KEY,label)}catch{} return label; }
-export function setDeviceLabel(label:string):void{if(typeof window==="undefined")return;try{localStorage.setItem(DEVICE_LABEL_KEY,label)}catch{}}
-export function getClientIpPlaceholder():string{return "client-unknown";}
-export interface StorageAdapter{getItem(key:string):string|null;setItem(key:string,value:string):void;removeItem(key:string):void;}
-class LocalStorageAdapter implements StorageAdapter{getItem(key:string){if(typeof window==="undefined")return null;try{return localStorage.getItem(key)}catch{return null}}setItem(key:string,value:string){if(typeof window==="undefined")return;try{localStorage.setItem(key,value)}catch(e){console.error("Error saving to localStorage",e)}}removeItem(key:string){if(typeof window==="undefined")return;try{localStorage.removeItem(key)}catch(e){console.error("Error removing from localStorage",e)}}}
-export const storage:StorageAdapter=new LocalStorageAdapter();
-export function getStoredJSON<T>(key:string,defaultValue:T):T{const val=storage.getItem(key);if(!val)return defaultValue;try{return JSON.parse(val) as T}catch{return defaultValue}}
-export function setStoredJSON<T>(key:string,value:T):void{storage.setItem(key,JSON.stringify(value));}
+
+function generateDeviceId(): string {
+  const rand = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+  return `dev-${rand}`;
+}
+
+export function getDeviceId(): string {
+  if (typeof window === "undefined") return "server-side";
+  try {
+    const existing = localStorage.getItem(DEVICE_ID_KEY)?.trim();
+    if (existing) return existing;
+    const id = generateDeviceId();
+    localStorage.setItem(DEVICE_ID_KEY, id);
+    return id;
+  } catch {
+    return generateDeviceId();
+  }
+}
+
+/**
+ * Returns immediately. The employee login must never wait for a third-party
+ * fingerprint CDN. FingerprintJS, when available, is only an optional
+ * secondary identifier and is not required for attendance.
+ */
+export async function getPersistentFingerprintId(): Promise<string> {
+  const deviceId = getDeviceId();
+  try {
+    const cached = localStorage.getItem(FINGERPRINT_KEY)?.trim();
+    if (cached) return cached;
+  } catch {}
+  return deviceId;
+}
+
+export function getDeviceLabel(): string {
+  if (typeof window === "undefined") return "server";
+  try {
+    const stored = localStorage.getItem(DEVICE_LABEL_KEY)?.trim();
+    if (stored) return stored;
+  } catch {}
+
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
+  let label = "متصفح الهاتف";
+  if (/iPhone/i.test(ua)) label = "iPhone";
+  else if (/iPad/i.test(ua)) label = "iPad";
+  else if (/Android/i.test(ua)) label = "Android";
+  else if (/Windows/i.test(ua)) label = "Windows PC";
+  else if (/Mac OS X|Macintosh/i.test(ua)) label = "Mac";
+  else if (/Linux/i.test(ua)) label = "Linux";
+
+  try { localStorage.setItem(DEVICE_LABEL_KEY, label); } catch {}
+  return label;
+}
+
+export function setDeviceLabel(label: string): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(DEVICE_LABEL_KEY, label.trim() || "متصفح الهاتف"); } catch {}
+}
+
+export function getClientIpPlaceholder(): string { return "client-unknown"; }
+
+export interface StorageAdapter {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+class LocalStorageAdapter implements StorageAdapter {
+  getItem(key: string) { if (typeof window === "undefined") return null; try { return localStorage.getItem(key); } catch { return null; } }
+  setItem(key: string, value: string) { if (typeof window === "undefined") return; try { localStorage.setItem(key, value); } catch {} }
+  removeItem(key: string) { if (typeof window === "undefined") return; try { localStorage.removeItem(key); } catch {} }
+}
+
+export const storage: StorageAdapter = new LocalStorageAdapter();
+export function getStoredJSON<T>(key: string, defaultValue: T): T {
+  const val = storage.getItem(key);
+  if (!val) return defaultValue;
+  try { return JSON.parse(val) as T; } catch { return defaultValue; }
+}
+export function setStoredJSON<T>(key: string, value: T): void { storage.setItem(key, JSON.stringify(value)); }
