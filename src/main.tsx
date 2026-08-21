@@ -4,12 +4,13 @@ import App from "./App";
 import "./index.css";
 import { seedIfEmpty } from "@/lib/storage";
 import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnostics";
+import { startRealtimeSync } from "@/lib/realtime";
 
 seedIfEmpty();
 installGlobalDiagnostics();
+startRealtimeSync();
 
 window.addEventListener("unhandledrejection", (event) => {
-  // Keep a compact application-level marker in addition to the global recorder.
   recordDiagnostic("error", "APP_UNHANDLED_REJECTION", "حدث خطأ غير معالج في التطبيق.", event.reason);
 });
 
