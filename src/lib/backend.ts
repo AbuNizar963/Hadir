@@ -1,5 +1,6 @@
 import type { AdminAccount, Employee, AttendanceRecord, EmployeeRequest, Settings, Location } from "@/types";
 import { getPersistentFingerprintId, getDeviceLabel } from "@/lib/device";
+import { compressProfileImageDataUrl } from "@/lib/imageCompression";
 
 const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
 export const backendEnabled = Boolean(API_URL);
@@ -14,6 +15,18 @@ export function validateAvatarDataUrl(value: unknown): string | null {
   if (bytes > MAX_AVATAR_BYTES) throw new Error("حجم صورة الموظف يجب ألا يتجاوز 10 ميغابايت.");
   return value;
 }
+
+async function prepareAvatar(value: unknown): Promise<string | null> {
+  const validated = validateAvatarDataUrl(value);
+  if (!validated) return null;
+  return compressProfileImageDataUrl(validated, {
+    maxWidth: 512,
+    maxHeight: 512,
+    quality: 0.78,
+    type: "image/webp",
+  });
+}
+
 function token() { return typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token") || localStorage.getItem("hadir.auth.token") || ""; }
 function persistToken(value: string) { localStorage.setItem("hadir.api.token", value); localStorage.setItem("hadir.auth.token", value); }
 
@@ -63,8 +76,15 @@ export async function getBackendEmployeeProfile(){
   });
   return employeeProfilePromise;
 }
-export async function getBackendEmployees(){return request<Employee[]>("/api/employees");} export async function createBackendEmployee(input:any){validateAvatarDataUrl(input.avatar);return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify(input)});}
-export async function updateBackendEmployee(id:string,input:any){validateAvatarDataUrl(input.avatar);return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(input)});}
+export async function getBackendEmployees(){return request<Employee[]>("/api/employees");}
+export async function createBackendEmployee(input:any){
+  const avatar = await prepareAvatar(input.avatar);
+  return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify({...input,avatar})});
+}
+export async function updateBackendEmployee(id:string,input:any){
+  const avatar = input.avatar === undefined ? undefined : await prepareAvatar(input.avatar);
+  return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...input,...(avatar !== undefined ? {avatar} : {})})});
+}
 export async function deleteBackendEmployee(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}`,{method:"DELETE"});}
 export async function resetBackendEmployeeDevice(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}/device`,{method:"DELETE"});}
 export async function getBackendAttendance(limit=500){return request<AttendanceRecord[]>(`/api/attendance?limit=${Math.min(limit,2000)}`);} export async function createBackendAttendance(record:Omit<AttendanceRecord,"id"|"ip">){return request<{ok:boolean}>("/api/attendance",{method:"POST",body:JSON.stringify(record)});}
