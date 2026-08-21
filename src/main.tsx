@@ -5,7 +5,9 @@ import "./index.css";
 import { seedIfEmpty } from "@/lib/storage";
 import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnostics";
 import { startRealtimeSync } from "@/lib/realtime";
+import { installApiCredentials } from "@/lib/apiCredentials";
 
+installApiCredentials();
 seedIfEmpty();
 installGlobalDiagnostics();
 startRealtimeSync();
