@@ -4,89 +4,73 @@ import { currentManager } from "@/lib/auth";
 import { backendMe, bootstrapBackend, backendEnabled } from "@/lib/backend";
 import { setManagerSession } from "@/lib/storage";
 
+const ADMIN_TOKEN_KEY = "hadir.api.token.admin";
+const ADMIN_ROLES = ["owner", "manager", "supervisor"] as const;
+
+type AdminRole = typeof ADMIN_ROLES[number];
+
 export default function ProtectedManager({ children }: { children: React.ReactNode }) {
-  const session = currentManager();
   const [checking, setChecking] = useState(backendEnabled);
-  const [failed, setFailed] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    if (!backendEnabled) {
-      setChecking(false);
-      return;
-    }
-
     let alive = true;
-
-    const run = async () => {
-      if (!session) {
-        try {
-          const b = await bootstrapBackend();
-          if (!alive) return;
-          setManagerSession({
-            loginAt: new Date().toISOString(),
-            name: "إعداد النظام",
-            role: "owner",
-            jobNumber: "",
-            accountId: "bootstrap",
-          });
-          setFailed(false);
-          setChecking(false);
-          return b;
-        } catch {
-          if (alive) {
-            setFailed(true);
-            setChecking(false);
-          }
-          return;
-        }
+    const restore = async () => {
+      if (!backendEnabled) {
+        const local = currentManager();
+        if (alive) { setAuthorized(Boolean(local?.role && ADMIN_ROLES.includes(local.role as AdminRole))); setChecking(false); }
+        return;
       }
 
-      // A stored manager session is authoritative for the local UI.
-      // A temporary Worker/network failure must NEVER log the user out.
+      const local = currentManager();
+      const token = typeof window !== "undefined" ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;
+
+      if (!local && !token) {
+        try {
+          const bootstrap = await bootstrapBackend();
+          if (!alive) return;
+          if (bootstrap.bootstrap) {
+            setManagerSession({ loginAt: new Date().toISOString(), name: "إعداد النظام", role: "owner", jobNumber: "", accountId: "bootstrap" });
+            setAuthorized(true);
+          } else setAuthorized(false);
+        } catch {
+          if (alive) setAuthorized(false);
+        } finally {
+          if (alive) setChecking(false);
+        }
+        return;
+      }
+
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
           const me = await backendMe();
           if (!alive) return;
-          if (me.user?.role && ["owner", "manager", "supervisor"].includes(me.user.role)) {
-            setFailed(false);
-            setChecking(false);
-            return;
+          const role = me.user?.role;
+          if (typeof role === "string" && ADMIN_ROLES.includes(role as AdminRole)) {
+            const user = me.user as { id?: string; username?: string; name?: string; role?: string };
+            setManagerSession({ loginAt: local?.loginAt || new Date().toISOString(), name: user.name, role, jobNumber: user.username, accountId: user.id });
+            setAuthorized(true);
+          } else {
+            setAuthorized(false);
           }
-        } catch {
-          if (attempt < 3) {
-            await new Promise((resolve) => window.setTimeout(resolve, 500 * attempt));
-            continue;
-          }
-          // Keep the saved session. The next protected API request can recover
-          // when Cloudflare becomes reachable again. Only explicit logout clears it.
-          if (alive) {
-            setFailed(false);
-            setChecking(false);
-          }
+          setChecking(false);
           return;
+        } catch {
+          if (attempt < 3) await new Promise((resolve) => window.setTimeout(resolve, 500 * attempt));
         }
       }
 
       if (alive) {
-        setFailed(false);
+        // Network/Cloudflare failure is not a logout. Preserve the local session.
+        setAuthorized(Boolean(local?.role && ADMIN_ROLES.includes(local.role as AdminRole)) || Boolean(token));
         setChecking(false);
       }
     };
-
-    void run();
-    return () => {
-      alive = false;
-    };
+    void restore();
+    return () => { alive = false; };
   }, []);
 
-  if (checking) {
-    return <div className="min-h-screen flex items-center justify-center text-sm">جاري التحقق من جلسة حاضر…</div>;
-  }
-
-  const active = currentManager();
-  if (failed || !active || !active.role || !["owner", "manager", "supervisor"].includes(active.role)) {
-    return <Navigate to="/manager/login" replace />;
-  }
-
+  if (checking) return <div className="min-h-screen flex items-center justify-center text-sm">جاري استعادة جلسة حاضر…</div>;
+  if (!authorized) return <Navigate to="/manager/login" replace />;
   return <>{children}</>;
 }
