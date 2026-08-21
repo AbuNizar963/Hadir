@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: hadir-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -31,7 +35,9 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package.json
 
       - name: Validate Worker bundle
         working-directory: backend
-        run: npx wrangler@latest deploy --dry-run
+        run: npx --yes wrangler@4.123.0 deploy --dry-run
