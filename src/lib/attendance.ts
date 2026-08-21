@@ -6,7 +6,7 @@ import {
   getSettings,
   saveEmployees,
 } from "@/lib/storage";
-import { getBackendSettings, backendEnabled } from "@/lib/backend";
+import { getBackendSettings, getBackendEmployeeLocation, backendEnabled } from "@/lib/backend";
 import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
 import { haversineMeters, isValidGeoPosition, type GeoPosition, isLikelyMockedPosition } from "@/lib/geo";
 import type { AttendanceRecord } from "@/types";
@@ -59,9 +59,7 @@ function formatMinutesToText(totalMinutes: number): string {
 }
 
 export async function recordAttendance(args: RecordArgs): Promise<RecordResult> {
-  // Attendance devices may have an old localStorage copy of the settings.
-  // Always prefer the authoritative D1 settings when the backend is enabled,
-  // otherwise a device can compare its GPS against stale/default coordinates.
+  // Settings such as QR/time may be cached locally, so prefer D1 when the backend is enabled.
   let settings = getSettings();
   if (backendEnabled) {
     try {
@@ -74,7 +72,7 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
           : settings.adminAccounts,
       };
     } catch (error) {
-      console.warn("تعذر تحميل إعدادات الموقع من Cloudflare D1، سيتم استخدام النسخة المحلية:", error);
+      console.warn("تعذر تحميل إعدادات الحضور من Cloudflare D1:", error);
     }
   }
 
@@ -166,13 +164,45 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     return { ok: false, reason: "تعذّر التحقق من موقعك. يرجى تعطيل أدوات تغيير الموقع." };
   }
 
-  const assignedLocation = settings.locations?.find((location) => location.id === employee.locationId);
-  const targetLat = Number(assignedLocation?.lat ?? settings.workSiteLat);
-  const targetLng = Number(assignedLocation?.lng ?? settings.workSiteLng);
-  const targetRadius = Number(assignedLocation?.radiusMeters ?? settings.radiusMeters);
+  // IMPORTANT: when D1 is enabled, the attendance decision must use the same
+  // authoritative location that the employee page loaded from D1. Never fall
+  // back to stale localStorage coordinates for the security-critical GPS check.
+  let targetLat: number;
+  let targetLng: number;
+  let targetRadius: number;
+  let targetLocationId = "main";
 
-  if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng) || !Number.isFinite(targetRadius) || targetRadius < 0) {
-    return { ok: false, reason: "إعدادات موقع العمل غير صالحة. يرجى مراجعة إعدادات GPS في لوحة الإدارة." };
+  if (backendEnabled) {
+    try {
+      const remote = await getBackendEmployeeLocation();
+      targetLat = Number(remote.location.lat);
+      targetLng = Number(remote.location.lng);
+      targetRadius = Number(remote.location.radiusMeters);
+      targetLocationId = String(remote.location.id || "main");
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "تعذر تحميل موقع العمل من قاعدة بيانات D1";
+      log({
+        employeeId: employee.id,
+        jobNumber: employee.jobNumber,
+        actorName: employee.name,
+        action: args.type,
+        result: "rejected",
+        reason: `فشل التحقق من موقع D1: ${reason}`,
+        lat: args.position.lat,
+        lng: args.position.lng,
+      });
+      return { ok: false, reason: `تعذر التحقق من موقع العمل من D1: ${reason}` };
+    }
+  } else {
+    const assignedLocation = settings.locations?.find((location) => location.id === employee.locationId);
+    targetLat = Number(assignedLocation?.lat ?? settings.workSiteLat);
+    targetLng = Number(assignedLocation?.lng ?? settings.workSiteLng);
+    targetRadius = Number(assignedLocation?.radiusMeters ?? settings.radiusMeters);
+    targetLocationId = String(assignedLocation?.id || employee.locationId || "main");
+  }
+
+  if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng) || !Number.isFinite(targetRadius) || targetRadius <= 0) {
+    return { ok: false, reason: "إعدادات موقع العمل غير صالحة. يرجى مراجعة موقع العمل في لوحة الإدارة." };
   }
 
   const distance = haversineMeters(args.position, { lat: targetLat, lng: targetLng });
@@ -264,7 +294,7 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     deviceId,
     ip: getClientIpPlaceholder(),
     qrCode: submittedQr,
-    locationId: assignedLocation?.id || "main",
+    locationId: targetLocationId,
   };
 
   addAttendance(record);
