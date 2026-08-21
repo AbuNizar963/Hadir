@@ -1,0 +1,54 @@
+name: Activate smart employee import
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/pages/ManagerEmployees.tsx'
+      - 'src/components/employees/SmartEmployeeImport.tsx'
+      - 'package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch manager page
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/pages/ManagerEmployees.tsx')
+          s=p.read_text()
+          imp='import SmartEmployeeImport from "@/components/employees/SmartEmployeeImport";'
+          if imp not in s:
+              marker='import { addNotification } from "@/lib/notifications";'
+              if marker not in s:
+                  raise SystemExit('manager import marker not found')
+              s=s.replace(marker, marker+'\n'+imp, 1)
+          if '<SmartEmployeeImport' not in s:
+              import re
+              m=re.search(r'<ManagerLayout\\b[^>]*>', s)
+              if not m:
+                  raise SystemExit('ManagerLayout opening tag not found')
+              widget='\\n      <SmartEmployeeImport onImported={() => { void refreshEmployeesFromD1(); }} />'
+              s=s[:m.end()]+widget+s[m.end():]
+          p.write_text(s)
+          PY
+      - name: Install and verify
+        run: |
+          corepack enable
+          npm install --ignore-scripts
+          npx tsc --noEmit
+          npm run build
+      - name: Commit activation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/pages/ManagerEmployees.tsx
+          if git diff --cached --quiet; then echo 'Smart importer already active'; exit 0; fi
+          git commit -m 'feat: add smart Excel employee import button'
+          git push
