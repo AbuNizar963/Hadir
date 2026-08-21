@@ -1,0 +1,89 @@
+name: Install free smart import export
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/pages/ManagerEmployees.tsx'
+      - 'src/components/employees/SmartEmployeeImport.tsx'
+      - 'package.json'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install smart importer in manager page
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/ManagerEmployees.tsx')
+          s = p.read_text(encoding='utf-8')
+          imp = 'import SmartEmployeeImport from "@/components/employees/SmartEmployeeImport";'
+          if imp not in s:
+              marker = 'import { addNotification } from "@/lib/notifications";'
+              if marker not in s:
+                  raise SystemExit('Could not find manager imports')
+              s = s.replace(marker, marker + '\n' + imp, 1)
+          # Remove the old CSV-only picker/button and replace it with the smart importer.
+          old = '<input ref={importInputRef} type="file" accept=".csv,text/csv" onChange={importEmployees} className="hidden"/><button type="button" onClick={()=>importInputRef.current?.click()} className="btn-secondary text-xs" disabled={importing}>{importing?"جاري الاستيراد…":"استيراد ملف"}</button>'
+          if old in s:
+              s = s.replace(old, '', 1)
+          old_help = '<div className="text-[11px] text-muted-foreground mb-3">صيغة الاستيراد: CSV. الأعمدة الأساسية: <span className="mono">name, jobNumber</span>، ويمكن إضافة بيانات الدوام والمقر والحالة.</div>'
+          if old_help in s:
+              s = s.replace(old_help, '<div className="text-[11px] text-muted-foreground mb-3">الاستيراد الذكي يدعم Excel وCSV ويكتشف الاسم والرقم الوظيفي حتى عند اختلاف ترتيب أو أسماء الأعمدة.</div>', 1)
+          if '<SmartEmployeeImport' not in s:
+              anchor = '<h2 className="text-sm font-bold">قائمة الموظفين الحاليين ({employees.length})</h2>'
+              if anchor not in s:
+                  raise SystemExit('Could not find employee list header')
+              s = s.replace(anchor, anchor + '<SmartEmployeeImport onImported={() => { void refreshEmployeesFromD1(); }} />', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Add open-source disclosure
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public
+          if [ ! -f public/open-source.md ]; then
+            cat > public/open-source.md <<'EOF'
+          # Open Source Notices
+
+          Hadir uses SheetJS Community Edition for spreadsheet import/export.
+          SheetJS Community Edition is licensed under Apache License 2.0.
+          See https://sheetjs.com/ and https://www.apache.org/licenses/LICENSE-2.0
+          EOF
+          fi
+
+      - name: Verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          npm install --ignore-scripts
+          npx tsc --noEmit --pretty false
+          npm run build
+
+      - name: Commit
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'Smart import/export is already installed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/pages/ManagerEmployees.tsx public/open-source.md
+          git commit -m 'feat: install free smart employee import export'
+          git push
