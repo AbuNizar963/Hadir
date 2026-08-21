@@ -58,20 +58,6 @@ export async function getBackendAdmins(){return request<Array<{id:string;usernam
 export async function createBackendAdmin(input:{name:string;username:string;password:string;role:"manager"|"supervisor"}){return request<{ok:boolean}>("/api/admins",{method:"POST",body:JSON.stringify(input)});}
 export async function updateBackendAdmin(id:string,input:{name?:string;active?:boolean;password?:string}){return request<{ok:boolean}>(`/api/admins/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(input)});}
 export async function deleteBackendAdmin(id:string){return request<{ok:boolean}>(`/api/admins/${encodeURIComponent(id)}`,{method:"DELETE"});}
-let employeeProfilePromise: Promise<Employee> | null = null;
-let employeeProfileToken = "";
-export async function getBackendEmployeeProfile(){
-  const currentToken = token();
-  if (!currentToken) throw new Error("جلسة الموظف غير موجودة. يرجى تسجيل الدخول مرة أخرى.");
-  if (employeeProfilePromise && employeeProfileToken === currentToken) return employeeProfilePromise;
-  employeeProfileToken = currentToken;
-  employeeProfilePromise = request<Employee>("/api/employee/profile").catch((error) => { employeeProfilePromise = null; employeeProfileToken = ""; throw error; });
-  return employeeProfilePromise;
-}
-export async function getBackendEmployees(){return request<Employee[]>("/api/employees");}
-export async function createBackendEmployee(input:any){const avatar = await prepareAvatar(input.avatar);return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify({...input,avatar})});}
-export async function updateBackendEmployee(id:string,input:any){const avatar = input.avatar === undefined ? undefined : await prepareAvatar(input.avatar);return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...input,...(avatar !== undefined ? {avatar} : {})})});}
-export async function deleteBackendEmployee(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}`,{method:"DELETE"});}
 export async function resetBackendEmployeeDevice(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}/device`,{method:"DELETE"});}
 export async function getBackendAttendance(limit=500){return request<AttendanceRecord[]>(`/api/attendance?limit=${Math.min(limit,2000)}`);} export async function createBackendAttendance(record:Omit<AttendanceRecord,"id"|"ip">){return request<{ok:boolean}>("/api/attendance",{method:"POST",body:JSON.stringify(record)});}
 export async function getBackendRequests(){return request<EmployeeRequest[]>("/api/requests");} export async function createBackendRequest(input:Omit<EmployeeRequest,"id"|"status"|"createdAt">){return request<{ok:boolean}>("/api/requests",{method:"POST",body:JSON.stringify(input)});} export async function updateBackendRequest(id:string,status:"approved"|"rejected"){return request<{ok:boolean}>(`/api/requests/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({status})});}
@@ -80,35 +66,35 @@ export async function getBackendSettings(){return request<Settings>("/api/settin
 export async function saveBackendSettings(settings:Partial<Settings>&{ownerPassword?:string}){return request<{ok:boolean}>("/api/settings",{method:"PUT",body:JSON.stringify(settings)});}
 export async function getBackendLocations(){return request<Location[]>("/api/locations");} export async function saveBackendLocation(location:Location){return request<{ok:boolean}>("/api/locations",{method:"PUT",body:JSON.stringify(location)});}
 
-/**
- * Employee attendance must not call /api/settings because that endpoint is
- * intentionally protected for management accounts. The employee already has
- * an authenticated D1 profile, while storage.getSettings() is backed by the
- * synchronized D1 view (see storage.ts/d1View.ts). Use the employee's assigned
- * location first, then the main location, and finally the main GPS settings.
- */
+/** Employee location is read from D1 through the employee-authorized locations endpoint. */
 export async function getBackendEmployeeLocation(): Promise<{location: Location}> {
   const employee = await getBackendEmployeeProfile();
-  const settings = getSettings();
-  const locations = Array.isArray(settings.locations) ? settings.locations : [];
-  const assigned = employee.locationId ? locations.find((item) => item.id === employee.locationId) : undefined;
-  const main = locations.find((item) => item.id === "main") || locations[0];
+  const locations = await getBackendLocations();
+  const assigned = employee.locationId ? locations.find((item) => String(item.id) === String(employee.locationId)) : undefined;
+  const main = locations.find((item) => String(item.id) === "main") || locations[0];
   const candidate = assigned || main;
-  const lat = Number(candidate?.lat ?? settings.workSiteLat);
-  const lng = Number(candidate?.lng ?? settings.workSiteLng);
-  const radiusMeters = Number(candidate?.radiusMeters ?? settings.radiusMeters);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radiusMeters) || radiusMeters < 0) {
-    throw new Error("بيانات موقع العمل غير متاحة أو غير صالحة في إعدادات النظام.");
+  if (!candidate) throw new Error("لا يوجد موقع عمل محفوظ في قاعدة بيانات D1.");
+  const lat = Number(candidate.lat);
+  const lng = Number(candidate.lng);
+  const radiusMeters = Number(candidate.radiusMeters);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+    throw new Error("بيانات موقع العمل في قاعدة بيانات D1 غير صالحة.");
   }
-  return {
-    location: {
-      id: String(candidate?.id || employee.locationId || "main"),
-      name: String(candidate?.name || "المقر الرئيسي"),
-      lat,
-      lng,
-      radiusMeters,
-    },
-  };
+  return { location: { id: String(candidate.id), name: String(candidate.name || "المقر الرئيسي"), lat, lng, radiusMeters } };
 }
 
+export async function getBackendEmployeeProfile(){
+  const currentToken = token();
+  if (!currentToken) throw new Error("جلسة الموظف غير موجودة. يرجى تسجيل الدخول مرة أخرى.");
+  if (employeeProfilePromise && employeeProfileToken === currentToken) return employeeProfilePromise;
+  employeeProfileToken = currentToken;
+  employeeProfilePromise = request<Employee>("/api/employee/profile").catch((error) => { employeeProfilePromise = null; employeeProfileToken = ""; throw error; });
+  return employeeProfilePromise;
+}
+let employeeProfilePromise: Promise<Employee> | null = null;
+let employeeProfileToken = "";
+export async function getBackendEmployees(){return request<Employee[]>("/api/employees");}
+export async function createBackendEmployee(input:any){const avatar = await prepareAvatar(input.avatar);return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify({...input,avatar})});}
+export async function updateBackendEmployee(id:string,input:any){const avatar = input.avatar === undefined ? undefined : await prepareAvatar(input.avatar);return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...input,...(avatar !== undefined ? {avatar} : {})})});}
+export async function deleteBackendEmployee(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}`,{method:"DELETE"});}
 export async function backendHealth(){return request<{ok:boolean;database?:string;ownerInitialized?:boolean}>("/api/health");} export type {AdminAccount};
