@@ -2,6 +2,8 @@ export interface ProfileImageCompressionOptions {
   maxWidth?: number;
   maxHeight?: number;
   quality?: number;
+  minQuality?: number;
+  maxBytes?: number;
   type?: "image/webp" | "image/jpeg";
 }
 
@@ -9,9 +11,12 @@ const DEFAULT_OPTIONS: Required<ProfileImageCompressionOptions> = {
   maxWidth: 512,
   maxHeight: 512,
   quality: 0.78,
+  minQuality: 0.45,
+  maxBytes: 100 * 1024,
   type: "image/webp",
 };
 
+/** Compresses a profile image in the browser and guarantees the configured byte limit. */
 export async function compressProfileImageDataUrl(
   dataUrl: string,
   options: ProfileImageCompressionOptions = {},
@@ -22,42 +27,53 @@ export async function compressProfileImageDataUrl(
 
   const settings = { ...DEFAULT_OPTIONS, ...options };
   const image = await loadImage(dataUrl);
-
   const scale = Math.min(
     settings.maxWidth / image.naturalWidth,
     settings.maxHeight / image.naturalHeight,
     1,
   );
 
-  const width = Math.max(1, Math.round(image.naturalWidth * scale));
-  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  let width = Math.max(1, Math.round(image.naturalWidth * scale));
+  let height = Math.max(1, Math.round(image.naturalHeight * scale));
 
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  for (let dimensionPass = 0; dimensionPass < 4; dimensionPass += 1) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("تعذر معالجة صورة الموظف.");
 
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("تعذر معالجة صورة الموظف.");
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    if (settings.type === "image/jpeg") {
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, width, height);
+    }
+    context.drawImage(image, 0, 0, width, height);
 
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
+    let quality = Math.min(0.95, Math.max(settings.minQuality, settings.quality));
+    for (let qualityPass = 0; qualityPass < 8; qualityPass += 1) {
+      const blob = await canvasToBlob(canvas, settings.type, quality);
+      if (blob.size <= settings.maxBytes) return blobToDataUrl(blob);
+      quality = Math.max(settings.minQuality, quality - 0.07);
+      if (quality <= settings.minQuality) break;
+    }
 
-  if (settings.type === "image/jpeg") {
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, width, height);
+    width = Math.max(128, Math.floor(width * 0.82));
+    height = Math.max(128, Math.floor(height * 0.82));
   }
 
-  context.drawImage(image, 0, 0, width, height);
+  throw new Error("تعذر ضغط صورة الموظف إلى أقل من 100 كيلوبايت. اختر صورة أصغر.");
+}
 
-  const compressed = await new Promise<Blob>((resolve, reject) => {
+async function canvasToBlob(canvas: HTMLCanvasElement, type: "image/webp" | "image/jpeg", quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => blob ? resolve(blob) : reject(new Error("تعذر ضغط صورة الموظف.")),
-      settings.type,
-      settings.quality,
+      type,
+      quality,
     );
   });
-
-  return blobToDataUrl(compressed);
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
