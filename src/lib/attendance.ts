@@ -6,7 +6,13 @@ import {
   getSettings,
   saveEmployees,
 } from "@/lib/storage";
-import { getBackendSettings, getBackendEmployeeLocation, backendEnabled } from "@/lib/backend";
+import {
+  createBackendAttendance,
+  getBackendSettings,
+  getBackendEmployeeLocation,
+  getBackendEmployeeProfile,
+  backendEnabled,
+} from "@/lib/backend";
 import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
 import { haversineMeters, isValidGeoPosition, type GeoPosition, isLikelyMockedPosition } from "@/lib/geo";
 import type { AttendanceRecord } from "@/types";
@@ -59,7 +65,6 @@ function formatMinutesToText(totalMinutes: number): string {
 }
 
 export async function recordAttendance(args: RecordArgs): Promise<RecordResult> {
-  // Settings such as QR/time may be cached locally, so prefer D1 when the backend is enabled.
   let settings = getSettings();
   if (backendEnabled) {
     try {
@@ -76,7 +81,24 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     }
   }
 
-  const employee = findEmployeeByJobNumber(args.jobNumber);
+  // When D1 is enabled, the authenticated session is the source of truth.
+  // Do not look the employee up only in localStorage: that can be stale even
+  // though the employee has just authenticated successfully against D1.
+  let employee;
+  if (backendEnabled) {
+    try {
+      employee = await getBackendEmployeeProfile();
+      if (String(employee.jobNumber).trim() !== String(args.jobNumber).trim()) {
+        return { ok: false, reason: "جلسة الموظف لا تطابق الرقم الوظيفي الحالي. يرجى تسجيل الدخول مرة أخرى." };
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "تعذر التحقق من جلسة الموظف";
+      return { ok: false, reason };
+    }
+  } else {
+    employee = findEmployeeByJobNumber(args.jobNumber);
+  }
+
   const deviceId = getDeviceId();
 
   if (!employee) {
@@ -164,9 +186,6 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     return { ok: false, reason: "تعذّر التحقق من موقعك. يرجى تعطيل أدوات تغيير الموقع." };
   }
 
-  // IMPORTANT: when D1 is enabled, the attendance decision must use the same
-  // authoritative location that the employee page loaded from D1. Never fall
-  // back to stale localStorage coordinates for the security-critical GPS check.
   let targetLat: number;
   let targetLng: number;
   let targetRadius: number;
@@ -296,6 +315,42 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     qrCode: submittedQr,
     locationId: targetLocationId,
   };
+
+  if (backendEnabled) {
+    try {
+      // D1 is authoritative: the server derives employee identity from the
+      // authenticated session instead of trusting a job number from the UI.
+      const remote = await createBackendAttendance({
+        employeeId: employee.id,
+        jobNumber: employee.jobNumber,
+        employeeName: employee.name,
+        type: args.type,
+        timestamp: record.timestamp,
+        lat: record.lat,
+        lng: record.lng,
+        distanceMeters: record.distanceMeters,
+        deviceId: record.deviceId,
+        qrCode: record.qrCode,
+        locationId: record.locationId,
+      });
+      if (!remote?.ok) return { ok: false, reason: "تعذر حفظ تسجيل الحضور في D1." };
+      if (remote.record) Object.assign(record, remote.record);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "تعذر حفظ تسجيل الحضور في D1";
+      log({
+        employeeId: employee.id,
+        jobNumber: employee.jobNumber,
+        actorName: employee.name,
+        action: args.type,
+        result: "rejected",
+        reason: `فشل حفظ الحضور في D1: ${reason}`,
+        lat: args.position.lat,
+        lng: args.position.lng,
+        distanceMeters: distance,
+      });
+      return { ok: false, reason: `تعذر حفظ تسجيل الحضور في D1: ${reason}` };
+    }
+  }
 
   addAttendance(record);
 
