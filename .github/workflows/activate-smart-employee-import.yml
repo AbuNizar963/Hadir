@@ -21,6 +21,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p=Path('src/pages/ManagerEmployees.tsx')
           s=p.read_text()
           imp='import SmartEmployeeImport from "@/components/employees/SmartEmployeeImport";'
@@ -30,11 +31,10 @@ jobs:
                   raise SystemExit('manager import marker not found')
               s=s.replace(marker, marker+'\n'+imp, 1)
           if '<SmartEmployeeImport' not in s:
-              import re
-              m=re.search(r'<ManagerLayout\\b[^>]*>', s)
+              m=re.search(r'<ManagerLayout\b[^>]*>', s)
               if not m:
                   raise SystemExit('ManagerLayout opening tag not found')
-              widget='\\n      <SmartEmployeeImport onImported={() => { void refreshEmployeesFromD1(); }} />'
+              widget='\n      <SmartEmployeeImport onImported={() => { void refreshEmployeesFromD1(); }} />'
               s=s[:m.end()]+widget+s[m.end():]
           p.write_text(s)
           PY
