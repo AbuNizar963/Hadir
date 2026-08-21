@@ -47,6 +47,7 @@ jobs:
       - name: Build
         run: bun run build
 
+      # Ensure the current main branch (including owner diagnostics UI) is what Pages publishes.
       - name: Make SPA fallback
         run: cp dist/index.html dist/404.html
 
