@@ -49,7 +49,21 @@ export async function getBackendAdmins(){return request<Array<{id:string;usernam
 export async function createBackendAdmin(input:{name:string;username:string;password:string;role:"manager"|"supervisor"}){return request<{ok:boolean}>("/api/admins",{method:"POST",body:JSON.stringify(input)});}
 export async function updateBackendAdmin(id:string,input:{name?:string;active?:boolean;password?:string}){return request<{ok:boolean}>(`/api/admins/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(input)});}
 export async function deleteBackendAdmin(id:string){return request<{ok:boolean}>(`/api/admins/${encodeURIComponent(id)}`,{method:"DELETE"});}
-export async function getBackendEmployeeProfile(){return request<Employee>("/api/employee/profile");} export async function getBackendEmployees(){return request<Employee[]>("/api/employees");} export async function createBackendEmployee(input:any){validateAvatarDataUrl(input.avatar);return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify(input)});}
+let employeeProfilePromise: Promise<Employee> | null = null;
+let employeeProfileToken = "";
+export async function getBackendEmployeeProfile(){
+  const currentToken = token();
+  if (!currentToken) throw new Error("جلسة الموظف غير موجودة. يرجى تسجيل الدخول مرة أخرى.");
+  if (employeeProfilePromise && employeeProfileToken === currentToken) return employeeProfilePromise;
+  employeeProfileToken = currentToken;
+  employeeProfilePromise = request<Employee>("/api/employee/profile").catch((error) => {
+    employeeProfilePromise = null;
+    employeeProfileToken = "";
+    throw error;
+  });
+  return employeeProfilePromise;
+}
+export async function getBackendEmployees(){return request<Employee[]>("/api/employees");} export async function createBackendEmployee(input:any){validateAvatarDataUrl(input.avatar);return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify(input)});}
 export async function updateBackendEmployee(id:string,input:any){validateAvatarDataUrl(input.avatar);return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(input)});}
 export async function deleteBackendEmployee(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}`,{method:"DELETE"});}
 export async function resetBackendEmployeeDevice(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}/device`,{method:"DELETE"});}
