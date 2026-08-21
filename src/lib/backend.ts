@@ -6,6 +6,7 @@ import { getSettings } from "@/lib/storage";
 const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
 export const backendEnabled = Boolean(API_URL);
 export const MAX_AVATAR_BYTES = 10 * 1024 * 1024;
+export const MAX_STORED_AVATAR_BYTES = 100 * 1024;
 export function validateAvatarDataUrl(value: unknown): string | null {
   if (value == null || value === "") return null;
   if (typeof value !== "string" || !value.startsWith("data:image/")) throw new Error("صورة الموظف غير صالحة.");
@@ -13,14 +14,32 @@ export function validateAvatarDataUrl(value: unknown): string | null {
   if (comma < 0) throw new Error("صيغة صورة الموظف غير صالحة.");
   const base64 = value.slice(comma + 1);
   const bytes = Math.floor(base64.length * 3 / 4) - (base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0);
-  if (bytes > MAX_AVATAR_BYTES) throw new Error("حجم صورة الموظف يجب ألا يتجاوز 10 ميغابايت.");
+  if (bytes > MAX_AVATAR_BYTES) throw new Error("حجم صورة الموظف الأصلية يجب ألا يتجاوز 10 ميغابايت.");
   return value;
 }
 
 async function prepareAvatar(value: unknown): Promise<string | null> {
   const validated = validateAvatarDataUrl(value);
   if (!validated) return null;
-  return compressProfileImageDataUrl(validated, { maxWidth: 512, maxHeight: 512, quality: 0.78, type: "image/webp" });
+  const compressed = await compressProfileImageDataUrl(validated, { maxWidth: 512, maxHeight: 512, quality: 0.78, type: "image/webp" });
+  const comma = compressed.indexOf(",");
+  if (comma < 0) throw new Error("تعذر تجهيز صورة الموظف.");
+  const base64 = compressed.slice(comma + 1);
+  const bytes = Math.floor(base64.length * 3 / 4) - (base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0);
+  if (bytes > MAX_STORED_AVATAR_BYTES) throw new Error("تعذر ضغط صورة الموظف إلى أقل من 100 كيلوبايت.");
+  return compressed;
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0) throw new Error("صيغة الصورة المضغوطة غير صالحة.");
+  const header = dataUrl.slice(0, comma);
+  const base64 = dataUrl.slice(comma + 1);
+  const mime = /^data:([^;]+);base64$/i.exec(header)?.[1] || "image/webp";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
 }
 
 function token() { return typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token") || localStorage.getItem("hadir.auth.token") || ""; }
@@ -49,6 +68,32 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   finally { window.clearTimeout(timeout); }
   const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error((data as any).error || `فشل الاتصال بالخادم (${response.status})`); return data as T;
 }
+
+async function uploadEmployeeAvatar(employeeId: string, dataUrl: string): Promise<{ key: string; size: number }> {
+  const blob = dataUrlToBlob(dataUrl);
+  if (blob.type !== "image/webp" || blob.size <= 0 || blob.size > MAX_STORED_AVATAR_BYTES) throw new Error("صورة الموظف يجب أن تكون WebP وأقل من 100 كيلوبايت.");
+  const form = new FormData();
+  form.append("file", blob, "avatar.webp");
+  const headers = new Headers();
+  const t = token();
+  if (t) headers.set("authorization", `Bearer ${t}`);
+  const response = await fetch(`${API_URL}/api/employees/${encodeURIComponent(employeeId)}/avatar`, { method: "POST", headers, body: form });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error((data as any).error || `فشل رفع صورة الموظف (${response.status})`);
+  return data as { key: string; size: number };
+}
+
+async function deleteEmployeeAvatar(employeeId: string): Promise<void> {
+  const headers = new Headers();
+  const t = token();
+  if (t) headers.set("authorization", `Bearer ${t}`);
+  const response = await fetch(`${API_URL}/api/employees/${encodeURIComponent(employeeId)}/avatar`, { method: "DELETE", headers });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error((data as any).error || `فشل حذف صورة الموظف (${response.status})`);
+  }
+}
+
 export async function backendLogin(username: string, password: string) { const data = await request<{ token:string;user:any;kind:"admin"|"employee" }>("/api/auth/login",{method:"POST",body:JSON.stringify({username,password})}); if(data.kind!=="admin")throw new Error("هذا الحساب موظف وليس حساب إدارة"); persistToken(data.token); return data.user; }
 export async function backendEmployeeLogin(username: string, password: string) { let deviceId: string; try { deviceId = await getPersistentFingerprintId(); } catch { throw new Error("تعذر التحقق من الجهاز. فعّل JavaScript وحاول مرة أخرى."); } const data = await request<{ token:string;user:any;kind:"admin"|"employee" }>("/api/auth/login",{method:"POST",body:JSON.stringify({username:username.trim(),password,deviceId,deviceLabel:getDeviceLabel()})}); if(data.kind!=="employee")throw new Error("هذا الحساب إداري وليس حساب موظف"); persistToken(data.token); return data.user as Employee; }
 export async function bootstrapBackend(){const data=await request<{token:string;bootstrap:boolean}>("/api/bootstrap");if(!data.bootstrap)throw new Error("تم إعداد حساب المالك مسبقًا");persistToken(data.token);return data;}
@@ -94,7 +139,34 @@ export async function getBackendEmployeeProfile(){
 let employeeProfilePromise: Promise<Employee> | null = null;
 let employeeProfileToken = "";
 export async function getBackendEmployees(){return request<Employee[]>("/api/employees");}
-export async function createBackendEmployee(input:any){const avatar = await prepareAvatar(input.avatar);return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify({...input,avatar})});}
-export async function updateBackendEmployee(id:string,input:any){const avatar = input.avatar === undefined ? undefined : await prepareAvatar(input.avatar);return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...input,...(avatar !== undefined ? {avatar} : {})})});}
+
+export async function createBackendEmployee(input:any){
+  const avatar = await prepareAvatar(input.avatar);
+  const { avatar: _avatar, ...payload } = input;
+  const created = await request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify(payload)});
+  if (avatar && created.employee?.id) {
+    const uploaded = await uploadEmployeeAvatar(created.employee.id, avatar);
+    created.employee = { ...created.employee, avatar: uploaded.key };
+  }
+  return created;
+}
+
+export async function updateBackendEmployee(id:string,input:any){
+  const hasAvatar = Object.prototype.hasOwnProperty.call(input, "avatar");
+  const avatar = hasAvatar ? await prepareAvatar(input.avatar) : undefined;
+  const { avatar: _avatar, ...payload } = input;
+  const updated = await request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify(payload)});
+  if (hasAvatar) {
+    if (avatar) {
+      const uploaded = await uploadEmployeeAvatar(id, avatar);
+      updated.employee = { ...updated.employee, avatar: uploaded.key };
+    } else {
+      await deleteEmployeeAvatar(id);
+      updated.employee = { ...updated.employee, avatar: null };
+    }
+  }
+  return updated;
+}
+
 export async function deleteBackendEmployee(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}`,{method:"DELETE"});}
 export async function backendHealth(){return request<{ok:boolean;database?:string;ownerInitialized?:boolean}>("/api/health");} export type {AdminAccount};
