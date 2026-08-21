@@ -2,84 +2,28 @@ import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getAttendance, getEmployees, getSettings } from "@/lib/storage";
+import { getEmployeeWorkPeriod } from "@/lib/schedule";
 import { formatDate, formatDurationMinutes, formatTime, minutesBetween } from "@/lib/utils";
 import { downloadCSV, type CsvCell } from "@/lib/csv";
 import { FileSpreadsheet, FileText, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { AttendanceRecord, Employee } from "@/types";
 
-type Mode = "daily" | "monthly";
+type Mode="daily"|"monthly";
+type ReportRow={key:string;name:string;jobNumber:string;checkIn:string;checkOut:string;late:number;worked:number;status:string;detail:string;scheduled:boolean;};
+const dayMs=86_400_000;
+function dateAtNoon(value:string){const [y,m,d]=value.split("-").map(Number);return new Date(y,m-1,d,12,0,0,0);}
+function findSession(records:AttendanceRecord[], employee:Employee, periodStart:Date|null, periodEnd:Date|null){if(!periodStart)return{checkIn:undefined,checkOut:undefined};const sorted=records.filter(r=>r.employeeId===employee.id).sort((a,b)=>new Date(a.timestamp).getTime()-new Date(b.timestamp).getTime());let checkIn:AttendanceRecord|undefined;let checkOut:AttendanceRecord|undefined;for(const r of sorted){const t=new Date(r.timestamp).getTime();if(r.type==="check-in"&&t>=periodStart.getTime()&&(!periodEnd||t<=periodEnd.getTime()+60_000)){checkIn=r;checkOut=undefined;}else if(r.type==="check-out"&&checkIn&&t>=new Date(checkIn.timestamp).getTime()&&(!periodEnd||t<=periodEnd.getTime()+60_000)){checkOut=r;break;}}return{checkIn,checkOut};}
+function periodKey(periodStart:Date|null){return periodStart?periodStart.toISOString().slice(0,10):"";}
 
-export default function ManagerReports() {
-  const [mode, setMode] = useState<Mode>("daily");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-
-  const employees = getEmployees();
-  const settings = getSettings();
-  const all = getAttendance();
-
-  const rows = useMemo(() => {
-    const [hh, mm] = settings.workStart.split(":").map(Number);
-    if (mode === "daily") {
-      return employees.map((e) => {
-        const list = all.filter((r) => r.employeeId === e.id && r.timestamp.startsWith(date));
-        const ci = list.find((r) => r.type === "check-in");
-        const co = list.find((r) => r.type === "check-out");
-        let late = 0;
-        if (ci) {
-          const sched = new Date(ci.timestamp); sched.setHours(hh, mm, 0, 0);
-          late = Math.max(0, Math.round((new Date(ci.timestamp).getTime() - sched.getTime()) / 60000) - settings.lateGraceMinutes);
-        }
-        return { key:e.id, name:e.name, jobNumber:e.jobNumber, checkIn:ci?formatTime(ci.timestamp):"—", checkOut:co?formatTime(co.timestamp):"—", late, worked:ci&&co?minutesBetween(ci.timestamp,co.timestamp):0, status:!ci?"غياب":co?"منصرف":"حاضر" };
-      });
-    }
-    return employees.map((e) => {
-      const list = all.filter((r) => r.employeeId === e.id && r.timestamp.startsWith(month));
-      const daysPresent = new Set(list.filter((r) => r.type === "check-in").map((r) => r.timestamp.slice(0,10)));
-      let totalWorked=0,totalLate=0;
-      Array.from(daysPresent).forEach((d) => {
-        const ci=list.find((r)=>r.type==="check-in"&&r.timestamp.startsWith(d)); const co=list.find((r)=>r.type==="check-out"&&r.timestamp.startsWith(d));
-        if(ci&&co) totalWorked+=minutesBetween(ci.timestamp,co.timestamp);
-        if(ci){const sched=new Date(ci.timestamp);sched.setHours(hh,mm,0,0);totalLate+=Math.max(0,Math.round((new Date(ci.timestamp).getTime()-sched.getTime())/60000)-settings.lateGraceMinutes);}
-      });
-      return {key:e.id,name:e.name,jobNumber:e.jobNumber,checkIn:"",checkOut:"",late:totalLate,worked:totalWorked,daysPresent:daysPresent.size,status:""} as any;
-    });
-  }, [mode,date,month,employees,all,settings]);
-
-  const exportData = () => {
-    const headers: string[] = mode === "daily"
-      ? ["الموظف","الرقم الوظيفي","الحضور","الانصراف","التأخر (دقيقة)","ساعات العمل","الحالة"]
-      : ["الموظف","الرقم الوظيفي","أيام الحضور","إجمالي التأخر (دقيقة)","إجمالي ساعات العمل"];
-    const body: CsvCell[][] = rows.map((r:any) => mode === "daily"
-      ? [r.name,r.jobNumber,r.checkIn,r.checkOut,r.late,formatDurationMinutes(r.worked),r.status]
-      : [r.name,r.jobNumber,r.daysPresent,r.late,formatDurationMinutes(r.worked)]);
-    downloadCSV(`report-${mode}-${mode === "daily" ? date : month}`,headers,body);
-  };
-
-  const exportExcel = () => {
-    const title = mode === "daily" ? `تقرير الحضور اليومي - ${formatDate(date)}` : `تقرير الحضور الشهري - ${month}`;
-    const headers = mode === "daily"
-      ? ["الموظف","الرقم الوظيفي","الحضور","الانصراف","التأخر (دقيقة)","ساعات العمل","الحالة"]
-      : ["الموظف","الرقم الوظيفي","أيام الحضور","إجمالي التأخر (دقيقة)","إجمالي ساعات العمل"];
-    const data = rows.map((r:any) => mode === "daily"
-      ? [r.name,r.jobNumber,r.checkIn,r.checkOut,r.late,formatDurationMinutes(r.worked),r.status]
-      : [r.name,r.jobNumber,r.daysPresent,r.late,formatDurationMinutes(r.worked)]);
-    const summary = mode === "daily"
-      ? ["ملخص", `إجمالي الموظفين: ${rows.length}`, `حاضر: ${rows.filter((r:any)=>r.status==="حاضر").length}`, `منصرف: ${rows.filter((r:any)=>r.status==="منصرف").length}`, `غياب: ${rows.filter((r:any)=>r.status==="غياب").length}`, `إجمالي التأخر: ${rows.reduce((n:any,r:any)=>n+r.late,0)} دقيقة`]
-      : ["ملخص", `إجمالي الموظفين: ${rows.length}`, `إجمالي أيام الحضور: ${rows.reduce((n:any,r:any)=>n+r.daysPresent,0)}`, `إجمالي التأخر: ${rows.reduce((n:any,r:any)=>n+r.late,0)} دقيقة`, `إجمالي ساعات العمل: ${formatDurationMinutes(rows.reduce((n:any,r:any)=>n+r.worked,0))}`];
-    const sheet = XLSX.utils.aoa_to_sheet([[title], summary, [], headers, ...data]);
-    sheet["!merges"] = [{s:{r:0,c:0},e:{r:0,c:headers.length-1}}];
-    sheet["!cols"] = headers.map((h,i)=>({wch:Math.max(16,h.length+4,i===0?22:0)}));
-    const headerRow = 3;
-    sheet["!autofilter"] = {ref:`A${headerRow+1}:${XLSX.utils.encode_col(headers.length-1)}${headerRow+1+data.length}`};
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook,sheet,mode === "daily" ? "تقرير يومي" : "تقرير شهري");
-    XLSX.writeFile(workbook,`Hadir-${mode}-report-${mode === "daily" ? date : month}.xlsx`);
-  };
-
-  return <ManagerLayout title="التقارير" subtitle={mode === "daily" ? `تقرير يومي · ${formatDate(date)}` : `تقرير شهري · ${month}`} actions={<div className="flex flex-wrap gap-2"><Button onClick={exportExcel} className="text-sm"><FileSpreadsheet className="ml-2 h-4 w-4"/>تصدير Excel ذكي</Button><Button onClick={exportData} variant="outline" className="text-sm"><FileText className="ml-2 h-4 w-4"/>CSV</Button></div>}>
-    <div className="hud-card p-4 mb-5 space-y-3"><div className="flex flex-wrap items-center gap-3"><div className="inline-flex bg-secondary/50 rounded-xl p-1 border border-border/50"><button onClick={()=>setMode("daily")} className={`px-4 py-1.5 rounded-lg text-sm font-semibold ${mode==="daily"?"bg-primary text-primary-foreground":"text-muted-foreground"}`}>يومي</button><button onClick={()=>setMode("monthly")} className={`px-4 py-1.5 rounded-lg text-sm font-semibold ${mode==="monthly"?"bg-primary text-primary-foreground":"text-muted-foreground"}`}>شهري</button></div>{mode==="daily"?<input aria-label="تاريخ التقرير" type="date" className="input max-w-[200px] mono" value={date} onChange={e=>setDate(e.target.value)}/>:<input aria-label="شهر التقرير" type="month" className="input max-w-[200px] mono" value={month} onChange={e=>setMonth(e.target.value)}/>}</div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Wand2 className="h-4 w-4 text-primary"/>تصدير Excel يتعرف تلقائيًا على نوع التقرير ويضيف ملخصًا وفلاتر وأعمدة مناسبة للتحليل.</div></div>
-    <div className="hud-card overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-xs text-muted-foreground bg-secondary/40"><tr><Th>الموظف</Th><Th>الرقم</Th>{mode==="daily"?<><Th>الحضور</Th><Th>الانصراف</Th><Th>التأخر</Th><Th>ساعات العمل</Th><Th>الحالة</Th></>:<><Th>أيام الحضور</Th><Th>إجمالي التأخر</Th><Th>إجمالي ساعات العمل</Th></>}</tr></thead><tbody>{rows.map((r:any)=><tr key={r.key} className="border-t border-border/50"><Td className="font-semibold">{r.name}</Td><Td className="mono">{r.jobNumber}</Td>{mode==="daily"?<><Td className="mono">{r.checkIn}</Td><Td className="mono">{r.checkOut}</Td><Td className={`mono ${r.late>0?"text-[hsl(var(--warning))]":""}`}>{r.late} د</Td><Td className="mono">{formatDurationMinutes(r.worked)}</Td><Td>{r.status==="غياب"?<span className="badge bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]">غياب</span>:r.status==="منصرف"?<span className="badge bg-accent/15 text-accent">منصرف</span>:<span className="badge bg-primary/15 text-primary">حاضر</span>}</Td></>:<><Td className="mono">{r.daysPresent}</Td><Td className={`mono ${r.late>0?"text-[hsl(var(--warning))]":""}`}>{r.late} د</Td><Td className="mono">{formatDurationMinutes(r.worked)}</Td></>}</tr>)}</tbody></table></div></div>
-  </ManagerLayout>;
+export default function ManagerReports(){
+ const [mode,setMode]=useState<Mode>("daily"); const [date,setDate]=useState(new Date().toISOString().slice(0,10)); const [month,setMonth]=useState(new Date().toISOString().slice(0,7));
+ const employees=getEmployees(); const all=getAttendance(); const settings=getSettings();
+ const rows=useMemo<ReportRow[]>(()=>{if(mode==="daily"){const target=dateAtNoon(date);return employees.map(e=>{const period=getEmployeeWorkPeriod(e,target);if(!period.isWorkDay){return{key:e.id,name:e.name,jobNumber:e.jobNumber,checkIn:"—",checkOut:"—",late:0,worked:0,status:e.scheduleType==="ROTATION"?"راحة مجدولة":"إجازة أسبوعية",detail:period.detail||"لا يوجد دوام مجدول",scheduled:false};}const session=findSession(all,e,period.start,period.end);const ci=session.checkIn;const co=session.checkOut;let late=0;if(ci&&period.start){late=Math.max(0,Math.round((new Date(ci.timestamp).getTime()-period.start.getTime())/60000)-(e.gracePeriodMinutes??settings.lateGraceMinutes??10));}const status=!ci?"غياب":!co?"حاضر · بدون انصراف":"مكتمل";return{key:e.id,name:e.name,jobNumber:e.jobNumber,checkIn:ci?formatTime(ci.timestamp):"—",checkOut:co?formatTime(co.timestamp):"—",late,worked:ci?minutesBetween(ci.timestamp,co?.timestamp??new Date().toISOString()):0,status,detail:period.detail||"",scheduled:true};});}
+  const [y,m]=month.split("-").map(Number);const days=new Date(y,m,0).getDate();return employees.map(e=>{let workDays=0,offDays=0,absent=0,completed=0,open=0,totalWorked=0,totalLate=0;const seenPeriods=new Set<string>();for(let d=1;d<=days;d++){const target=new Date(y,m-1,d,12);const p=getEmployeeWorkPeriod(e,target);if(!p.isWorkDay){offDays++;continue;}workDays++;const key=periodKey(p.start);if(e.scheduleType==="ROTATION"&&seenPeriods.has(key))continue;seenPeriods.add(key);const s=findSession(all,e,p.start,p.end);if(s.checkIn){if(s.checkOut){completed++;totalWorked+=minutesBetween(s.checkIn.timestamp,s.checkOut.timestamp);}else open++;if(p.start)totalLate+=Math.max(0,Math.round((new Date(s.checkIn.timestamp).getTime()-p.start.getTime())/60000)-(e.gracePeriodMinutes??settings.lateGraceMinutes??10));}else absent++;}return{key:e.id,name:e.name,jobNumber:e.jobNumber,checkIn:"",checkOut:"",late:totalLate,worked:totalWorked,status:"",detail:`عمل مجدول: ${workDays} · راحة: ${offDays} · غياب: ${absent} · مكتمل: ${completed} · مفتوح: ${open}`,scheduled:workDays>0} as ReportRow;});},[mode,date,month,employees,all,settings]);
+ const exportExcel=()=>{const daily=mode==="daily";const headers=daily?["الموظف","الرقم الوظيفي","الحضور","الانصراف","التأخر (دقيقة)","ساعات العمل","الحالة","تفاصيل الجدول"]:["الموظف","الرقم الوظيفي","العمل المجدول","الراحة","الغياب","المناوبات المكتملة","الفترات المفتوحة","إجمالي التأخر (دقيقة)","إجمالي ساعات العمل","تفاصيل"];const data=daily?rows.map(r=>[r.name,r.jobNumber,r.checkIn,r.checkOut,r.late,formatDurationMinutes(r.worked),r.status,r.detail]):rows.map(r=>{const parts=r.detail.match(/عمل مجدول: (\d+) · راحة: (\d+) · غياب: (\d+) · مكتمل: (\d+) · مفتوح: (\d+)/);return[r.name,r.jobNumber,parts?.[1]??0,parts?.[2]??0,parts?.[3]??0,parts?.[4]??0,parts?.[5]??0,r.late,formatDurationMinutes(r.worked),r.detail];});const summary=daily?[`إجمالي الموظفين: ${rows.length}`,`حاضر: ${rows.filter(r=>r.status.includes("حاضر")||r.status==="مكتمل").length}`,`راحة/إجازة: ${rows.filter(r=>!r.scheduled).length}`,`غياب: ${rows.filter(r=>r.status==="غياب").length}`,`بدون انصراف: ${rows.filter(r=>r.status.includes("بدون")).length}`]:[`إجمالي الموظفين: ${rows.length}`,`إجمالي ساعات العمل: ${formatDurationMinutes(rows.reduce((n,r)=>n+r.worked,0))}`,`إجمالي التأخر: ${rows.reduce((n,r)=>n+r.late,0)} دقيقة`];const ws=XLSX.utils.aoa_to_sheet([[daily?`تقرير الحضور اليومي - ${formatDate(date)}`:`تقرير الحضور الشهري - ${month}`],summary,[],headers,...data]);ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:headers.length-1}}];ws["!autofilter"]={ref:`A4:${XLSX.utils.encode_col(headers.length-1)}${4+data.length}`};ws["!cols"]=headers.map((h,i)=>({wch:Math.max(16,h.length+4,i===0?22:0)}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,daily?"تقرير يومي":"تقرير شهري");XLSX.writeFile(wb,`Hadir-${mode}-report-${daily?date:month}.xlsx`);};
+ const exportCsv=()=>{const headers: string[]=mode==="daily"?["الموظف","الرقم الوظيفي","الحضور","الانصراف","التأخر (دقيقة)","ساعات العمل","الحالة","تفاصيل الجدول"]:["الموظف","الرقم الوظيفي","تفاصيل الجدول","إجمالي التأخر (دقيقة)","إجمالي ساعات العمل"];const body:CsvCell[][]=mode==="daily"?rows.map(r=>[r.name,r.jobNumber,r.checkIn,r.checkOut,r.late,formatDurationMinutes(r.worked),r.status,r.detail]):rows.map(r=>[r.name,r.jobNumber,r.detail,r.late,formatDurationMinutes(r.worked)]);downloadCSV(`report-${mode}-${mode==="daily"?date:month}`,headers,body);};
+ return <ManagerLayout title="التقارير" subtitle={mode==="daily"?`تقرير يومي · ${formatDate(date)}`:`تقرير شهري · ${month}`} actions={<div className="flex flex-wrap gap-2"><Button onClick={exportExcel} className="text-sm"><FileSpreadsheet className="ml-2 h-4 w-4"/>تصدير Excel ذكي</Button><Button onClick={exportCsv} variant="outline" className="text-sm"><FileText className="ml-2 h-4 w-4"/>CSV</Button></div>}><div className="hud-card p-4 mb-5 space-y-3"><div className="flex flex-wrap items-center gap-3"><div className="inline-flex bg-secondary/50 rounded-xl p-1 border border-border/50"><button onClick={()=>setMode("daily")} className={`px-4 py-1.5 rounded-lg text-sm font-semibold ${mode==="daily"?"bg-primary text-primary-foreground":"text-muted-foreground"}`}>يومي</button><button onClick={()=>setMode("monthly")} className={`px-4 py-1.5 rounded-lg text-sm font-semibold ${mode==="monthly"?"bg-primary text-primary-foreground":"text-muted-foreground"}`}>شهري</button></div>{mode==="daily"?<input aria-label="تاريخ التقرير" type="date" className="input max-w-[200px] mono" value={date} onChange={e=>setDate(e.target.value)}/>:<input aria-label="شهر التقرير" type="month" className="input max-w-[200px] mono" value={month} onChange={e=>setMonth(e.target.value)}/>}</div><div className="flex items-center gap-2 text-xs text-muted-foreground"><Wand2 className="h-4 w-4 text-primary"/>التقرير يحسب الحالة من جدول الموظف نفسه: يوم عمل، راحة، غياب، حضور بدون انصراف أو فترة مكتملة.</div></div><div className="hud-card overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-xs text-muted-foreground bg-secondary/40"><tr><Th>الموظف</Th><Th>الرقم</Th>{mode==="daily"?<><Th>الحضور</Th><Th>الانصراف</Th><Th>التأخر</Th><Th>ساعات العمل</Th><Th>الحالة</Th><Th>الجدول</Th></>:<><Th>ملخص الجدول</Th><Th>التأخر</Th><Th>ساعات العمل</Th></>}</tr></thead><tbody>{rows.map(r=><tr key={r.key} className="border-t border-border/50 align-top"><Td className="font-semibold">{r.name}</Td><Td className="mono">{r.jobNumber}</Td>{mode==="daily"?<><Td className="mono">{r.checkIn}</Td><Td className="mono">{r.checkOut}</Td><Td className={`mono ${r.late>0?"text-[hsl(var(--warning))]":""}`}>{r.late} د</Td><Td className="mono">{formatDurationMinutes(r.worked)}</Td><Td><Status value={r.status}/></Td><Td className="text-xs text-muted-foreground">{r.detail}</Td></>:<><Td className="text-xs">{r.detail}</Td><Td className="mono">{r.late} د</Td><Td className="mono">{formatDurationMinutes(r.worked)}</Td></>}</tr>)}</tbody></table></div></div></ManagerLayout>;
 }
-function Th({children}:{children:React.ReactNode}){return <th className="text-right font-semibold px-3 py-2.5">{children}</th>;} function Td({children,className="",colSpan}:{children:React.ReactNode;className?:string;colSpan?:number}){return <td className={`px-3 py-2.5 ${className}`} colSpan={colSpan}>{children}</td>;}
+function Status({value}:{value:string}){const off=value.includes("راحة")||value.includes("إجازة");const absent=value==="غياب";const open=value.includes("بدون");return <span className={`badge ${off?"bg-accent/15 text-accent":absent?"bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]":open?"bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]":"bg-primary/15 text-primary"}`}>{value}</span>;}
+function Th({children}:{children:React.ReactNode}){return <th className="text-right font-semibold px-3 py-2.5">{children}</th>;}function Td({children,className="",colSpan}:{children:React.ReactNode;className?:string;colSpan?:number}){return <td className={`px-3 py-2.5 ${className}`} colSpan={colSpan}>{children}</td>;}
