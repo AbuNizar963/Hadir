@@ -1,6 +1,8 @@
 import app from "./app";
 import { HadirRealtime } from "./realtime";
 
+// Keep the production Worker deployment in sync with the D1-backed API entrypoint.
+
 type Env = { REALTIME: DurableObjectNamespace; DB: D1Database; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_RECOVERY_CODE?: string; PROFILE_IMAGES?: R2Bucket };
 const SESSION_COOKIE = "hadir_session";
 const cors = (origin: string) => ({ "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS" });
