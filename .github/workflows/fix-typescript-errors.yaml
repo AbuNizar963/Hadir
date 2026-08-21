@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - "fix/**"
+      - 'fix/**'
   pull_request:
     branches:
       - main
@@ -15,25 +15,23 @@ permissions:
 
 jobs:
   typecheck-and-build:
-    name: TypeScript + Build
+    name: TypeScript and Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22'
 
-      - name: Install dependencies
-        run: npm install --no-package-lock --no-audit --no-fund --legacy-peer-deps
+      - name: Install dependencies without lockfile
+        run: npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund
 
-      - name: TypeScript
+      - name: TypeScript check
         run: npm run typecheck
 
       - name: Build
