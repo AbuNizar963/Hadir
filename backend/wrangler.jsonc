@@ -1,8 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hadir-api",
-  "main": "src/app.ts",
-  "compatibility_date": "2026-08-20",
+  "main": "src/entry.ts",
+  "compatibility_date": "2026-08-21",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
@@ -22,6 +22,20 @@
     {
       "binding": "PROFILE_IMAGES",
       "bucket_name": "hadir-profile-images"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REALTIME",
+        "class_name": "HadirRealtime"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-realtime",
+      "new_sqlite_classes": ["HadirRealtime"]
     }
   ],
   "observability": {
