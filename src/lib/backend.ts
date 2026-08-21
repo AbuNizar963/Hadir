@@ -19,12 +19,7 @@ export function validateAvatarDataUrl(value: unknown): string | null {
 async function prepareAvatar(value: unknown): Promise<string | null> {
   const validated = validateAvatarDataUrl(value);
   if (!validated) return null;
-  return compressProfileImageDataUrl(validated, {
-    maxWidth: 512,
-    maxHeight: 512,
-    quality: 0.78,
-    type: "image/webp",
-  });
+  return compressProfileImageDataUrl(validated, { maxWidth: 512, maxHeight: 512, quality: 0.78, type: "image/webp" });
 }
 
 function token() { return typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token") || localStorage.getItem("hadir.auth.token") || ""; }
@@ -69,28 +64,33 @@ export async function getBackendEmployeeProfile(){
   if (!currentToken) throw new Error("جلسة الموظف غير موجودة. يرجى تسجيل الدخول مرة أخرى.");
   if (employeeProfilePromise && employeeProfileToken === currentToken) return employeeProfilePromise;
   employeeProfileToken = currentToken;
-  employeeProfilePromise = request<Employee>("/api/employee/profile").catch((error) => {
-    employeeProfilePromise = null;
-    employeeProfileToken = "";
-    throw error;
-  });
+  employeeProfilePromise = request<Employee>("/api/employee/profile").catch((error) => { employeeProfilePromise = null; employeeProfileToken = ""; throw error; });
   return employeeProfilePromise;
 }
 export async function getBackendEmployees(){return request<Employee[]>("/api/employees");}
-export async function createBackendEmployee(input:any){
-  const avatar = await prepareAvatar(input.avatar);
-  return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify({...input,avatar})});
-}
-export async function updateBackendEmployee(id:string,input:any){
-  const avatar = input.avatar === undefined ? undefined : await prepareAvatar(input.avatar);
-  return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...input,...(avatar !== undefined ? {avatar} : {})})});
-}
+export async function createBackendEmployee(input:any){const avatar = await prepareAvatar(input.avatar);return request<{ok:boolean;employee:Employee}>("/api/employees",{method:"POST",body:JSON.stringify({...input,avatar})});}
+export async function updateBackendEmployee(id:string,input:any){const avatar = input.avatar === undefined ? undefined : await prepareAvatar(input.avatar);return request<{ok:boolean;employee:Employee}>(`/api/employees/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({...input,...(avatar !== undefined ? {avatar} : {})})});}
 export async function deleteBackendEmployee(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}`,{method:"DELETE"});}
 export async function resetBackendEmployeeDevice(id:string){return request<{ok:boolean}>(`/api/employees/${encodeURIComponent(id)}/device`,{method:"DELETE"});}
 export async function getBackendAttendance(limit=500){return request<AttendanceRecord[]>(`/api/attendance?limit=${Math.min(limit,2000)}`);} export async function createBackendAttendance(record:Omit<AttendanceRecord,"id"|"ip">){return request<{ok:boolean}>("/api/attendance",{method:"POST",body:JSON.stringify(record)});}
-export async function getBackendRequests(){return request<EmployeeRequest[]>("/api/requests");} export async function createBackendRequest(input:Omit<EmployeeRequest,"id"|"status"|"createdAt">){return request<{ok:boolean}>("/api/requests",{method:"POST",body:JSON.stringify(input)});}
-export async function updateBackendRequest(id:string,status:"approved"|"rejected"){return request<{ok:boolean}>(`/api/requests/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({status})});}
-export async function getBackendAudit(limit=500){return request<any[]>(`/api/audit?limit=${Math.min(limit,2000)}`);} export async function getBackendSettings(){return request<Settings>("/api/settings");}
+export async function getBackendRequests(){return request<EmployeeRequest[]>("/api/requests");} export async function createBackendRequest(input:Omit<EmployeeRequest,"id"|"status"|"createdAt">){return request<{ok:boolean}>("/api/requests",{method:"POST",body:JSON.stringify(input)});} export async function updateBackendRequest(id:string,status:"approved"|"rejected"){return request<{ok:boolean}>(`/api/requests/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({status})});}
+export async function getBackendAudit(limit=500){return request<any[]>(`/api/audit?limit=${Math.min(limit,2000)}`);}
+export async function getBackendSettings(){return request<Settings>("/api/settings");}
 export async function saveBackendSettings(settings:Partial<Settings>&{ownerPassword?:string}){return request<{ok:boolean}>("/api/settings",{method:"PUT",body:JSON.stringify(settings)});}
 export async function getBackendLocations(){return request<Location[]>("/api/locations");} export async function saveBackendLocation(location:Location){return request<{ok:boolean}>("/api/locations",{method:"PUT",body:JSON.stringify(location)});}
-export async function getBackendEmployeeLocation(){return request<{location:Location}>("/api/employee-location");} export async function backendHealth(){return request<{ok:boolean;database?:string;ownerInitialized?:boolean}>("/api/health");} export type {AdminAccount};
+
+/** Employee attendance uses the same D1 settings source as ManagerSettings. */
+export async function getBackendEmployeeLocation(): Promise<{location: Location}> {
+  const settings = await getBackendSettings();
+  const locations = Array.isArray(settings.locations) ? settings.locations : [];
+  const main = locations.find((item) => item.id === "main") || locations[0];
+  const lat = Number(settings.workSiteLat);
+  const lng = Number(settings.workSiteLng);
+  const radiusMeters = Number(settings.radiusMeters);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radiusMeters) || radiusMeters < 0) {
+    throw new Error("بيانات موقع العمل في إعدادات النظام غير صالحة.");
+  }
+  return { location: { id: String(main?.id || "main"), name: String(main?.name || "المقر الرئيسي"), lat, lng, radiusMeters } };
+}
+
+export async function backendHealth(){return request<{ok:boolean;database?:string;ownerInitialized?:boolean}>("/api/health");} export type {AdminAccount};
