@@ -1,6 +1,7 @@
-type Env = { DB: D1Database; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_RECOVERY_CODE?: string };
+type Env = { DB: D1Database; PROFILE_IMAGES: R2Bucket; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_RECOVERY_CODE?: string };
 
 const original = (await import("./index")).default;
+const { handleProfileImageRequest } = await import("./r2");
 const encoder = new TextEncoder();
 const PASSWORD_ITERATIONS = 100000;
 
@@ -23,7 +24,7 @@ function json(data: unknown, status: number, origin: string) {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": origin,
     "access-control-allow-headers": "content-type, authorization, x-device-id",
-    "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
+    "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
   }});
 }
 
@@ -56,8 +57,17 @@ async function recoverLocationFromSettings(db: D1Database) {
   return await db.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id='main' LIMIT 1").first<any>();
 }
 
+async function actorFromOriginal(req: Request, env: Env) {
+  const url = new URL(req.url);
+  url.pathname = "/api/me";
+  url.search = "";
+  const probe = await original.fetch(new Request(url, { method: "GET", headers: req.headers }), env, {} as ExecutionContext);
+  if (!probe.ok) return null;
+  return (await probe.json().catch(() => ({})) as any).user || null;
+}
+
 async function recovery(req: Request, env: Env, origin: string) {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,OPTIONS" } });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS" } });
   if (req.method !== "POST") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
   if (!env.OWNER_RECOVERY_CODE) return json({ error: "استعادة المالك غير مفعلة على الخادم" }, 503, origin);
 
@@ -122,9 +132,11 @@ export default {
     const origin = env.APP_ORIGIN || "*";
     if (url.pathname.replace(/\/$/, "") === "/api/auth/recover-owner") return recovery(req, env, origin);
 
-    // Keep the settings table and the employee-facing locations table in sync.
-    // The manager UI writes GPS settings through /api/settings; this wrapper
-    // mirrors the authoritative main site into locations in the same D1 database.
+    if (url.pathname.replace(/\/$/, "").match(/^\/api\/employees\/[^/]+\/avatar$/)) {
+      const actor = await actorFromOriginal(req, env);
+      return handleProfileImageRequest(req, env, actor, origin);
+    }
+
     if (url.pathname.replace(/\/$/, "") === "/api/settings" && req.method === "PUT") {
       const copy = req.clone();
       const response = await original.fetch(req, env, ctx);
@@ -140,9 +152,6 @@ export default {
       return response;
     }
 
-    // Employee location is always resolved from the same D1 database. If the
-    // older core handler cannot find a location, repair it from saved settings
-    // and return the repaired D1 row instead of exposing a misleading 404.
     if (url.pathname.replace(/\/$/, "") === "/api/employee-location" && req.method === "GET") {
       const response = await original.fetch(req, env, ctx);
       if (response.status !== 404) return response;
