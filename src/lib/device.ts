@@ -38,6 +38,10 @@ export function getDeviceLabel(): string {
   return label;
 }
 export function setDeviceLabel(label: string): void { try { if (typeof window !== "undefined") localStorage.setItem(DEVICE_LABEL_KEY, label.trim()); } catch {} }
+
+/** Browser-side placeholder. The authoritative client IP is captured by the Worker from the request. */
+export function getClientIpPlaceholder(): string { return "browser"; }
+
 export interface StorageAdapter { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void; }
 class LocalStorageAdapter implements StorageAdapter { getItem(key: string) { try { return typeof window === "undefined" ? null : localStorage.getItem(key); } catch { return null; } } setItem(key: string, value: string) { try { if (typeof window !== "undefined") localStorage.setItem(key, value); } catch {} } removeItem(key: string) { try { if (typeof window !== "undefined") localStorage.removeItem(key); } catch {} } }
 export const storage: StorageAdapter = new LocalStorageAdapter();
