@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
 import { currentSession, logoutEmployee } from "@/lib/auth";
@@ -7,6 +7,8 @@ import { backendEnabled, getBackendEmployeeProfile, getBackendAttendance, getBac
 import { getEmployeeScheduleStatus } from "@/lib/schedule";
 import { formatTime, formatDurationMinutes, todayKey, minutesBetween } from "@/lib/utils";
 import type { AttendanceRecord, Employee, Location } from "@/types";
+
+const PROFILE_TIMEOUT_MS = 12000;
 
 export default function EmployeeHome() {
   const nav = useNavigate();
@@ -21,45 +23,85 @@ export default function EmployeeHome() {
   const [requestType, setRequestType] = useState<RequestType>("permission");
   const [reason, setReason] = useState("");
   const [requestSent, setRequestSent] = useState(false);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     if (!session) { nav("/login", { replace: true }); return; }
     let cancelled = false;
+
     const loadFromD1 = async () => {
+      // Prevent focus/events/timers from starting overlapping profile requests.
+      if (loadingRef.current) return;
+      loadingRef.current = true;
       setLoadingProfile(true);
       setProfileError(null);
-      if (!backendEnabled) { setProfileError("خادم D1 غير مفعّل."); setLoadingProfile(false); return; }
+
+      if (!backendEnabled) {
+        if (!cancelled) {
+          setProfileError("خادم D1 غير مفعّل. يرجى المحاولة لاحقاً.");
+          setLoadingProfile(false);
+        }
+        loadingRef.current = false;
+        return;
+      }
+
       try {
-        // ملف الموظف هو المصدر الإلزامي. لا تجعل فشل الحضور أو المواقع يمنع فتح الصفحة.
-        const profile = await getBackendEmployeeProfile();
+        const timeout = new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error("انتهت مهلة الاتصال بقاعدة البيانات. تحقق من الاتصال ثم أعد المحاولة.")), PROFILE_TIMEOUT_MS);
+        });
+
+        // D1 is the only source of truth for the employee profile.
+        const profile = await Promise.race([getBackendEmployeeProfile(), timeout]);
+
         if (cancelled) return;
+        if (!profile) {
+          throw new Error("لم يتم العثور على ملف الموظف المرتبط بحسابك في D1.");
+        }
+
         setEmp(profile);
         setProfileError(null);
         setLoadingProfile(false);
 
-        // البيانات الإضافية تُحمّل بعد الملف بشكل مستقل.
+        // Optional data must never prevent the employee page from opening.
         const [attendanceResult, locationsResult] = await Promise.allSettled([
           getBackendAttendance(500),
           getBackendLocations(),
         ]);
         if (cancelled) return;
-        if (attendanceResult.status === "fulfilled") setAttendance(attendanceResult.value);
-        if (locationsResult.status === "fulfilled") setLocations(locationsResult.value);
+        if (attendanceResult.status === "fulfilled" && Array.isArray(attendanceResult.value)) {
+          setAttendance(attendanceResult.value);
+        }
+        if (locationsResult.status === "fulfilled" && Array.isArray(locationsResult.value)) {
+          setLocations(locationsResult.value);
+        }
       } catch (error) {
         if (cancelled) return;
-        const message = error instanceof Error ? error.message : "تعذر تحميل بيانات الموظف من D1.";
+        const message = error instanceof Error && error.message.trim()
+          ? error.message
+          : "تعذر تحميل بيانات الموظف من D1. يرجى المحاولة مرة أخرى.";
         setProfileError(message);
         setEmp(null);
         setLoadingProfile(false);
+      } finally {
+        loadingRef.current = false;
+        if (!cancelled) setLoadingProfile(false);
       }
     };
+
     void loadFromD1();
-    const refresh = () => { void loadFromD1(); };
+
+    const refresh = () => {
+      // Cloud changes may trigger a refresh, but never while another request is running.
+      void loadFromD1();
+    };
     window.addEventListener("hadir:cloud-data-changed", refresh);
     window.addEventListener("hadir:d1-view-changed", refresh);
-    window.addEventListener("focus", refresh);
-    const timer = window.setInterval(refresh, 30000);
-    return () => { cancelled = true; window.removeEventListener("hadir:cloud-data-changed", refresh); window.removeEventListener("hadir:d1-view-changed", refresh); window.removeEventListener("focus", refresh); window.clearInterval(timer); };
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("hadir:cloud-data-changed", refresh);
+      window.removeEventListener("hadir:d1-view-changed", refresh);
+    };
   }, [session, nav]);
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
@@ -78,6 +120,7 @@ export default function EmployeeHome() {
   if (checkIn) { const scheduled = new Date(checkIn.timestamp); scheduled.setHours(hh, mm, 0, 0); const diff = Math.round((new Date(checkIn.timestamp).getTime() - scheduled.getTime()) / 60000); const grace = emp?.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10; lateMinutes = Math.max(0, diff - grace); }
   const shiftEnded = emp ? isShiftOver(emp) : false;
   const logout = () => { logoutEmployee(); nav("/login"); };
+  const retryProfile = () => { window.location.reload(); };
   const canCheckIn = isWorkDay && !checkIn;
   const canCheckOut = isWorkDay && !!checkIn && !checkOut && shiftEnded;
 
@@ -89,7 +132,7 @@ export default function EmployeeHome() {
 
   if (!session) return null;
   if (loadingProfile) return <div className="min-h-screen grid place-items-center px-5"><div className="hud-card w-full max-w-md p-7 text-center"><Brand /><div className="mt-5 font-bold">جاري تحميل بيانات الموظف من D1...</div><div className="text-xs text-muted-foreground mt-2">يتم جلب ملف الموظف المرتبط بحسابك مباشرة من قاعدة البيانات.</div></div></div>;
-  if (profileError || !emp) return <div className="min-h-screen grid place-items-center px-5"><div className="hud-card w-full max-w-md p-7 text-center"><Brand /><div className="mt-5 font-bold">تعذر تحميل بيانات الموظف</div><div className="text-sm text-muted-foreground mt-2">{profileError || "لم يتم العثور على ملف الموظف في D1."}</div><div className="flex gap-2 mt-5"><button onClick={() => window.location.reload()} className="btn-primary flex-1 py-2.5 rounded-xl">إعادة المحاولة</button><button onClick={logout} className="btn-ghost flex-1 py-2.5 rounded-xl">تسجيل الخروج</button></div></div></div>;
+  if (profileError || !emp) return <div className="min-h-screen grid place-items-center px-5"><div className="hud-card w-full max-w-md p-7 text-center"><Brand /><div className="mt-5 font-bold">تعذر تحميل بيانات الموظف</div><div className="text-sm text-muted-foreground mt-2">{profileError || "لم يتم العثور على ملف الموظف في D1."}</div><div className="flex gap-2 mt-5"><button onClick={retryProfile} className="btn-primary flex-1 py-2.5 rounded-xl">إعادة المحاولة</button><button onClick={logout} className="btn-ghost flex-1 py-2.5 rounded-xl">تسجيل الخروج</button></div></div></div>;
 
   return (<div className="min-h-screen">
     <header className="max-w-xl mx-auto px-4 sm:px-5 py-4 sm:py-5 flex items-center justify-between"><Brand /><button onClick={logout} className="btn-ghost text-xs">خروج</button></header>
@@ -104,5 +147,5 @@ export default function EmployeeHome() {
 function Stat({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-secondary/40 border border-border/50 p-2 sm:p-3"><div className="text-[10px] text-muted-foreground mono">{label}</div><div className="font-extrabold mt-0.5 mono tabular-nums text-sm sm:text-lg">{value}</div></div>; }
 function Row({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-secondary/30 border border-border/50 p-2 sm:p-2.5"><div className="text-muted-foreground truncate">{label}</div><div className="font-semibold mt-0.5 truncate">{value}</div></div>; }
 function ArrowIn() { return <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>; }
-function ArrowOut() { return <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6 text-accent" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>; }
+function ArrowOut() { return <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-6 sm:w-6 text-accent" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1 2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>; }
 function RestIcon() { return <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>; }
