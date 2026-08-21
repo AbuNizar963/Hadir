@@ -31,7 +31,7 @@ export function getDeviceLabel(): string {
   if (typeof window === "undefined") return "server";
   try { const stored = localStorage.getItem(DEVICE_LABEL_KEY)?.trim(); if (stored) return stored; } catch {}
   const ua = navigator.userAgent || "";
-  let device = /iPhone/i.test(ua) ? "iPhone" : /iPad/i.test(ua) ? "iPad" : /Android/i.test(ua) ? "Android" : /Windows/i.test(ua) ? "Windows" : /Macintosh|Mac OS X/i.test(ua) ? "Mac" : "متصفح";
+  const device = /iPhone/i.test(ua) ? "iPhone" : /iPad/i.test(ua) ? "iPad" : /Android/i.test(ua) ? "Android" : /Windows/i.test(ua) ? "Windows" : /Macintosh|Mac OS X/i.test(ua) ? "Mac" : "متصفح";
   const browser = /Edg\//i.test(ua) ? "Edge" : /Chrome\//i.test(ua) ? "Chrome" : /Firefox\//i.test(ua) ? "Firefox" : /Safari\//i.test(ua) ? "Safari" : "Browser";
   const label = `${device} · ${browser}`;
   try { localStorage.setItem(DEVICE_LABEL_KEY, label); } catch {}
