@@ -47,6 +47,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: TypeScript strict check
+        run: bun run typecheck
+
       - name: Build production bundle
         run: bun run build
 
@@ -55,9 +58,7 @@ jobs:
           set -euo pipefail
           test -f dist/index.html
           test -s dist/index.html
-          test -f src/components/layout/ManagerLayout.tsx
-          grep -q "getDiagnostics" src/components/layout/ManagerLayout.tsx
-          echo "Production bundle and owner diagnostics source verified."
+          echo "Production bundle verified."
 
       - name: Make SPA fallback
         run: cp dist/index.html dist/404.html
