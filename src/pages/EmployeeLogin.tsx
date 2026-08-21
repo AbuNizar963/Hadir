@@ -7,6 +7,15 @@ import { getSettings } from "@/lib/storage";
 
 const LOGIN_TIMEOUT_MS = 20000;
 
+type EmployeeLoginUser = {
+  id?: string;
+  jobNumber?: string;
+  username?: string;
+  name?: string;
+  status?: string;
+  role?: string;
+};
+
 export default function EmployeeLogin() {
   const nav = useNavigate();
   const settings = getSettings();
@@ -30,12 +39,23 @@ export default function EmployeeLogin() {
         timer = window.setTimeout(() => reject(new Error("انتهت مهلة الاتصال بخادم حاضر. تحقق من الإنترنت وحاول مرة أخرى.")), LOGIN_TIMEOUT_MS);
       });
 
-      const employee = await Promise.race([backendEmployeeLogin(jobNumber, pin), timeout]);
+      const rawUser = await Promise.race([backendEmployeeLogin(jobNumber.trim(), pin), timeout]) as EmployeeLoginUser;
+      const employeeId = String(rawUser?.id || "").trim();
+      // The Worker session actor uses `username` for the employee job number,
+      // while employee CRUD/profile responses expose `jobNumber`.
+      const employeeJobNumber = String(rawUser?.jobNumber || rawUser?.username || "").trim();
 
-      if (!employee?.id || !employee?.jobNumber) throw new Error("تعذر العثور على ملف الموظف المرتبط بهذا الحساب في D1.");
-      if (employee.status && employee.status !== "active") throw new Error("حساب الموظف موقوف. يرجى مراجعة الإدارة.");
+      if (!employeeId || !employeeJobNumber) throw new Error("تعذر العثور على ملف الموظف المرتبط بهذا الحساب في D1.");
+      if (rawUser.status && rawUser.status !== "active") throw new Error("حساب الموظف موقوف. يرجى مراجعة الإدارة.");
 
-      setSession({ employeeId: employee.id, jobNumber: employee.jobNumber, name: employee.name, loginAt: new Date().toISOString(), role: employee.role });
+      setSession({
+        employeeId,
+        jobNumber: employeeJobNumber,
+        name: String(rawUser.name || "").trim(),
+        loginAt: new Date().toISOString(),
+        role: rawUser.role || "staff",
+      });
+      window.dispatchEvent(new Event("hadir:session-changed"));
       nav("/employee", { replace: true });
     } catch (error) {
       setErr(error instanceof Error ? error.message : "تعذر تسجيل الدخول. حاول مرة أخرى.");
