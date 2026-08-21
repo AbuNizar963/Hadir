@@ -130,9 +130,6 @@ export function getCurrentPosition(options: PositionOptions = {}): Promise<GeoPo
           else finish(new Error("انتهت مهلة تحديد الموقع. فعّل GPS وحاول مرة أخرى."));
         },
         {
-          enableHighAccuracy: true,
-          timeout: GPS_TIMEOUT_MS,
-          maximumAge: 0,
           ...options,
           enableHighAccuracy: true,
           timeout: GPS_TIMEOUT_MS,
