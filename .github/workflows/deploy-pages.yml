@@ -19,8 +19,6 @@ env:
   VITE_BASE_PATH: /Hadir/
   VITE_API_URL: https://hadir-api.abunizar963.workers.dev
 
-auto_cancel: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
