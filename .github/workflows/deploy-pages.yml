@@ -1,4 +1,5 @@
 name: Deploy Hadir to GitHub Pages
+run-name: Deploy Hadir
 
 on:
   push:
