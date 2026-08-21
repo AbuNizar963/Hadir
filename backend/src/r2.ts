@@ -78,9 +78,9 @@ export async function handleProfileImageRequest(
       .first<{ id: string }>();
     if (!employee) return json({ error: "الموظف غير موجود" }, 404, origin);
 
-    const previous = await env.DB.prepare("SELECT avatar FROM employees WHERE id=? LIMIT 1")
+    const previous = await env.DB.prepare("SELECT avatar_key FROM employees WHERE id=? LIMIT 1")
       .bind(employeeId)
-      .first<{ avatar: string | null }>();
+      .first<{ avatar_key: string | null }>();
 
     await env.PROFILE_IMAGES.put(key, file.stream(), {
       httpMetadata: {
@@ -94,7 +94,7 @@ export async function handleProfileImageRequest(
     });
 
     try {
-      await env.DB.prepare("UPDATE employees SET avatar=? WHERE id=?")
+      await env.DB.prepare("UPDATE employees SET avatar_key=? WHERE id=?")
         .bind(key, employeeId)
         .run();
     } catch (error) {
@@ -102,8 +102,8 @@ export async function handleProfileImageRequest(
       throw error;
     }
 
-    if (previous?.avatar && previous.avatar !== key && previous.avatar.startsWith("employees/")) {
-      await env.PROFILE_IMAGES.delete(previous.avatar).catch(() => undefined);
+    if (previous?.avatar_key && previous.avatar_key !== key && previous.avatar_key.startsWith("employees/")) {
+      await env.PROFILE_IMAGES.delete(previous.avatar_key).catch(() => undefined);
     }
 
     return json({ ok: true, key, size: file.size }, 200, origin);
@@ -115,7 +115,7 @@ export async function handleProfileImageRequest(
     }
 
     await env.PROFILE_IMAGES.delete(key);
-    await env.DB.prepare("UPDATE employees SET avatar=NULL WHERE id=?").bind(employeeId).run();
+    await env.DB.prepare("UPDATE employees SET avatar_key=NULL WHERE id=?").bind(employeeId).run();
     return json({ ok: true }, 200, origin);
   }
 
