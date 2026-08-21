@@ -14,41 +14,45 @@ permissions:
 
 jobs:
   activate:
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Patch manager page
         run: |
-          python3 - <<'PY'
+          set -euo pipefail
+          python3 <<'PY'
           from pathlib import Path
-          import re
           p=Path('src/pages/ManagerEmployees.tsx')
-          s=p.read_text()
+          s=p.read_text(encoding='utf-8')
           imp='import SmartEmployeeImport from "@/components/employees/SmartEmployeeImport";'
           if imp not in s:
               marker='import { addNotification } from "@/lib/notifications";'
               if marker not in s:
                   raise SystemExit('manager import marker not found')
               s=s.replace(marker, marker+'\n'+imp, 1)
-          if '<SmartEmployeeImport' not in s:
-              m=re.search(r'<ManagerLayout\b[^>]*>', s)
-              if not m:
-                  raise SystemExit('ManagerLayout opening tag not found')
-              widget='\n      <SmartEmployeeImport onImported={() => { void refreshEmployeesFromD1(); }} />'
-              s=s[:m.end()]+widget+s[m.end():]
-          p.write_text(s)
+          old='<input ref={importInputRef} type="file" accept=".csv,text/csv" onChange={importEmployees} className="hidden"/><button type="button" onClick={()=>importInputRef.current?.click()} className="btn-secondary text-xs" disabled={importing}>{importing?"جاري الاستيراد…":"استيراد ملف"}</button>'
+          new='<SmartEmployeeImport onImported={() => { void refreshEmployeesFromD1(); }} />'
+          if old in s:
+              s=s.replace(old,new,1)
+          elif '<SmartEmployeeImport' not in s:
+              raise SystemExit('CSV-only importer control not found')
+          s=s.replace('صيغة الاستيراد: CSV. الأعمدة الأساسية: <span className="mono">name, jobNumber</span>، ويمكن إضافة بيانات الدوام والمقر والحالة.','يمكنك استيراد Excel أو CSV حتى لو كانت الأعمدة غير مرتبة؛ سيحاول النظام تحديد الاسم والرقم الوظيفي تلقائياً.')
+          p.write_text(s,encoding='utf-8')
           PY
-      - name: Install and verify
+      - name: Verify
         run: |
           corepack enable
           npm install --ignore-scripts
-          npx tsc --noEmit
+          npx tsc --noEmit --pretty false
           npm run build
+          grep -q 'SmartEmployeeImport' src/pages/ManagerEmployees.tsx
+          ! grep -q 'accept=".csv,text/csv"' src/pages/ManagerEmployees.tsx
       - name: Commit activation
         run: |
+          if git diff --quiet -- src/pages/ManagerEmployees.tsx; then echo 'Smart importer already active'; exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/pages/ManagerEmployees.tsx
-          if git diff --cached --quiet; then echo 'Smart importer already active'; exit 0; fi
-          git commit -m 'feat: add smart Excel employee import button'
+          git commit -m 'fix: replace CSV-only employee import with smart Excel import'
           git push
