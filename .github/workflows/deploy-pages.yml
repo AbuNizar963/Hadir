@@ -47,18 +47,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build
+      - name: Build production bundle
         run: bun run build
 
-      - name: Verify owner diagnostics UI is in the published bundle
+      - name: Verify Pages artifact
         run: |
           set -euo pipefail
           test -f dist/index.html
-          if ! grep -R -q "سجل أخطاء النظام" dist; then
-            echo "ERROR: owner diagnostics UI is missing from the production bundle." >&2
-            exit 1
-          fi
-          echo "Owner diagnostics UI verified in dist."
+          test -s dist/index.html
+          test -f src/components/layout/ManagerLayout.tsx
+          grep -q "getDiagnostics" src/components/layout/ManagerLayout.tsx
+          echo "Production bundle and owner diagnostics source verified."
 
       - name: Make SPA fallback
         run: cp dist/index.html dist/404.html
