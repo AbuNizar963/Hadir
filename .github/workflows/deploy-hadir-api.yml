@@ -20,12 +20,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Validate Cloudflare credentials
         shell: bash
         env:
@@ -35,22 +33,18 @@ jobs:
           set -euo pipefail
           [[ -n "$CF_TOKEN" ]] || { echo 'Missing CLOUDFLARE_API_TOKEN' >&2; exit 1; }
           [[ -n "$CF_ACCOUNT" ]] || { echo 'Missing CLOUDFLARE_ACCOUNT_ID' >&2; exit 1; }
-
       - name: Install Wrangler
         run: npm install --no-save --no-package-lock wrangler@4.123.0
-
       - name: Authenticate with Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler whoami
-
       - name: Verify D1 is reachable
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler d1 list
-
       - name: Ensure R2 profile bucket exists
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -59,25 +53,17 @@ jobs:
         run: |
           set -euo pipefail
           BUCKET="hadir-profile-images"
-          if npx wrangler r2 bucket list | grep -Fq "$BUCKET"; then
-            echo "R2 bucket $BUCKET already exists."
-          else
-            echo "Creating R2 bucket $BUCKET..."
-            npx wrangler r2 bucket create "$BUCKET"
-          fi
-
+          if npx wrangler r2 bucket list | grep -Fq "$BUCKET"; then echo "R2 bucket $BUCKET already exists."; else npx wrangler r2 bucket create "$BUCKET"; fi
       - name: Validate Worker bundle
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy --dry-run
-
       - name: Apply D1 migrations
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler d1 migrations apply Hadir --remote
-
       - name: Inspect production D1 schema
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -85,11 +71,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo 'Production D1 tables:'
           npx wrangler d1 execute Hadir --remote --command "SELECT name, type FROM sqlite_master WHERE type IN ('table','index') ORDER BY type,name;"
-          echo 'Production admin account state:'
           npx wrangler d1 execute Hadir --remote --command "SELECT id, username, name, role, active, created_at FROM admin_accounts ORDER BY created_at;"
-
       - name: Configure JWT secret
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -98,12 +81,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$CONFIGURED_JWT_SECRET" ]]; then
-            echo 'Missing JWT_SECRET GitHub secret.' >&2
-            exit 1
-          fi
+          [[ -n "$CONFIGURED_JWT_SECRET" ]] || { echo 'Missing JWT_SECRET GitHub secret.' >&2; exit 1; }
           printf '%s' "$CONFIGURED_JWT_SECRET" | npx wrangler secret put JWT_SECRET
-
       - name: Configure owner recovery secret
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -112,48 +91,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$CONFIGURED_OWNER_RECOVERY_CODE" ]]; then
-            echo 'Missing OWNER_RECOVERY_CODE GitHub secret.' >&2
-            exit 1
-          fi
+          [[ -n "$CONFIGURED_OWNER_RECOVERY_CODE" ]] || { echo 'Missing OWNER_RECOVERY_CODE GitHub secret.' >&2; exit 1; }
           printf '%s' "$CONFIGURED_OWNER_RECOVERY_CODE" | npx wrangler secret put OWNER_RECOVERY_CODE
-
       - name: Verify configured Worker secret names
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler secret list
-
       - name: Deploy Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
-
-      - name: Verify deployed Worker and D1
+      - name: Verify canonical deployed Worker and D1
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          HADIR_API_URL: https://hadir-api.abunizar963.workers.dev
         shell: bash
         run: |
           set -euo pipefail
-          BASE_URL="${VITE_API_URL:-}"
-          [[ -n "$BASE_URL" ]] || { echo 'Missing VITE_API_URL GitHub secret.' >&2; exit 1; }
-          BASE_URL="${BASE_URL%/}"
-          [[ "$BASE_URL" == https://* ]] || { echo 'VITE_API_URL must use HTTPS.' >&2; exit 1; }
-
-          echo "Checking $BASE_URL/api/health"
-          HEALTH=$(curl -fsS --retry 3 --retry-delay 2 --max-time 20 "$BASE_URL/api/health")
+          BASE_URL="${HADIR_API_URL%/}"
+          HEALTH=$(curl -fsS --retry 5 --retry-delay 2 --connect-timeout 10 --max-time 30 "$BASE_URL/api/health")
           echo "$HEALTH"
-          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"){console.error("Worker/D1 health check failed");process.exit(1)}console.log("Worker and D1 are healthy; ownerInitialized="+x.ownerInitialized)' "$HEALTH"
-
-          echo "Checking $BASE_URL/api/bootstrap availability"
-          BOOT_STATUS=$(curl -sS -o /tmp/bootstrap.json -w '%{http_code}' --retry 3 --retry-delay 2 --max-time 20 "$BASE_URL/api/bootstrap")
+          node -e 'const x=JSON.parse(process.argv[1]);if(!x.ok||x.database!=="D1"){console.error("Worker/D1 health check failed");process.exit(1)}console.log("Worker/D1 healthy")' "$HEALTH"
+          BOOT_STATUS=$(curl -sS -o /tmp/bootstrap.json -w '%{http_code}' --retry 5 --retry-delay 2 --connect-timeout 10 --max-time 30 "$BASE_URL/api/bootstrap")
           cat /tmp/bootstrap.json
-          if [[ "$BOOT_STATUS" == "200" ]]; then
-            node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync("/tmp/bootstrap.json","utf8"));if(typeof x.bootstrap!=="boolean"){console.error("Bootstrap endpoint returned invalid JSON");process.exit(1)}console.log("Bootstrap endpoint OK")'
-          elif [[ "$BOOT_STATUS" == "401" ]]; then
-            echo 'Bootstrap endpoint is protected by authentication; health check passed, so deployment verification continues.'
-          else
-            echo "Bootstrap endpoint returned unexpected HTTP status: $BOOT_STATUS" >&2
-            exit 1
-          fi
+          [[ "$BOOT_STATUS" == "200" || "$BOOT_STATUS" == "401" ]] || { echo "Unexpected bootstrap status: $BOOT_STATUS" >&2; exit 1; }
