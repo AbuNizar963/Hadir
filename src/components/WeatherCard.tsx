@@ -26,9 +26,9 @@ export default function WeatherCard({ compact = false, latitude, longitude, titl
       try { const next = await readWeather(lat, lon, controller.signal); if (!cancelled) setW({ ...next, city }); }
       catch { if (!cancelled) setW(x => ({ ...x, loading: false, error: "تعذر جلب الطقس" })); }
     };
-    const useDevicePosition = Boolean(hideWhenWithinKm != null && referenceLatitude != null && referenceLongitude != null);
+    const needsDevicePosition = hideWhenWithinKm != null && referenceLatitude != null && referenceLongitude != null;
     const load = () => {
-      if (useDevicePosition) {
+      if (needsDevicePosition) {
         if (!navigator.geolocation) { if (!cancelled) setW(x => ({ ...x, loading: false, error: "الموقع غير متاح" })); return; }
         navigator.geolocation.getCurrentPosition(position => {
           if (cancelled) return;
