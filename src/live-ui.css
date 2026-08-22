@@ -12,6 +12,10 @@
 .live-value:where([data-changed="true"]) { animation: live-value-pop 260ms ease-out; }
 @keyframes live-value-pop { 0% { transform: scale(.96); opacity: .55; } 100% { transform: scale(1); opacity: 1; } }
 
+.weather-strip-live { min-height: 1cm; max-height: 1.55cm; overflow: hidden; transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease; animation: weather-breathe 6s ease-in-out infinite; }
+.weather-strip-live:hover { transform: translateY(-1px); }
+@keyframes weather-breathe { 0%,100% { opacity: .94; } 50% { opacity: 1; } }
+
 @media (prefers-reduced-motion: reduce) {
-  .live-status-dot, .live-value { animation: none !important; transition: none !important; }
+  .live-status-dot, .live-value, .weather-strip-live { animation: none !important; transition: none !important; }
 }
