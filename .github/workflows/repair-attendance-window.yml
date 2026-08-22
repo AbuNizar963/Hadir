@@ -1,3 +1,4 @@
+# one-shot repair trigger
 name: Repair attendance confirmation window
 on:
   push:
@@ -18,86 +19,45 @@ jobs:
           s = p.read_text()
           old = 'async function ensureWorkflowSchema(db: D1Database) { await db.batch([db.prepare("CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,type TEXT NOT NULL DEFAULT \'info\',read_at TEXT,created_at TEXT NOT NULL)"),db.prepare("CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id,created_at DESC)")]); }'
           new = old[:-3] + ',db.prepare("CREATE TABLE IF NOT EXISTS attendance_verifications(user_id TEXT PRIMARY KEY,verified_at TEXT NOT NULL,expires_at TEXT NOT NULL,nonce TEXT NOT NULL)")]); }'
-          if old not in s:
-              raise SystemExit('schema anchor not found')
+          if old not in s: raise SystemExit('schema anchor not found')
           s = s.replace(old, new, 1)
-
           old = '  const fresh=await currentEmployeeLocation(env.DB,actor.id); if(!fresh)return json({error:"لا يوجد موقع عمل صالح محفوظ في D1"},409,origin);\n  const distance=distanceMeters(lat,lng,fresh.location.lat,fresh.location.lng);'
           new = '  const fresh=await currentEmployeeLocation(env.DB,actor.id); if(!fresh)return json({error:"لا يوجد موقع عمل صالح محفوظ في D1"},409,origin);\n  const verification=await env.DB.prepare("SELECT expires_at AS expiresAt,nonce FROM attendance_verifications WHERE user_id=? LIMIT 1").bind(actor.id).first<any>();\n  if(!verification || new Date(String(verification.expiresAt)).getTime() < Date.now()) { await env.DB.prepare("DELETE FROM attendance_verifications WHERE user_id=?").bind(actor.id).run().catch(()=>undefined); return json({error:"انتهت مهلة تأكيد الحضور (60 ثانية). أعد تحديد الموقع ومسح QR ثم أكد العملية."},409,origin); }\n  const settingsRow=await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind("qrCode").first<any>();\n  let expectedQr=""; try { expectedQr=String(JSON.parse(String(settingsRow?.value||""))||"").trim(); } catch { expectedQr=String(settingsRow?.value||"").trim(); }\n  if(!expectedQr || String(b.qrCode||"").trim()!==expectedQr) return json({error:"رمز QR غير صحيح أو منتهي."},403,origin);\n  const distance=distanceMeters(lat,lng,fresh.location.lat,fresh.location.lng);'
-          if old not in s:
-              raise SystemExit('attendance anchor not found')
+          if old not in s: raise SystemExit('attendance anchor not found')
           s = s.replace(old, new, 1)
-
           old = '  const deviceId=String(req.headers.get("x-device-id")||b.deviceId||"unknown").trim()||"unknown"; const ip=req.headers.get("CF-Connecting-IP")||"unknown"; const id=uid();'
           new = '  await env.DB.prepare("DELETE FROM attendance_verifications WHERE user_id=?").bind(actor.id).run().catch(()=>undefined);\n  const deviceId=String(req.headers.get("x-device-id")||b.deviceId||"unknown").trim()||"unknown"; const ip=req.headers.get("CF-Connecting-IP")||"unknown"; const id=uid();'
-          if old not in s:
-              raise SystemExit('consume anchor not found')
+          if old not in s: raise SystemExit('consume anchor not found')
           s = s.replace(old, new, 1)
-
           old = ' if(path==="/api/locations"&&req.method==="GET"){if(!actor||!["owner","manager","supervisor","staff"].includes(actor.role))return json({error:"غير مصرح"},403,origin);const rows=await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name").all<any>();return json(rows.results||[],200,origin);}'
           new = ' if(path==="/api/locations"&&req.method==="GET"){if(!actor||!["owner","manager","supervisor","staff"].includes(actor.role))return json({error:"غير مصرح"},403,origin);const rows=await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name").all<any>();if(actor.role==="staff"){const verifiedAt=new Date();const expiresAt=new Date(verifiedAt.getTime()+60000);await env.DB.prepare("INSERT INTO attendance_verifications(user_id,verified_at,expires_at,nonce) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET verified_at=excluded.verified_at,expires_at=excluded.expires_at,nonce=excluded.nonce").bind(actor.id,verifiedAt.toISOString(),expiresAt.toISOString(),crypto.randomUUID()).run();}return json(rows.results||[],200,origin);}'
-          if old not in s:
-              raise SystemExit('locations anchor not found')
+          if old not in s: raise SystemExit('locations anchor not found')
           s = s.replace(old, new, 1)
           p.write_text(s)
-
           p = Path('src/main.tsx')
           s = p.read_text()
           marker = 'installApiCredentials();\n'
           insert = r'''
-
 function installAttendanceConfirmationGuard() {
   if (typeof window === "undefined") return;
   const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-  let timer: number | null = null;
-  let expiresAt = 0;
-  let lastQr = "";
-  let host: HTMLSpanElement | null = null;
+  let timer: number | null = null; let expiresAt = 0; let lastQr = ""; let host: HTMLSpanElement | null = null;
   const stop = () => { if (timer !== null) { window.clearInterval(timer); timer = null; } expiresAt = 0; if (host) { host.remove(); host = null; } };
   const isScanPage = () => /\/employee\/scan\/(check-in|check-out)/.test(window.location.pathname);
   const findQr = () => Array.from(document.querySelectorAll<HTMLInputElement>('input')).find((el) => String(el.value || '').trim() && !/password|search|number|date|time/i.test(el.type));
   const findConfirm = () => Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((el) => { const t = (el.textContent || '').replace(/\s+/g, ' ').trim(); return /تأكيد|تسجيل الحضور|تسجيل الانصراف|تأكيد الحضور|تأكيد الانصراف/.test(t) && !/تحديد موقعي|الكاميرا|مسح|إلغاء/.test(t); });
-  const start = async (qr: string) => {
-    if (!isScanPage() || !qr || qr === lastQr) return;
-    lastQr = qr;
-    stop();
-    try { await fetch(`${API_URL}/api/locations`, { credentials: "include", cache: "no-store" }); } catch { /* submit endpoint still performs all server checks */ }
-    expiresAt = Date.now() + 60000;
-    const tick = () => {
-      const button = findConfirm();
-      if (!button) return;
-      if (!host) { host = document.createElement('span'); host.className = 'attendance-confirm-timer'; button.parentElement?.insertBefore(host, button); }
-      const remaining = Math.max(0, expiresAt - Date.now());
-      const seconds = Math.ceil(remaining / 1000);
-      host.textContent = seconds > 0 ? `⏱ ${seconds} ث` : '⏱ انتهت المهلة';
-      host.setAttribute('role', 'status');
-      button.disabled = seconds <= 0;
-      button.setAttribute('aria-disabled', seconds <= 0 ? 'true' : 'false');
-      if (seconds <= 0) stop();
-    };
-    tick(); timer = window.setInterval(tick, 250);
-  };
-  const observer = new MutationObserver(() => {
-    if (!isScanPage()) { stop(); lastQr = ""; return; }
-    const qr = findQr();
-    if (qr && qr.value.trim() && qr.value.trim() !== lastQr) void start(qr.value.trim());
-  });
-  observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['value', 'disabled'] });
-  window.addEventListener('beforeunload', stop);
+  const start = async (qr: string) => { if (!isScanPage() || !qr || qr === lastQr) return; lastQr = qr; stop(); try { await fetch(`${API_URL}/api/locations`, { credentials: "include", cache: "no-store" }); } catch {} expiresAt = Date.now() + 60000; const tick = () => { const button = findConfirm(); if (!button) return; if (!host) { host = document.createElement('span'); host.className = 'attendance-confirm-timer'; button.parentElement?.insertBefore(host, button); } const seconds = Math.ceil(Math.max(0, expiresAt - Date.now()) / 1000); host.textContent = seconds > 0 ? `⏱ ${seconds} ث` : '⏱ انتهت المهلة'; host.setAttribute('role', 'status'); button.disabled = seconds <= 0; button.setAttribute('aria-disabled', seconds <= 0 ? 'true' : 'false'); if (seconds <= 0) stop(); }; tick(); timer = window.setInterval(tick, 250); };
+  const observer = new MutationObserver(() => { if (!isScanPage()) { stop(); lastQr = ""; return; } const qr = findQr(); if (qr && qr.value.trim() && qr.value.trim() !== lastQr) void start(qr.value.trim()); });
+  observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['value', 'disabled'] }); window.addEventListener('beforeunload', stop);
 }
-
 installAttendanceConfirmationGuard();
 '''
-          if marker not in s:
-              raise SystemExit('main marker not found')
-          s = s.replace(marker, marker + insert, 1)
+          if marker not in s: raise SystemExit('main marker not found')
+          if 'installAttendanceConfirmationGuard' not in s: s = s.replace(marker, marker + insert, 1)
           p.write_text(s)
-
-          css = Path('src/index.css')
-          s = css.read_text()
-          s += '\n\n.attendance-confirm-timer{display:inline-flex;align-items:center;justify-content:center;min-width:72px;margin-inline-end:.5rem;padding:.35rem .65rem;border:1px solid hsl(var(--border));border-radius:.75rem;font-size:.78rem;font-weight:800;background:hsl(var(--muted)/.55);font-variant-numeric:tabular-nums}\n'
+          css = Path('src/index.css'); s = css.read_text();
+          if '.attendance-confirm-timer' not in s: s += '\n.attendance-confirm-timer{display:inline-flex;align-items:center;justify-content:center;min-width:72px;margin-inline-end:.5rem;padding:.35rem .65rem;border:1px solid hsl(var(--border));border-radius:.75rem;font-size:.78rem;font-weight:800;background:hsl(var(--muted)/.55);font-variant-numeric:tabular-nums}\n'
           css.write_text(s)
-
       - name: Build frontend
         run: |
           corepack enable || true
