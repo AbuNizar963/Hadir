@@ -18,23 +18,19 @@ export default function ManagerDashboard() {
   useEffect(() => {
     let active = true;
     const load = async () => {
-      try {
-        const [serverEmployees, serverAttendance, serverRequests] = await Promise.all([
-          getBackendEmployees(),
-          getBackendAttendance(2000),
-          getBackendRequests("admin"),
-        ]);
-        if (!active) return;
-        setEmployees(serverEmployees);
-        setAttendance(serverAttendance);
-        setRequests(serverRequests);
-      } catch {
-        if (!active) return;
-        setEmployees(getEmployees());
-        setAttendance(getAttendance());
-      } finally {
-        if (active) setLoadingRequests(false);
-      }
+      const [employeeResult, attendanceResult, requestResult] = await Promise.allSettled([
+        getBackendEmployees(),
+        getBackendAttendance(2000),
+        getBackendRequests("admin"),
+      ]);
+      if (!active) return;
+
+      if (employeeResult.status === "fulfilled") setEmployees(employeeResult.value);
+      else setEmployees(getEmployees());
+      if (attendanceResult.status === "fulfilled") setAttendance(attendanceResult.value);
+      else setAttendance(getAttendance());
+      if (requestResult.status === "fulfilled") setRequests(requestResult.value);
+      setLoadingRequests(false);
     };
     void load();
     const timer = window.setInterval(() => void load(), 15000);
@@ -49,7 +45,10 @@ export default function ManagerDashboard() {
   const presentIds = new Set(todayRec.filter((r) => r.type === "check-in").map((r) => r.employeeId));
   const [hh, mm] = (settings?.workStart || "08:00").split(":").map(Number);
   const scheduled = new Date(); scheduled.setHours(hh, mm, 0, 0);
-  const lateList = todayRec.filter((r) => r.type === "check-in").map((r) => ({ ...r, late: Math.max(0, Math.round((new Date(r.timestamp).getTime() - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)) })).filter((r) => r.late > 0);
+  const lateList = todayRec
+    .filter((r) => r.type === "check-in")
+    .map((r) => ({ ...r, late: Math.max(0, Math.round((new Date(r.timestamp).getTime() - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)) }))
+    .filter((r) => r.late > 0);
   const absentList = employees.filter((e) => e.status === "active" && !presentIds.has(e.id));
   const pendingRequests = requests.filter((r) => r.status === "pending");
   const todayRequests = requests.filter((r) => r.createdAt?.startsWith(today));
@@ -81,14 +80,14 @@ export default function ManagerDashboard() {
     >
       <div className="grid md:grid-cols-4 gap-4 mb-6"><Kpi label="إجمالي الموظفين" value={employees.length} /><Kpi label="حضور اليوم" value={presentIds.size} accent="primary" /><Kpi label="غياب" value={absentList.length} accent="warning" /><Kpi label="طلبات بانتظار المراجعة" value={pendingRequests.length} accent="destructive" /></div>
 
+      <div className="hud-card p-5 mb-6 border-primary/20">
+        <div className="flex items-center justify-between gap-3 mb-4"><div><SectionTitle title="إدارة الطلبات" hint={`${todayRequests.length} اليوم · ${pendingRequests.length} بانتظار المراجعة`} /><p className="text-xs text-muted-foreground -mt-1">طلبات الإجازة والاستئذان والانصراف تظهر هنا فور وصولها.</p></div><Link to="/manager/requests" className="text-xs font-bold text-primary">عرض كل الطلبات ←</Link></div>
+        {loadingRequests ? <p className="text-sm text-muted-foreground">جاري تحميل الطلبات...</p> : pendingRequests.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">لا توجد طلبات جديدة بانتظار المراجعة.</p> : <div className="space-y-3">{pendingRequests.slice(0, 20).map((request) => <div key={request.id} className="rounded-xl border border-border/70 bg-background/20 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-bold">{request.employeeName} · {request.requestType ? request.requestType : requestType(request.type)}</div><div className="mt-1 text-xs text-muted-foreground">{request.reason || "بدون ملاحظة"}</div><div className="mt-1 text-[11px] text-muted-foreground">{new Date(request.createdAt).toLocaleString("ar-SA")}</div></div><div className="flex gap-2"><button disabled={requestBusy === request.id} onClick={() => void decideRequest(request, "approved")} className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary disabled:opacity-50">✓ موافقة</button><button disabled={requestBusy === request.id} onClick={() => void decideRequest(request, "rejected")} className="rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive disabled:opacity-50">✕ رفض</button></div></div></div>)}</div>}
+      </div>
+
       <div className="flex gap-2 mb-4"><select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="border px-2 py-1.5 rounded-lg text-sm bg-secondary/50"><option value="all">الكل</option><option value="present">الحاضرون</option><option value="absent">الغائبون</option><option value="late">المتأخرون</option></select><input type="text" placeholder="🔍 بحث بالاسم" value={search} onChange={(e) => setSearch(e.target.value)} className="border px-3 py-1.5 rounded-lg text-sm bg-secondary/50 flex-1" /></div>
 
       <div className="hud-card p-5"><SectionTitle title="قائمة الموظفين" hint={`عدد: ${filteredEmployees.length}`} /><ul className="space-y-2">{filteredEmployees.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">لا توجد نتائج مطابقة</p> : filteredEmployees.map((e) => <li key={e.id} className="flex justify-between items-center border-b border-border/50 pb-2"><span className="font-medium">{e.name}</span><span className="text-xs px-2 py-1 rounded bg-secondary text-muted-foreground">{e.role}</span></li>)}</ul></div>
-
-      <div className="hud-card p-5 mt-6">
-        <div className="flex items-center justify-between gap-3 mb-4"><SectionTitle title="إدارة الطلبات" hint={`${todayRequests.length} اليوم · ${pendingRequests.length} بانتظار المراجعة`} /><Link to="/manager" className="text-xs text-primary">تحديث</Link></div>
-        {loadingRequests ? <p className="text-sm text-muted-foreground">جاري تحميل الطلبات...</p> : pendingRequests.length === 0 ? <p className="text-sm text-muted-foreground">لا توجد طلبات جديدة بانتظار المراجعة.</p> : <div className="space-y-3">{pendingRequests.slice(0, 20).map((request) => <div key={request.id} className="rounded-xl border border-border/70 bg-background/20 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-bold">{request.employeeName} · {requestType(request.type)}</div><div className="mt-1 text-xs text-muted-foreground">{request.reason || "بدون ملاحظة"}</div><div className="mt-1 text-[11px] text-muted-foreground">{new Date(request.createdAt).toLocaleString("ar-SA")}</div></div><div className="flex gap-2"><button disabled={requestBusy === request.id} onClick={() => void decideRequest(request, "approved")} className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary disabled:opacity-50">✓ موافقة</button><button disabled={requestBusy === request.id} onClick={() => void decideRequest(request, "rejected")} className="rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive disabled:opacity-50">✕ رفض</button></div></div></div>)}</div>}
-      </div>
     </ManagerLayout>
   );
 }
