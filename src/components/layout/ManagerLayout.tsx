@@ -18,8 +18,9 @@ const NAV = [
 
 export default function ManagerLayout({title,subtitle,actions,children}:{title:string;subtitle?:string;actions?:React.ReactNode;children:React.ReactNode}){
   const nav=useNavigate(); const managerSession=getManagerSession(); const currentRole=managerSession?.role||"manager";
+  const currentUserId=String((managerSession as any)?.accountId || (managerSession as any)?.id || "");
   const [notifications,setNotifications]=useState<AppNotification[]>([]); const [showNotifications,setShowNotifications]=useState(false); const [menuOpen,setMenuOpen]=useState(false); const [theme,setTheme]=useState("system"); const [showDiagnostics,setShowDiagnostics]=useState(false); const [diagnostics,setDiagnostics]=useState<DiagnosticEntry[]>([]);
-  useEffect(()=>{const load=()=>{try{const all=getNotifications();setNotifications(Array.isArray(all)?all.filter(n=>n.userId==="manager"||n.userId==="admin"||n.userId==="all"):[]);}catch(e){console.error(e)}};load();const i=setInterval(load,3000);return()=>clearInterval(i)},[]);
+  useEffect(()=>{const load=()=>{try{const all=getNotifications(currentUserId);setNotifications(Array.isArray(all)?all.filter(n=>n.userId===currentUserId||n.userId==="manager"||n.userId==="admin"||n.userId==="all"):[]);}catch(e){console.error(e)}};load();const i=setInterval(load,3000);return()=>clearInterval(i)},[currentUserId]);
   const unreadCount=notifications.filter(n=>!n.read).length;
   const logout=()=>{localStorage.removeItem("managerAuth");backendLogout();setManagerSession(null);nav("/manager/login");};
   const filteredNav=NAV.filter(n=>!n.editRoles||n.editRoles.includes(currentRole));
