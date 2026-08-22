@@ -1,0 +1,36 @@
+name: Fix duplicate attendance timer
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.head_commit.message != 'fix: keep a single attendance confirmation timer'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove duplicate timer above confirmation button
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/EmployeeScan.tsx')
+          s = p.read_text(encoding='utf-8')
+          block = '''          <div className="mb-4 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2.5 flex items-center justify-between gap-3"><div><div className="text-xs font-bold text-primary">⏱️ مهلة تأكيد {title}</div><div className="text-[11px] text-muted-foreground mt-0.5">{confirmationActive ? "يجب الضغط على زر التأكيد قبل انتهاء الدقيقة، وإلا يجب إعادة التحقق." : "سيبدأ العداد بعد التحقق من الموقع وQR. لا يمكن تأكيد العملية قبل اكتمال التحقق."}</div></div><div className="mono text-xl font-black tabular-nums text-primary min-w-[4.5rem] text-center">{timerText}</div></div>\n'''
+          if block not in s:
+              raise SystemExit('duplicate timer block not found')
+          s = s.replace(block, '', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          grep -n 'timerReadyText\|timerText' src/pages/EmployeeScan.tsx
+      - name: Commit fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/pages/EmployeeScan.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: keep a single attendance confirmation timer'
+          git push
