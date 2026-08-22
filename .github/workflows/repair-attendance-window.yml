@@ -8,6 +8,8 @@ on:
       - main
     paths:
       - 'backend/src/**'
+      - 'backend/package.json'
+      - 'backend/package-lock.json'
       - 'src/**'
       - '.github/workflows/repair-attendance-window.yml'
 
@@ -28,7 +30,7 @@ jobs:
           bun-version: 1.2.15
 
       - name: Install frontend dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Typecheck frontend
         run: bun run typecheck
@@ -40,11 +42,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package.json
 
       - name: Install Worker dependencies
         working-directory: backend
-        run: npm ci
+        run: npm install --no-package-lock
 
       - name: Validate Worker bundle
         working-directory: backend
-        run: npm run build
+        run: npm run check
