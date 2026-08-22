@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { getSettings } from "@/lib/storage";
-import NotificationBell from "@/components/NotificationBell";
-import { currentSession } from "@/lib/auth";
 
 export default function Brand({ className }: { className?: string }) {
   const [logo, setLogo] = useState<string | null | undefined>(
@@ -11,8 +9,6 @@ export default function Brand({ className }: { className?: string }) {
   const [name, setName] = useState<string>(
     () => getSettings().brandName || "حاضِر"
   );
-
-  const session = currentSession();
 
   useEffect(() => {
     const sync = () => {
@@ -29,8 +25,7 @@ export default function Brand({ className }: { className?: string }) {
   }, []);
 
   return (
-    <div className={cn("flex items-center justify-between w-full", className)}>
-      {/* الشعار واسم النظام */}
+    <div className={cn("flex items-center w-full", className)}>
       <div className="flex items-center gap-2.5">
         {logo ? (
           <img
@@ -64,11 +59,6 @@ export default function Brand({ className }: { className?: string }) {
           <div className="text-[10px] text-muted-foreground mono">HADIR · v1.1</div>
         </div>
       </div>
-
-      {/* أيقونة جرس الإشعارات */}
-      <NotificationBell
-        userId={session?.role === "admin" ? "admin" : session?.jobNumber}
-      />
     </div>
   );
 }
