@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
+import NotificationBell from "@/components/NotificationBell";
 import { currentSession, logoutEmployee } from "@/lib/auth";
 import { getSettings, type RequestType } from "@/lib/storage";
 import { backendEnabled, getBackendAttendance, getBackendEmployeeProfile, getBackendLocations, createBackendRequest } from "@/lib/backend";
@@ -37,17 +38,20 @@ export default function EmployeeHome(){
  if(error||!emp)return <Centered><Brand/><div className="mt-5 font-bold">تعذر تحميل بيانات الموظف</div><div className="text-sm text-muted-foreground mt-2">{error||"لم يتم العثور على ملف الموظف."}</div><button className="btn-primary mt-5 w-full" onClick={()=>window.location.reload()}>إعادة المحاولة</button></Centered>;
  const showCountdown=countdown.kind!=="NONE"&&Boolean(countdown.target)&&Boolean(remaining);
  return <div className="min-h-screen bg-background">
-  <header className="max-w-xl mx-auto px-4 sm:px-5 pt-5 pb-3 flex items-center justify-between">
-   <div ref={menuRef} className="relative z-[100]">
-    <button type="button" onClick={()=>setMenuOpen(v=>!v)} className="h-12 w-12 rounded-xl border border-border/70 bg-secondary/60 text-foreground grid place-items-center shadow-sm hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="فتح قائمة الموظف" aria-expanded={menuOpen} aria-haspopup="menu">
-     <span className="sr-only">القائمة</span><span aria-hidden="true" className="flex flex-col gap-1.5 items-center justify-center"><span className="block h-0.5 w-6 rounded-full bg-current"/><span className="block h-0.5 w-6 rounded-full bg-current"/><span className="block h-0.5 w-6 rounded-full bg-current"/></span>
-    </button>
-    {menuOpen&&<div className="fixed left-4 top-20 z-[9999] w-[min(16rem,calc(100vw-2rem))] rounded-2xl border border-border/70 bg-background shadow-2xl p-2" role="menu">
-      <button type="button" onClick={()=>{setMenuOpen(false);setShowProfile(true);}} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary transition-colors" role="menuitem"><span className="h-9 w-9 rounded-xl bg-primary/12 text-primary grid place-items-center">👤</span><span>الملف الشخصي للموظف</span></button>
-      <button type="button" onClick={logout} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold text-destructive hover:bg-destructive/10 transition-colors" role="menuitem"><span className="h-9 w-9 rounded-xl bg-destructive/10 grid place-items-center">↪</span><span>تسجيل الخروج</span></button>
-    </div>}
+  <header dir="ltr" className="max-w-xl mx-auto px-4 sm:px-5 pt-5 pb-3 flex items-center justify-between">
+   <div className="flex items-center gap-2 shrink-0" dir="ltr">
+    <div ref={menuRef} className="relative z-[100]">
+     <button type="button" onClick={()=>setMenuOpen(v=>!v)} className="h-12 w-12 rounded-xl border border-border/70 bg-secondary/60 text-foreground grid place-items-center shadow-sm hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="فتح قائمة الموظف" aria-expanded={menuOpen} aria-haspopup="menu">
+      <span className="sr-only">القائمة</span><span aria-hidden="true" className="flex flex-col gap-1.5 items-center justify-center"><span className="block h-0.5 w-6 rounded-full bg-current"/><span className="block h-0.5 w-6 rounded-full bg-current"/><span className="block h-0.5 w-6 rounded-full bg-current"/></span>
+     </button>
+     {menuOpen&&<div className="fixed left-4 top-20 z-[9999] w-[min(16rem,calc(100vw-2rem))] rounded-2xl border border-border/70 bg-background shadow-2xl p-2" role="menu">
+       <button type="button" onClick={()=>{setMenuOpen(false);setShowProfile(true);}} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary transition-colors" role="menuitem"><span className="h-9 w-9 rounded-xl bg-primary/12 text-primary grid place-items-center">👤</span><span>الملف الشخصي للموظف</span></button>
+       <button type="button" onClick={logout} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold text-destructive hover:bg-destructive/10 transition-colors" role="menuitem"><span className="h-9 w-9 rounded-xl bg-destructive/10 grid place-items-center">↪</span><span>تسجيل الخروج</span></button>
+     </div>}
+    </div>
+    <NotificationBell userId={emp.id}/>
    </div>
-   <Brand/>
+   <div dir="rtl"><Brand/></div>
   </header>
   <main className="max-w-xl mx-auto px-4 sm:px-5 pb-16 space-y-4">
    <section className="hud-card overflow-hidden p-5 sm:p-6">
