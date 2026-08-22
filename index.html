@@ -25,16 +25,47 @@
     <div id="root"></div>
     <script>
       (() => {
-        const ask = () => {
-          if (!("Notification" in window)) return;
-          if (Notification.permission !== "default") return;
-          const employee = localStorage.getItem("hadir.session");
-          const admin = localStorage.getItem("hadir.manager_session");
-          if (!employee && !admin) return;
-          void Notification.requestPermission();
+        const API = (window.__HADIR_API__ || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+        const token = () => localStorage.getItem("hadir.api.token.employee") || localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token") || "";
+        const sessionExists = () => Boolean(localStorage.getItem("hadir.session") || localStorage.getItem("hadir.manager_session"));
+        const seenKey = "hadir.browser.notifications.seen";
+        const seen = () => { try { return new Set(JSON.parse(localStorage.getItem(seenKey) || "[]")); } catch { return new Set(); } };
+        const saveSeen = (set) => { try { localStorage.setItem(seenKey, JSON.stringify(Array.from(set).slice(-200))); } catch {} };
+        let primed = false;
+        const show = (n) => {
+          if (!("Notification" in window) || Notification.permission !== "granted") return;
+          try { new Notification(n.title, { body: n.message, icon: "/favicon.svg", tag: `hadir-${n.id}` }); } catch {}
         };
-        window.setTimeout(ask, 1200);
-        window.setInterval(ask, 10000);
+        const sync = async () => {
+          if (!sessionExists()) return;
+          const t = token();
+          if (!t) return;
+          try {
+            const r = await fetch(`${API}/api/notifications`, { headers: { authorization: `Bearer ${t}` }, credentials: "include", cache: "no-store" });
+            if (!r.ok) return;
+            const rows = await r.json();
+            if (!Array.isArray(rows)) return;
+            const ids = seen();
+            if (!primed) {
+              rows.forEach(n => ids.add(n.id));
+              primed = true;
+              saveSeen(ids);
+              return;
+            }
+            for (const n of rows) {
+              if (ids.has(n.id)) continue;
+              ids.add(n.id);
+              show(n);
+            }
+            saveSeen(ids);
+          } catch {}
+        };
+        const ask = () => {
+          if (!("Notification" in window) || !sessionExists()) return;
+          if (Notification.permission === "default") void Notification.requestPermission();
+        };
+        window.setTimeout(() => { ask(); void sync(); }, 1500);
+        window.setInterval(() => { ask(); void sync(); }, 15000);
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>
