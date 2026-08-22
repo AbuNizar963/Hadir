@@ -1,4 +1,4 @@
-import type { AdminAccount, Employee, AttendanceRecord, EmployeeRequest, Settings, Location } from "@/types";
+import type { AdminAccount, Employee, AttendanceRecord, EmployeeRequest, Settings, Location, EscapeEvent } from "@/types";
 import { getDeviceFingerprint, getDeviceId, getDeviceLabel } from "@/lib/device";
 import { compressProfileImageDataUrl } from "@/lib/imageCompression";
 
@@ -64,5 +64,7 @@ export async function getBackendEmployees() { return request<Employee[]>("/api/e
 export async function createBackendEmployee(input: Record<string, unknown>) { const avatar = await prepareAvatar(input.avatar); const { avatar: _avatar, ...payload } = input; const created = await requestWithRetry<{ ok: boolean; employee: Employee }>("/api/employees", { method: "POST", body: JSON.stringify(payload) }, 3, "admin"); if (avatar && created.employee?.id) { const uploaded = await uploadEmployeeAvatar(created.employee.id, avatar); created.employee = { ...created.employee, avatar: uploaded.key }; } return created; }
 export async function updateBackendEmployee(id: string, input: Record<string, unknown>) { const hasAvatar = Object.prototype.hasOwnProperty.call(input, "avatar"); const avatar = hasAvatar ? await prepareAvatar(input.avatar) : undefined; const { avatar: _avatar, ...payload } = input; const updated = await requestWithRetry<{ ok: boolean; employee: Employee }>(`/api/employees/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) }, 3, "admin"); if (hasAvatar) { if (avatar) { const uploaded = await uploadEmployeeAvatar(id, avatar); updated.employee = { ...updated.employee, avatar: uploaded.key }; } else { await deleteEmployeeAvatar(id); updated.employee = { ...updated.employee, avatar: null }; } } return updated; }
 export async function deleteBackendEmployee(id: string) { return requestWithRetry<{ ok: boolean }>(`/api/employees/${encodeURIComponent(id)}`, { method: "DELETE" }, 3, "admin"); }
+export async function getBackendEscapeEvents(employeeId?: string, limit = 500) { const query = new URLSearchParams({ limit: String(Math.min(limit, 2000)) }); if (employeeId) query.set("employeeId", employeeId); return request<EscapeEvent[]>(`/api/escape-events?${query.toString()}`, {}, "admin"); }
+export async function createBackendEscapeEvent(input: { employeeId: string; status: "escaped" | "returned"; reason?: string; lat?: number; lng?: number }) { return requestWithRetry<{ ok: boolean; event: EscapeEvent }>("/api/escape-events", { method: "POST", body: JSON.stringify(input) }, 3, "admin"); }
 export async function backendHealth() { return request<{ ok: boolean; database?: string; ownerInitialized?: boolean }>("/api/health"); }
 export type { AdminAccount };
