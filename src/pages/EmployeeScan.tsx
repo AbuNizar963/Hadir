@@ -15,6 +15,8 @@ type BarcodeDetectorLike = { detect(source: CanvasImageSource): Promise<Array<{ 
 type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
 declare global { interface Window { BarcodeDetector?: BarcodeDetectorConstructor } }
 
+const CONFIRMATION_WINDOW_MS = 60_000;
+
 export default function EmployeeScan() {
   const { type } = useParams<{ type: "check-in" | "check-out" }>();
   const nav = useNavigate();
@@ -33,6 +35,8 @@ export default function EmployeeScan() {
   const [scannerSupported, setScannerSupported] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [confirmationExpiresAt, setConfirmationExpiresAt] = useState<number | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
@@ -82,6 +86,8 @@ export default function EmployeeScan() {
     }
     setIsLocating(true);
     setError(null);
+    setConfirmationExpiresAt(null);
+    setRemainingSeconds(0);
     setStep("gps");
     try {
       const position = await getCurrentPosition();
@@ -102,6 +108,33 @@ export default function EmployeeScan() {
 
   useEffect(() => { setScannerSupported(typeof window !== "undefined" && "BarcodeDetector" in window); }, []);
   const inRange = distance !== null && Number.isFinite(distance) && distance <= targetRadius;
+  const qrVerified = Boolean(qrInput.trim()) && (!settings.qrCode || qrInput.trim() === settings.qrCode.trim());
+  const confirmationActive = Boolean(confirmationExpiresAt && remainingSeconds > 0 && inRange && qrVerified);
+
+  // Start the one-minute confirmation window only after both GPS and QR are verified.
+  // Editing the QR value creates a fresh verification window; letting it expire clears the QR.
+  useEffect(() => {
+    if (!inRange || !qrVerified || step !== "scan") {
+      setConfirmationExpiresAt(null);
+      setRemainingSeconds(0);
+      return;
+    }
+    const expiresAt = Date.now() + CONFIRMATION_WINDOW_MS;
+    setConfirmationExpiresAt(expiresAt);
+    setRemainingSeconds(60);
+    const timer = window.setInterval(() => {
+      const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+      setRemainingSeconds(seconds);
+      if (seconds <= 0) {
+        window.clearInterval(timer);
+        setConfirmationExpiresAt(null);
+        setRemainingSeconds(0);
+        setQrInput("");
+        setError("انتهت مهلة تأكيد الحضور/الانصراف. أعد مسح رمز QR ثم أكّد العملية خلال دقيقة واحدة.");
+      }
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [inRange, qrVerified, step]);
 
   const startCamera = async () => {
     setError(null);
@@ -157,15 +190,18 @@ export default function EmployeeScan() {
   const submit = () => {
     if (!pos || !session || !qrInput.trim()) return;
     if (!inRange) { setError(`أنت خارج نطاق العمل. المسافة الحالية: ${distance ?? "غير معروفة"} م (الحد المسموح: ${targetRadius} م)`); setStep("error"); return; }
+    if (!confirmationActive) { setError("انتهت أو لم تبدأ مهلة التحقق. أعد مسح رمز QR وأكّد العملية خلال دقيقة واحدة."); return; }
     setError(null); setStep("submitting");
     void (async () => {
       const response = await recordAttendance({ jobNumber: session.jobNumber, type: action, position: pos, qrCode: qrInput.trim() });
       if (!response.ok) { setError(response.reason ?? "تعذر تسجيل العملية"); setStep("error"); return; }
+      setConfirmationExpiresAt(null);
+      setRemainingSeconds(0);
       setResult({ time: response.record!.timestamp, timeNote: response.timeNote }); setStep("success");
     })();
   };
 
-  const title = action === "check-in" ? "تسجيل الحضور" : "تسجيل الانصراف";
+  const title = action === "check-out" ? "تسجيل الانصراف" : "تسجيل الحضور";
   const statusText = step === "loading-location" ? "جاري تحميل موقع العمل" : isLocating ? "جاري تحديد موقعك..." : step === "error" ? "تعذر التحقق من الموقع" : step === "gps" ? "اضغط لتحديد موقعك" : inRange ? "تم التحقق من الموقع" : "خارج نطاق الموقع";
 
   return (
@@ -194,7 +230,12 @@ export default function EmployeeScan() {
           </div>
           <div className="mt-4"><label className="block text-xs text-muted-foreground mb-1" htmlFor="qr-code">قيمة QR</label><input id="qr-code" className="input mono text-sm" placeholder="أدخل القيمة المطبوعة على QR" value={qrInput} onChange={(e) => setQrInput(e.target.value)} disabled={step !== "scan" || !inRange} autoComplete="off" /></div>
         </section>
-        <section className="hud-card p-6">{step === "error" && <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm mb-4"><div className="font-semibold text-destructive">فشل التحقق</div><div className="text-xs text-muted-foreground mt-1">{error}</div></div>}{step === "success" && result && <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm mb-4"><div className="font-extrabold text-primary text-lg">تمت العملية بنجاح</div><div className="text-xs text-muted-foreground mt-1">{title} في {formatTime(result.time)}{result.timeNote ? ` · ${result.timeNote}` : ""}</div></div>}<div className="flex gap-3"><button className="btn-primary flex-1 py-3" onClick={submit} disabled={step !== "scan" || !inRange || !qrInput.trim() || !pos}>{step === "submitting" ? "جاري التسجيل..." : `تأكيد ${title}`}</button>{(step === "success" || step === "error") && <button onClick={() => { stopCamera(); nav("/employee"); }} className="btn-secondary">عودة</button>}</div></section>
+        <section className="hud-card p-6">
+          {confirmationActive && <div className="mb-4 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2.5 flex items-center justify-between gap-3"><div><div className="text-xs font-bold text-primary">⏱️ مهلة تأكيد {title}</div><div className="text-[11px] text-muted-foreground mt-0.5">يجب الضغط على زر التأكيد قبل انتهاء الدقيقة، وإلا يجب إعادة التحقق.</div></div><div className="mono text-xl font-black tabular-nums text-primary min-w-[3.5rem] text-center">00:{String(remainingSeconds).padStart(2, "0")}</div></div>}
+          {step === "error" && <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm mb-4"><div className="font-semibold text-destructive">فشل التحقق</div><div className="text-xs text-muted-foreground mt-1">{error}</div></div>}
+          {step === "success" && result && <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm mb-4"><div className="font-extrabold text-primary text-lg">تمت العملية بنجاح</div><div className="text-xs text-muted-foreground mt-1">{title} في {formatTime(result.time)}{result.timeNote ? ` · ${result.timeNote}` : ""}</div></div>}
+          <div className="flex gap-3 items-center"><button className="btn-primary flex-1 py-3" onClick={submit} disabled={step !== "scan" || !inRange || !qrInput.trim() || !pos || !confirmationActive}>{step === "submitting" ? "جاري التسجيل..." : `تأكيد ${title}`}</button>{confirmationActive && <div className="shrink-0 rounded-xl border border-primary/25 bg-secondary/50 px-3 py-2 text-center"><div className="text-[10px] text-muted-foreground">المتبقي</div><div className="mono font-black text-sm tabular-nums">00:{String(remainingSeconds).padStart(2, "0")}</div></div>}{(step === "success" || step === "error") && <button onClick={() => { stopCamera(); nav("/employee"); }} className="btn-secondary">عودة</button>}</div>
+        </section>
       </main>
     </div>
   );
