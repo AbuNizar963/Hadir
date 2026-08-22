@@ -32,13 +32,15 @@ export function getEmployeeScheduleStatus(employee: Employee | null | undefined,
   if (!employee) return { isWorkDay: false, label: "غير محدد" };
   if (period.kind === "NOT_STARTED") return { isWorkDay: false, label: "لم تبدأ المناوبة بعد", detail: period.detail };
   if (period.kind === "INVALID") return { isWorkDay: false, label: "جدول غير صالح", detail: period.detail };
-  if (period.kind === "OFF") return { isWorkDay: false, label: "يوم راحة (تناوبي)", detail: period.detail };
+  if (period.kind === "OFF") {
+    const cycleDay = rotationCycleDay(employee, target) + 1;
+    return { isWorkDay: false, label: "فترة راحة", detail: `اليوم ${cycleDay} · راحة`, cycleDay, cycleTotal: Math.max(1, Math.floor(employee.rotationDaysOn ?? 4)) + Math.max(0, Math.floor(employee.rotationDaysOff ?? 4)) };
+  }
   if (employee.scheduleType === "ROTATION") {
-    const cycleDay = rotationCycleDay(employee, target);
+    const cycleDay = rotationCycleDay(employee, target) + 1;
     const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
     const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
-    const total = on + off;
-    return { isWorkDay: true, label: "يوم عمل (تناوبي)", detail: `اليوم ${cycleDay + 1} من ${total} في الدورة`, cycleDay: cycleDay + 1, cycleTotal: total };
+    return { isWorkDay: true, label: "في المناوبة", detail: `اليوم ${cycleDay} · عمل`, cycleDay, cycleTotal: on + off };
   }
   return { isWorkDay: true, label: "يوم عمل (إداري)", detail: period.detail };
 }
@@ -95,7 +97,7 @@ export function getScheduleCountdown(employee: Employee | null | undefined, targ
     if (!start) return { kind: "NONE", target: null, label: "" };
     return { kind: "NEXT_WORK_START", target: withTime(start, parseTime(employee.workStartTime, "09:00")), label: "بداية أول مناوبة" };
   }
-  if (period.isWorkDay && period.end) return { kind: "WORK_END", target: period.end, label: "نهاية المناوبة المتوقعة" };
+  if (period.isWorkDay && period.end) return { kind: "WORK_END", target: period.end, label: "تنتهي المناوبة خلال" };
   if (employee.scheduleType === "ROTATION" && period.kind === "OFF") {
     const startDate = parseYYYYMMDD(employee.rotationStartDate);
     if (!startDate) return { kind: "NONE", target: null, label: "" };
@@ -109,7 +111,7 @@ export function getScheduleCountdown(employee: Employee | null | undefined, targ
     const next = new Date(startOfDay(target).getTime() + daysUntilNext * DAY_MS);
     next.setHours(firstStart.getHours(), firstStart.getMinutes(), 0, 0);
     if (next.getTime() <= target.getTime()) next.setTime(next.getTime() + DAY_MS);
-    return { kind: "NEXT_WORK_START", target: next, label: "بداية المناوبة القادمة" };
+    return { kind: "NEXT_WORK_START", target: next, label: "تبدأ المناوبة القادمة خلال" };
   }
   return { kind: "NONE", target: null, label: "" };
 }
