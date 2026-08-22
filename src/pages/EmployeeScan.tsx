@@ -248,23 +248,7 @@ function GpsRadar() {
       });
     };
 
-    const drawSatellite = (x: number, y: number) => {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.strokeStyle = "#00ffcc";
-      ctx.fillStyle = "#00ffcc";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(-5, -5, 10, 10);
-      ctx.strokeRect(-12, -3, 5, 6);
-      ctx.strokeRect(7, -3, 5, 6);
-      ctx.beginPath();
-      ctx.arc(0, 0, 12, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(0, 255, 204, 0.25)";
-      ctx.stroke();
-      ctx.restore();
-    };
-
-    const drawTargets = () => {
+    const drawTargets = (now: number) => {
       const targets = [
         { r: 0.40, angle: 45 },
         { r: 0.74, angle: 160 },
@@ -275,23 +259,36 @@ function GpsRadar() {
         const rad = (target.angle - 90) * (Math.PI / 180);
         const x = center + radius * target.r * Math.cos(rad);
         const y = center + radius * target.r * Math.sin(rad);
-        if (index === 0) {
-          drawSatellite(x, y);
-          return;
-        }
+        const pulse = 0.5 + 0.5 * Math.sin(now / 260 + index * 1.7);
+        const targetRadius = 3 + pulse * 2.5;
+
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = "#00ffcc";
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = "#00ffcc";
+        ctx.arc(x, y, targetRadius + 5 + pulse * 5, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 51, 102, ${0.12 + pulse * 0.18})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(x, y, targetRadius, 0, Math.PI * 2);
+        ctx.fillStyle = "#ff3366";
+        ctx.shadowBlur = 10 + pulse * 10;
+        ctx.shadowColor = "#ff3366";
         ctx.fill();
         ctx.shadowBlur = 0;
       });
 
+      const centerPulse = 0.5 + 0.5 * Math.sin(now / 85);
+      const centerRadius = 5 + centerPulse * 3;
       ctx.beginPath();
-      ctx.arc(center, center, 5, 0, Math.PI * 2);
+      ctx.arc(center, center, centerRadius + 6 + centerPulse * 7, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 51, 102, ${0.16 + centerPulse * 0.24})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(center, center, centerRadius, 0, Math.PI * 2);
       ctx.fillStyle = "#ff3366";
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 14 + centerPulse * 16;
       ctx.shadowColor = "#ff3366";
       ctx.fill();
       ctx.shadowBlur = 0;
@@ -320,10 +317,10 @@ function GpsRadar() {
       ctx.restore();
     };
 
-    const animate = () => {
+    const animate = (now: number) => {
       if (cancelled) return;
       drawRadarBase();
-      drawTargets();
+      drawTargets(now);
       drawSweep();
       sweepAngle += 0.025;
       if (sweepAngle >= Math.PI * 2) sweepAngle = 0;
