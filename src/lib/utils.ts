@@ -1,37 +1,39 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+/** Normalize Arabic-Indic and Eastern Arabic-Indic digits to Western Arabic digits (0-9). */
+export function normalizeDigits(value: string): string {
+  return String(value)
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export function formatDateTime(iso: string): string {
   const date = new Date(iso);
-  return date.toLocaleString("ar-EG", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
+  return normalizeDigits(date.toLocaleString("ar-EG", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }));
 }
 
 export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("ar-EG", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  return normalizeDigits(new Date(iso).toLocaleTimeString("ar-EG", {
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }));
 }
 
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ar-EG", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+  return normalizeDigits(new Date(iso).toLocaleDateString("ar-EG", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }));
+}
+
+export function formatNumber(value: number): string {
+  return normalizeDigits(new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value));
 }
 
 /** Return the user's local calendar date rather than the UTC date. */
@@ -50,12 +52,10 @@ export function formatDurationMinutes(minutes: number): string {
   const safe = Math.max(0, Math.round(minutes));
   const hours = Math.floor(safe / 60);
   const min = safe % 60;
-  return `${hours} س ${min} د`;
+  return `${formatNumber(hours)} س ${formatNumber(min)} د`;
 }
 
 export function generateId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
