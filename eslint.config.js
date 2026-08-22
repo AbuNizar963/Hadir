@@ -45,6 +45,7 @@ export default [
       "@typescript-eslint/no-empty-object-type": "off",
       "@typescript-eslint/no-unused-expressions": "off",
       "@typescript-eslint/no-require-imports": "off",
+      // TypeScript owns identifier/type checking for browser and Worker code.
       "no-undef": "off",
       "no-redeclare": "off",
       "no-empty": "off",
