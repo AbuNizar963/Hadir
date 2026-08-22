@@ -22,45 +22,26 @@ export default function WeatherCard({ compact = false, latitude, longitude, titl
     let cancelled = false;
     let timer: number | undefined;
     const controller = new AbortController();
-
     const fetchAt = async (lat: number, lon: number, city: string) => {
-      try {
-        const next = await readWeather(lat, lon, controller.signal);
-        if (!cancelled) setW({ ...next, city });
-      } catch {
-        if (!cancelled) setW(x => ({ ...x, loading: false, error: "تعذر جلب الطقس" }));
-      }
+      try { const next = await readWeather(lat, lon, controller.signal); if (!cancelled) setW({ ...next, city }); }
+      catch { if (!cancelled) setW(x => ({ ...x, loading: false, error: "تعذر جلب الطقس" })); }
     };
-
+    const useDevicePosition = Boolean(hideWhenWithinKm != null && referenceLatitude != null && referenceLongitude != null);
     const load = () => {
-      if (latitude != null && longitude != null) {
-        setHidden(false);
-        void fetchAt(latitude, longitude, "موقع العمل");
-        return;
-      }
-      if (!navigator.geolocation) {
-        if (!cancelled) setW(x => ({ ...x, loading: false, error: "الموقع غير متاح" }));
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        position => {
+      if (useDevicePosition) {
+        if (!navigator.geolocation) { if (!cancelled) setW(x => ({ ...x, loading: false, error: "الموقع غير متاح" })); return; }
+        navigator.geolocation.getCurrentPosition(position => {
           if (cancelled) return;
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          if (hideWhenWithinKm != null && referenceLatitude != null && referenceLongitude != null) {
-            const inside = distanceKm(lat, lon, referenceLatitude, referenceLongitude) <= hideWhenWithinKm;
-            setHidden(inside);
-            if (inside) return;
-          }
-          void fetchAt(lat, lon, "موقعك الحالي");
-        },
-        () => {
-          if (!cancelled && hideWhenWithinKm == null) setW(x => ({ ...x, loading: false, error: "فعّل الموقع لعرض الطقس" }));
-        },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
-      );
+          const inside = distanceKm(position.coords.latitude, position.coords.longitude, referenceLatitude!, referenceLongitude!) <= hideWhenWithinKm!;
+          setHidden(inside);
+          if (!inside && latitude != null && longitude != null) void fetchAt(latitude, longitude, "موقع العمل");
+        }, () => { if (!cancelled) { setHidden(false); if (latitude != null && longitude != null) void fetchAt(latitude, longitude, "موقع العمل"); } }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 });
+        return;
+      }
+      setHidden(false);
+      if (latitude != null && longitude != null) void fetchAt(latitude, longitude, "موقع العمل");
+      else if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => { if (!cancelled) void fetchAt(p.coords.latitude, p.coords.longitude, "موقعك الحالي"); }, () => { if (!cancelled) setW(x => ({ ...x, loading: false, error: "فعّل الموقع لعرض الطقس" })); }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 });
     };
-
     load();
     timer = window.setInterval(load, 600000);
     return () => { cancelled = true; controller.abort(); if (timer) window.clearInterval(timer); };
