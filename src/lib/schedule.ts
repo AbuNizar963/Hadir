@@ -95,9 +95,14 @@ export function getScheduleCountdown(employee: Employee | null | undefined, targ
   if (period.kind === "NOT_STARTED") {
     const start = parseYYYYMMDD(employee.rotationStartDate);
     if (!start) return { kind: "NONE", target: null, label: "" };
-    return { kind: "NEXT_WORK_START", target: withTime(start, parseTime(employee.workStartTime, "09:00")), label: "بداية أول مناوبة" };
+    const firstStart = withTime(start, parseTime(employee.workStartTime, "09:00"));
+    if (firstStart.getTime() <= target.getTime()) return { kind: "NONE", target: null, label: "" };
+    return { kind: "NEXT_WORK_START", target: firstStart, label: "بداية أول مناوبة" };
   }
-  if (period.isWorkDay && period.end) return { kind: "WORK_END", target: period.end, label: "تنتهي المناوبة خلال" };
+  // بعد انتهاء الدوام الإداري لا نعرض عدادًا ثابتًا 00:00؛ لا يوجد إجراء زمني يحتاجه الموظف حتى يبدأ يوم العمل التالي.
+  if (period.isWorkDay && period.end && period.end.getTime() > target.getTime()) {
+    return { kind: "WORK_END", target: period.end, label: "تنتهي المناوبة خلال" };
+  }
   if (employee.scheduleType === "ROTATION" && period.kind === "OFF") {
     const startDate = parseYYYYMMDD(employee.rotationStartDate);
     if (!startDate) return { kind: "NONE", target: null, label: "" };
