@@ -31,6 +31,8 @@ export default function EmployeeScan() {
   const [result, setResult] = useState<{ time: string; timeNote?: string } | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [scannerSupported, setScannerSupported] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
@@ -67,6 +69,8 @@ export default function EmployeeScan() {
     mediaStreamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setIsCameraActive(false);
+    setTorchSupported(false);
+    setTorchOn(false);
   };
 
   const refreshGps = async () => {
@@ -112,10 +116,23 @@ export default function EmployeeScan() {
     if (!navigator.mediaDevices?.getUserMedia) { setError("هذا المتصفح لا يدعم الكاميرا. يمكنك إدخال قيمة QR يدويًا."); return; }
     try {
       stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16 / 9 } }, audio: false });
       mediaStreamRef.current = stream;
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean } | undefined;
+      setTorchSupported(Boolean(capabilities?.torch));
       setIsCameraActive(true);
     } catch (e) { console.error("تعذر فتح الكاميرا:", e); setError("تعذر فتح الكاميرا. تأكد من منح صلاحية الكاميرا واستخدام HTTPS، أو أدخل قيمة QR يدويًا."); stopCamera(); }
+  };
+
+  const toggleTorch = async () => {
+    const track = mediaStreamRef.current?.getVideoTracks()[0];
+    if (!track || !torchSupported) return;
+    try {
+      const next = !torchOn;
+      await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+      setTorchOn(next);
+    } catch { setError("لا يمكن تشغيل إضاءة الكاميرا على هذا الجهاز."); }
   };
 
   useEffect(() => {
@@ -180,8 +197,34 @@ export default function EmployeeScan() {
         </section>
         <section className={`hud-card p-6 ${!inRange ? "opacity-60" : ""}`}>
           <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">٢. مسح رمز QR</div><StepBadge state={qrInput ? "done" : step === "scan" && inRange ? "active" : "idle"} /></div>
-          <div className="rounded-xl border border-dashed border-border/70 bg-secondary/30 p-6 text-center overflow-hidden">
-            {isCameraActive ? <div className="relative mx-auto h-56 w-full max-w-xs rounded-xl overflow-hidden bg-black border border-primary/50"><video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted playsInline autoPlay /><div className="absolute inset-0 grid place-items-center pointer-events-none"><div className="h-32 w-32 border-2 border-dashed border-white/90 rounded-xl" /></div><div className="absolute bottom-3 inset-x-3 flex items-center justify-between gap-2"><span className="px-3 py-1.5 bg-black/70 text-white text-[11px] rounded-full">{scannerSupported ? "وجّه الكاميرا نحو QR" : "الكاميرا تعمل؛ المسح التلقائي غير مدعوم"}</span><button type="button" onClick={stopCamera} className="px-3 py-1.5 bg-destructive text-white text-xs font-bold rounded-full">إغلاق</button></div></div> : <><div className="mx-auto h-24 w-24 rounded-2xl bg-background grid place-items-center mb-3 border border-border/60 shadow-inner"><QrIcon /></div><p className="text-xs text-muted-foreground max-w-xs mx-auto leading-6">امسح رمز QR المخصص لـ{locationName}.</p><div className="flex justify-center gap-2 mt-4"><button type="button" onClick={() => void startCamera()} className="btn-primary text-xs shadow" disabled={step !== "scan" || !inRange}>📷 فتح الكاميرا</button><button type="button" onClick={() => setQrInput(settings.qrCode || "")} className="btn-secondary text-xs" disabled={step !== "scan" || !inRange || !settings.qrCode}>إدخال القيمة يدويًا</button></div></>}
+          <div className="rounded-2xl border border-border/70 bg-background overflow-hidden text-center">
+            {isCameraActive ? <div className="relative min-h-[68vh] sm:min-h-[560px] w-full bg-black overflow-hidden">
+              <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted playsInline autoPlay />
+              <div className="absolute inset-0 bg-black/15 pointer-events-none" />
+              <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4 text-white">
+                <div><div className="text-sm font-bold">مسح رمز QR</div><div className="text-[11px] text-white/70 mt-0.5">ضع الرمز داخل الإطار</div></div>
+                <button type="button" onClick={stopCamera} className="h-10 w-10 rounded-full bg-black/55 border border-white/20 grid place-items-center text-lg" aria-label="إغلاق الكاميرا">×</button>
+              </div>
+              <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                <div className="relative w-[78vw] max-w-[340px] aspect-square">
+                  <div className="absolute inset-0 rounded-[28px] border border-white/15" />
+                  <div className="absolute -inset-px rounded-[28px] border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,.18),0_0_36px_rgba(255,255,255,.18)]" />
+                  <div className="absolute left-0 top-0 h-12 w-12 border-l-4 border-t-4 border-white rounded-tl-2xl" />
+                  <div className="absolute right-0 top-0 h-12 w-12 border-r-4 border-t-4 border-white rounded-tr-2xl" />
+                  <div className="absolute left-0 bottom-0 h-12 w-12 border-l-4 border-b-4 border-white rounded-bl-2xl" />
+                  <div className="absolute right-0 bottom-0 h-12 w-12 border-r-4 border-b-4 border-white rounded-br-2xl" />
+                  <div className="absolute left-4 right-4 top-1/2 h-px bg-white/90 shadow-[0_0_12px_rgba(255,255,255,.8)] animate-pulse" />
+                </div>
+              </div>
+              <div className="absolute inset-x-0 bottom-0 z-10 p-5">
+                <div className="mx-auto max-w-sm rounded-2xl bg-black/55 backdrop-blur-md border border-white/15 p-3 flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse shrink-0" />
+                  <span className="text-xs text-white/90 flex-1 text-right">{scannerSupported ? "وجّه الكاميرا نحو رمز QR وسيتم التعرف عليه تلقائيًا" : "الكاميرا تعمل، لكن المسح التلقائي غير مدعوم في هذا المتصفح"}</span>
+                  {torchSupported && <button type="button" onClick={() => void toggleTorch()} className={`h-10 w-10 shrink-0 rounded-xl border text-base ${torchOn ? "bg-white text-black border-white" : "bg-white/10 text-white border-white/20"}`} aria-label={torchOn ? "إطفاء الإضاءة" : "تشغيل الإضاءة"}>⌁</button>}
+                </div>
+                <button type="button" onClick={stopCamera} className="mt-2 w-full max-w-sm mx-auto block rounded-xl bg-white/10 border border-white/20 text-white py-2.5 text-xs font-bold">إغلاق الكاميرا</button>
+              </div>
+            </div> : <div className="p-6 sm:p-8"><div className="mx-auto h-20 w-20 rounded-2xl bg-secondary grid place-items-center mb-4 border border-border/60"><QrIcon /></div><p className="text-sm font-semibold">امسح رمز QR المخصص لـ{locationName}</p><p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1.5 leading-6">افتح الكاميرا ووجّه الرمز داخل الإطار. سيتم التعرف عليه تلقائيًا دون الحاجة للضغط على زر الالتقاط.</p><div className="flex flex-col sm:flex-row justify-center gap-2 mt-5"><button type="button" onClick={() => void startCamera()} className="btn-primary text-xs shadow" disabled={step !== "scan" || !inRange}>📷 فتح ماسح QR</button><button type="button" onClick={() => setQrInput(settings.qrCode || "")} className="btn-secondary text-xs" disabled={step !== "scan" || !inRange || !settings.qrCode}>إدخال القيمة يدويًا</button></div></div>}
           </div>
           <div className="mt-4"><label className="block text-xs text-muted-foreground mb-1" htmlFor="qr-code">قيمة QR</label><input id="qr-code" className="input mono text-sm" placeholder="أدخل القيمة المطبوعة على QR" value={qrInput} onChange={(e) => setQrInput(e.target.value)} disabled={step !== "scan" || !inRange} autoComplete="off" /></div>
         </section>
