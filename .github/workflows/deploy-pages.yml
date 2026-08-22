@@ -29,7 +29,7 @@ concurrency:
 
 env:
   VITE_API_URL: https://hadir-api.abunizar963.workers.dev
-  VITE_BASE_PATH: /
+  VITE_BASE_PATH: /Hadir/
 
 jobs:
   build:
