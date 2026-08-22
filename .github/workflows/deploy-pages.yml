@@ -56,13 +56,21 @@ jobs:
       - name: Build production bundle
         run: bun run build
 
-      - name: Verify production bundle
+      - name: Prepare GitHub Pages SPA routes
         shell: bash
         run: |
           set -euo pipefail
           test -s dist/index.html
           cp dist/index.html dist/404.html
-          echo 'Frontend bundle verified.'
+          mkdir -p dist/employee dist/employee/scan/attendance dist/employee/scan/departure
+          mkdir -p dist/login dist/manager dist/manager/login
+          cp dist/index.html dist/employee/index.html
+          cp dist/index.html dist/employee/scan/attendance/index.html
+          cp dist/index.html dist/employee/scan/departure/index.html
+          cp dist/index.html dist/login/index.html
+          cp dist/index.html dist/manager/index.html
+          cp dist/index.html dist/manager/login/index.html
+          echo 'SPA route entry points prepared.'
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
