@@ -2,6 +2,7 @@ export type EmployeeStatus = "active" | "suspended";
 export type ScheduleType = "ADMIN" | "ROTATION";
 export type UserRole = "owner" | "admin" | "manager" | "supervisor" | "staff";
 export type RequestType = "permission" | "leave" | "checkout";
+export type EscapeStatus = "escaped" | "returned";
 
 export interface EmployeeRequest { id: string; employeeId: string; employeeName: string; jobNumber: string; type: RequestType; reason?: string; status: "pending" | "approved" | "rejected"; createdAt: string; }
 export interface Location { id: string; name: string; lat: number; lng: number; radiusMeters: number; }
@@ -20,6 +21,7 @@ export interface Employee {
 }
 
 export interface AttendanceRecord { id: string; employeeId: string; jobNumber: string; employeeName: string; type: "check-in" | "check-out"; timestamp: string; lat: number; lng: number; distanceMeters: number; deviceId: string; ip: string; qrCode: string; locationId?: string; }
+export interface EscapeEvent { id: string; employeeId: string; jobNumber: string; employeeName: string; status: EscapeStatus; timestamp: string; reason?: string | null; actorId?: string | null; actorName?: string | null; lat?: number | null; lng?: number | null; createdAt: string; }
 export type AuditResult = "success" | "rejected";
 export interface AuditEntry {
   id: string; employeeId: string | null; jobNumber: string; actorName: string;
