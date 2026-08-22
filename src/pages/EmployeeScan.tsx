@@ -175,25 +175,7 @@ export default function EmployeeScan() {
         <section className="hud-card p-6"><div className="text-xs text-muted-foreground mono">{action === "check-in" ? "CHECK IN" : "CHECK OUT"}</div><h1 className="text-2xl font-extrabold mt-0.5">{title}</h1><div className="text-sm text-muted-foreground mt-1">{session?.name ?? "الموظف"} · <span className="mono">{session?.jobNumber ?? "-"}</span> · <span className="text-primary font-semibold">{locationName}</span></div></section>
         <section className="hud-card p-5 sm:p-6">
           <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "loading-location" || step === "gps" || isLocating ? "active" : step === "error" ? "fail" : "done"} /></div>
-          <div className="relative mx-auto w-full max-w-[280px] aspect-square rounded-full border border-primary/25 bg-primary/[0.035] overflow-hidden grid place-items-center shadow-[0_0_40px_hsl(var(--primary)/.08)]">
-            <div className="absolute inset-[8%] rounded-full border border-primary/15" /><div className="absolute inset-[20%] rounded-full border border-primary/20" /><div className="absolute inset-[33%] rounded-full border border-primary/25" /><div className="absolute inset-[44%] rounded-full border border-primary/30" />
-            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-primary/10" /><div className="absolute top-1/2 left-0 right-0 h-px bg-primary/10" /><div className="absolute inset-0 radar-sweep opacity-80" />
-            <div className="absolute h-3 w-3 rounded-full bg-destructive shadow-[0_0_0_5px_hsl(var(--destructive)/.12),0_0_18px_hsl(var(--destructive)/.85)] radar-ping" aria-hidden="true" />
-            <div className="radar-core" />
-            <div className="absolute top-5 left-1/2 -translate-x-1/2 text-primary/90" aria-hidden="true">
-              <div className="relative h-9 w-9 grid place-items-center">
-                <svg viewBox="0 0 40 40" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 11l7 7M30 11l-7 7M10 29l7-7M30 29l-7-7" opacity=".7"/>
-                  <path d="M14 8l4 4-5 5-4-4 5-5ZM26 8l-4 4 5 5 4-4-5-5ZM14 32l4-4-5-5-4 4 5 5ZM26 32l-4-4 5-5 4 4-5 5Z"/>
-                  <circle cx="20" cy="20" r="5"/><circle cx="20" cy="20" r="1.5" fill="currentColor"/>
-                  <path d="M20 3v4M20 33v4"/>
-                </svg>
-                <span className="absolute -inset-1 rounded-full border border-primary/25 animate-ping" />
-                <span className="absolute -inset-3 rounded-full border border-primary/10" />
-              </div>
-            </div>
-            <div className="absolute bottom-5 rounded-full bg-background/80 border border-border/50 px-3 py-1 text-[10px] mono text-muted-foreground backdrop-blur">LIVE LOCATION · GPS</div>
-          </div>
+          <GpsRadar />
           <div className="text-center mt-4"><div className="text-base font-extrabold radar-status">{statusText}</div><div className="text-xs text-muted-foreground mt-1">{step === "loading-location" ? "يتم تحميل موقع العمل من الخادم..." : isLocating ? "جاري استقبال بيانات الموقع من جهازك ومقارنتها بالموقع المسجل..." : step === "gps" || step === "error" ? "اضغط لتحديد موقعك ومقارنته بموقع العمل." : "تم تحديد موقع جهازك ومقارنته بنطاق العمل."}</div></div>
           <button type="button" onClick={() => void refreshGps()} disabled={isLocating || !location} className="btn-primary w-full mt-4 py-3 flex items-center justify-center gap-2">{isLocating ? <><span className="animate-spin">⟳</span> جاري تحديد موقعي...</> : <>📍 تحديد موقعي الحالي</>}</button>
           <div className="grid grid-cols-2 gap-2 text-center mt-4 text-xs"><Cell label="المسافة الحالية" value={distance !== null ? `${Math.round(distance)} م` : "…"} /><Cell label="النطاق المسموح" value={Number.isFinite(targetRadius) ? `${Math.round(targetRadius)} م` : "…"} /><Cell label="خط العرض" value={pos ? pos.lat.toFixed(5) : "…"} /><Cell label="خط الطول" value={pos ? pos.lng.toFixed(5) : "…"} /></div>
@@ -214,6 +196,150 @@ export default function EmployeeScan() {
         </section>
         <section className="hud-card p-6">{step === "error" && <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm mb-4"><div className="font-semibold text-destructive">فشل التحقق</div><div className="text-xs text-muted-foreground mt-1">{error}</div></div>}{step === "success" && result && <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm mb-4"><div className="font-extrabold text-primary text-lg">تمت العملية بنجاح</div><div className="text-xs text-muted-foreground mt-1">{title} في {formatTime(result.time)}{result.timeNote ? ` · ${result.timeNote}` : ""}</div></div>}<div className="flex gap-3"><button className="btn-primary flex-1 py-3" onClick={submit} disabled={step !== "scan" || !inRange || !qrInput.trim() || !pos}>{step === "submitting" ? "جاري التسجيل..." : `تأكيد ${title}`}</button>{(step === "success" || step === "error") && <button onClick={() => { stopCamera(); nav("/employee"); }} className="btn-secondary">عودة</button>}</div></section>
       </main>
+    </div>
+  );
+}
+
+function GpsRadar() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const size = 400;
+    const center = size / 2;
+    const radius = size / 2 - 20;
+    let sweepAngle = 0;
+    let frame = 0;
+    let cancelled = false;
+
+    const drawRadarBase = () => {
+      ctx.clearRect(0, 0, size, size);
+      ctx.fillStyle = "#061013";
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.strokeStyle = "rgba(0, 255, 204, 0.20)";
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 4; i += 1) {
+        ctx.beginPath();
+        ctx.arc(center, center, (radius / 4) * i, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "rgba(0, 255, 204, 0.12)";
+      ctx.beginPath();
+      ctx.moveTo(center - radius, center);
+      ctx.lineTo(center + radius, center);
+      ctx.moveTo(center, center - radius);
+      ctx.lineTo(center, center + radius);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(0, 255, 204, 0.55)";
+      ctx.font = "10px monospace";
+      ctx.textAlign = "center";
+      [0, 45, 90, 135, 180, 225, 270, 315].forEach((degree) => {
+        const rad = (degree - 90) * (Math.PI / 180);
+        const x = center + (radius + 12) * Math.cos(rad);
+        const y = center + (radius + 12) * Math.sin(rad) + 3;
+        ctx.fillText(`${degree}°`, x, y);
+      });
+    };
+
+    const drawSatellite = (x: number, y: number) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = "#00ffcc";
+      ctx.fillStyle = "#00ffcc";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-5, -5, 10, 10);
+      ctx.strokeRect(-12, -3, 5, 6);
+      ctx.strokeRect(7, -3, 5, 6);
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(0, 255, 204, 0.25)";
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    const drawTargets = () => {
+      const targets = [
+        { r: 0.40, angle: 45 },
+        { r: 0.74, angle: 160 },
+        { r: 0.56, angle: 280 },
+      ];
+
+      targets.forEach((target, index) => {
+        const rad = (target.angle - 90) * (Math.PI / 180);
+        const x = center + radius * target.r * Math.cos(rad);
+        const y = center + radius * target.r * Math.sin(rad);
+        if (index === 0) {
+          drawSatellite(x, y);
+          return;
+        }
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = "#00ffcc";
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "#00ffcc";
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+
+      ctx.beginPath();
+      ctx.arc(center, center, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ff3366";
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#ff3366";
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    };
+
+    const drawSweep = () => {
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(sweepAngle);
+      const gradient = ctx.createConicGradient(-Math.PI / 2, 0, 0);
+      gradient.addColorStop(0, "rgba(0, 255, 204, 0.28)");
+      gradient.addColorStop(0.15, "rgba(0, 255, 204, 0.03)");
+      gradient.addColorStop(1, "transparent");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, radius, -Math.PI / 2, Math.PI);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -radius);
+      ctx.strokeStyle = "#00ffcc";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    const animate = () => {
+      if (cancelled) return;
+      drawRadarBase();
+      drawTargets();
+      drawSweep();
+      sweepAngle += 0.025;
+      if (sweepAngle >= Math.PI * 2) sweepAngle = 0;
+      frame = window.requestAnimationFrame(animate);
+    };
+
+    frame = window.requestAnimationFrame(animate);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return (
+    <div className="mx-auto w-full max-w-[280px] aspect-square rounded-full border border-primary/25 bg-[#061013] overflow-hidden shadow-[0_0_40px_hsl(var(--primary)/.08)]">
+      <canvas ref={canvasRef} width={400} height={400} className="block h-full w-full" aria-label="رادار تحديد الموقع GPS" />
     </div>
   );
 }
