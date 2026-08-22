@@ -57,6 +57,7 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | "system">(readTheme());
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
@@ -102,6 +103,7 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
     setDiagnostics(getDiagnostics());
     setShowDiagnostics(true);
     setMenuOpen(false);
+    setThemeMenuOpen(false);
   };
 
   const notificationRoute = (n: AppNotification) => {
@@ -132,9 +134,9 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
     }
   };
 
-  const setThemeAndClose = (value: "light" | "dark" | "system") => {
+  const setThemeAndKeepMenu = (value: "light" | "dark" | "system") => {
     setTheme(value);
-    setMenuOpen(false);
+    setThemeMenuOpen(false);
   };
 
   useEffect(() => { if (showNotifications) void reloadNotifications(); }, [showNotifications]);
@@ -152,14 +154,18 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">{filteredNav.map(n => <NavLink key={n.to} to={n.to} end={n.end as any} aria-label={n.label} className={({ isActive }) => cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition", isActive ? "bg-primary/15 text-primary border border-primary/30 shadow-sm" : "text-foreground/80 hover:bg-secondary hover:text-foreground")}><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-background/40 border border-border/50 text-base" aria-hidden="true">{n.icon}</span><span className="flex-1">{n.label}</span>{n.to === "/manager/requests" && unreadCount > 0 && <span className="badge bg-primary/15 text-primary">{unreadCount}</span>}</NavLink>)}</nav>
       <div className="p-3 border-t border-border/50 space-y-1">
         <button type="button" onClick={() => setShowNotifications(true)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm hover:bg-secondary"><span>الإشعارات</span>{unreadCount > 0 && <span className="badge bg-primary/15 text-primary">{unreadCount}</span>}</button>
-        <button type="button" onClick={() => setMenuOpen(v => !v)} className="w-full rounded-xl px-3 py-2.5 text-sm text-right hover:bg-secondary">☰ القائمة</button>
+        <button type="button" onClick={() => { setMenuOpen(v => !v); setThemeMenuOpen(false); }} className="w-full rounded-xl px-3 py-2.5 text-sm text-right hover:bg-secondary">☰ القائمة</button>
         {menuOpen && <div className="mt-1 rounded-xl border border-border bg-card p-2 shadow-lg">
           {currentRole === "owner" && <button onClick={openDiagnostics} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-primary">🛠️ سجل الأخطاء ({getDiagnostics().filter(x => x.level === "error").length})</button>}
           <div className="border-t my-1" />
-          <div className="px-3 py-2 text-xs font-bold text-muted-foreground">المظهر</div>
-          <button onClick={() => setThemeAndClose("dark")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}>🌙 داكن</button>
-          <button onClick={() => setThemeAndClose("light")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}>☀️ فاتح</button>
-          <button onClick={() => setThemeAndClose("system")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}>◐ تلقائي</button>
+          <button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-secondary text-sm font-semibold">
+            <span>🎨 المظهر</span><span className="text-muted-foreground text-xs">{theme === "dark" ? "داكن" : theme === "light" ? "فاتح" : "تلقائي"}⌄</span>
+          </button>
+          {themeMenuOpen && <div className="mt-1 mr-2 border-r border-border pr-2 space-y-1">
+            <button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}>🌙 الوضع الداكن</button>
+            <button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}>☀️ الوضع الفاتح</button>
+            <button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}>◐ تلقائي حسب النظام</button>
+          </div>}
           <button onClick={logout} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-red-600">🚪 تسجيل خروج</button>
         </div>}
       </div>
@@ -167,16 +173,20 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
 
     <div className="lg:mr-64">
       <div className="lg:hidden sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border/60">
-        <div className="px-4 py-3 flex items-center justify-between"><Brand /><button onClick={() => setMenuOpen(v => !v)} aria-label="فتح القائمة" className="p-2 rounded-lg border border-border text-sm font-semibold">☰</button></div>
+        <div className="px-4 py-3 flex items-center justify-between"><Brand /><button onClick={() => { setMenuOpen(v => !v); setThemeMenuOpen(false); }} aria-label="فتح القائمة" className="p-2 rounded-lg border border-border text-sm font-semibold">☰</button></div>
         <div className="px-2 pb-2 grid grid-cols-3 sm:grid-cols-6 gap-1 overflow-x-auto">{filteredNav.map(n => <NavLink key={n.to} to={n.to} end={n.end as any} aria-label={n.label} className={({ isActive }) => cn("min-w-0 rounded-xl px-2 py-2 text-center text-[10px] font-semibold", isActive ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}><span className="block text-base leading-5" aria-hidden="true">{n.icon}</span><span className="block mt-0.5 truncate">{n.label}</span></NavLink>)}</div>
         {menuOpen && <div className="absolute left-3 top-14 w-60 bg-card border border-border rounded-xl shadow-lg p-2 z-50">
-          <button onClick={() => { setShowNotifications(true); setMenuOpen(false); }} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm">🔔 الإشعارات {unreadCount > 0 && `(${unreadCount})`}</button>
+          <button onClick={() => { setShowNotifications(true); setMenuOpen(false); setThemeMenuOpen(false); }} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm">🔔 الإشعارات {unreadCount > 0 && `(${unreadCount})`}</button>
           {currentRole === "owner" && <button onClick={openDiagnostics} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-primary">🛠️ سجل الأخطاء ({diagnostics.filter(x => x.level === "error").length})</button>}
           <div className="border-t my-1" />
-          <div className="px-3 py-2 text-xs font-bold text-muted-foreground">المظهر</div>
-          <button onClick={() => setThemeAndClose("dark")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}>🌙 داكن</button>
-          <button onClick={() => setThemeAndClose("light")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}>☀️ فاتح</button>
-          <button onClick={() => setThemeAndClose("system")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}>◐ تلقائي</button>
+          <button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-secondary text-sm font-semibold">
+            <span>🎨 المظهر</span><span className="text-muted-foreground text-xs">{theme === "dark" ? "داكن" : theme === "light" ? "فاتح" : "تلقائي"}⌄</span>
+          </button>
+          {themeMenuOpen && <div className="mt-1 mr-2 border-r border-border pr-2 space-y-1">
+            <button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}>🌙 الوضع الداكن</button>
+            <button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}>☀️ الوضع الفاتح</button>
+            <button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}>◐ تلقائي حسب النظام</button>
+          </div>}
           <button onClick={logout} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-red-600">🚪 تسجيل خروج</button>
         </div>}
       </div>
