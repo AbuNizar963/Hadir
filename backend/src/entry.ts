@@ -9,8 +9,24 @@ function configuredOrigins(env: Env): string[] { return String(env.APP_ORIGIN ||
 function responseOrigin(request: Request, env: Env): string { const incoming = String(request.headers.get("origin") || "").trim().replace(/\/$/, ""); const allowed = configuredOrigins(env); if (!incoming) return allowed[0] || "*"; return allowed.length === 0 || allowed.includes(incoming) ? incoming : allowed[0] || "*"; }
 function readCookie(request: Request, name: string): string | null { const cookies=request.headers.get("cookie")||""; const item=cookies.split(";").map(v=>v.trim()).find(v=>v.startsWith(`${name}=`)); return item ? decodeURIComponent(item.slice(name.length+1)) : null; }
 async function hashToken(token: string) { const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token)); let binary=""; for(const byte of new Uint8Array(digest)) binary+=String.fromCharCode(byte); return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,""); }
-async function actorIdFromSession(request: Request, env: Env): Promise<string|null> { const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\s+/i,"")||"").trim(); if(!token||!env.DB)return null; try { const tokenHash=await hashToken(token); const row=await env.DB.prepare("SELECT user_id AS userId FROM auth_sessions WHERE token_hash=? LIMIT 1").bind(tokenHash).first<{userId:string}>(); return row?.userId||null; } catch { return null; } }
+async function actorIdFromSession(request: Request, env: Env): Promise<string|null> { const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\s+/i,"")||"").trim(); if(!token||!env.DB)return null; try { const tokenHash=await hashToken(token); const row=await env.DB.prepare("SELECT user_id AS userId FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1").bind(tokenHash).first<{userId:string}>(); return row?.userId||null; } catch { return null; } }
 async function actorFromSession(request: Request, env: Env): Promise<any|null> { const id=await actorIdFromSession(request,env); if(!id)return null; return env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,role,device_id AS deviceId,device_label AS deviceLabel FROM employees WHERE id=? LIMIT 1").bind(id).first<any>(); }
+async function actorForAdministrativeAction(request: Request, env: Env): Promise<any|null> {
+  // Prefer the application's canonical /api/me authentication because it
+  // supports both the current server session and legacy admin sessions during
+  // migration. Fall back to the hardened D1 session lookup for new sessions.
+  try {
+    const url = new URL(request.url);
+    url.pathname = "/api/me";
+    url.search = "";
+    const probe = await app.fetch(new Request(url, { method: "GET", headers: request.headers }), env, {} as ExecutionContext);
+    if (probe.ok) {
+      const data = await probe.json().catch(() => ({})) as any;
+      if (data?.user) return data.user;
+    }
+  } catch {}
+  return actorFromSession(request, env);
+}
 function realtimeId(env: Env) { return env.REALTIME.idFromName("hadir-global"); }
 async function broadcast(env: Env, payload: Record<string, unknown>) { if(!env.REALTIME)return; const stub=env.REALTIME.get(realtimeId(env)); await stub.fetch("https://realtime/broadcast",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)}).catch(()=>undefined); }
 function validDeviceId(value: string|null): value is string { return Boolean(value&&value.trim().length>=8&&value.trim().length<=200); }
@@ -28,8 +44,6 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
     if(url.pathname==="/api/realtime"&&request.method==="GET"){ const userId=await actorIdFromSession(request,env); if(!userId)return new Response("غير مصرح",{status:401,headers:cors(origin)}); if(!env.REALTIME)return new Response("Realtime غير مفعّل",{status:503,headers:cors(origin)}); const response=await env.REALTIME.get(realtimeId(env)).fetch(new URL("https://realtime/connect?userId="+encodeURIComponent(userId)),{method:"GET"}); return response.status===101?response:new Response("Realtime connection failed",{status:502,headers:cors(origin)}); }
     const prepared=await ensureDeviceIdentity(request);
     const mutation=["POST","PUT","PATCH","DELETE"].includes(request.method)&&url.pathname.startsWith("/api/");
-
-    // Employee device binding is enforced here, before the normal login response is exposed.
     if(url.pathname==="/api/auth/login"&&request.method==="POST"){
       const loginBody=await prepared.request.clone().json().catch(()=>({})) as any;
       const response=await app.fetch(prepared.request,env,ctx);
@@ -54,7 +68,17 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
     if(url.pathname==="/api/device/passkey/registration/options"&&request.method==="GET"){ if(!actor||actor.role!=="staff")return new Response(JSON.stringify({error:"غير مصرح"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}}); const options=await registrationOptions(env,actor.id,actor.jobNumber,actor.name); return new Response(JSON.stringify(options),{status:200,headers:{...cors(origin),"content-type":"application/json"}}); }
     if(url.pathname==="/api/device/passkey/registration/verify"&&request.method==="POST"){ if(!actor||actor.role!=="staff")return new Response(JSON.stringify({error:"غير مصرح"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}}); const body=await request.json().catch(()=>null); if(!body)return new Response(JSON.stringify({error:"بيانات مفتاح الجهاز غير صالحة"}),{status:400,headers:{...cors(origin),"content-type":"application/json"}}); const result=await verifyRegistration(env,actor.id,body); return new Response(JSON.stringify(result),{status:200,headers:{...cors(origin),"content-type":"application/json"}}); }
     const deviceReset=url.pathname.match(/^\/api\/employees\/([^/]+)\/device$/);
-    if(deviceReset&&request.method==="DELETE"){ if(!actor||!["owner","manager"].includes(actor.role))return new Response(JSON.stringify({error:"المالك أو المدير فقط"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}}); const employeeId=decodeURIComponent(deviceReset[1]); await clearEmployeeDevice(env,employeeId); await env.DB.prepare("DELETE FROM employee_passkeys WHERE employee_id=?").bind(employeeId).run(); await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) SELECT ?,id,job_number,?, 'device-unbind','success','تم فك ربط جهاز الموظف',?,?,?,? FROM employees WHERE id=?").bind(crypto.randomUUID(),actor.name||"الإدارة",new Date().toISOString(),request.headers.get("x-device-id")||"unknown",request.headers.get("CF-Connecting-IP")||"unknown",employeeId).run().catch(()=>undefined); return new Response(JSON.stringify({ok:true}),{status:200,headers:{...cors(origin),"content-type":"application/json"}}); }
+    if(deviceReset&&request.method==="DELETE"){
+      const admin=await actorForAdministrativeAction(request,env);
+      if(!admin||!["owner","manager"].includes(String(admin.role).toLowerCase()))return new Response(JSON.stringify({error:"المالك أو المدير فقط"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}});
+      const employeeId=decodeURIComponent(deviceReset[1]);
+      const employee=await env.DB.prepare("SELECT id,job_number AS jobNumber,name FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
+      if(!employee)return new Response(JSON.stringify({error:"الموظف غير موجود"}),{status:404,headers:{...cors(origin),"content-type":"application/json"}});
+      await clearEmployeeDevice(env,employeeId);
+      await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),employee.id,employee.jobNumber||"",admin.name||"الإدارة", "device-unbind","success","تم فك ربط جهاز الموظف",new Date().toISOString(),request.headers.get("x-device-id")||"unknown",request.headers.get("CF-Connecting-IP")||"unknown").run().catch(()=>undefined);
+      await broadcast(env,{type:"employee-device-unbound",employeeId:employee.id,timestamp:new Date().toISOString()});
+      return new Response(JSON.stringify({ok:true,employeeId:employee.id}),{status:200,headers:{...cors(origin),"content-type":"application/json"}});
+    }
 
     const response=await app.fetch(prepared.request,env,ctx);
     if(mutation&&response.ok)ctx.waitUntil(broadcast(env,{type:"cloud-data-changed",timestamp:new Date().toISOString(),path:url.pathname,method:request.method}));
