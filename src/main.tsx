@@ -12,6 +12,12 @@ seedIfEmpty();
 installGlobalDiagnostics();
 startRealtimeSync();
 
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
+  });
+}
+
 window.addEventListener("unhandledrejection", (event) => {
   recordDiagnostic("error", "APP_UNHANDLED_REJECTION", "حدث خطأ غير معالج في التطبيق.", event.reason);
 });
