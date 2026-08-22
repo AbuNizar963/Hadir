@@ -42,7 +42,7 @@ export default function EmployeeHome(){
     <button type="button" onClick={()=>setMenuOpen(v=>!v)} className="h-12 w-12 rounded-xl border border-border/70 bg-secondary/60 text-foreground grid place-items-center shadow-sm hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="فتح قائمة الموظف" aria-expanded={menuOpen} aria-haspopup="menu">
      <span className="sr-only">القائمة</span><span aria-hidden="true" className="flex flex-col gap-1.5 items-center justify-center"><span className="block h-0.5 w-6 rounded-full bg-current"/><span className="block h-0.5 w-6 rounded-full bg-current"/><span className="block h-0.5 w-6 rounded-full bg-current"/></span>
     </button>
-    {menuOpen&&<div className="absolute left-0 top-full mt-2 z-[9999] w-64 rounded-2xl border border-border/70 bg-background shadow-2xl p-2" role="menu">
+    {menuOpen&&<div className="fixed left-4 top-20 z-[9999] w-[min(16rem,calc(100vw-2rem))] rounded-2xl border border-border/70 bg-background shadow-2xl p-2" role="menu">
       <button type="button" onClick={()=>{setMenuOpen(false);setShowProfile(true);}} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary transition-colors" role="menuitem"><span className="h-9 w-9 rounded-xl bg-primary/12 text-primary grid place-items-center">👤</span><span>الملف الشخصي للموظف</span></button>
       <button type="button" onClick={logout} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold text-destructive hover:bg-destructive/10 transition-colors" role="menuitem"><span className="h-9 w-9 rounded-xl bg-destructive/10 grid place-items-center">↪</span><span>تسجيل الخروج</span></button>
     </div>}
