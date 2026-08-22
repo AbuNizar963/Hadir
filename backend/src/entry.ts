@@ -1,6 +1,7 @@
 import app from "./app";
 import { HadirRealtime } from "./realtime";
 import { bindEmployeeDevice, clearEmployeeDevice, deviceStatus, registrationOptions, verifyRegistration } from "./deviceSecurity";
+import { handleWorkforce } from "./workforce";
 
 type Env = { REALTIME: DurableObjectNamespace; DB: D1Database; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_RECOVERY_CODE?: string; PROFILE_IMAGES?: R2Bucket; WEBAUTHN_RP_ID?: string; WEBAUTHN_ORIGIN?: string };
 const SESSION_COOKIE = "hadir_session";
@@ -56,6 +57,10 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
     }
 
     const actor=await actorFromSession(request,env);
+    if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"){
+      const workforceResponse=await handleWorkforce(prepared.request,env,actor,url.pathname);
+      if(workforceResponse.status!==404)return addDeviceCookie(workforceResponse,prepared.deviceId,prepared.setCookie,origin);
+    }
     if(url.pathname==="/api/device/status"&&request.method==="GET"){ if(!actor||actor.role!=="staff")return new Response(JSON.stringify({error:"غير مصرح"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}}); return new Response(JSON.stringify(await deviceStatus(env,actor.id)),{status:200,headers:{...cors(origin),"content-type":"application/json"}}); }
     if(url.pathname==="/api/device/passkey/registration/options"&&request.method==="GET"){ if(!actor||actor.role!=="staff")return new Response(JSON.stringify({error:"غير مصرح"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}}); const options=await registrationOptions(env,actor.id,actor.jobNumber,actor.name); return new Response(JSON.stringify(options),{status:200,headers:{...cors(origin),"content-type":"application/json"}}); }
     if(url.pathname==="/api/device/passkey/registration/verify"&&request.method==="POST"){ if(!actor||actor.role!=="staff")return new Response(JSON.stringify({error:"غير مصرح"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}}); const body=await request.json().catch(()=>null); if(!body)return new Response(JSON.stringify({error:"بيانات مفتاح الجهاز غير صالحة"}),{status:400,headers:{...cors(origin),"content-type":"application/json"}}); const result=await verifyRegistration(env,actor.id,body); return new Response(JSON.stringify(result),{status:200,headers:{...cors(origin),"content-type":"application/json"}}); }
