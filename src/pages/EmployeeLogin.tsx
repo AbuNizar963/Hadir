@@ -1,20 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
-import { backendEmployeeLogin } from "@/lib/backend";
+import { backendEmployeeLogin, registerEmployeePasskey } from "@/lib/backend";
 import { setSession, setManagerSession } from "@/lib/storage";
 import { getSettings } from "@/lib/storage";
 
 const LOGIN_TIMEOUT_MS = 20000;
-
-type EmployeeLoginUser = {
-  id?: string;
-  jobNumber?: string;
-  username?: string;
-  name?: string;
-  status?: string;
-  role?: string;
-};
+type EmployeeLoginUser = { id?: string; jobNumber?: string; username?: string; name?: string; status?: string; role?: string };
 
 export default function EmployeeLogin() {
   const nav = useNavigate();
@@ -24,46 +16,29 @@ export default function EmployeeLogin() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => () => undefined, []);
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
-    setErr(null);
-    setLoading(true);
-
+    setErr(null); setLoading(true);
     let timer = 0;
     try {
       setManagerSession(null);
-      const timeout = new Promise<never>((_, reject) => {
-        timer = window.setTimeout(() => reject(new Error("انتهت مهلة الاتصال بخادم حاضر. تحقق من الإنترنت وحاول مرة أخرى.")), LOGIN_TIMEOUT_MS);
-      });
-
+      const timeout = new Promise<never>((_, reject) => { timer = window.setTimeout(() => reject(new Error("انتهت مهلة الاتصال بخادم حاضر. تحقق من الإنترنت وحاول مرة أخرى.")), LOGIN_TIMEOUT_MS); });
       const rawUser = await Promise.race([backendEmployeeLogin(jobNumber.trim(), pin), timeout]) as EmployeeLoginUser;
       const employeeId = String(rawUser?.id || "").trim();
-      // The Worker session actor uses `username` for the employee job number,
-      // while employee CRUD/profile responses expose `jobNumber`.
       const employeeJobNumber = String(rawUser?.jobNumber || rawUser?.username || "").trim();
-
       if (!employeeId || !employeeJobNumber) throw new Error("تعذر العثور على ملف الموظف المرتبط بهذا الحساب في D1.");
       if (rawUser.status && rawUser.status !== "active") throw new Error("حساب الموظف موقوف. يرجى مراجعة الإدارة.");
-
-      setSession({
-        employeeId,
-        jobNumber: employeeJobNumber,
-        name: String(rawUser.name || "").trim(),
-        loginAt: new Date().toISOString(),
-        role: rawUser.role || "staff",
-      });
+      setSession({ employeeId, jobNumber: employeeJobNumber, name: String(rawUser.name || "").trim(), loginAt: new Date().toISOString(), role: rawUser.role || "staff" });
       window.dispatchEvent(new Event("hadir:session-changed"));
+      // WebAuthn is an additional durable device anchor. Failure/unsupported browser
+      // must not block a valid first login; the server-side binding remains enforced.
+      try { await registerEmployeePasskey(); } catch { /* enrollment can be completed later from the employee device/security panel */ }
       nav("/employee", { replace: true });
     } catch (error) {
       setErr(error instanceof Error ? error.message : "تعذر تسجيل الدخول. حاول مرة أخرى.");
-    } finally {
-      if (timer) window.clearTimeout(timer);
-      setLoading(false);
-    }
+    } finally { if (timer) window.clearTimeout(timer); setLoading(false); }
   };
 
-  return <div className="min-h-screen flex flex-col"><header className="p-5"><Brand /></header><main className="flex-1 grid place-items-center px-5 pb-10"><div className="w-full max-w-md hud-card p-7"><div className="text-xs mono text-muted-foreground">{settings.brandName || "HADIR"} · بوابة الموظفين</div><h1 className="text-2xl font-extrabold mt-1">تسجيل دخول الموظف</h1><p className="text-sm text-muted-foreground mt-1">أدخل رقمك الوظيفي ورمز الـ PIN الخاص بك للوصول لنظام الحضور.</p><form onSubmit={submit} className="mt-6 space-y-4"><div><label className="block text-sm font-semibold mb-1.5">الرقم الوظيفي</label><input type="text" className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm" value={jobNumber} onChange={e=>setJobNumber(e.target.value)} placeholder="مثال: 1001" required disabled={loading}/></div><div><label className="block text-sm font-semibold mb-1.5">رمز الـ PIN السري</label><input type="password" className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm" value={pin} onChange={e=>setPin(e.target.value)} placeholder="أدخل رمز الـ PIN" required disabled={loading}/></div>{err&&<div className="rounded-xl border border-destructive/40 bg-destructive/10 text-destructive-foreground p-3 text-sm">{err}</div>}<button className="btn-primary w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl" disabled={loading}>{loading?"جاري التحقق من D1...":"دخول الموظف"}</button></form><div className="mt-5 text-xs text-center flex justify-between items-center"><Link to="/" className="text-muted-foreground hover:text-foreground">← العودة للرئيسية</Link><Link to="/manager/login" className="text-primary hover:underline">دخول الإدارة ؟</Link></div></div></main></div>;
+  return <div className="min-h-screen flex flex-col"><header className="p-5"><Brand /></header><main className="flex-1 grid place-items-center px-5 pb-10"><div className="w-full max-w-md hud-card p-7"><div className="text-xs mono text-muted-foreground">{settings.brandName || "HADIR"} · بوابة الموظفين</div><h1 className="text-2xl font-extrabold mt-1">تسجيل دخول الموظف</h1><p className="text-sm text-muted-foreground mt-1">يدخل الموظف برقم العمل وPIN، ثم يتحقق النظام من الجهاز المرتبط بالمستخدم.</p><form onSubmit={submit} className="mt-6 space-y-4"><div><label className="block text-sm font-semibold mb-1.5">الرقم الوظيفي</label><input type="text" inputMode="numeric" autoComplete="username" className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm" value={jobNumber} onChange={e=>setJobNumber(e.target.value)} placeholder="مثال: 1001" required disabled={loading}/></div><div><label className="block text-sm font-semibold mb-1.5">رمز الـ PIN السري</label><input type="password" inputMode="numeric" autoComplete="current-password" className="input w-full p-2.5 rounded-xl border border-border bg-secondary/50 text-sm" value={pin} onChange={e=>setPin(e.target.value)} placeholder="أدخل رمز الـ PIN" required disabled={loading}/></div>{err&&<div className="rounded-xl border border-destructive/40 bg-destructive/10 text-destructive-foreground p-3 text-sm">{err}</div>}<button className="btn-primary w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl" disabled={loading}>{loading?"جاري التحقق من الحساب والجهاز...":"دخول الموظف"}</button></form><div className="mt-3 rounded-xl border border-border/70 bg-secondary/30 p-3 text-xs text-muted-foreground">🔐 عند أول دخول يحفظ حاضر هوية الجهاز في D1 ويحاول إنشاء Passkey على الهاتف. إذا تم مسح بيانات المتصفح، يبقى الـPasskey هو طبقة الاسترداد الأقوى.</div><div className="mt-5 text-xs text-center flex justify-between items-center"><Link to="/" className="text-muted-foreground hover:text-foreground">← العودة للرئيسية</Link><Link to="/manager/login" className="text-primary hover:underline">دخول الإدارة ؟</Link></div></div></main></div>;
 }
