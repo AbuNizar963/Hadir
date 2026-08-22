@@ -39,7 +39,7 @@ export default function NotificationBell({ userId }: Props) {
   if (!userId) return null;
 
   return <div className="relative" ref={wrapRef}>
-    <button type="button" onClick={() => setOpen((v) => !v)} className="relative h-9 w-9 rounded-xl bg-secondary/50 hover:bg-secondary border border-border grid place-items-center transition" aria-label="الإشعارات">
+    <button type="button" onClick={() => setOpen((v) => !v)} className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="الإشعارات">
       <BellIcon />
       {unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold grid place-items-center mono">{unreadCount > 99 ? "99+" : unreadCount}</span>}
     </button>
