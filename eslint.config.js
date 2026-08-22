@@ -16,7 +16,11 @@ export default [
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        ...globals.serviceworker,
+      },
       parser: tsParser,
       parserOptions: {
         sourceType: "module",
@@ -41,6 +45,7 @@ export default [
       "@typescript-eslint/no-empty-object-type": "off",
       "@typescript-eslint/no-unused-expressions": "off",
       "@typescript-eslint/no-require-imports": "off",
+      "no-undef": "off",
       "no-empty": "off",
       "no-useless-escape": "off",
     },
