@@ -111,8 +111,6 @@ export default function EmployeeScan() {
   const qrVerified = Boolean(qrInput.trim()) && (!settings.qrCode || qrInput.trim() === settings.qrCode.trim());
   const confirmationActive = Boolean(confirmationExpiresAt && remainingSeconds > 0 && inRange && qrVerified);
 
-  // Start the one-minute confirmation window only after both GPS and QR are verified.
-  // Editing the QR value creates a fresh verification window; letting it expire clears the QR.
   useEffect(() => {
     if (!inRange || !qrVerified || step !== "scan") {
       setConfirmationExpiresAt(null);
@@ -211,6 +209,18 @@ export default function EmployeeScan() {
       <header className="max-w-xl mx-auto px-5 py-5 flex items-center justify-between"><Brand /><Link to="/employee" className="btn-ghost text-xs" onClick={stopCamera}>إلغاء</Link></header>
       <main className="max-w-xl mx-auto px-5 pb-16 space-y-5">
         <section className="hud-card p-6"><div className="text-xs text-muted-foreground mono">{action === "check-in" ? "CHECK IN" : "CHECK OUT"}</div><h1 className="text-2xl font-extrabold mt-0.5">{title}</h1><div className="text-sm text-muted-foreground mt-1">{session?.name ?? "الموظف"} · <span className="mono">{session?.jobNumber ?? "-"}</span> · <span className="text-primary font-semibold">{locationName}</span></div></section>
+        <section className="hud-card p-5 sm:p-6 border-primary/20 bg-primary/[0.03]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-bold">مهلة تأكيد {title}</div>
+              <div className="text-[11px] text-muted-foreground mt-1">بعد التحقق من الموقع وQR. لا يمكن تأكيد العملية بعد انتهاء الدقيقة.</div>
+            </div>
+            <div className={`shrink-0 rounded-2xl border px-4 py-2.5 text-center min-w-[88px] ${confirmationActive ? "border-primary/30 bg-secondary/60" : "border-border/60 bg-secondary/30"}`}>
+              <div className={`mono font-black text-xl leading-none tabular-nums ${confirmationActive ? "text-primary" : "text-muted-foreground"}`}>{timerText}</div>
+              <div className="text-[10px] text-muted-foreground mt-1">{timerReadyText}</div>
+            </div>
+          </div>
+        </section>
         <section className="hud-card p-5 sm:p-6">
           <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "loading-location" || step === "gps" || isLocating ? "active" : step === "error" ? "fail" : "done"} /></div>
           <GpsRadar />
@@ -235,7 +245,7 @@ export default function EmployeeScan() {
         <section className="hud-card p-6">
           {step === "error" && <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm mb-4"><div className="font-semibold text-destructive">فشل التحقق</div><div className="text-xs text-muted-foreground mt-1">{error}</div></div>}
           {step === "success" && result && <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-sm mb-4"><div className="font-extrabold text-primary text-lg">تمت العملية بنجاح</div><div className="text-xs text-muted-foreground mt-1">{title} في {formatTime(result.time)}{result.timeNote ? ` · ${result.timeNote}` : ""}</div></div>}
-          <div className="flex gap-3 items-center"><button className="btn-primary flex-1 py-3" onClick={submit} disabled={step !== "scan" || !inRange || !qrInput.trim() || !pos || !confirmationActive}>{step === "submitting" ? "جاري التسجيل..." : `تأكيد ${title}`}</button><div className={`shrink-0 rounded-xl border px-3 py-2 text-center ${confirmationActive ? "border-primary/25 bg-secondary/50" : "border-border/60 bg-secondary/30"}`}><div className="text-[10px] text-muted-foreground">{timerReadyText}</div><div className={`mono font-black text-sm tabular-nums ${confirmationActive ? "text-primary" : "text-muted-foreground"}`}>{timerText}</div></div>{(step === "success" || step === "error") && <button onClick={() => { stopCamera(); nav("/employee"); }} className="btn-secondary">عودة</button>}</div>
+          <div className="flex gap-3 items-center"><button className="btn-primary flex-1 py-3" onClick={submit} disabled={step !== "scan" || !inRange || !qrInput.trim() || !pos || !confirmationActive}>{step === "submitting" ? "جاري التسجيل..." : `تأكيد ${title}`}</button>{(step === "success" || step === "error") && <button onClick={() => { stopCamera(); nav("/employee"); }} className="btn-secondary">عودة</button>}</div>
         </section>
       </main>
     </div>
