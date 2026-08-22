@@ -1,11 +1,11 @@
 {
-  "id": "/Hadir/employee",
+  "id": "/Hadir/",
   "name": "حاضر · نظام الحضور والانصراف",
   "short_name": "حاضر",
-  "description": "بوابة الموظفين الآمنة لتسجيل الحضور والانصراف",
+  "description": "نظام حاضر لتسجيل الحضور والانصراف وإدارة الموظفين",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "/Hadir/employee",
+  "start_url": "/Hadir/",
   "scope": "/Hadir/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
@@ -21,7 +21,7 @@
       "name": "تسجيل الحضور والانصراف",
       "short_name": "الحضور",
       "description": "فتح شاشة تسجيل الحضور والانصراف",
-      "url": "/Hadir/employee/scan",
+      "url": "/Hadir/employee",
       "icons": [{ "src": "/Hadir/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
     },
     {
