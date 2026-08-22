@@ -45,13 +45,13 @@ export default function EmployeeScan() {
     void getBackendEmployeeLocation().then(({ location: remote }) => {
       if (cancelled) return;
       const next = { id: String(remote.id || "main"), name: String(remote.name || "المقر الرئيسي"), lat: Number(remote.lat), lng: Number(remote.lng), radiusMeters: Number(remote.radiusMeters) };
-      if (![next.lat, next.lng, next.radiusMeters].every(Number.isFinite) || next.radiusMeters <= 0) throw new Error("بيانات موقع العمل القادمة من قاعدة بيانات D1 غير صالحة");
+      if (![next.lat, next.lng, next.radiusMeters].every(Number.isFinite) || next.radiusMeters <= 0) throw new Error("بيانات موقع العمل القادمة من الخادم غير صالحة");
       setLocation(next);
       setStep("gps");
     }).catch((e) => {
       if (cancelled) return;
       setLocation(null);
-      setError(e instanceof Error ? e.message : "تعذر تحميل موقع العمل من قاعدة بيانات D1");
+      setError(e instanceof Error ? e.message : "تعذر تحميل موقع العمل من الخادم");
       setStep("error");
     });
     return () => { cancelled = true; };
@@ -74,12 +74,9 @@ export default function EmployeeScan() {
   };
 
   const refreshGps = async () => {
-    if (!location) {
-      setError("لم يتم تحميل موقع العمل من قاعدة بيانات D1 بعد.");
-      return;
-    }
+    if (!location) { setError("لم يتم تحميل موقع العمل من الخادم بعد."); return; }
     if (![targetLat, targetLng, targetRadius].every(Number.isFinite) || targetRadius <= 0) {
-      setError("إعدادات موقع العمل في قاعدة بيانات D1 غير صالحة.");
+      setError("إعدادات موقع العمل في الخادم غير صالحة");
       setStep("error");
       return;
     }
@@ -100,15 +97,10 @@ export default function EmployeeScan() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر الحصول على موقعك الحالي");
       setStep("error");
-    } finally {
-      setIsLocating(false);
-    }
+    } finally { setIsLocating(false); }
   };
 
-  useEffect(() => {
-    setScannerSupported(typeof window !== "undefined" && "BarcodeDetector" in window);
-  }, []);
-
+  useEffect(() => { setScannerSupported(typeof window !== "undefined" && "BarcodeDetector" in window); }, []);
   const inRange = distance !== null && Number.isFinite(distance) && distance <= targetRadius;
 
   const startCamera = async () => {
@@ -164,7 +156,7 @@ export default function EmployeeScan() {
 
   const submit = () => {
     if (!pos || !session || !qrInput.trim()) return;
-    if (!inRange) { setError(`أنت خارج نطاق مقر العمل. المسافة الحالية: ${distance ?? "غير معروفة"} م (الحد المسموح: ${targetRadius} م)`); setStep("error"); return; }
+    if (!inRange) { setError(`أنت خارج نطاق العمل. المسافة الحالية: ${distance ?? "غير معروفة"} م (الحد المسموح: ${targetRadius} م)`); setStep("error"); return; }
     setError(null); setStep("submitting");
     void (async () => {
       const response = await recordAttendance({ jobNumber: session.jobNumber, type: action, position: pos, qrCode: qrInput.trim() });
@@ -174,57 +166,47 @@ export default function EmployeeScan() {
   };
 
   const title = action === "check-in" ? "تسجيل الحضور" : "تسجيل الانصراف";
-  const statusText = step === "loading-location" ? "جاري تحميل موقع الشركة" : isLocating ? "جاري تحديد موقعك..." : step === "error" ? "تعذر التحقق من الموقع" : step === "gps" ? "اضغط لتحديد موقعك" : inRange ? "تم التحقق من الموقع" : "خارج نطاق الموقع";
+  const statusText = step === "loading-location" ? "جاري تحميل موقع العمل" : isLocating ? "جاري تحديد موقعك..." : step === "error" ? "تعذر التحقق من الموقع" : step === "gps" ? "اضغط لتحديد موقعك" : inRange ? "تم التحقق من الموقع" : "خارج نطاق الموقع";
 
   return (
     <div className="min-h-screen">
       <header className="max-w-xl mx-auto px-5 py-5 flex items-center justify-between"><Brand /><Link to="/employee" className="btn-ghost text-xs" onClick={stopCamera}>إلغاء</Link></header>
       <main className="max-w-xl mx-auto px-5 pb-16 space-y-5">
-        <section className="hud-card p-6"><div className="text-xs text-muted-foreground mono">ACTION</div><h1 className="text-2xl font-extrabold mt-0.5">{title}</h1><div className="text-sm text-muted-foreground mt-1">{session?.name ?? "الموظف"} · <span className="mono">{session?.jobNumber ?? "-"}</span> · <span className="text-primary font-semibold">{locationName}</span></div></section>
+        <section className="hud-card p-6"><div className="text-xs text-muted-foreground mono">{action === "check-in" ? "CHECK IN" : "CHECK OUT"}</div><h1 className="text-2xl font-extrabold mt-0.5">{title}</h1><div className="text-sm text-muted-foreground mt-1">{session?.name ?? "الموظف"} · <span className="mono">{session?.jobNumber ?? "-"}</span> · <span className="text-primary font-semibold">{locationName}</span></div></section>
         <section className="hud-card p-5 sm:p-6">
           <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "loading-location" || step === "gps" || isLocating ? "active" : step === "error" ? "fail" : "done"} /></div>
-          <div className="relative mx-auto w-full max-w-[250px] aspect-square rounded-full border border-primary/25 bg-primary/[0.035] overflow-hidden grid place-items-center shadow-[0_0_40px_hsl(var(--primary)/.08)]">
+          <div className="relative mx-auto w-full max-w-[280px] aspect-square rounded-full border border-primary/25 bg-primary/[0.035] overflow-hidden grid place-items-center shadow-[0_0_40px_hsl(var(--primary)/.08)]">
             <div className="absolute inset-[8%] rounded-full border border-primary/15" /><div className="absolute inset-[20%] rounded-full border border-primary/20" /><div className="absolute inset-[33%] rounded-full border border-primary/25" /><div className="absolute inset-[44%] rounded-full border border-primary/30" />
             <div className="absolute left-1/2 top-0 bottom-0 w-px bg-primary/10" /><div className="absolute top-1/2 left-0 right-0 h-px bg-primary/10" /><div className="absolute inset-0 radar-sweep opacity-80" />
-            <div className="radar-core" /><div className="absolute bottom-5 rounded-full bg-background/80 border border-border/50 px-3 py-1 text-[10px] mono text-muted-foreground backdrop-blur">LIVE LOCATION</div>
+            <div className="absolute h-3 w-3 rounded-full bg-destructive shadow-[0_0_0_5px_hsl(var(--destructive)/.12),0_0_18px_hsl(var(--destructive)/.85)] radar-ping" aria-hidden="true" />
+            <div className="radar-core" />
+            <div className="absolute top-5 left-1/2 -translate-x-1/2 text-primary/90" aria-hidden="true"><div className="relative"><svg viewBox="0 0 32 32" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M16 7v18M7 16h18M10 10l12 12M22 10L10 22"/><circle cx="16" cy="16" r="4"/><path d="M5 6c2-2 4-3 6-3M27 6c-2-2 4-3 6-3M5 26c2 2 4 3 6 3M27 26c-2 2-4 3-6 3"/></svg><span className="absolute -inset-2 rounded-full border border-primary/25 animate-ping" /></div></div>
+            <div className="absolute bottom-5 rounded-full bg-background/80 border border-border/50 px-3 py-1 text-[10px] mono text-muted-foreground backdrop-blur">LIVE LOCATION · GPS</div>
           </div>
-          <div className="text-center mt-4"><div className="text-base font-extrabold radar-status">{statusText}</div><div className="text-xs text-muted-foreground mt-1">{step === "loading-location" ? "يتم تحميل إحداثيات الشركة والنطاق من قاعدة بيانات D1..." : isLocating ? "اسمح للمتصفح بالوصول إلى موقعك الحالي..." : step === "gps" || step === "error" ? "اضغط الزر لتحديد موقعك ومقارنته بموقع العمل المحفوظ في D1." : "تم التحقق من موقع جهازك ومقارنته بموقع العمل."}</div></div>
-          <button type="button" onClick={() => void refreshGps()} disabled={isLocating || !location} className="btn-primary w-full mt-4 py-3 flex items-center justify-center gap-2">
-            {isLocating ? <><span className="animate-spin">⟳</span> جاري تحديد موقعي...</> : <>📍 تحديد موقعي الحالي</>}
-          </button>
+          <div className="text-center mt-4"><div className="text-base font-extrabold radar-status">{statusText}</div><div className="text-xs text-muted-foreground mt-1">{step === "loading-location" ? "يتم تحميل موقع العمل من الخادم..." : isLocating ? "جاري استقبال إشارة الموقع من جهازك ومقارنتها بالموقع المسجل..." : step === "gps" || step === "error" ? "اضغط لتحديد موقعك ومقارنته بموقع العمل." : "تم تحديد موقع جهازك ومقارنته بنطاق العمل."}</div></div>
+          <button type="button" onClick={() => void refreshGps()} disabled={isLocating || !location} className="btn-primary w-full mt-4 py-3 flex items-center justify-center gap-2">{isLocating ? <><span className="animate-spin">⟳</span> جاري تحديد موقعي...</> : <>📍 تحديد موقعي الحالي</>}</button>
           <div className="grid grid-cols-2 gap-2 text-center mt-4 text-xs"><Cell label="المسافة الحالية" value={distance !== null ? `${Math.round(distance)} م` : "…"} /><Cell label="النطاق المسموح" value={Number.isFinite(targetRadius) ? `${Math.round(targetRadius)} م` : "…"} /><Cell label="خط العرض" value={pos ? pos.lat.toFixed(5) : "…"} /><Cell label="خط الطول" value={pos ? pos.lng.toFixed(5) : "…"} /></div>
-          {distance !== null && !inRange && <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center text-xs text-destructive font-semibold">الموقع خارج النطاق؛ لن يتم السماح بتسجيل الحضور.</div>}
+          {distance !== null && !inRange && <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-center text-xs text-destructive font-semibold">الموقع خارج النطاق؛ لن يتم السماح بتسجيل العملية.</div>}
         </section>
         <section className={`hud-card p-6 ${!inRange ? "opacity-60" : ""}`}>
           <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">٢. مسح رمز QR</div><StepBadge state={qrInput ? "done" : step === "scan" && inRange ? "active" : "idle"} /></div>
           <div className="rounded-2xl border border-border/70 bg-background overflow-hidden text-center">
-            {isCameraActive ? <div className="relative min-h-[68vh] sm:min-h-[560px] w-full bg-black overflow-hidden">
+            {isCameraActive ? <div className="relative min-h-[72vh] sm:min-h-[580px] w-full bg-black overflow-hidden">
               <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted playsInline autoPlay />
               <div className="absolute inset-0 bg-black/15 pointer-events-none" />
-              <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4 text-white">
-                <div><div className="text-sm font-bold">مسح رمز QR</div><div className="text-[11px] text-white/70 mt-0.5">ضع الرمز داخل الإطار</div></div>
-                <button type="button" onClick={stopCamera} className="h-10 w-10 rounded-full bg-black/55 border border-white/20 grid place-items-center text-lg" aria-label="إغلاق الكاميرا">×</button>
-              </div>
-              <div className="absolute inset-0 grid place-items-center pointer-events-none">
-                <div className="relative w-[78vw] max-w-[340px] aspect-square">
-                  <div className="absolute inset-0 rounded-[28px] border border-white/15" />
-                  <div className="absolute -inset-px rounded-[28px] border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,.18),0_0_36px_rgba(255,255,255,.18)]" />
-                  <div className="absolute left-0 top-0 h-12 w-12 border-l-4 border-t-4 border-white rounded-tl-2xl" />
-                  <div className="absolute right-0 top-0 h-12 w-12 border-r-4 border-t-4 border-white rounded-tr-2xl" />
-                  <div className="absolute left-0 bottom-0 h-12 w-12 border-l-4 border-b-4 border-white rounded-bl-2xl" />
-                  <div className="absolute right-0 bottom-0 h-12 w-12 border-r-4 border-b-4 border-white rounded-br-2xl" />
-                  <div className="absolute left-4 right-4 top-1/2 h-px bg-white/90 shadow-[0_0_12px_rgba(255,255,255,.8)] animate-pulse" />
-                </div>
-              </div>
-              <div className="absolute inset-x-0 bottom-0 z-10 p-5">
-                <div className="mx-auto max-w-sm rounded-2xl bg-black/55 backdrop-blur-md border border-white/15 p-3 flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse shrink-0" />
-                  <span className="text-xs text-white/90 flex-1 text-right">{scannerSupported ? "وجّه الكاميرا نحو رمز QR وسيتم التعرف عليه تلقائيًا" : "الكاميرا تعمل، لكن المسح التلقائي غير مدعوم في هذا المتصفح"}</span>
-                  {torchSupported && <button type="button" onClick={() => void toggleTorch()} className={`h-10 w-10 shrink-0 rounded-xl border text-base ${torchOn ? "bg-white text-black border-white" : "bg-white/10 text-white border-white/20"}`} aria-label={torchOn ? "إطفاء الإضاءة" : "تشغيل الإضاءة"}>⌁</button>}
-                </div>
-                <button type="button" onClick={stopCamera} className="mt-2 w-full max-w-sm mx-auto block rounded-xl bg-white/10 border border-white/20 text-white py-2.5 text-xs font-bold">إغلاق الكاميرا</button>
-              </div>
-            </div> : <div className="p-6 sm:p-8"><div className="mx-auto h-20 w-20 rounded-2xl bg-secondary grid place-items-center mb-4 border border-border/60"><QrIcon /></div><p className="text-sm font-semibold">امسح رمز QR المخصص لـ{locationName}</p><p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1.5 leading-6">افتح الكاميرا ووجّه الرمز داخل الإطار. سيتم التعرف عليه تلقائيًا دون الحاجة للضغط على زر الالتقاط.</p><div className="flex flex-col sm:flex-row justify-center gap-2 mt-5"><button type="button" onClick={() => void startCamera()} className="btn-primary text-xs shadow" disabled={step !== "scan" || !inRange}>📷 فتح ماسح QR</button><button type="button" onClick={() => setQrInput(settings.qrCode || "")} className="btn-secondary text-xs" disabled={step !== "scan" || !inRange || !settings.qrCode}>إدخال القيمة يدويًا</button></div></div>}
+              <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4 text-white"><div><div className="text-sm font-bold">ماسح QR</div><div className="text-[11px] text-white/70 mt-0.5">ضع الرمز داخل الإطار الأخضر</div></div><button type="button" onClick={stopCamera} className="h-10 w-10 rounded-full bg-black/55 border border-white/20 grid place-items-center text-lg" aria-label="إغلاق الكاميرا">×</button></div>
+              <div className="absolute inset-0 grid place-items-center pointer-events-none"><div className="relative w-[82vw] max-w-[360px] aspect-square">
+                <div className="absolute inset-0 rounded-[30px] bg-black/10 shadow-[0_0_0_9999px_rgba(0,0,0,.22)]" />
+                <div className="absolute inset-0 rounded-[30px] border border-white/25" />
+                <div className="absolute left-0 top-0 h-16 w-16 border-l-[5px] border-t-[5px] border-primary rounded-tl-3xl shadow-[0_0_18px_hsl(var(--primary)/.8)]" />
+                <div className="absolute right-0 top-0 h-16 w-16 border-r-[5px] border-t-[5px] border-primary rounded-tr-3xl shadow-[0_0_18px_hsl(var(--primary)/.8)]" />
+                <div className="absolute left-0 bottom-0 h-16 w-16 border-l-[5px] border-b-[5px] border-primary rounded-bl-3xl shadow-[0_0_18px_hsl(var(--primary)/.8)]" />
+                <div className="absolute right-0 bottom-0 h-16 w-16 border-r-[5px] border-b-[5px] border-primary rounded-br-3xl shadow-[0_0_18px_hsl(var(--primary)/.8)]" />
+                <div className="absolute left-5 right-5 top-1/2 h-0.5 bg-primary shadow-[0_0_16px_hsl(var(--primary)/.95)] animate-pulse" />
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-white shadow-[0_0_12px_white]" />
+              </div></div>
+              <div className="absolute inset-x-0 bottom-0 z-10 p-5"><div className="mx-auto max-w-sm rounded-2xl bg-black/55 backdrop-blur-md border border-white/15 p-3 flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse shrink-0" /><span className="text-xs text-white/90 flex-1 text-right">{scannerSupported ? "وجّه الكاميرا نحو رمز QR وسيتم التعرف عليه تلقائيًا" : "الكاميرا تعمل، لكن المسح التلقائي غير مدعوم في هذا المتصفح"}</span>{torchSupported && <button type="button" onClick={() => void toggleTorch()} className={`h-10 w-10 shrink-0 rounded-xl border text-base ${torchOn ? "bg-white text-black border-white" : "bg-white/10 text-white border-white/20"}`} aria-label={torchOn ? "إطفاء الإضاءة" : "تشغيل الإضاءة"}>⌁</button>}</div><button type="button" onClick={stopCamera} className="mt-2 w-full max-w-sm mx-auto block rounded-xl bg-white/10 border border-white/20 text-white py-2.5 text-xs font-bold">إغلاق الكاميرا</button></div>
+            </div> : <div className="p-6 sm:p-8"><div className="mx-auto h-20 w-20 rounded-2xl bg-secondary grid place-items-center mb-4 border border-border/60"><QrIcon /></div><p className="text-sm font-semibold">امسح رمز QR المخصص لـ{locationName}</p><p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1.5 leading-6">افتح الكاميرا ووجّه الرمز داخل الإطار الأخضر. سيتم التعرف عليه تلقائيًا.</p><div className="flex flex-col sm:flex-row justify-center gap-2 mt-5"><button type="button" onClick={() => void startCamera()} className="btn-primary text-xs shadow" disabled={step !== "scan" || !inRange}>📷 فتح ماسح QR</button><button type="button" onClick={() => setQrInput(settings.qrCode || "")} className="btn-secondary text-xs" disabled={step !== "scan" || !inRange || !settings.qrCode}>إدخال القيمة يدويًا</button></div></div>}
           </div>
           <div className="mt-4"><label className="block text-xs text-muted-foreground mb-1" htmlFor="qr-code">قيمة QR</label><input id="qr-code" className="input mono text-sm" placeholder="أدخل القيمة المطبوعة على QR" value={qrInput} onChange={(e) => setQrInput(e.target.value)} disabled={step !== "scan" || !inRange} autoComplete="off" /></div>
         </section>
