@@ -175,31 +175,24 @@ export default function EmployeeScan() {
         <section className="hud-card p-6"><div className="text-xs text-muted-foreground mono">{action === "check-in" ? "CHECK IN" : "CHECK OUT"}</div><h1 className="text-2xl font-extrabold mt-0.5">{title}</h1><div className="text-sm text-muted-foreground mt-1">{session?.name ?? "الموظف"} · <span className="mono">{session?.jobNumber ?? "-"}</span> · <span className="text-primary font-semibold">{locationName}</span></div></section>
         <section className="hud-card p-5 sm:p-6">
           <div className="flex items-center justify-between mb-3"><div className="text-sm font-bold">١. التحقق من الموقع</div><StepBadge state={step === "loading-location" || step === "gps" || isLocating ? "active" : step === "error" ? "fail" : "done"} /></div>
-          <div className="relative mx-auto w-full max-w-[300px] aspect-square rounded-full border border-primary/25 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/.10),transparent_58%)] overflow-hidden grid place-items-center shadow-[0_0_60px_hsl(var(--primary)/.10)]">
-            <div className="absolute inset-[7%] rounded-full border border-primary/10" />
-            <div className="absolute inset-[19%] rounded-full border border-primary/15" />
-            <div className="absolute inset-[31%] rounded-full border border-primary/20" />
-            <div className="absolute inset-[43%] rounded-full border border-primary/25" />
-            <div className="absolute inset-[55%] rounded-full border border-primary/30" />
-            <div className="absolute left-1/2 top-[6%] bottom-[6%] w-px bg-primary/10" />
-            <div className="absolute top-1/2 left-[6%] right-[6%] h-px bg-primary/10" />
-            <div className="absolute inset-[12%] rounded-full radar-sweep opacity-90" />
-            <div className="absolute inset-[7%] rounded-full border border-primary/10" style={{ clipPath: "polygon(50% 0, 100% 0, 100% 100%, 50% 100%)" }} />
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-destructive shadow-[0_0_0_7px_hsl(var(--destructive)/.10),0_0_26px_hsl(var(--destructive)/.85)] radar-ping" aria-hidden="true" />
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-12 w-12 rounded-full border border-primary/35 animate-ping" aria-hidden="true" />
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-24 w-24 rounded-full border border-primary/10" aria-hidden="true" />
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 text-primary" aria-hidden="true">
-              <svg viewBox="0 0 72 72" className="h-12 w-12 drop-shadow-[0_0_10px_hsl(var(--primary)/.45)]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M36 8v9M36 55v9M8 36h9M55 36h9" opacity=".55" />
-                <circle cx="36" cy="36" r="11" opacity=".9" />
-                <path d="M36 25c7 0 12 5 12 12 0 9-12 19-12 19S24 46 24 37c0-7 5-12 12-12Z" opacity=".95" />
-                <circle cx="36" cy="37" r="3.5" fill="currentColor" stroke="none" />
-                <path d="M16 18c-4 4-6 9-6 15M56 18c4 4 6 9 6 15" opacity=".4" />
-                <path d="M16 54c-4-4-6-9-6-15M56 54c4-4 6-9 6-15" opacity=".4" />
-              </svg>
-              <span className="absolute -inset-3 rounded-full border border-primary/15" />
+          <div className="relative mx-auto w-full max-w-[280px] aspect-square rounded-full border border-primary/25 bg-primary/[0.035] overflow-hidden grid place-items-center shadow-[0_0_40px_hsl(var(--primary)/.08)]">
+            <div className="absolute inset-[8%] rounded-full border border-primary/15" /><div className="absolute inset-[20%] rounded-full border border-primary/20" /><div className="absolute inset-[33%] rounded-full border border-primary/25" /><div className="absolute inset-[44%] rounded-full border border-primary/30" />
+            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-primary/10" /><div className="absolute top-1/2 left-0 right-0 h-px bg-primary/10" /><div className="absolute inset-0 radar-sweep opacity-80" />
+            <div className="absolute h-3 w-3 rounded-full bg-destructive shadow-[0_0_0_5px_hsl(var(--destructive)/.12),0_0_18px_hsl(var(--destructive)/.85)] radar-ping" aria-hidden="true" />
+            <div className="radar-core" />
+            <div className="absolute top-5 left-1/2 -translate-x-1/2 text-primary/90" aria-hidden="true">
+              <div className="relative h-9 w-9 grid place-items-center">
+                <svg viewBox="0 0 40 40" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 11l7 7M30 11l-7 7M10 29l7-7M30 29l-7-7" opacity=".7"/>
+                  <path d="M14 8l4 4-5 5-4-4 5-5ZM26 8l-4 4 5 5 4-4-5-5ZM14 32l4-4-5-5-4 4 5 5ZM26 32l-4-4 5-5 4 4-5 5Z"/>
+                  <circle cx="20" cy="20" r="5"/><circle cx="20" cy="20" r="1.5" fill="currentColor"/>
+                  <path d="M20 3v4M20 33v4"/>
+                </svg>
+                <span className="absolute -inset-1 rounded-full border border-primary/25 animate-ping" />
+                <span className="absolute -inset-3 rounded-full border border-primary/10" />
+              </div>
             </div>
-            <div className="absolute bottom-5 rounded-full bg-background/85 border border-primary/20 px-3 py-1.5 text-[10px] mono text-primary backdrop-blur">LIVE LOCATION · GPS</div>
+            <div className="absolute bottom-5 rounded-full bg-background/80 border border-border/50 px-3 py-1 text-[10px] mono text-muted-foreground backdrop-blur">LIVE LOCATION · GPS</div>
           </div>
           <div className="text-center mt-4"><div className="text-base font-extrabold radar-status">{statusText}</div><div className="text-xs text-muted-foreground mt-1">{step === "loading-location" ? "يتم تحميل موقع العمل من الخادم..." : isLocating ? "جاري استقبال بيانات الموقع من جهازك ومقارنتها بالموقع المسجل..." : step === "gps" || step === "error" ? "اضغط لتحديد موقعك ومقارنته بموقع العمل." : "تم تحديد موقع جهازك ومقارنته بنطاق العمل."}</div></div>
           <button type="button" onClick={() => void refreshGps()} disabled={isLocating || !location} className="btn-primary w-full mt-4 py-3 flex items-center justify-center gap-2">{isLocating ? <><span className="animate-spin">⟳</span> جاري تحديد موقعي...</> : <>📍 تحديد موقعي الحالي</>}</button>
