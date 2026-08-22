@@ -2,29 +2,37 @@ name: Fix duplicate attendance timer
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    paths:
+      - .github/workflows/fix-duplicate-attendance-timer.yml
 
 permissions:
   contents: write
 
 jobs:
   fix:
-    if: github.event.head_commit.message != 'fix: keep a single attendance confirmation timer'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Remove duplicate timer above confirmation button
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove the duplicate timer above the confirmation button
         shell: bash
         run: |
-          python3 -c "from pathlib import Path; p=Path('src/pages/EmployeeScan.tsx'); s=p.read_text(encoding='utf-8'); lines=s.splitlines(True); s=''.join(line for line in lines if '⏱️ مهلة تأكيد' not in line); p.write_text(s, encoding='utf-8')"
-          test "$(grep -c 'timerText' src/pages/EmployeeScan.tsx)" -eq 1
-          test "$(grep -c 'timerReadyText' src/pages/EmployeeScan.tsx)" -eq 1
-      - name: Commit fix
+          python3 -c 'from pathlib import Path; p=Path("src/pages/EmployeeScan.tsx"); lines=p.read_text(encoding="utf-8").splitlines(True); p.write_text("".join(line for line in lines if "⏱️ مهلة تأكيد" not in line), encoding="utf-8")'
+          test "$(grep -c 'timerText' src/pages/EmployeeScan.tsx)" -eq 2
+          test "$(grep -c 'timerReadyText' src/pages/EmployeeScan.tsx)" -eq 2
+
+      - name: Commit source fix
         shell: bash
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/pages/EmployeeScan.tsx
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'fix: keep a single attendance confirmation timer'
+          if git diff --cached --quiet; then
+            echo "No source change needed."
+            exit 0
+          fi
+          git commit -m "fix: keep one attendance confirmation timer"
           git push
