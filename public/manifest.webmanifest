@@ -1,12 +1,12 @@
 {
-  "id": "./employee",
+  "id": "/Hadir/employee",
   "name": "حاضر · نظام الحضور والانصراف",
   "short_name": "حاضر",
   "description": "بوابة الموظفين الآمنة لتسجيل الحضور والانصراف",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "./employee",
-  "scope": "./",
+  "start_url": "/Hadir/employee",
+  "scope": "/Hadir/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "portrait",
@@ -14,22 +14,22 @@
   "theme_color": "#0b0f14",
   "categories": ["business", "productivity"],
   "icons": [
-    { "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/Hadir/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ],
   "shortcuts": [
     {
       "name": "تسجيل الحضور والانصراف",
       "short_name": "الحضور",
       "description": "فتح شاشة تسجيل الحضور والانصراف",
-      "url": "./employee/scan",
-      "icons": [{ "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "url": "/Hadir/employee/scan",
+      "icons": [{ "src": "/Hadir/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
     },
     {
       "name": "دخول الموظف",
       "short_name": "دخول الموظف",
       "description": "فتح صفحة دخول الموظف",
-      "url": "./employee",
-      "icons": [{ "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "url": "/Hadir/employee",
+      "icons": [{ "src": "/Hadir/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }
   ]
 }
