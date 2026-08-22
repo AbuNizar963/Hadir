@@ -232,16 +232,16 @@ export default function EmployeeScan() {
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
-            className="h-11 w-11 rounded-xl border border-border/70 bg-secondary/60 text-foreground grid place-items-center shadow-sm hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="h-11 w-11 rounded-xl border border-border/70 bg-secondary/60 text-white grid place-items-center shadow-sm hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
             aria-label="فتح قائمة الموظف"
             aria-expanded={menuOpen}
             aria-haspopup="menu"
           >
             <span className="sr-only">القائمة</span>
             <span aria-hidden="true" className="flex flex-col gap-1.5 items-center justify-center">
-              <span className="block h-0.5 w-5 rounded-full bg-current" />
-              <span className="block h-0.5 w-5 rounded-full bg-current" />
-              <span className="block h-0.5 w-5 rounded-full bg-current" />
+              <span className="block h-0.5 w-5 rounded-full bg-white" />
+              <span className="block h-0.5 w-5 rounded-full bg-white" />
+              <span className="block h-0.5 w-5 rounded-full bg-white" />
             </span>
           </button>
           {menuOpen && (
