@@ -11,9 +11,9 @@ export default function WeatherCard({compact=false,latitude,longitude,title="ا�
  const [w,setW]=useState<WeatherState>({temp:0,apparent:0,code:0,wind:0,city:"موقعك الحالي",loading:true});
  const [hidden,setHidden]=useState(false);
  useEffect(()=>{let cancelled=false;let timer:number|undefined;const controller=new AbortController();const load=()=>{
-   const usePosition=(lat:number,lon:number)=>{if(hideWhenWithinKm!=null&&referenceLatitude!=null&&referenceLongitude!=null){setHidden(distanceKm(lat,lon,referenceLatitude,referenceLongitude)<=hideWhenWithinKm);return;}readWeather(latitude??lat,longitude??lon,controller.signal).then(next=>{if(!cancelled)setW({...next,city:latitude!=null?"موقع العمل":"موقعك الحالي"});}).catch(()=>{if(!cancelled)setW(x=>({...x,loading:false,error:"تعذر جلب الطقس"}));});};
-   if(latitude==null||longitude==null||hideWhenWithinKm!=null){navigator.geolocation.getCurrentPosition(p=>usePosition(p.coords.latitude,p.coords.longitude),()=>{if(!cancelled&&hideWhenWithinKm==null)setW(x=>({...x,loading:false,error:"فعّل الموقع لعرض الطقس"}));},{enableHighAccuracy:false,timeout:8000,maximumAge:300000});}
-   else usePosition(latitude,longitude);
+   const fetchAt=async(lat:number,lon:number,city:string)=>{try{const next=await readWeather(lat,lon,controller.signal);if(!cancelled)setW({...next,city});}catch{if(!cancelled)setW(x=>({...x,loading:false,error:"تعذر جلب الطقس"}));}};
+   const usePosition=(lat:number,lon:number)=>{if(hideWhenWithinKm!=null&&referenceLatitude!=null&&referenceLongitude!=null){const inside=distanceKm(lat,lon,referenceLatitude,referenceLongitude)<=hideWhenWithinKm;setHidden(inside);if(inside)return;}fetchAt(latitude??lat,longitude??lon,latitude!=null?"موقع العمل":"موقعك الحالي");};
+   if(latitude==null||longitude==null||hideWhenWithinKm!=null){navigator.geolocation.getCurrentPosition(p=>usePosition(p.coords.latitude,p.coords.longitude),()=>{if(!cancelled&&hideWhenWithinKm==null)setW(x=>({...x,loading:false,error:"فعّل الموقع لعرض الطقس"}));},{enableHighAccuracy:false,timeout:8000,maximumAge:300000});} else usePosition(latitude,longitude);
  };
  load();timer=window.setInterval(load,600000);return()=>{cancelled=true;controller.abort();if(timer)window.clearInterval(timer)};
  },[latitude,longitude,hideWhenWithinKm,referenceLatitude,referenceLongitude]);
