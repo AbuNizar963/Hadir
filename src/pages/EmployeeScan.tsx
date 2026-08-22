@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Brand from "@/components/Brand";
-import { currentSession } from "@/lib/auth";
+import { currentSession, logoutEmployee } from "@/lib/auth";
 import { getCurrentPosition, haversineMeters, type GeoPosition } from "@/lib/geo";
 import { getSettings } from "@/lib/storage";
 import { getBackendEmployeeLocation } from "@/lib/backend";
@@ -37,10 +37,12 @@ export default function EmployeeScan() {
   const [torchOn, setTorchOn] = useState(false);
   const [confirmationExpiresAt, setConfirmationExpiresAt] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
   const scanningRef = useRef(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +62,22 @@ export default function EmployeeScan() {
     });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnOutside = (event: MouseEvent | TouchEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("mousedown", closeOnOutside);
+    document.addEventListener("touchstart", closeOnOutside, { passive: true });
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutside);
+      document.removeEventListener("touchstart", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
 
   const targetLat = location?.lat ?? NaN;
   const targetLng = location?.lng ?? NaN;
@@ -199,6 +217,9 @@ export default function EmployeeScan() {
     })();
   };
 
+  const handleProfile = () => { setMenuOpen(false); nav("/employee"); };
+  const handleLogout = () => { setMenuOpen(false); stopCamera(); logoutEmployee(); nav("/login", { replace: true }); };
+
   const title = action === "check-out" ? "تسجيل الانصراف" : "تسجيل الحضور";
   const statusText = step === "loading-location" ? "جاري تحميل موقع العمل" : isLocating ? "جاري تحديد موقعك..." : step === "error" ? "تعذر التحقق من الموقع" : step === "gps" ? "اضغط لتحديد موقعك" : inRange ? "تم التحقق من الموقع" : "خارج نطاق الموقع";
   const timerText = confirmationActive ? `00:${String(remainingSeconds).padStart(2, "0")}` : "--:--";
@@ -206,7 +227,34 @@ export default function EmployeeScan() {
 
   return (
     <div className="min-h-screen">
-      <header className="max-w-xl mx-auto px-5 py-5 flex items-center justify-between"><Brand /><Link to="/employee" className="btn-ghost text-xs" onClick={stopCamera}>إلغاء</Link></header>
+      <header className="max-w-xl mx-auto px-5 py-5 flex items-center justify-between">
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            className="h-10 w-10 rounded-xl border border-border/60 bg-secondary/40 text-foreground grid place-items-center text-xl leading-none shadow-sm hover:bg-secondary/70 transition-colors"
+            aria-label="فتح قائمة الموظف"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+          >
+            ☰
+          </button>
+          {menuOpen && (
+            <div className="absolute left-0 top-full mt-2 z-50 w-56 rounded-2xl border border-border/70 bg-background/95 backdrop-blur-xl shadow-2xl p-2" role="menu">
+              <button type="button" onClick={handleProfile} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary/70 transition-colors" role="menuitem">
+                <span className="h-9 w-9 rounded-xl bg-primary/12 text-primary grid place-items-center">👤</span>
+                <span>الملف الشخصي للموظف</span>
+              </button>
+              <div className="h-px bg-border/50 my-1" />
+              <button type="button" onClick={handleLogout} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold text-destructive hover:bg-destructive/10 transition-colors" role="menuitem">
+                <span className="h-9 w-9 rounded-xl bg-destructive/10 grid place-items-center">↪</span>
+                <span>تسجيل الخروج</span>
+              </button>
+            </div>
+          )}
+        </div>
+        <Brand />
+      </header>
       <main className="max-w-xl mx-auto px-5 pb-16 space-y-5">
         <section className="hud-card p-6"><div className="text-xs text-muted-foreground mono">{action === "check-in" ? "CHECK IN" : "CHECK OUT"}</div><h1 className="text-2xl font-extrabold mt-0.5">{title}</h1><div className="text-sm text-muted-foreground mt-1">{session?.name ?? "الموظف"} · <span className="mono">{session?.jobNumber ?? "-"}</span> · <span className="text-primary font-semibold">{locationName}</span></div></section>
         <section className="hud-card p-5 sm:p-6 border-primary/20 bg-primary/[0.03]">
