@@ -2,8 +2,8 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/Hadir/favicon.svg" />
+    <link rel="manifest" href="/Hadir/manifest.webmanifest" />
     <meta name="theme-color" content="#0b0f14" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>حاضر · نظام الحضور والانصراف الإلكتروني</title>
@@ -34,7 +34,7 @@
         let primed = false;
         const show = (n) => {
           if (!("Notification" in window) || Notification.permission !== "granted") return;
-          try { new Notification(n.title, { body: n.message, icon: "/favicon.svg", tag: `hadir-${n.id}` }); } catch {}
+          try { new Notification(n.title, { body: n.message, icon: "/Hadir/favicon.svg", tag: `hadir-${n.id}` }); } catch {}
         };
         const sync = async () => {
           if (!sessionExists()) return;
