@@ -1,0 +1,14 @@
+{
+  "name": "حاضر · نظام الحضور والانصراف",
+  "short_name": "حاضر",
+  "description": "بوابة الموظفين الآمنة لتسجيل الحضور والانصراف",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/employee",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
+  "categories": ["business", "productivity"]
+}
