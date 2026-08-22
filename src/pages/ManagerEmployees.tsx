@@ -60,9 +60,9 @@ function Section({ number, title, description, children }: SectionProps) {
 
 type EmployeeTableProps = { rows: Employee[]; locations: Location[]; onEdit: (employee: Employee) => void; onRemove: (employee: Employee) => void; onResetDevice: (employee: Employee) => void };
 function EmployeeTable({ rows, locations, onEdit, onRemove, onResetDevice }: EmployeeTableProps) {
-  if (!rows.length) return <div className="py-7 text-center text-sm text-muted-foreground">لا توجد موظفين ضمن هذه القائمة.</div>;
+  if (!rows.length) return <div className="py-8 text-center text-sm text-muted-foreground">لا يوجد موظفون ضمن هذه القائمة.</div>;
   return (
-    <div className="overflow-x-auto rounded-xl border border-border/60">
+    <div className="overflow-x-auto rounded-xl border border-border/60 bg-background/10">
       <table className="w-full text-sm"><thead><tr className="border-b bg-muted/20">
         <th className="p-3 text-right font-semibold">الموظف</th><th className="p-3 text-right font-semibold">الدوام</th>
         <th className="p-3 text-right font-semibold">الموقع</th><th className="p-3 text-right font-semibold">الهاتف / الجهاز</th>
@@ -70,13 +70,13 @@ function EmployeeTable({ rows, locations, onEdit, onRemove, onResetDevice }: Emp
       </tr></thead><tbody>
         {rows.map((employee) => {
           const location = locations.find((item) => String(item.id) === String(employee.locationId)) || locations.find((item) => item.id === "main");
-          return <tr key={employee.id} className="border-b last:border-b-0 align-top hover:bg-muted/10">
-            <td className="p-3"><div className="font-semibold">{employee.name}</div><div className="mono mt-0.5 text-xs text-muted-foreground">{employee.jobNumber}</div><div className="mt-1 text-[11px] text-muted-foreground">{employee.role === "manager" ? "مدير" : employee.role === "supervisor" ? "مشرف" : "موظف"}</div></td>
-            <td className="p-3 text-xs"><div className="font-medium">{employee.scheduleType === "ROTATION" ? "تناوبي" : "إداري"}</div><div className="mt-1 text-muted-foreground">{employee.workStartTime || "--:--"} → {employee.workEndTime || "--:--"}</div><div className="mt-1 text-muted-foreground">سماح: {employee.gracePeriodMinutes ?? 0} د</div></td>
+          return <tr key={employee.id} className="border-b last:border-b-0 align-top transition-colors hover:bg-primary/[0.03]">
+            <td className="p-3"><div className="flex items-start gap-2.5"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/5 text-xs font-bold text-primary">{employee.name.trim().charAt(0) || "م"}</div><div><div className="font-semibold">{employee.name}</div><div className="mono mt-0.5 text-xs text-muted-foreground">{employee.jobNumber}</div><div className="mt-1 text-[11px] text-muted-foreground">{employee.role === "manager" ? "مدير" : employee.role === "supervisor" ? "مشرف" : "موظف"}</div></div></div></td>
+            <td className="p-3 text-xs"><div className="font-medium">{employee.scheduleType === "ROTATION" ? "تناوبي" : "إداري"}</div>{employee.scheduleType === "ROTATION" ? <div className="mt-1 text-muted-foreground">{employee.rotationDaysOn ?? 0} عمل · {employee.rotationDaysOff ?? 0} راحة</div> : <div className="mt-1 text-muted-foreground">{employee.workStartTime || "--:--"} → {employee.workEndTime || "--:--"}</div>}<div className="mt-1 text-muted-foreground">سماح: {employee.gracePeriodMinutes ?? 0} د</div></td>
             <td className="p-3 text-xs">{location?.name || "المقر الرئيسي"}</td>
-            <td className="p-3 text-xs"><div>{employee.deviceLabel || "غير مرتبط"}</div><div className="mono mt-1 text-[10px] text-muted-foreground">{employee.deviceId ? "جهاز موثق" : "لا يوجد جهاز"}</div>{employee.deviceId && <button type="button" className="mt-1 text-[11px] text-destructive" onClick={() => onResetDevice(employee)}>إلغاء ربط الجهاز</button>}</td>
-            <td className="p-3"><span className="text-xs">{employee.status === "active" ? "فعال" : "موقوف"}</span></td>
-            <td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary text-xs" onClick={() => onEdit(employee)}>تعديل</button><button type="button" className="text-xs text-destructive" onClick={() => onRemove(employee)}>حذف</button></div></td>
+            <td className="p-3 text-xs"><div>{employee.deviceLabel || "غير مرتبط"}</div><div className="mono mt-1 text-[10px] text-muted-foreground">{employee.deviceId ? "جهاز موثق" : "لا يوجد جهاز"}</div>{employee.deviceId && <button type="button" className="mt-1 rounded-lg px-2 py-1 text-[11px] text-destructive transition-colors hover:bg-destructive/10" onClick={() => onResetDevice(employee)}>إلغاء ربط الجهاز</button>}</td>
+            <td className="p-3"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${employee.status === "active" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{employee.status === "active" ? "فعال" : "موقوف"}</span></td>
+            <td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary text-xs" onClick={() => onEdit(employee)}>تعديل</button><button type="button" className="rounded-lg px-2.5 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10" onClick={() => onRemove(employee)}>حذف</button></div></td>
           </tr>;
         })}
       </tbody></table>
@@ -86,10 +86,14 @@ function EmployeeTable({ rows, locations, onEdit, onRemove, onResetDevice }: Emp
 
 type ScheduleGroupProps = { title: string; subtitle: string; rows: Employee[]; open: boolean; onToggle: () => void; locations: Location[]; onEdit: (employee: Employee) => void; onRemove: (employee: Employee) => void; onResetDevice: (employee: Employee) => void };
 function ScheduleGroup({ title, subtitle, rows, open, onToggle, locations, onEdit, onRemove, onResetDevice }: ScheduleGroupProps) {
-  return <section className="overflow-hidden rounded-2xl border border-border/70">
-    <button type="button" aria-expanded={open} className="flex w-full items-center justify-between gap-4 p-4 text-right transition-colors hover:bg-muted/10 sm:p-5" onClick={onToggle}>
-      <span className="min-w-0"><span className="block text-sm font-bold">{title}</span><span className="mt-1 block text-[11px] text-muted-foreground">{subtitle}</span></span>
-      <span className="flex shrink-0 items-center gap-3"><span className="badge bg-primary/10 text-primary">{rows.length}</span><span className={`text-lg transition-transform ${open ? "rotate-180" : ""}`}>⌄</span></span>
+  const isRotation = title.includes("تناوبي");
+  return <section className={`overflow-hidden rounded-2xl border transition-all ${open ? "border-primary/25 shadow-sm" : "border-border/70"}`}>
+    <button type="button" aria-expanded={open} className="group flex w-full items-center justify-between gap-4 p-4 text-right transition-all hover:bg-primary/[0.03] sm:p-5" onClick={onToggle}>
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/5 text-primary" aria-hidden="true">{isRotation ? "↻" : "▦"}</span>
+        <span className="min-w-0"><span className="flex items-center gap-2 text-sm font-bold">{title}<span className="badge bg-primary/10 text-primary">{rows.length}</span></span><span className="mt-1 block text-[11px] text-muted-foreground">{subtitle}</span></span>
+      </span>
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/30 text-lg transition-transform ${open ? "rotate-180" : ""}`}>⌄</span>
     </button>
     {open && <div className="border-t border-border/60 bg-background/20 p-3 sm:p-4"><EmployeeTable rows={rows} locations={locations} onEdit={onEdit} onRemove={onRemove} onResetDevice={onResetDevice} /></div>}
   </section>;
@@ -157,9 +161,9 @@ export default function ManagerEmployees() {
   const rotationEmployees = visible.filter((employee) => employee.scheduleType === "ROTATION");
   const commonTableProps = { locations, onEdit: edit, onRemove: remove, onResetDevice: resetDevice };
 
-  return <ManagerLayout title="الموظفون" subtitle="إدارة حسابات الموظفين وبياناتهم من قاعدة بيانات D1"><div className="space-y-5">
-    <section className="hud-card p-5"><div className="mb-3"><div className="mono text-xs font-bold text-primary">SMART IMPORT · استيراد Excel / CSV</div><p className="mt-1 text-xs text-muted-foreground">إضافة مجموعة موظفين دفعة واحدة مع الحفاظ على بيانات الدوام.</p></div><SmartEmployeeImport onImported={() => void load()} /></section>
-    <section className="hud-card p-5"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><div className="mono mb-1 text-xs font-bold text-primary">EMPLOYEE PROFILE</div><h2 className="text-base font-bold">{editingId ? "تعديل بيانات الموظف" : "إضافة موظف جديد"}</h2><p className="mt-1 text-xs text-muted-foreground">نموذج منظم مع الحفاظ على شكل النظام الحالي.</p></div>{editingId && <button type="button" className="btn-secondary" onClick={() => { setEditingId(null); setForm(emptyForm); }}>إلغاء التعديل</button>}</div>
+  return <ManagerLayout title="الموظفون" subtitle="إدارة حسابات الموظفين وبياناتهم بأمان عبر الخادم"><div className="space-y-5">
+    <section className="hud-card overflow-hidden p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><div className="mono text-xs font-bold text-primary">SMART IMPORT · استيراد Excel / CSV</div><p className="mt-1 text-xs text-muted-foreground">إضافة مجموعة موظفين دفعة واحدة مع الحفاظ على بيانات الدوام.</p></div><span className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-[11px] font-semibold text-primary">مزامنة آمنة</span></div><SmartEmployeeImport onImported={() => void load()} /></section>
+    <section className="hud-card overflow-hidden p-5"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><div className="mono mb-1 text-xs font-bold text-primary">EMPLOYEE PROFILE</div><h2 className="text-base font-bold">{editingId ? "تعديل بيانات الموظف" : "إضافة موظف جديد"}</h2><p className="mt-1 text-xs text-muted-foreground">نموذج منظم مع الحفاظ على هوية وألوان النظام.</p></div>{editingId && <button type="button" className="btn-secondary" onClick={() => { setEditingId(null); setForm(emptyForm); }}>إلغاء التعديل</button>}</div>
       <div className="space-y-3">
         <Section number="01" title="بيانات الموظف" description="المعلومات الأساسية التي يستخدمها الموظف لتسجيل الدخول."><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="اسم الموظف"><input className="input w-full" autoComplete="name" autoCorrect="off" spellCheck={false} placeholder="اكتب اسم الموظف" value={form.name} onChange={(event) => setField("name", event.target.value)} /></Field>
@@ -182,6 +186,6 @@ export default function ManagerEmployees() {
       </div>
       <div className="mt-5 flex justify-end border-t border-border/60 pt-4"><button type="button" className="btn-primary min-w-32" disabled={saving} onClick={() => void submit()}>{saving ? "جاري الحفظ…" : editingId ? "حفظ التعديل" : "إضافة الموظف"}</button></div>{error && <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
     </section>
-    <section className="hud-card p-5"><div className="mb-5 flex flex-wrap items-end justify-between gap-4"><div><div className="mono mb-1 text-xs font-bold text-primary">EMPLOYEE DIRECTORY</div><h2 className="font-bold">قائمة الموظفين <span className="font-normal text-muted-foreground">({visible.length})</span></h2><p className="mt-1 text-xs text-muted-foreground">اختر نوع الدوام لعرض الموظفين.</p></div><Field label="بحث الموظفين" className="w-full sm:w-72"><input className="input w-full" placeholder="الاسم أو الرقم أو الجهاز" value={query} onChange={(event) => setQuery(event.target.value)} /></Field></div>{loading ? <div className="py-8 text-center text-sm text-muted-foreground">جاري تحميل الموظفين من الخادم…</div> : <div className="space-y-3"><ScheduleGroup title="الموظفون الإداريون" subtitle="موظفو الدوام الإداري وأوقات دوامهم ومواقعهم" rows={adminEmployees} open={openGroups.ADMIN} onToggle={() => setOpenGroups((current) => ({ ...current, ADMIN: !current.ADMIN }))} {...commonTableProps} /><ScheduleGroup title="الموظفون التناوبيون" subtitle="موظفو المناوبات ودورة العمل والراحة" rows={rotationEmployees} open={openGroups.ROTATION} onToggle={() => setOpenGroups((current) => ({ ...current, ROTATION: !current.ROTATION }))} {...commonTableProps} /></div>}</section>
+    <section className="hud-card overflow-hidden p-5"><div className="mb-5 flex flex-wrap items-end justify-between gap-4"><div><div className="mono mb-1 text-xs font-bold text-primary">EMPLOYEE DIRECTORY</div><h2 className="font-bold">قائمة الموظفين <span className="font-normal text-muted-foreground">({visible.length})</span></h2><p className="mt-1 text-xs text-muted-foreground">اختر القسم لعرض الموظفين، وتبقى التفاصيل مخفية حتى تحتاجها.</p></div><Field label="بحث الموظفين" className="w-full sm:w-72"><input className="input w-full" placeholder="الاسم أو الرقم أو الجهاز" value={query} onChange={(event) => setQuery(event.target.value)} /></Field></div>{loading ? <div className="py-8 text-center text-sm text-muted-foreground">جاري تحميل الموظفين من الخادم…</div> : <div className="space-y-3"><ScheduleGroup title="الموظفون الإداريون" subtitle="الدوام الإداري وأوقات العمل ومواقع الموظفين" rows={adminEmployees} open={openGroups.ADMIN} onToggle={() => setOpenGroups((current) => ({ ...current, ADMIN: !current.ADMIN }))} {...commonTableProps} /><ScheduleGroup title="الموظفون التناوبيون" subtitle="المناوبات ودورات العمل والراحة" rows={rotationEmployees} open={openGroups.ROTATION} onToggle={() => setOpenGroups((current) => ({ ...current, ROTATION: !current.ROTATION }))} {...commonTableProps} /></div>}</section>
   </div></ManagerLayout>;
 }
