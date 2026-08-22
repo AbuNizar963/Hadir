@@ -46,6 +46,7 @@ export default [
       "@typescript-eslint/no-unused-expressions": "off",
       "@typescript-eslint/no-require-imports": "off",
       "no-undef": "off",
+      "no-redeclare": "off",
       "no-empty": "off",
       "no-useless-escape": "off",
     },
