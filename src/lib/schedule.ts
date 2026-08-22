@@ -17,6 +17,12 @@ export interface WorkPeriod {
   detail?: string;
 }
 
+export interface ScheduleCountdown {
+  kind: "WORK_END" | "NEXT_WORK_START" | "NONE";
+  target: Date | null;
+  label: string;
+}
+
 const DAY_MS = 86_400_000;
 const DEFAULT_ADMIN_DAYS = [0, 1, 2, 3, 4];
 const DAY_NAMES = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
@@ -29,8 +35,10 @@ export function getEmployeeScheduleStatus(employee: Employee | null | undefined,
   if (period.kind === "OFF") return { isWorkDay: false, label: "يوم راحة (تناوبي)", detail: period.detail };
   if (employee.scheduleType === "ROTATION") {
     const cycleDay = rotationCycleDay(employee, target);
-    const total = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4)) + Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
-    return { isWorkDay: true, label: "يوم عمل (تناوبي)", detail: `اليوم ${cycleDay + 1} من ${Math.max(1, Math.floor(employee.rotationDaysOn ?? 4))} في المناوبة`, cycleDay: cycleDay + 1, cycleTotal: total };
+    const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
+    const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
+    const total = on + off;
+    return { isWorkDay: true, label: "يوم عمل (تناوبي)", detail: `اليوم ${cycleDay + 1} من ${total} في الدورة`, cycleDay: cycleDay + 1, cycleTotal: total };
   }
   return { isWorkDay: true, label: "يوم عمل (إداري)", detail: period.detail };
 }
@@ -79,6 +87,33 @@ export function getActiveWorkPeriod(employee: Employee | null | undefined, targe
   return current;
 }
 
+export function getScheduleCountdown(employee: Employee | null | undefined, target: Date = new Date()): ScheduleCountdown {
+  if (!employee) return { kind: "NONE", target: null, label: "" };
+  const period = getEmployeeWorkPeriod(employee, target);
+  if (period.kind === "NOT_STARTED") {
+    const start = parseYYYYMMDD(employee.rotationStartDate);
+    if (!start) return { kind: "NONE", target: null, label: "" };
+    return { kind: "NEXT_WORK_START", target: withTime(start, parseTime(employee.workStartTime, "09:00")), label: "بداية أول مناوبة" };
+  }
+  if (period.isWorkDay && period.end) return { kind: "WORK_END", target: period.end, label: "نهاية المناوبة المتوقعة" };
+  if (employee.scheduleType === "ROTATION" && period.kind === "OFF") {
+    const startDate = parseYYYYMMDD(employee.rotationStartDate);
+    if (!startDate) return { kind: "NONE", target: null, label: "" };
+    const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
+    const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
+    const cycleLength = on + off;
+    const firstStart = withTime(startDate, parseTime(employee.workStartTime, "09:00"));
+    const diff = Math.max(0, Math.floor((startOfDay(target).getTime() - startOfDay(firstStart).getTime()) / DAY_MS));
+    const cycleDay = diff % cycleLength;
+    const daysUntilNext = cycleLength - cycleDay;
+    const next = new Date(startOfDay(target).getTime() + daysUntilNext * DAY_MS);
+    next.setHours(firstStart.getHours(), firstStart.getMinutes(), 0, 0);
+    if (next.getTime() <= target.getTime()) next.setTime(next.getTime() + DAY_MS);
+    return { kind: "NEXT_WORK_START", target: next, label: "بداية المناوبة القادمة" };
+  }
+  return { kind: "NONE", target: null, label: "" };
+}
+
 export function isWithinWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): boolean {
   const period = getActiveWorkPeriod(employee, target);
   return Boolean(period.isWorkDay && period.start && period.end && target >= period.start && target <= period.end);
@@ -87,7 +122,7 @@ export function isWithinWorkPeriod(employee: Employee | null | undefined, target
 function rotationCycleDay(employee: Employee, target: Date): number {
   const start = parseYYYYMMDD(employee.rotationStartDate);
   if (!start) return 0;
-  const diff = Math.floor((startOfDay(target).getTime() - start.getTime()) / DAY_MS);
+  const diff = Math.floor((startOfDay(target).getTime() - startOfDay(start).getTime()) / DAY_MS);
   const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
   const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
   return Math.max(0, diff) % (on + off);
