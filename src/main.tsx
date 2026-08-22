@@ -14,7 +14,10 @@ startRealtimeSync();
 
 if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
+    const base = import.meta.env.BASE_URL || "/";
+    const swUrl = new URL("sw.js", new URL(base, window.location.origin)).toString();
+    const scope = new URL(base, window.location.origin).pathname;
+    navigator.serviceWorker.register(swUrl, { scope }).catch(() => undefined);
   });
 }
 
