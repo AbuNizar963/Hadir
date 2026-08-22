@@ -34,13 +34,15 @@ export function getEmployeeScheduleStatus(employee: Employee | null | undefined,
   if (period.kind === "INVALID") return { isWorkDay: false, label: "جدول غير صالح", detail: period.detail };
   if (period.kind === "OFF") {
     const cycleDay = rotationCycleDay(employee, target) + 1;
-    return { isWorkDay: false, label: "فترة راحة", detail: `اليوم ${cycleDay} · راحة`, cycleDay, cycleTotal: Math.max(1, Math.floor(employee.rotationDaysOn ?? 4)) + Math.max(0, Math.floor(employee.rotationDaysOff ?? 4)) };
+    const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
+    const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
+    return { isWorkDay: false, label: "فترة راحة", detail: `اليوم ${Math.max(1, cycleDay - on)} من ${off} في الراحة`, cycleDay, cycleTotal: on + off };
   }
   if (employee.scheduleType === "ROTATION") {
     const cycleDay = rotationCycleDay(employee, target) + 1;
     const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
     const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
-    return { isWorkDay: true, label: "في المناوبة", detail: `اليوم ${cycleDay} · عمل`, cycleDay, cycleTotal: on + off };
+    return { isWorkDay: true, label: "في المناوبة", detail: `اليوم ${cycleDay} من ${on} في المناوبة`, cycleDay, cycleTotal: on + off };
   }
   return { isWorkDay: true, label: "يوم عمل (إداري)", detail: period.detail };
 }
@@ -65,7 +67,7 @@ export function getEmployeeWorkPeriod(employee: Employee | null | undefined, tar
   const daysOn = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
   const daysOff = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
   const cycleLength = daysOn + daysOff;
-  const firstStart = withTime(startDate, parseTime(employee.workStartTime, "09:00"));
+  const firstStart = withTime(startDate, parseTime(employee.rotationStartTime || employee.workStartTime, "09:00"));
   const diff = Math.floor((startOfDay(target).getTime() - startOfDay(firstStart).getTime()) / DAY_MS);
   if (diff < 0) return { isWorkDay: false, kind: "NOT_STARTED", start: null, end: null, label: "لم تبدأ المناوبة بعد", detail: `تبدأ أول مناوبة في ${employee.rotationStartDate} الساعة ${formatTime(firstStart)}` };
   const dayInCycle = diff % cycleLength;
@@ -74,8 +76,10 @@ export function getEmployeeWorkPeriod(employee: Employee | null | undefined, tar
     return { isWorkDay: false, kind: "OFF", start: null, end: null, label: "راحة تناوبية", detail: `اليوم ${offDay} من ${daysOff} في الراحة` };
   }
   const periodStart = new Date(firstStart.getTime() + Math.floor(diff / cycleLength) * cycleLength * DAY_MS);
+  // المناوبة التناوبية تمتد أيامًا متواصلة من ساعة البداية في اليوم الأول
+  // إلى الساعة نفسها في بداية اليوم التالي للدورة، ولا تستخدم وقت نهاية إداري.
   const end = new Date(periodStart.getTime() + daysOn * DAY_MS);
-  return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "مناوبة تناوبية", detail: `مناوبة ${dayInCycle + 1} من ${daysOn} · ${formatTime(periodStart)} → ${formatTime(end)}` };
+  return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "مناوبة تناوبية", detail: `اليوم ${dayInCycle + 1} من ${daysOn} في المناوبة · ${formatTime(periodStart)} → ${formatTime(end)}` };
 }
 
 export function getActiveWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): WorkPeriod {
@@ -95,11 +99,10 @@ export function getScheduleCountdown(employee: Employee | null | undefined, targ
   if (period.kind === "NOT_STARTED") {
     const start = parseYYYYMMDD(employee.rotationStartDate);
     if (!start) return { kind: "NONE", target: null, label: "" };
-    const firstStart = withTime(start, parseTime(employee.workStartTime, "09:00"));
+    const firstStart = withTime(start, parseTime(employee.rotationStartTime || employee.workStartTime, "09:00"));
     if (firstStart.getTime() <= target.getTime()) return { kind: "NONE", target: null, label: "" };
     return { kind: "NEXT_WORK_START", target: firstStart, label: "بداية أول مناوبة" };
   }
-  // بعد انتهاء الدوام الإداري لا نعرض عدادًا ثابتًا 00:00؛ لا يوجد إجراء زمني يحتاجه الموظف حتى يبدأ يوم العمل التالي.
   if (period.isWorkDay && period.end && period.end.getTime() > target.getTime()) {
     return { kind: "WORK_END", target: period.end, label: "تنتهي المناوبة خلال" };
   }
@@ -109,7 +112,7 @@ export function getScheduleCountdown(employee: Employee | null | undefined, targ
     const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
     const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
     const cycleLength = on + off;
-    const firstStart = withTime(startDate, parseTime(employee.workStartTime, "09:00"));
+    const firstStart = withTime(startDate, parseTime(employee.rotationStartTime || employee.workStartTime, "09:00"));
     const diff = Math.max(0, Math.floor((startOfDay(target).getTime() - startOfDay(firstStart).getTime()) / DAY_MS));
     const cycleDay = diff % cycleLength;
     const daysUntilNext = cycleLength - cycleDay;
