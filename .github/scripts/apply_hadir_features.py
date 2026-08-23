@@ -10,6 +10,8 @@ REQUIRED_FILES = (
     "backend/src/workforce.ts",
 )
 
+# These markers intentionally describe the current implementation. This script is
+# validation-only; it must never expect code from an older patch revision.
 REQUIRED_MARKERS = {
     "src/pages/AIAssistant.tsx": (
         "getPrayerTimes",
@@ -19,8 +21,9 @@ REQUIRED_MARKERS = {
     ),
     "src/pages/EmployeeProfile.tsx": (
         "getBackendEmployeeProfile",
-        "/avatar",
-        "newPin",
+        "saveProfile",
+        "setAvatar",
+        "newPassword",
     ),
     "src/lib/avatarUrl.ts": (
         "employeeAvatarUrl",
