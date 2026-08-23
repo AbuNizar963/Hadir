@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { currentSession } from "@/lib/auth";
 import { getBackendEmployeeProfile } from "@/lib/backend";
 import { compressProfileImageDataUrl } from "@/lib/imageCompression";
+import EmployeeDigitalCard from "@/components/employee/EmployeeDigitalCard";
 
 const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
 const deviceId = () => localStorage.getItem("hadir.device.id") || "";
@@ -93,14 +94,7 @@ export default function EmployeeProfile() {
     setMessage("");
     try {
       const original = await fileToDataUrl(file);
-      const compressed = await compressProfileImageDataUrl(original, {
-        maxWidth: 512,
-        maxHeight: 512,
-        quality: 0.78,
-        minQuality: 0.45,
-        type: "image/webp",
-        maxBytes: 100 * 1024,
-      });
+      const compressed = await compressProfileImageDataUrl(original, { maxWidth: 512, maxHeight: 512, quality: 0.78, minQuality: 0.45, type: "image/webp", maxBytes: 100 * 1024 });
       const saved = await saveProfile({ avatar: compressed });
       const storedAvatar = saved.employee?.avatar;
       setAvatar(typeof storedAvatar === "string" && storedAvatar.startsWith("data:image/") ? storedAvatar : compressed);
@@ -179,6 +173,8 @@ export default function EmployeeProfile() {
             </div>
           </div>
         </section>
+
+        <EmployeeDigitalCard />
 
         <section className="hud-card p-5">
           <div className="flex items-center justify-between mb-4">
