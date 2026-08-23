@@ -1,6 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Camera, ImagePlus, KeyRound, ShieldCheck } from "lucide-react";
 import { currentSession } from "@/lib/auth";
 import { getBackendEmployeeProfile } from "@/lib/backend";
 import { compressProfileImageDataUrl } from "@/lib/imageCompression";
@@ -36,20 +35,36 @@ export default function EmployeeProfile() {
   const session = currentSession();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(session?.name || "");
+  const [jobNumber, setJobNumber] = useState(session?.jobNumber || "");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [photoSaving, setPhotoSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [lastSync, setLastSync] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    void getBackendEmployeeProfile().then(profile => {
+  const loadProfile = async () => {
+    setLoading(true);
+    try {
+      const profile = await getBackendEmployeeProfile();
       setName(profile.name);
+      setJobNumber(profile.jobNumber || session?.jobNumber || "");
       setAvatar(typeof profile.avatar === "string" && profile.avatar.startsWith("data:image/") ? profile.avatar : null);
-    }).catch(() => undefined);
-  }, []);
+      setLastSync(new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }));
+    } catch {
+      setName(session?.name || "");
+      setJobNumber(session?.jobNumber || "");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void loadProfile(); }, []);
 
   const openPhotoPicker = () => {
     setError("");
@@ -110,6 +125,7 @@ export default function EmployeeProfile() {
       await saveProfile({ password: newPassword });
       setNewPassword("");
       setConfirm("");
+      setShowPassword(false);
       setMessage("تم تغيير كلمة السر بنجاح");
     } catch (err) {
       setError(err instanceof Error ? err.message : "تعذر تغيير كلمة السر");
@@ -118,39 +134,86 @@ export default function EmployeeProfile() {
     }
   };
 
+  const copyJobNumber = async () => {
+    if (!jobNumber) return;
+    try {
+      await navigator.clipboard.writeText(jobNumber);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError("تعذر نسخ الرقم الوظيفي.");
+    }
+  };
+
+  const refresh = async () => {
+    setError("");
+    setMessage("");
+    await loadProfile();
+    setMessage("تم تحديث بيانات الملف الشخصي.");
+  };
+
   return (
     <main dir="rtl" className="min-h-screen bg-background p-4 sm:p-6">
       <div className="mx-auto max-w-xl space-y-4">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold"><ArrowRight className="h-4 w-4" /> العودة</button>
+        <div className="flex items-center justify-between gap-2">
+          <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold"><span aria-hidden="true">→</span> العودة</button>
+          <button type="button" onClick={() => void refresh()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold hover:bg-secondary disabled:opacity-50"><span aria-hidden="true">↻</span> تحديث البيانات</button>
+        </div>
+
         <section className="hud-card overflow-hidden p-6">
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-2 border-primary/30 bg-primary/10 text-3xl font-black text-primary">
                 {avatar ? <img src={avatar} alt={name} className="h-full w-full object-cover" /> : name.charAt(0) || "م"}
               </div>
-              <button type="button" onClick={openPhotoPicker} disabled={photoSaving} aria-label="اختيار صورة شخصية من ألبوم الصور" title="اختيار صورة من الصور" className="absolute -bottom-2 -left-2 grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-lg transition hover:scale-105 disabled:cursor-wait disabled:opacity-60">
-                {photoSaving ? <span className="text-xs font-black">…</span> : <Camera className="h-5 w-5" />}
+              <button type="button" onClick={openPhotoPicker} disabled={photoSaving} aria-label="تغيير الصورة الشخصية" title="تغيير الصورة الشخصية" className="absolute -bottom-2 -left-2 grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-lg transition hover:scale-105 disabled:cursor-wait disabled:opacity-60">
+                {photoSaving ? <span className="text-xs font-black">…</span> : <span aria-hidden="true">▣</span>}
               </button>
               <input ref={fileInputRef} type="file" accept="image/*,.heic,.heif" onChange={photo} className="absolute h-px w-px overflow-hidden opacity-0" tabIndex={-1} aria-label="اختيار صورة من ألبوم الصور" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-xs text-muted-foreground">الملف الشخصي</div>
-              <h1 className="text-2xl font-black">{name}</h1>
-              <p className="mt-1 text-xs text-muted-foreground">يمكنك تغيير صورتك وكلمة السر الخاصة بحسابك.</p>
-              <button type="button" onClick={openPhotoPicker} disabled={photoSaving} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-xs font-bold text-primary disabled:opacity-50"><ImagePlus className="h-4 w-4" /> {photoSaving ? "جاري حفظ الصورة…" : "اختيار صورة من الصور"}</button>
+              <h1 className="text-2xl font-black truncate">{name}</h1>
+              <p className="mt-1 text-xs text-muted-foreground">إدارة الصورة الشخصية وأمان الحساب ومعلومات الموظف.</p>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-secondary/50 px-2.5 py-1.5 text-xs font-bold"><span aria-hidden="true">♙</span> موظف</div>
             </div>
           </div>
         </section>
+
+        <section className="hud-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div><div className="text-xs text-muted-foreground">معلومات الحساب</div><div className="font-black mt-0.5">بيانات الموظف</div></div>
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-background/50 border border-border/50" aria-hidden="true">▥</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl border border-border/50 bg-secondary/25 p-3"><div className="text-[10px] text-muted-foreground">الاسم</div><div className="font-bold mt-1 truncate">{name || "—"}</div></div>
+            <button type="button" onClick={() => void copyJobNumber()} className="rounded-xl border border-border/50 bg-secondary/25 p-3 text-right hover:bg-secondary/50"><div className="text-[10px] text-muted-foreground">الرقم الوظيفي</div><div className="font-bold mt-1 truncate">{copied ? "تم النسخ ✓" : jobNumber || "—"}</div></button>
+            <div className="rounded-xl border border-border/50 bg-secondary/25 p-3"><div className="text-[10px] text-muted-foreground">حالة الحساب</div><div className="font-bold mt-1 text-primary">● نشط</div></div>
+            <div className="rounded-xl border border-border/50 bg-secondary/25 p-3"><div className="text-[10px] text-muted-foreground">آخر مزامنة</div><div className="font-bold mt-1">{lastSync || "جاري التحميل…"}</div></div>
+          </div>
+        </section>
+
         <section className="hud-card p-6">
-          <div className="flex items-center gap-2 font-black"><KeyRound className="h-5 w-5 text-primary" /> تغيير كلمة السر</div>
+          <div className="flex items-center gap-3 font-black"><span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">⚿</span><span>أمان الحساب</span></div>
           <form onSubmit={password} className="mt-5 space-y-4">
-            <input className="input w-full" type="password" autoComplete="new-password" placeholder="كلمة السر الجديدة" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-            <input className="input w-full" type="password" autoComplete="new-password" placeholder="تأكيد كلمة السر" value={confirm} onChange={e => setConfirm(e.target.value)} />
+            <div className="relative">
+              <input className="input w-full pl-12" type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="كلمة السر الجديدة" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+              <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-secondary" aria-label={showPassword ? "إخفاء كلمة السر" : "إظهار كلمة السر"}>{showPassword ? "إخفاء" : "إظهار"}</button>
+            </div>
+            <input className="input w-full" type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="تأكيد كلمة السر" value={confirm} onChange={e => setConfirm(e.target.value)} />
             <button className="btn-primary w-full" disabled={saving}>{saving ? "جاري الحفظ…" : "حفظ كلمة السر"}</button>
           </form>
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground"><ShieldCheck className="h-4 w-4 shrink-0 text-primary" /> تُحفظ كلمة السر في الخادم باستخدام PBKDF2 ولا يتم تخزينها كنص مكشوف.</div>
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground"><span aria-hidden="true">✓</span><span>تُحفظ كلمة السر في الخادم باستخدام PBKDF2 ولا يتم تخزينها كنص مكشوف.</span></div>
           {message && <div className="mt-3 rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm text-primary">{message}</div>}
           {error && <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+        </section>
+
+        <section className="hud-card p-5">
+          <div className="flex items-center justify-between"><div><div className="text-xs text-muted-foreground">اختصارات الملف</div><div className="font-black mt-0.5">إجراءات سريعة</div></div><span aria-hidden="true">⌁</span></div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <button type="button" onClick={openPhotoPicker} disabled={photoSaving} className="rounded-xl border border-border bg-secondary/30 p-3 text-right font-bold hover:bg-secondary disabled:opacity-50"><span className="block text-lg mb-1" aria-hidden="true">▣</span>تغيير الصورة</button>
+            <button type="button" onClick={() => void copyJobNumber()} className="rounded-xl border border-border bg-secondary/30 p-3 text-right font-bold hover:bg-secondary"><span className="block text-lg mb-1" aria-hidden="true">▤</span>{copied ? "تم نسخ الرقم" : "نسخ الرقم الوظيفي"}</button>
+          </div>
         </section>
       </div>
     </main>
