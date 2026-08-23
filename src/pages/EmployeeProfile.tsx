@@ -1,0 +1,2 @@
+import { useNavigate } from "react-router-dom";
+export default function EmployeeProfile(){const navigate=useNavigate();return <main dir="rtl" className="min-h-screen grid place-items-center bg-background p-6"><section className="hud-card max-w-md w-full p-6 text-center"><h1 className="text-2xl font-black">الملف الشخصي</h1><p className="mt-3 text-sm text-muted-foreground">سيتم تحميل أدوات الملف الشخصي الآمنة هنا.</p><button className="btn-primary mt-5" onClick={()=>navigate(-1)}>العودة</button></section></main>}
