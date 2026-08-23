@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
 import { cn } from "@/lib/utils";
@@ -19,18 +19,12 @@ const NAV = [
   { to: "/manager/settings", label: "الإعدادات", icon: "⚙", editRoles: ["owner"] },
 ];
 
-function adminToken() {
-  return typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token.admin") || "";
-}
+function adminToken() { return typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token.admin") || ""; }
 
 async function loadServerNotifications(): Promise<AppNotification[]> {
   const token = adminToken();
   if (!token) return [];
-  const response = await fetch(`${API_URL}/api/notifications`, {
-    headers: { authorization: `Bearer ${token}` },
-    credentials: "include",
-    cache: "no-store",
-  });
+  const response = await fetch(`${API_URL}/api/notifications`, { headers: { authorization: `Bearer ${token}` }, credentials: "include", cache: "no-store" });
   if (!response.ok) throw new Error(`notifications:${response.status}`);
   const rows = await response.json() as Array<{ id: string; userId: string; title: string; message: string; type: AppNotification["type"]; readAt: string | null; createdAt: string }>;
   return rows.map(n => ({ id: n.id, userId: n.userId, title: n.title, body: n.message, type: n.type, read: Boolean(n.readAt), createdAt: n.createdAt }));
@@ -41,7 +35,6 @@ function readTheme(): "light" | "dark" | "system" {
   const value = localStorage.getItem(THEME_KEY);
   return value === "light" || value === "dark" || value === "system" ? value : "system";
 }
-
 function applyTheme(theme: "light" | "dark" | "system") {
   if (typeof document === "undefined") return;
   const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -72,9 +65,7 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
         try {
           const all = getNotifications(currentUserId);
           if (active) setNotifications(Array.isArray(all) ? all.filter(n => n.userId === currentUserId || n.userId === "manager" || n.userId === "admin" || n.userId === "all") : []);
-        } catch {
-          if (active) setNotifications([]);
-        }
+        } catch { if (active) setNotifications([]); }
       }
     };
     void load();
@@ -86,7 +77,6 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
     applyTheme(theme);
     try { localStorage.setItem(THEME_KEY, theme); } catch { /* ignore storage errors */ }
   }, [theme]);
-
   useEffect(() => {
     if (theme !== "system") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -98,14 +88,7 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
   const unreadCount = notifications.filter(n => !n.read).length;
   const logout = () => { localStorage.removeItem("managerAuth"); backendLogout(); setManagerSession(null); nav("/manager/login"); };
   const filteredNav = NAV.filter(n => !n.editRoles || n.editRoles.includes(currentRole));
-
-  const openDiagnostics = () => {
-    setDiagnostics(getDiagnostics());
-    setShowDiagnostics(true);
-    setMenuOpen(false);
-    setThemeMenuOpen(false);
-  };
-
+  const openDiagnostics = () => { setDiagnostics(getDiagnostics()); setShowDiagnostics(true); setMenuOpen(false); setThemeMenuOpen(false); };
   const notificationRoute = (n: AppNotification) => {
     const text = `${n.title} ${n.body}`.toLowerCase();
     if (n.type === "error" || text.includes("خطأ") || text.includes("فشل")) return "/manager/audit";
@@ -115,7 +98,6 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
     if (text.includes("إعداد") || text.includes("settings")) return "/manager/settings";
     return null;
   };
-
   const notificationTitle = (n: AppNotification) => {
     if (n.title === "طلب موظف جديد") {
       const m = n.body.match(/طلب\s+(استئذان|إجازة|انصراف)/);
@@ -123,8 +105,7 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
     }
     return n.title;
   };
-
-  const reloadNotifications = async () => {
+  const reloadNotifications = useCallback(async () => {
     try {
       const server = await loadServerNotifications();
       setNotifications(server.filter(n => n.userId === currentUserId));
@@ -132,20 +113,16 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
       const all = getNotifications(currentUserId);
       setNotifications(all.filter(n => n.userId === currentUserId || n.userId === "manager" || n.userId === "admin" || n.userId === "all"));
     }
-  };
+  }, [currentUserId]);
+  const setThemeAndKeepMenu = (value: "light" | "dark" | "system") => { setTheme(value); setThemeMenuOpen(false); };
 
-  const setThemeAndKeepMenu = (value: "light" | "dark" | "system") => {
-    setTheme(value);
-    setThemeMenuOpen(false);
-  };
-
-  useEffect(() => { if (showNotifications) void reloadNotifications(); }, [showNotifications]);
+  useEffect(() => { if (showNotifications) void reloadNotifications(); }, [showNotifications, reloadNotifications]);
   useEffect(() => {
     if (!showNotifications) return;
     const onChanged = () => void reloadNotifications();
     window.addEventListener("hadir:notifications-changed", onChanged);
     return () => window.removeEventListener("hadir:notifications-changed", onChanged);
-  }, [showNotifications, currentUserId]);
+  }, [showNotifications, reloadNotifications]);
 
   return <div className="min-h-screen bg-background text-foreground">
     <aside className="fixed top-0 right-0 bottom-0 w-64 border-l border-border/70 bg-sidebar/95 backdrop-blur-md hidden lg:flex flex-col z-40">
@@ -158,50 +135,22 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
         {menuOpen && <div className="mt-1 rounded-xl border border-border bg-card p-2 shadow-lg">
           {currentRole === "owner" && <button onClick={openDiagnostics} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-primary">🛠️ سجل الأخطاء ({getDiagnostics().filter(x => x.level === "error").length})</button>}
           <div className="border-t my-1" />
-          <button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-secondary text-sm font-semibold">
-            <span>🎨 المظهر</span><span className="text-muted-foreground text-xs">{theme === "dark" ? "داكن" : theme === "light" ? "فاتح" : "تلقائي"}⌄</span>
-          </button>
-          {themeMenuOpen && <div className="mt-1 mr-2 border-r border-border pr-2 space-y-1">
-            <button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}>🌙 الوضع الداكن</button>
-            <button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}>☀️ الوضع الفاتح</button>
-            <button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}>◐ تلقائي حسب النظام</button>
-          </div>}
+          <button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-secondary text-sm font-semibold"><span>🎨 المظهر</span><span className="text-muted-foreground text-xs">{theme === "dark" ? "داكن" : theme === "light" ? "فاتح" : "تلقائي"}⌄</span></button>
+          {themeMenuOpen && <div className="mt-1 mr-2 border-r border-border pr-2 space-y-1"><button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}>🌙 الوضع الداكن</button><button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}>☀️ الوضع الفاتح</button><button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}>◐ تلقائي حسب النظام</button></div>}
           <button onClick={logout} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-red-600">🚪 تسجيل خروج</button>
         </div>}
       </div>
     </aside>
-
     <div className="lg:mr-64">
       <div className="lg:hidden sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border/60">
         <div className="px-4 py-3 flex items-center justify-between"><Brand /><button onClick={() => { setMenuOpen(v => !v); setThemeMenuOpen(false); }} aria-label="فتح القائمة" className="p-2 rounded-lg border border-border text-sm font-semibold">☰</button></div>
         <div className="px-2 pb-2 grid grid-cols-3 sm:grid-cols-6 gap-1 overflow-x-auto">{filteredNav.map(n => <NavLink key={n.to} to={n.to} end={n.end as any} aria-label={n.label} className={({ isActive }) => cn("min-w-0 rounded-xl px-2 py-2 text-center text-[10px] font-semibold", isActive ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}><span className="block text-base leading-5" aria-hidden="true">{n.icon}</span><span className="block mt-0.5 truncate">{n.label}</span></NavLink>)}</div>
-        {menuOpen && <div className="absolute left-3 top-14 w-60 bg-card border border-border rounded-xl shadow-lg p-2 z-50">
-          <button onClick={() => { setShowNotifications(true); setMenuOpen(false); setThemeMenuOpen(false); }} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm">🔔 الإشعارات {unreadCount > 0 && `(${unreadCount})`}</button>
-          {currentRole === "owner" && <button onClick={openDiagnostics} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-primary">🛠️ سجل الأخطاء ({diagnostics.filter(x => x.level === "error").length})</button>}
-          <div className="border-t my-1" />
-          <button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-secondary text-sm font-semibold">
-            <span>🎨 المظهر</span><span className="text-muted-foreground text-xs">{theme === "dark" ? "داكن" : theme === "light" ? "فاتح" : "تلقائي"}⌄</span>
-          </button>
-          {themeMenuOpen && <div className="mt-1 mr-2 border-r border-border pr-2 space-y-1">
-            <button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}>🌙 الوضع الداكن</button>
-            <button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}>☀️ الوضع الفاتح</button>
-            <button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}>◐ تلقائي حسب النظام</button>
-          </div>}
-          <button onClick={logout} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-red-600">🚪 تسجيل خروج</button>
-        </div>}
+        {menuOpen && <div className="absolute left-3 top-14 w-60 bg-card border border-border rounded-xl shadow-lg p-2 z-50"><button onClick={() => { setShowNotifications(true); setMenuOpen(false); setThemeMenuOpen(false); }} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm">🔔 الإشعارات {unreadCount > 0 && `(${unreadCount})`}</button>{currentRole === "owner" && <button onClick={openDiagnostics} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-primary">🛠️ سجل الأخطاء ({diagnostics.filter(x => x.level === "error").length})</button>}<div className="border-t my-1" /><button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-secondary text-sm font-semibold"><span>🎨 المظهر</span><span className="text-muted-foreground text-xs">{theme === "dark" ? "داكن" : theme === "light" ? "فاتح" : "تلقائي"}⌄</span></button>{themeMenuOpen && <div className="mt-1 mr-2 border-r border-border pr-2 space-y-1"><button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}>🌙 الوضع الداكن</button><button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}>☀️ الوضع الفاتح</button><button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}>◐ تلقائي حسب النظام</button></div>}<button onClick={logout} className="w-full text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-red-600">🚪 تسجيل خروج</button></div>}
       </div>
-
       <header className="px-5 lg:px-10 pt-6 pb-4 border-b border-border/40 mb-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><div className="text-xs text-muted-foreground mono">HADIR · {currentRole.toUpperCase()}</div><h1 className="text-2xl md:text-3xl font-extrabold mt-1">{title}</h1>{subtitle && <div className="text-sm text-muted-foreground mt-1">{subtitle}</div>}</div>{actions}</div></header>
       <main className="px-5 lg:px-10 pb-16">{children}</main>
     </div>
-
-    {showNotifications && <div className="fixed inset-0 z-50 bg-black/30" onClick={() => setShowNotifications(false)}><div className="absolute left-4 top-4 w-[24rem] max-w-[calc(100%-2rem)] max-h-[80vh] overflow-hidden bg-card border border-border rounded-2xl shadow-xl" onClick={e => e.stopPropagation()}>
-      <div className="p-4 border-b border-border/60"><div className="flex items-center justify-between gap-2"><div><div className="font-bold">الإشعارات</div><div className="text-[11px] text-muted-foreground mt-1">يتم الاحتفاظ بالإشعارات لمدة شهر واحد.</div></div><button type="button" onClick={() => setShowNotifications(false)} className="rounded-lg px-2 py-1 hover:bg-secondary">✕</button></div>
-        <div className="flex gap-2 mt-3"><button type="button" disabled={unreadCount === 0} onClick={() => { markAllAsRead(currentUserId); setNotifications(p => p.map(x => x.userId === currentUserId ? { ...x, read: true } : x)); }} className="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold disabled:opacity-40">✓ تحديد الكل كمقروء</button><button type="button" disabled={notifications.length === 0} onClick={() => { clearNotifications(currentUserId); setNotifications([]); }} className="rounded-lg border border-destructive/30 text-destructive px-3 py-2 text-xs font-semibold disabled:opacity-40">حذف الكل</button></div>
-      </div>
-      {notifications.length === 0 ? <div className="p-6 text-sm text-muted-foreground text-center">لا توجد إشعارات.</div> : <div className="p-2 max-h-[58vh] overflow-y-auto space-y-1">{notifications.map(n => <div key={n.id} className={cn("flex gap-1 rounded-xl transition", !n.read && "bg-primary/5")}><button onClick={() => { markNotificationAsRead(n.id); setNotifications(p => p.map(x => x.id === n.id ? { ...x, read: true } : x)); setShowNotifications(false); const route = notificationRoute(n); if (route) nav(route); }} className="min-w-0 flex-1 text-right p-3 rounded-lg hover:bg-secondary text-sm"><div className="flex items-center gap-2"><span className={cn("h-2 w-2 rounded-full shrink-0", n.read ? "bg-muted" : "bg-primary")} /><div className="font-bold truncate">{notificationTitle(n)}</div></div><div className="text-xs text-muted-foreground mt-1">{n.body}</div><div className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString("ar-SA")}</div></button><button type="button" title="حذف الإشعار" aria-label="حذف الإشعار" onClick={() => { removeNotification(n.id); setNotifications(p => p.filter(x => x.id !== n.id)); }} className="self-start mt-2 rounded-lg px-2 py-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">🗑</button></div>)}</div>}
-    </div></div>}
-
+    {showNotifications && <div className="fixed inset-0 z-50 bg-black/30" onClick={() => setShowNotifications(false)}><div className="absolute left-4 top-4 w-[24rem] max-w-[calc(100%-2rem)] max-h-[80vh] overflow-hidden bg-card border border-border rounded-2xl shadow-xl" onClick={e => e.stopPropagation()}><div className="p-4 border-b border-border/60"><div className="flex items-center justify-between gap-2"><div><div className="font-bold">الإشعارات</div><div className="text-[11px] text-muted-foreground mt-1">يتم الاحتفاظ بالإشعارات لمدة شهر واحد.</div></div><button type="button" onClick={() => setShowNotifications(false)} className="rounded-lg px-2 py-1 hover:bg-secondary">✕</button></div><div className="flex gap-2 mt-3"><button type="button" disabled={unreadCount === 0} onClick={() => { markAllAsRead(currentUserId); setNotifications(p => p.map(x => x.userId === currentUserId ? { ...x, read: true } : x)); }} className="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold disabled:opacity-40">✓ تحديد الكل كمقروء</button><button type="button" disabled={notifications.length === 0} onClick={() => { clearNotifications(currentUserId); setNotifications([]); }} className="rounded-lg border border-destructive/30 text-destructive px-3 py-2 text-xs font-semibold disabled:opacity-40">حذف الكل</button></div></div>{notifications.length === 0 ? <div className="p-6 text-sm text-muted-foreground text-center">لا توجد إشعارات.</div> : <div className="p-2 max-h-[58vh] overflow-y-auto space-y-1">{notifications.map(n => <div key={n.id} className={cn("flex gap-1 rounded-xl transition", !n.read && "bg-primary/5")}><button onClick={() => { markNotificationAsRead(n.id); setNotifications(p => p.map(x => x.id === n.id ? { ...x, read: true } : x)); setShowNotifications(false); const route = notificationRoute(n); if (route) nav(route); }} className="min-w-0 flex-1 text-right p-3 rounded-lg hover:bg-secondary text-sm"><div className="flex items-center gap-2"><span className={cn("h-2 w-2 rounded-full shrink-0", n.read ? "bg-muted" : "bg-primary")} /><div className="font-bold truncate">{notificationTitle(n)}</div></div><div className="text-xs text-muted-foreground mt-1">{n.body}</div><div className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString("ar-SA")}</div></button><button type="button" title="حذف الإشعار" aria-label="حذف الإشعار" onClick={() => { removeNotification(n.id); setNotifications(p => p.filter(x => x.id !== n.id)); }} className="self-start mt-2 rounded-lg px-2 py-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">🗑</button></div>)}</div>}</div></div>}
     {showDiagnostics && <div className="fixed inset-0 z-[60] bg-black/50 p-4 flex items-start justify-center overflow-auto" onClick={() => setShowDiagnostics(false)}><div dir="rtl" className="w-full max-w-3xl mt-8 bg-card border border-primary/30 rounded-2xl shadow-2xl p-5" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between gap-3 mb-4"><div><div className="text-xs mono text-primary font-bold">DIAGNOSTICS · OWNER ONLY</div><h2 className="text-xl font-extrabold mt-1">سجل أخطاء النظام</h2></div><button type="button" className="btn-secondary" onClick={() => setShowDiagnostics(false)}>إغلاق</button></div><div className="flex gap-2 mb-4"><span className="text-xs rounded-lg border px-2 py-1">الأخطاء: {diagnostics.filter(x => x.level === "error").length}</span><span className="text-xs rounded-lg border px-2 py-1">الإجمالي: {diagnostics.length}</span><button type="button" className="btn-secondary mr-auto text-xs" onClick={() => { clearDiagnostics(); setDiagnostics([]); }}>مسح السجل</button></div>{diagnostics.length === 0 ? <div className="p-5 rounded-xl border text-sm text-muted-foreground">لا توجد أخطاء مسجلة حاليًا.</div> : <div className="space-y-2 max-h-[65vh] overflow-auto">{diagnostics.map(d => <details key={d.id} className="border rounded-xl p-3 bg-secondary/20"><summary className="cursor-pointer text-sm"><b className="mono">{d.code}</b> · {new Date(d.timestamp).toLocaleString("ar-SA")} · {d.message}</summary><pre dir="ltr" className="mt-3 whitespace-pre-wrap break-words text-[11px] mono overflow-auto">{JSON.stringify({ level: d.level, code: d.code, timestamp: d.timestamp, message: d.message, stack: d.stack, context: d.context }, null, 2)}</pre></details>)}</div>}</div></div>}
   </div>;
 }
