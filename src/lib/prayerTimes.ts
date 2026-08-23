@@ -11,6 +11,13 @@ export async function getPrayerTimes(location:PrayerLocation, date=new Date()):P
  const h=data?.date?.hijri; const parts=h?.date?.split("-")||[]; const hijri=parts.length===3?`${parts[0]} ${h?.month?.ar||""} ${h?.year||""} هـ`:"";
  return {times:{fajr:clean(t.Fajr),sunrise:clean(t.Sunrise),dhuhr:clean(t.Dhuhr),asr:clean(t.Asr),maghrib:clean(t.Maghrib),isha:clean(t.Isha)},meta:{gregorian:data?.date?.readable||"",hijri,city:location.city||"موقعك الحالي"}};
 }
+export async function getQiblaBearingFromProvider(latitude:number,longitude:number):Promise<number>{
+ const url=`https://api.aladhan.com/v1/qibla/${encodeURIComponent(latitude)}/${encodeURIComponent(longitude)}`;
+ const res=await fetch(url); if(!res.ok) throw new Error("Qibla provider unavailable");
+ const json=await res.json() as {data?:{direction?:number}}; const direction=json.data?.direction;
+ if(typeof direction!=="number" || !Number.isFinite(direction)) throw new Error("Invalid Qibla direction");
+ return (direction%360+360)%360;
+}
 function clean(v?:string){return v?.slice(0,5) ?? "--:--";}
 export function qiblaBearing(latitude:number, longitude:number):number{const kaabaLat=21.422487*Math.PI/180; const kaabaLon=39.826206*Math.PI/180; const lat=latitude*Math.PI/180; const lon=longitude*Math.PI/180; const dLon=kaabaLon-lon; const y=Math.sin(dLon); const x=Math.cos(lat)*Math.tan(kaabaLat)-Math.sin(lat)*Math.cos(dLon); return (Math.atan2(y,x)*180/Math.PI+360)%360;}
 export function distanceToKaabaKm(latitude:number,longitude:number){const R=6371;const a1=latitude*Math.PI/180;const a2=21.422487*Math.PI/180;const dLat=(21.422487-latitude)*Math.PI/180;const dLon=(39.826206-longitude)*Math.PI/180;const a=Math.sin(dLat/2)**2+Math.cos(a1)*Math.cos(a2)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
