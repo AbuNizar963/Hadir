@@ -23,6 +23,7 @@ import ProtectedManager from "@/components/ProtectedManager";
 import RequireManagerRole from "@/components/RequireManagerRole";
 const ManagerOnly=({children}:{children:React.ReactNode})=><ProtectedManager>{children}</ProtectedManager>;
 const basename=import.meta.env.BASE_URL.replace(/\/$/,"")||undefined;
+// Deployment refresh marker: keep all existing feature routes included in the Pages build.
 export default function App(){return <BrowserRouter basename={basename}><Routes>
 <Route path="/" element={<Landing/>}/><Route path="/login" element={<EmployeeLogin/>}/><Route path="/weather" element={<WeatherPage/>}/><Route path="/prayer" element={<PrayerPage/>}/>
 <Route path="/ai" element={<AIAssistant/>}/><Route path="/employee" element={<ProtectedEmployee><EmployeeHome/></ProtectedEmployee>}/><Route path="/employee/profile" element={<ProtectedEmployee><EmployeeProfile/></ProtectedEmployee>}/><Route path="/employee/history" element={<ProtectedEmployee><EmployeeHistory/></ProtectedEmployee>}/><Route path="/employee/scan/:type" element={<ProtectedEmployee><EmployeeScan/></ProtectedEmployee>}/>
