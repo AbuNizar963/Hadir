@@ -20,15 +20,26 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
+
           p = Path('src/pages/PrayerPage.tsx')
           s = p.read_text(encoding='utf-8')
+
           required = [
               'const needleRotation = bearing == null ? 0 : shortestDelta(bearing, heading);',
-              'transform: `rotate(${needleRotation}deg)`,',
               'getQiblaBearingFromProvider',
           ]
           missing = [item for item in required if item not in s]
+
+          # JSX formatting can vary (style={{ transform: ... }}, template strings,
+          # helper expressions, etc.), so validate the actual rotation expression
+          # instead of requiring one exact whitespace-sensitive source fragment.
+          has_rotation = bool(re.search(r'rotate\\(\\$\\{needleRotation\\}deg\\)', s))
+          if not has_rotation:
+              missing.append('rotation of needleRotation')
+
           if missing:
               raise SystemExit('Qibla implementation validation failed: ' + ', '.join(missing))
+
           print('Qibla compass implementation is present and uses bearing relative to device heading.')
           PY
