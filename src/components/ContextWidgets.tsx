@@ -82,6 +82,13 @@ export default function ContextWidgets() {
         body[data-hadir-scan="true"] header.max-w-xl button[aria-label="فتح قائمة الموظف"] {
           display: none !important;
         }
+        /* Manager quick tools share the same control row as ☰ instead of floating over the page. */
+        @media (min-width: 1024px) {
+          aside.fixed.right-0.bottom-0 > div:last-child > button:nth-child(2) {
+            width: calc(100% - 9.5rem) !important;
+            margin-right: 9.5rem !important;
+          }
+        }
       `}</style>
 
       {active && session && (
@@ -96,56 +103,29 @@ export default function ContextWidgets() {
 
       {employee && (
         <div data-hadir-employee-menu className="fixed left-3 top-3 z-[120]">
-          <button
-            type="button"
-            onClick={() => setEmployeeMenuOpen(value => !value)}
-            aria-label="فتح قائمة الموظف"
-            aria-expanded={employeeMenuOpen}
-            title="القائمة"
-            className="grid h-12 w-12 place-items-center rounded-xl border border-border/70 bg-background/95 text-primary shadow-xl backdrop-blur hover:bg-secondary transition"
-          >
+          <button type="button" onClick={() => setEmployeeMenuOpen(value => !value)} aria-label="فتح قائمة الموظف" aria-expanded={employeeMenuOpen} title="القائمة" className="grid h-12 w-12 place-items-center rounded-xl border border-border/70 bg-background/95 text-primary shadow-xl backdrop-blur hover:bg-secondary transition">
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
           {employeeMenuOpen && (
             <div className="absolute left-0 top-14 w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-border/70 bg-background/98 p-2 shadow-2xl backdrop-blur" role="menu">
-              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/employee/profile"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary">
-                <UserRound className="h-5 w-5 text-primary" /><span>الملف الشخصي</span>
-              </button>
+              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/employee/profile"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><UserRound className="h-5 w-5 text-primary" /><span>الملف الشخصي</span></button>
+              <div className="my-1 border-t border-border/60" /><div className="px-3 pb-1 pt-2 text-[10px] font-black text-muted-foreground">الملحقات</div>
+              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/weather"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><CloudSun className="h-5 w-5 text-sky-400" /><span>الطقس</span></button>
+              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/prayer"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><Compass className="h-5 w-5 text-emerald-400" /><span>مواقيت الصلاة والقبلة</span></button>
+              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/ai"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><Bot className="h-5 w-5 text-violet-400" /><span>المساعد الذكي</span></button>
+              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/employee/history"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><Paperclip className="h-5 w-5 text-amber-400" /><span>الملحقات وسجل العمل</span></button>
               <div className="my-1 border-t border-border/60" />
-              <div className="px-3 pb-1 pt-2 text-[10px] font-black text-muted-foreground">الملحقات</div>
-              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/weather"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary">
-                <CloudSun className="h-5 w-5 text-sky-400" /><span>الطقس</span>
-              </button>
-              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/prayer"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary">
-                <Compass className="h-5 w-5 text-emerald-400" /><span>مواقيت الصلاة والقبلة</span>
-              </button>
-              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/ai"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary">
-                <Bot className="h-5 w-5 text-violet-400" /><span>المساعد الذكي</span>
-              </button>
-              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/employee/history"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary">
-                <Paperclip className="h-5 w-5 text-amber-400" /><span>الملحقات وسجل العمل</span>
-              </button>
-              <div className="my-1 border-t border-border/60" />
-              <button type="button" onClick={employeeLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold text-destructive hover:bg-destructive/10">
-                <LogOut className="h-5 w-5" /><span>تسجيل الخروج</span>
-              </button>
+              <button type="button" onClick={employeeLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold text-destructive hover:bg-destructive/10"><LogOut className="h-5 w-5" /><span>تسجيل الخروج</span></button>
             </div>
           )}
         </div>
       )}
 
       {manager && (
-        <div dir="ltr" className="fixed z-[120] top-3 right-16 lg:right-[17rem] flex items-center gap-2">
-          <button type="button" onClick={() => nav("/prayer")} aria-label="فتح مواقيت الصلاة واتجاه القبلة" title="الصلاة والقبلة" className="h-11 w-11 shrink-0 rounded-xl bg-emerald-500/10 border border-emerald-400/25 text-emerald-300 shadow-lg grid place-items-center hover:bg-emerald-500/15 hover:-translate-y-0.5 transition-all">
-            <Compass className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <button type="button" onClick={() => nav("/weather")} aria-label="فتح الطقس" title="الطقس" className="h-11 w-11 shrink-0 rounded-xl bg-sky-500/10 border border-sky-400/25 text-sky-300 shadow-lg grid place-items-center hover:bg-sky-500/15 hover:-translate-y-0.5 transition-all">
-            <CloudSun className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <button type="button" onClick={() => nav("/ai")} aria-label="فتح المساعد الذكي" title="المساعد الذكي" className="relative h-11 w-11 shrink-0 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-lg grid place-items-center hover:bg-primary/15 hover:-translate-y-0.5 transition-all">
-            <Bot className="h-5 w-5" aria-hidden="true" />
-            <span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          </button>
+        <div dir="ltr" className="fixed z-[120] top-3 left-16 lg:top-auto lg:bottom-3 lg:left-auto lg:right-3 flex items-center gap-1.5 rounded-2xl border border-border/70 bg-background/95 p-1.5 shadow-xl backdrop-blur" data-hadir-manager-tools>
+          <button type="button" onClick={() => nav("/ai")} aria-label="فتح المساعد الذكي" title="المساعد الذكي" className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:-translate-y-0.5 transition-all"><Bot className="h-5 w-5" aria-hidden="true" /><span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /></button>
+          <button type="button" onClick={() => nav("/weather")} aria-label="فتح الطقس" title="الطقس" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-sky-400/25 bg-sky-500/10 text-sky-300 hover:bg-sky-500/15 hover:-translate-y-0.5 transition-all"><CloudSun className="h-5 w-5" aria-hidden="true" /></button>
+          <button type="button" onClick={() => nav("/prayer")} aria-label="فتح مواقيت الصلاة واتجاه القبلة" title="الصلاة والقبلة" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-400/25 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15 hover:-translate-y-0.5 transition-all"><Compass className="h-5 w-5" aria-hidden="true" /></button>
         </div>
       )}
     </>
