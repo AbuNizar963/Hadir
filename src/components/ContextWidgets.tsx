@@ -135,16 +135,16 @@ export default function ContextWidgets() {
       )}
 
       {manager && (
-        <div className="fixed z-[90] top-3 right-16 left-auto lg:left-auto lg:right-[17rem] flex items-center gap-2">
-          <button type="button" onClick={() => nav("/ai")} aria-label="فتح المساعد الذكي" title="المساعد الذكي" className="relative h-11 w-11 shrink-0 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-lg grid place-items-center hover:bg-primary/15 hover:-translate-y-0.5 transition-all">
-            <Bot className="h-5 w-5" aria-hidden="true" />
-            <span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+        <div dir="ltr" className="fixed z-[120] top-3 right-16 lg:right-[17rem] flex items-center gap-2">
+          <button type="button" onClick={() => nav("/prayer")} aria-label="فتح مواقيت الصلاة واتجاه القبلة" title="الصلاة والقبلة" className="h-11 w-11 shrink-0 rounded-xl bg-emerald-500/10 border border-emerald-400/25 text-emerald-300 shadow-lg grid place-items-center hover:bg-emerald-500/15 hover:-translate-y-0.5 transition-all">
+            <Compass className="h-5 w-5" aria-hidden="true" />
           </button>
           <button type="button" onClick={() => nav("/weather")} aria-label="فتح الطقس" title="الطقس" className="h-11 w-11 shrink-0 rounded-xl bg-sky-500/10 border border-sky-400/25 text-sky-300 shadow-lg grid place-items-center hover:bg-sky-500/15 hover:-translate-y-0.5 transition-all">
             <CloudSun className="h-5 w-5" aria-hidden="true" />
           </button>
-          <button type="button" onClick={() => nav("/prayer")} aria-label="فتح مواقيت الصلاة واتجاه القبلة" title="الصلاة والقبلة" className="h-11 w-11 shrink-0 rounded-xl bg-emerald-500/10 border border-emerald-400/25 text-emerald-300 shadow-lg grid place-items-center hover:bg-emerald-500/15 hover:-translate-y-0.5 transition-all">
-            <Compass className="h-5 w-5" aria-hidden="true" />
+          <button type="button" onClick={() => nav("/ai")} aria-label="فتح المساعد الذكي" title="المساعد الذكي" className="relative h-11 w-11 shrink-0 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-lg grid place-items-center hover:bg-primary/15 hover:-translate-y-0.5 transition-all">
+            <Bot className="h-5 w-5" aria-hidden="true" />
+            <span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
           </button>
         </div>
       )}
