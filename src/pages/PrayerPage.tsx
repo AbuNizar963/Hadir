@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, MapPin, RefreshCw, Share2 } from "lucide-react";
+import { ArrowRight, MapPin, RefreshCw, Share2, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar } from "lucide-react";
 import { getPrayerTimes, qiblaBearing, distanceToKaabaKm, bearingLabel, type PrayerResponse } from "@/lib/prayerTimes";
 
 type PrayerKey="fajr"|"sunrise"|"dhuhr"|"asr"|"maghrib"|"isha";const PRAYERS:{key:PrayerKey;name:string;icon:React.ComponentType<{className?:string}>}[]=[{key:"fajr",name:"الفجر",icon:p=><Icon kind="fajr" {...p}/>},{key:"sunrise",name:"الشروق",icon:p=><Icon kind="sunrise" {...p}/>},{key:"dhuhr",name:"الظهر",icon:p=><Icon kind="dhuhr" {...p}/>},{key:"asr",name:"العصر",icon:p=><Icon kind="asr" {...p}/>},{key:"maghrib",name:"المغرب",icon:p=><Icon kind="maghrib" {...p}/>},{key:"isha",name:"العشاء",icon:p=><Icon kind="isha" {...p}/>];
