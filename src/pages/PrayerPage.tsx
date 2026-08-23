@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, MapPin, RefreshCw, Share2 } from "lucide-react";
+import { ArrowRight, MapPin, RefreshCw, Share2, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar } from "lucide-react";
 import { getPrayerTimes, getQiblaBearingFromProvider, qiblaBearing, distanceToKaabaKm, bearingLabel, type PrayerResponse } from "@/lib/prayerTimes";
 
 type PrayerKey = "fajr" | "sunrise" | "dhuhr" | "asr" | "maghrib" | "isha";
