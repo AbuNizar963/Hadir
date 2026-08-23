@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getNotifications, markAllAsRead, markAsRead, removeNotification, clearNotifications, NOTIFICATIONS_CHANGED_EVENT, type AppNotification } from "@/lib/notifications";
-import WeatherCard from "@/components/WeatherCard";
 
 interface Props { userId?: string; }
 
 export default function NotificationBell({ userId }: Props) {
   const [open, setOpen] = useState(false);
-  const [weatherOpen, setWeatherOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const weatherRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const refresh = useMemo(() => () => { setItems(userId ? getNotifications(userId) : []); }, [userId]);
 
@@ -29,13 +26,6 @@ export default function NotificationBell({ userId }: Props) {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
-  useEffect(() => {
-    if (!weatherOpen) return;
-    const onClickOutside = (e: MouseEvent) => { if (weatherRef.current && !weatherRef.current.contains(e.target as Node)) setWeatherOpen(false); };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [weatherOpen]);
-
   const unreadCount = useMemo(() => items.filter((n) => !n.read).length, [items]);
   const handleClickItem = (notification: AppNotification) => {
     markAsRead(notification.id); refresh(); setOpen(false);
@@ -44,24 +34,13 @@ export default function NotificationBell({ userId }: Props) {
   if (!userId) return null;
 
   return <div className="flex items-center gap-2" dir="rtl">
-    <div className="relative" ref={weatherRef}>
-      <button type="button" onClick={() => { setWeatherOpen(v => !v); setOpen(false); }} className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="الطقس" aria-expanded={weatherOpen}>
-        <span className="text-xl leading-none animate-[pulse_3s_ease-in-out_infinite]" aria-hidden="true">🌤️</span>
-        <span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden="true" />
-      </button>
-      {weatherOpen && <div className="absolute left-0 mt-2 w-[min(360px,calc(100vw-24px))] rounded-2xl border border-border/80 bg-background/95 backdrop-blur-xl shadow-2xl z-[60] overflow-hidden">
-        <div className="px-4 py-3 border-b border-border/70 flex items-center justify-between bg-secondary/30">
-          <div><div className="text-sm font-black">الطقس الآن</div><div className="text-[10px] text-muted-foreground">يتحدث تلقائيًا من موقعك</div></div>
-          <span className="text-2xl" aria-hidden="true">🌤️</span>
-        </div>
-        <div className="p-2">
-          <WeatherCard compact title="موقعك الحالي" />
-        </div>
-      </div>}
-    </div>
+    <button type="button" onClick={() => navigate("/weather")} className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="فتح صفحة الطقس">
+      <span className="text-xl leading-none animate-[pulse_3s_ease-in-out_infinite]" aria-hidden="true">🌤️</span>
+      <span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden="true" />
+    </button>
 
     <div className="relative" ref={wrapRef}>
-      <button type="button" onClick={() => { setOpen(v => !v); setWeatherOpen(false); }} className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="الإشعارات">
+      <button type="button" onClick={() => setOpen(v => !v)} className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="الإشعارات" aria-expanded={open}>
         <BellIcon />
         {unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold grid place-items-center mono">{unreadCount > 99 ? "99+" : unreadCount}</span>}
       </button>
