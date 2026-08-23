@@ -1,57 +1,59 @@
 from pathlib import Path
 
-ROOT=Path('.')
+ROOT = Path(__file__).resolve().parents[2]
 
-def write(path, text):
-    p=ROOT/path; p.parent.mkdir(parents=True, exist_ok=True); p.write_text(text, encoding='utf-8')
+REQUIRED_FILES = (
+    "src/pages/AIAssistant.tsx",
+    "src/pages/EmployeeProfile.tsx",
+    "src/lib/avatarUrl.ts",
+    "src/features/auth/employee/EmployeeLogin.tsx",
+    "backend/src/workforce.ts",
+)
 
-def replace_once(path, old, new):
-    p=ROOT/path; s=p.read_text(encoding='utf-8')
-    if old not in s: raise SystemExit(f'missing patch anchor in {path}: {old[:120]}')
-    p.write_text(s.replace(old,new,1), encoding='utf-8')
+REQUIRED_MARKERS = {
+    "src/pages/AIAssistant.tsx": (
+        "getPrayerTimes",
+        "qiblaBearing",
+        "api.open-meteo.com",
+        "answerManagerQuestion",
+    ),
+    "src/pages/EmployeeProfile.tsx": (
+        "getBackendEmployeeProfile",
+        "/avatar",
+        "newPin",
+    ),
+    "src/lib/avatarUrl.ts": (
+        "employeeAvatarUrl",
+        "/api/employees/",
+    ),
+    "src/features/auth/employee/EmployeeLogin.tsx": (
+        "device-rebind-request",
+        "إرسال طلب للإدارة لفك الجهاز",
+    ),
+    "backend/src/workforce.ts": (
+        "device-rebind-request",
+    ),
+}
 
-# Avatar URL helper: the backend stores an R2 key, while <img> needs the protected API route.
-write('src/lib/avatarUrl.ts', '''const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\\/$/, "");\nexport function employeeAvatarUrl(value: string | null | undefined, employeeId: string): string | null {\n  if (!value) return null;\n  if (/^(https?:|data:|blob:)/i.test(value)) return value;\n  return `${API_URL}/api/employees/${encodeURIComponent(employeeId)}/avatar`;\n}\n''')
 
-# Employee profile page: photo + PIN, with local compression before R2 upload.
-write('src/pages/EmployeeProfile.tsx', '''import { useEffect, useRef, useState } from "react";\nimport { useNavigate } from "react-router-dom";\nimport { ArrowRight, Camera, KeyRound, Save, UserRound } from "lucide-react";\nimport Brand from "@/components/Brand";\nimport { getBackendEmployeeProfile } from "@/lib/backend";\nimport { employeeAvatarUrl } from "@/lib/avatarUrl";\n\nconst API_URL=String(import.meta.env.VITE_API_URL||"https://hadir-api.abunizar963.workers.dev").replace(/\\/$/,"");\nconst token=()=>localStorage.getItem("hadir.api.token.employee")||"";\nasync function compress(file:File):Promise<Blob>{\n const src=await createImageBitmap(file); const scale=Math.min(1,512/Math.max(src.width,src.height)); const canvas=document.createElement("canvas"); canvas.width=Math.max(1,Math.round(src.width*scale)); canvas.height=Math.max(1,Math.round(src.height*scale)); const ctx=canvas.getContext("2d"); if(!ctx) throw new Error("تعذر تجهيز الصورة"); ctx.drawImage(src,0,0,canvas.width,canvas.height); const blob=await new Promise<Blob|null>(r=>canvas.toBlob(r,"image/webp",.78)); src.close(); if(!blob||blob.size>100*1024) throw new Error("تعذر ضغط الصورة إلى أقل من 100 كيلوبايت"); return blob;\n}\nexport default function EmployeeProfile(){\n const nav=useNavigate(); const fileRef=useRef<HTMLInputElement>(null); const [emp,setEmp]=useState<any>(null); const [newPin,setNewPin]=useState(""); const [confirm,setConfirm]=useState(""); const [saving,setSaving]=useState(false); const [message,setMessage]=useState(""); const [error,setError]=useState("");\n const load=()=>void getBackendEmployeeProfile().then(setEmp).catch(e=>setError(e instanceof Error?e.message:"تعذر تحميل الملف الشخصي"));\n useEffect(load,[]);\n const upload=async(file:File)=>{setSaving(true);setError("");setMessage("");try{const blob=await compress(file);const form=new FormData();form.append("file",blob,"avatar.webp");const r=await fetch(`${API_URL}/api/employees/${encodeURIComponent(emp.id)}/avatar`,{method:"POST",headers:{authorization:`Bearer ${token()}`},body:form,credentials:"include"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"تعذر حفظ الصورة");await load();setMessage("تم تحديث الصورة الشخصية");}catch(e){setError(e instanceof Error?e.message:"تعذر حفظ الصورة");}finally{setSaving(false);}};\n const savePin=async(e:React.FormEvent)=>{e.preventDefault();if(newPin.length<4)return setError("كلمة السر يجب أن تتكون من 4 أحرف/أرقام على الأقل");if(newPin!==confirm)return setError("تأكيد كلمة السر غير مطابق");setSaving(true);setError("");setMessage("");try{const r=await fetch(`${API_URL}/api/employee/profile`,{method:"PATCH",headers:{"content-type":"application/json",authorization:`Bearer ${token()}`},credentials:"include",body:JSON.stringify({newPin})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"تعذر تحديث كلمة السر");setNewPin("");setConfirm("");setMessage("تم تحديث كلمة السر بنجاح");}catch(e){setError(e instanceof Error?e.message:"تعذر تحديث كلمة السر");}finally{setSaving(false);}};\n if(!emp)return <main dir="rtl" className="min-h-screen grid place-items-center bg-background"><div className="text-sm font-bold">جاري تحميل الملف الشخصي…</div></main>; const avatar=employeeAvatarUrl(emp.avatar,emp.id);\n return <main dir="rtl" className="min-h-screen bg-background p-4 sm:p-6"><div className="mx-auto max-w-xl space-y-4"><header className="flex items-center justify-between"><button onClick={()=>nav(-1)} className="btn-secondary inline-flex items-center gap-2"><ArrowRight className="h-4 w-4"/>عودة</button><Brand/></header><section className="hud-card p-6"><div className="flex items-center gap-4"><div className="relative"><div className="h-24 w-24 overflow-hidden rounded-3xl border border-primary/30 bg-primary/10 grid place-items-center">{avatar?<img src={avatar} alt={emp.name} className="h-full w-full object-cover"/>:<UserRound className="h-10 w-10 text-primary"/>}</div><button type="button" onClick={()=>fileRef.current?.click()} disabled={saving} className="absolute -bottom-2 -left-2 grid h-10 w-10 place-items-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-lg"><Camera className="h-5 w-5"/></button><input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f)void upload(f);e.currentTarget.value=""}}/></div><div><h1 className="text-2xl font-black">{emp.name}</h1><p className="mt-1 text-sm text-muted-foreground">الرقم الوظيفي: {emp.jobNumber}</p><p className="mt-1 text-xs text-muted-foreground">يمكنك تغيير صورتك وكلمة السر من هذه الصفحة.</p></div></div>{(message||error)&&<div className={`mt-5 rounded-2xl border p-3 text-sm ${error?"border-destructive/30 bg-destructive/10 text-destructive":"border-primary/30 bg-primary/10 text-primary"}`}>{error||message}</div>}<form onSubmit={savePin} className="mt-6 space-y-4"><div className="flex items-center gap-2 font-black"><KeyRound className="h-5 w-5 text-primary"/>تغيير كلمة السر</div><input type="password" inputMode="numeric" autoComplete="new-password" value={newPin} onChange={e=>setNewPin(e.target.value)} placeholder="كلمة السر الجديدة" className="input w-full p-3.5 rounded-2xl"/><input type="password" inputMode="numeric" autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="تأكيد كلمة السر" className="input w-full p-3.5 rounded-2xl"/><button disabled={saving} className="btn-primary w-full py-3.5 rounded-2xl inline-flex items-center justify-center gap-2"><Save className="h-4 w-4"/>{saving?"جارٍ الحفظ…":"حفظ التغييرات"}</button></form></section></div></main>;\n}\n''')
+def fail(message: str) -> None:
+    raise SystemExit(f"Hadir feature validation failed: {message}")
 
-# Route.
-replace_once('src/App.tsx', 'import EmployeeScan from "@/pages/EmployeeScan";\n', 'import EmployeeScan from "@/pages/EmployeeScan";\nimport EmployeeProfile from "@/pages/EmployeeProfile";\n')
-replace_once('src/App.tsx', '<Route path="/employee" element={<ProtectedEmployee><EmployeeHome/></ProtectedEmployee>}/>', '<Route path="/employee" element={<ProtectedEmployee><EmployeeHome/></ProtectedEmployee>}/><Route path="/employee/profile" element={<ProtectedEmployee><EmployeeProfile/></ProtectedEmployee>}/>')
 
-# Fix avatar rendering in both main employee views.
-replace_once('src/pages/EmployeeHome.tsx', 'import type { AttendanceRecord, Employee, Location } from "@/types";\n', 'import type { AttendanceRecord, Employee, Location } from "@/types";\nimport { employeeAvatarUrl } from "@/lib/avatarUrl";\n')
-replace_once('src/pages/EmployeeHome.tsx', '{emp.avatar?<img src={emp.avatar}', '{emp.avatar?<img src={employeeAvatarUrl(emp.avatar,emp.id) || ""}')
-# Profile menu should navigate to the dedicated profile page.
-replace_once('src/pages/EmployeeHome.tsx', 'onClick={()=>{setMenuOpen(false);setShowProfile(true);}}', 'onClick={()=>{setMenuOpen(false);nav("/employee/profile");}}')
-replace_once('src/pages/ManagerEmployees.tsx', 'import type { Employee, EscapeEvent, Location, ScheduleType } from "@/types";\n', 'import type { Employee, EscapeEvent, Location, ScheduleType } from "@/types";\nimport { employeeAvatarUrl } from "@/lib/avatarUrl";\n')
-replace_once('src/pages/ManagerEmployees.tsx', '{e.avatar?<img src={e.avatar}', '{e.avatar?<img src={employeeAvatarUrl(e.avatar,e.id) || ""}')
+def main() -> None:
+    for relative in REQUIRED_FILES:
+        path = ROOT / relative
+        if not path.is_file():
+            fail(f"missing required file: {relative}")
 
-# More meaningful live dot colours for the current card states.
-replace_once('src/pages/ManagerEmployees.tsx', '<span className={`live-status-dot ${escapeStatus==="escaped"?"bg-destructive":""}`} data-status={escapeStatus==="escaped"?"danger":"info"}/>', '<span className={`live-status-dot ${escapeStatus==="escaped"?"bg-destructive":e.status!=="active"?"bg-muted-foreground":"bg-primary"}`} data-status={escapeStatus==="escaped"?"danger":e.status!=="active"?"info":"success"} title={escapeStatus==="escaped"?"هارب":e.status!=="active"?"موقوف":"فعال"}/>' )
+    for relative, markers in REQUIRED_MARKERS.items():
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        missing = [marker for marker in markers if marker not in text]
+        if missing:
+            fail(f"{relative}: missing markers: {', '.join(missing)}")
 
-# Employee login: expose the safe rebind request when the backend says another device is bound.
-replace_once('src/pages/EmployeeLogin.tsx', 'import { getSettings } from "@/lib/storage";\n', 'import { getSettings } from "@/lib/storage";\nimport { getDeviceId, getDeviceLabel } from "@/lib/device";\n')
-replace_once('src/pages/EmployeeLogin.tsx', '  const [restoring, setRestoring] = useState(true);\n', '  const [restoring, setRestoring] = useState(true);\n  const [rebindLoading, setRebindLoading] = useState(false);\n  const [rebindSent, setRebindSent] = useState(false);\n')
-replace_once('src/pages/EmployeeLogin.tsx', '  const submit = async (e: React.FormEvent) => {', '''  const requestRebind = async () => {\n    if (!jobNumber.trim() || !pin) return setErr("أدخل الرقم الوظيفي ورمز الدخول أولاً.");\n    setRebindLoading(true); setErr(null);\n    try {\n      const api=String(import.meta.env.VITE_API_URL||"https://hadir-api.abunizar963.workers.dev").replace(/\\/$/,"");\n      const r=await fetch(`${api}/api/device/rebind-request`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jobNumber:jobNumber.trim(),pin,deviceId:getDeviceId(),deviceLabel:getDeviceLabel()})});\n      const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d.error||"تعذر إرسال الطلب");\n      setRebindSent(true); setErr("تم إرسال طلب إعادة ربط هاتفك إلى الإدارة. سيتم إشعار المالك والمدير.");\n    } catch(e){setErr(e instanceof Error?e.message:"تعذر إرسال طلب إعادة الربط.");} finally{setRebindLoading(false);}\n  };\n\n  const submit = async (e: React.FormEvent) => {''')
-replace_once('src/pages/EmployeeLogin.tsx', '{err&&<div role="alert" className="rounded-2xl border border-destructive/35 bg-destructive/10 text-destructive-foreground p-3.5 text-sm leading-6">{err}</div>}', '{err&&<div role="alert" className="rounded-2xl border border-destructive/35 bg-destructive/10 text-destructive-foreground p-3.5 text-sm leading-6">{err}</div>}{err?.includes("مرتبط بجهاز آخر")&&<button type="button" onClick={()=>void requestRebind()} disabled={rebindLoading||rebindSent} className="btn-secondary w-full py-3 rounded-2xl font-bold">{rebindSent?"تم إرسال الطلب ✓":rebindLoading?"جارٍ إرسال الطلب…":"📱 إرسال طلب إعادة ربط الهاتف للإدارة"}</button>}')
+    print("Hadir feature validation passed: AI/weather/prayer/qibla, employee profile/avatar, and device rebind are present.")
 
-# Allow an employee to upload their own avatar; managers/owners retain their access.
-replace_once('backend/src/r2.ts', 'if (actor.role !== "owner" && actor.role !== "manager") {\n      return json({ error: "المالك أو المدير فقط يستطيعان تغيير صورة الموظف" }, 403, origin);\n    }', 'if (actor.role !== "owner" && actor.role !== "manager" && actor.id !== employeeId) {\n      return json({ error: "غير مصرح بتغيير هذه الصورة" }, 403, origin);\n    }')
-replace_once('backend/src/r2.ts', 'if (actor.role !== "owner" && actor.role !== "manager") {\n      return json({ error: "المالك أو المدير فقط يستطيعان حذف صورة الموظف" }, 403, origin);\n    }', 'if (actor.role !== "owner" && actor.role !== "manager" && actor.id !== employeeId) {\n      return json({ error: "غير مصرح بحذف هذه الصورة" }, 403, origin);\n    }')
 
-# Backend endpoints: employee changes own PIN; new-device requests notify every active owner/manager.
-backend=ROOT/'backend/src/index.ts'; s=backend.read_text(encoding='utf-8')
-anchor='if(path==="/api/auth/login"&&req.method==="POST")'
-insert='''if(path==="/api/employee/profile"&&req.method==="PATCH"){\n const actor=await readToken(req,env); if(!actor||actor.role!=="staff") return json({error:"غير مصرح"},401,origin);\n const b=await body(req),newPin=String(b.newPin||""); if(newPin.length<4||newPin.length>32) return json({error:"كلمة السر يجب أن تكون بين 4 و32 حرفًا/رقمًا"},400,origin);\n await env.DB.prepare("UPDATE employees SET pin_hash=? WHERE id=?").bind(await hashPassword(newPin),actor.id).run();\n await audit(env,req,actor.name,"employee-profile-pin-updated","success",actor.id,actor.username);\n return json({ok:true},200,origin);\n}\nif(path==="/api/device/rebind-request"&&req.method==="POST"){\n const b=await body(req),jobNumber=String(b.jobNumber||"").trim(),pin=String(b.pin||""),deviceId=String(b.deviceId||"").trim(),deviceLabel=String(b.deviceLabel||"جهاز جديد").trim()||"جهاز جديد";\n if(!jobNumber||!pin||!deviceId) return json({error:"الرقم الوظيفي ورمز الدخول ومعرف الجهاز مطلوبة"},400,origin);\n const employee=await env.DB.prepare("SELECT id,job_number,name,pin_hash,device_id FROM employees WHERE job_number=? LIMIT 1").bind(jobNumber).first<any>();\n if(!employee||!(await verifyPassword(pin,employee.pin_hash))) return json({error:"رقم الموظف أو رمز الدخول غير صحيح"},401,origin);\n if(String(employee.device_id||"")===deviceId) return json({ok:true,alreadyBound:true,message:"هذا الهاتف مرتبط بالحساب بالفعل"},200,origin);\n const admins=await env.DB.prepare("SELECT id FROM admin_accounts WHERE active=1 AND role IN ('owner','manager')").all<any>();\n const title="طلب إعادة ربط هاتف"; const message=`الموظف ${employee.name} (${employee.job_number}) يريد إعادة ربط حسابه بهاتف جديد: ${deviceLabel}`;\n for(const admin of admins.results||[]) await env.DB.prepare("INSERT INTO notifications(id,user_id,title,message,type,created_at) VALUES(?,?,?,?,?,?)").bind(uid(),admin.id,title,message,"warning",now()).run();\n await audit(env,req,employee.name,"device-rebind-requested","success",employee.id,employee.job_number,deviceLabel);\n return json({ok:true,pending:true},201,origin);\n}\n'''
-if anchor not in s: raise SystemExit('missing backend auth anchor')
-s=s.replace(anchor,insert+anchor,1)
-# Ensure notifications table exists even when only ensureSchema() is used.
-needle='env.DB.prepare("CREATE TABLE IF NOT EXISTS auth_sessions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,user_type TEXT NOT NULL CHECK(user_type IN (\'admin\',\'employee\')),role TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,last_seen_at TEXT NOT NULL)"),'
-if needle in s:
- s=s.replace(needle,needle+'env.DB.prepare("CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,type TEXT NOT NULL DEFAULT \'info\',read_at TEXT,created_at TEXT NOT NULL)"),',1)
-backend.write_text(s,encoding='utf-8')
-
-print('Hadir feature patch applied')
-'''
+if __name__ == "__main__":
+    main()
