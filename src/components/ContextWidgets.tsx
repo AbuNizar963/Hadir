@@ -41,6 +41,15 @@ export default function ContextWidgets() {
   }, [active, sessionLoginAt]);
 
   useEffect(() => {
+    document.body.dataset.hadirHome = employee ? "true" : "false";
+    document.body.dataset.hadirScan = location.pathname.startsWith("/employee/scan/") ? "true" : "false";
+    return () => {
+      delete document.body.dataset.hadirHome;
+      delete document.body.dataset.hadirScan;
+    };
+  }, [employee, location.pathname]);
+
+  useEffect(() => {
     if (!employeeMenuOpen) return;
     const close = (event: MouseEvent | TouchEvent) => {
       const target = event.target as HTMLElement | null;
@@ -54,6 +63,10 @@ export default function ContextWidgets() {
     };
   }, [employeeMenuOpen]);
 
+  useEffect(() => {
+    if (!employee) setEmployeeMenuOpen(false);
+  }, [employee]);
+
   const employeeLogout = () => {
     setEmployeeMenuOpen(false);
     logoutEmployee();
@@ -62,6 +75,15 @@ export default function ContextWidgets() {
 
   return (
     <>
+      <style>{`
+        /* The employee menu is owned by ContextWidgets on /employee only.
+           Hide page-local copies so icons never stack on top of each other. */
+        body[data-hadir-home="true"] header.max-w-xl button[aria-label="فتح قائمة الموظف"],
+        body[data-hadir-scan="true"] header.max-w-xl button[aria-label="فتح قائمة الموظف"] {
+          display: none !important;
+        }
+      `}</style>
+
       {active && session && (
         <div className="fixed top-3 right-3 z-[80] w-[min(20rem,calc(100vw-1.5rem))] pointer-events-none">
           <div className={`hud-card p-3 shadow-xl transition-all duration-300 ${show ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0"}`}>
@@ -74,7 +96,14 @@ export default function ContextWidgets() {
 
       {employee && (
         <div data-hadir-employee-menu className="fixed left-3 top-3 z-[120]">
-          <button type="button" onClick={() => setEmployeeMenuOpen(value => !value)} aria-label="فتح قائمة الموظف" aria-expanded={employeeMenuOpen} title="القائمة" className="grid h-12 w-12 place-items-center rounded-xl border border-border/70 bg-background/95 text-primary shadow-xl backdrop-blur hover:bg-secondary transition">
+          <button
+            type="button"
+            onClick={() => setEmployeeMenuOpen(value => !value)}
+            aria-label="فتح قائمة الموظف"
+            aria-expanded={employeeMenuOpen}
+            title="القائمة"
+            className="grid h-12 w-12 place-items-center rounded-xl border border-border/70 bg-background/95 text-primary shadow-xl backdrop-blur hover:bg-secondary transition"
+          >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
           {employeeMenuOpen && (
