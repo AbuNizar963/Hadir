@@ -2,16 +2,14 @@ import { useMemo } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { currentSession } from "@/lib/auth";
 
-type Props = { compact?: boolean };
+type Props = { name?: string; jobNumber?: string; avatar?: string | null; compact?: boolean };
 
-export default function EmployeeDigitalCard({ compact = false }: Props) {
+export default function EmployeeDigitalCard({ name: nameProp, jobNumber: jobNumberProp, avatar, compact = false }: Props) {
   const session = currentSession();
-  const name = session?.name || "الموظف";
-  const jobNumber = session?.jobNumber || "—";
-  const employeeId = session?.employeeId || session?.id || jobNumber;
+  const name = nameProp || session?.name || "الموظف";
+  const jobNumber = jobNumberProp || session?.jobNumber || "—";
+  const employeeId = session?.employeeId || jobNumber;
   const verifyUrl = useMemo(() => `${window.location.origin}/employee/verify/${encodeURIComponent(employeeId)}`, [employeeId]);
-
-  const print = () => window.print();
 
   return (
     <section className={`hud-card p-5 ${compact ? "" : "mt-4"}`} aria-label="البطاقة الرقمية للموظف">
@@ -21,7 +19,9 @@ export default function EmployeeDigitalCard({ compact = false }: Props) {
       </div>
       <div className="rounded-3xl border border-primary/25 bg-primary/5 p-5">
         <div className="flex items-center gap-4">
-          <div className="grid h-20 w-20 place-items-center rounded-2xl border border-primary/20 bg-background text-2xl font-black text-primary">{name.charAt(0)}</div>
+          <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border border-primary/20 bg-background text-2xl font-black text-primary">
+            {avatar ? <img src={avatar} alt={name} className="h-full w-full object-cover" /> : name.charAt(0)}
+          </div>
           <div className="min-w-0">
             <div className="text-[10px] text-muted-foreground">Hadir</div>
             <div className="text-xl font-black truncate">{name}</div>
@@ -38,7 +38,7 @@ export default function EmployeeDigitalCard({ compact = false }: Props) {
           <div className="text-[9px] text-muted-foreground mt-2">امسح الرمز للتحقق من هوية الموظف</div>
         </div>
       </div>
-      <button type="button" onClick={print} className="btn-primary w-full mt-3 print:hidden">طباعة البطاقة</button>
+      <button type="button" onClick={() => window.print()} className="btn-primary w-full mt-3 print:hidden">طباعة البطاقة</button>
     </section>
   );
 }
