@@ -10,6 +10,9 @@
     "APP_ORIGIN": "https://abunizar963.github.io"
   },
   "account_id": "7c2f371786ada855f514d223e48daa72",
+  "ai": {
+    "binding": "AI"
+  },
   "d1_databases": [
     {
       "binding": "DB",
