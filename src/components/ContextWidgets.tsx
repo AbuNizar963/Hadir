@@ -82,13 +82,6 @@ export default function ContextWidgets() {
         body[data-hadir-scan="true"] header.max-w-xl button[aria-label="فتح قائمة الموظف"] {
           display: none !important;
         }
-        /* Manager quick tools share the same control row as ☰ instead of floating over the page. */
-        @media (min-width: 1024px) {
-          aside.fixed.right-0.bottom-0 > div:last-child > button:nth-child(2) {
-            width: calc(100% - 9.5rem) !important;
-            margin-right: 9.5rem !important;
-          }
-        }
       `}</style>
 
       {active && session && (
@@ -122,10 +115,22 @@ export default function ContextWidgets() {
       )}
 
       {manager && (
-        <div dir="ltr" className="fixed z-[120] top-3 left-16 lg:top-auto lg:bottom-3 lg:left-auto lg:right-3 flex items-center gap-1.5 rounded-2xl border border-border/70 bg-background/95 p-1.5 shadow-xl backdrop-blur" data-hadir-manager-tools>
-          <button type="button" onClick={() => nav("/ai")} aria-label="فتح المساعد الذكي" title="المساعد الذكي" className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:-translate-y-0.5 transition-all"><Bot className="h-5 w-5" aria-hidden="true" /><span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /></button>
-          <button type="button" onClick={() => nav("/weather")} aria-label="فتح الطقس" title="الطقس" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-sky-400/25 bg-sky-500/10 text-sky-300 hover:bg-sky-500/15 hover:-translate-y-0.5 transition-all"><CloudSun className="h-5 w-5" aria-hidden="true" /></button>
-          <button type="button" onClick={() => nav("/prayer")} aria-label="فتح مواقيت الصلاة واتجاه القبلة" title="الصلاة والقبلة" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-400/25 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15 hover:-translate-y-0.5 transition-all"><Compass className="h-5 w-5" aria-hidden="true" /></button>
+        <div
+          dir="ltr"
+          data-hadir-manager-tools
+          aria-label="اختصارات الإدارة"
+          className="fixed z-[120] top-3 left-[7.75rem] flex items-center gap-1.5 rounded-2xl border border-border/70 bg-background/95 p-1.5 shadow-xl backdrop-blur pointer-events-auto sm:left-[8.25rem] lg:top-3 lg:left-auto lg:right-[18rem]"
+        >
+          <button type="button" onClick={() => nav("/ai")} aria-label="فتح المساعد الذكي" title="المساعد الذكي" className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:-translate-y-0.5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/40">
+            <Bot className="h-5 w-5" aria-hidden="true" />
+            <span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden="true" />
+          </button>
+          <button type="button" onClick={() => nav("/weather")} aria-label="فتح الطقس" title="الطقس" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-sky-400/25 bg-sky-500/10 text-sky-300 hover:bg-sky-500/15 hover:-translate-y-0.5 transition-all focus:outline-none focus:ring-2 focus:ring-sky-400/40">
+            <CloudSun className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <button type="button" onClick={() => nav("/prayer")} aria-label="فتح مواقيت الصلاة واتجاه القبلة" title="الصلاة والقبلة" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-400/25 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15 hover:-translate-y-0.5 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/40">
+            <Compass className="h-5 w-5" aria-hidden="true" />
+          </button>
         </div>
       )}
     </>
