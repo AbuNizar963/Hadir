@@ -1,0 +1,24 @@
+export type AIEmployeeRecord = { id: string; name: string; jobNumber?: string; status?: string };
+export type AIAttendanceRecord = { employeeId: string; type: string; timestamp: string };
+export type AIEscapeRecord = { employeeId: string; employeeName?: string; jobNumber?: string; status: string; timestamp: string; reason?: string | null };
+export type AIAnswer = { text: string; items?: string[]; hint?: string };
+const norm = (v: string) => v.toLowerCase().replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/[ًٌٍَُِّْ]/g, "").trim();
+export const managerExamples = ["من هرب هذا الشهر؟","من غاب اليوم؟","كم نسبة الحضور اليوم؟","من أكثر الموظفين تأخرًا؟","من لديه مخالفات؟"];
+export const employeeExamples = ["متى غبت هذا العام؟","كم مرة تأخرت هذا العام؟","متى كان آخر حضور لي؟","كم يوم حضرت هذا الشهر؟","ما هي مناوبتي اليوم؟"];
+export function answerManagerQuestion(question: string, data: { employees: AIEmployeeRecord[]; attendance: AIAttendanceRecord[]; escapes: AIEscapeRecord[] }): AIAnswer {
+ const q=norm(question), now=new Date();
+ if(q.includes("هرب")||q.includes("هروب")){const start=new Date(now.getFullYear(),now.getMonth(),1).getTime();const rows=data.escapes.filter(e=>e.status==="escaped"&&new Date(e.timestamp).getTime()>=start);return rows.length?{text:`هذا الشهر تم تسجيل هروب ${rows.length} موظف/موظفين.`,items:rows.map(e=>`${e.employeeName||e.employeeId}${e.jobNumber?` (${e.jobNumber})`:""} — ${new Date(e.timestamp).toLocaleString("ar-EG")}`)}:{text:"لا توجد حالات هروب مسجلة هذا الشهر."};}
+ if(q.includes("غاب")||q.includes("غائب")){const today=now.toISOString().slice(0,10),checked=new Set(data.attendance.filter(a=>a.type==="check-in"&&a.timestamp.slice(0,10)===today).map(a=>a.employeeId)),active=data.employees.filter(e=>e.status==="active"),absent=active.filter(e=>!checked.has(e.id));return{text:`حسب بيانات اليوم، يوجد ${absent.length} موظف/موظفين لم يظهر لهم تسجيل حضور.`,items:absent.slice(0,30).map(e=>`${e.name}${e.jobNumber?` (${e.jobNumber})`:""}`)};}
+ if(q.includes("نسبه الحضور")||q.includes("نسبة الحضور")||q.includes("الحضور اليوم")){const today=now.toISOString().slice(0,10),active=data.employees.filter(e=>e.status==="active"),checked=new Set(data.attendance.filter(a=>a.type==="check-in"&&a.timestamp.slice(0,10)===today).map(a=>a.employeeId)),rate=active.length?Math.round(checked.size/active.length*100):0;return{text:`نسبة الحضور المسجلة اليوم تقريبًا ${rate}% (${checked.size} من ${active.length}).`};}
+ if(q.includes("تأخر")||q.includes("متاخر")){const count=new Map<string,number>();data.attendance.filter(a=>a.type==="check-in").forEach(a=>count.set(a.employeeId,(count.get(a.employeeId)||0)+1));const top=[...count.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([id,n])=>{const e=data.employees.find(x=>x.id===id);return`${e?.name||id}: ${n} تسجيل حضور`;});return{text:"هذه قراءة مبسطة لسجل الحضور وليست حكمًا على الالتزام الزمني:",items:top.length?top:["لا توجد بيانات حضور كافية."]};}
+ if(q.includes("مخالف"))return{text:"يمكنك فتح صفحة الموظفين أو التقارير لرؤية المخالفات المسجلة بالتفصيل.",hint:"جرّب: من غاب اليوم؟ أو من هرب هذا الشهر؟"};
+ return{text:"أستطيع مساعدتك في أسئلة الحضور الأساسية فقط حاليًا.",hint:managerExamples.join(" • ")};
+}
+export function answerEmployeeQuestion(question: string, employee: AIEmployeeRecord, attendance: AIAttendanceRecord[]): AIAnswer {
+ const q=norm(question),now=new Date(),own=attendance.filter(a=>a.employeeId===employee.id);
+ if(q.includes("غبت")||q.includes("غياب")){const year=now.getFullYear(),days=[...new Set(own.filter(a=>a.type==="check-in"&&new Date(a.timestamp).getFullYear()===year).map(a=>a.timestamp.slice(0,10)))];return{text:`لدي ${days.length} يوم حضور مسجل لك هذا العام. لا أعتبر الأيام غير المسجلة غيابًا مؤكدًا إلا إذا كان جدول المناوبة متاحًا.`,hint:"للدقة جرّب: متى كان آخر حضور لي؟"};}
+ if(q.includes("تاخرت")||q.includes("تأخرت")){const year=now.getFullYear(),checks=own.filter(a=>a.type==="check-in"&&new Date(a.timestamp).getFullYear()===year);return{text:`لدي ${checks.length} تسجيل حضور هذا العام. عدّ التأخير الدقيق يحتاج أوقات المناوبات المسجلة من الإدارة.`};}
+ if(q.includes("اخر حضور")||q.includes("آخر حضور")){const last=own.filter(a=>a.type==="check-in").sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime())[0];return{text:last?`آخر حضور مسجل لك كان ${new Date(last.timestamp).toLocaleString("ar-EG")}.`:"لا يوجد حضور مسجل حتى الآن."};}
+ if(q.includes("حضرت")||q.includes("حضور")){const month=now.getMonth(),year=now.getFullYear(),days=new Set(own.filter(a=>a.type==="check-in"&&new Date(a.timestamp).getMonth()===month&&new Date(a.timestamp).getFullYear()===year).map(a=>a.timestamp.slice(0,10)));return{text:`لديك ${days.size} يوم حضور مسجل هذا الشهر.`};}
+ return{text:`مرحبًا ${employee.name}. أستطيع الإجابة عن بيانات حضورك الأساسية فقط، ولا أطلع على بيانات الموظفين الآخرين.`,hint:employeeExamples.join(" • ")};
+}
