@@ -56,8 +56,6 @@ export default function EmployeeProfile() {
     setMessage("");
     const input = fileInputRef.current;
     if (!input) return;
-    // showPicker() asks the mobile browser for its native image/file picker while
-    // retaining the normal click() fallback for iOS/Safari and older browsers.
     try {
       if (typeof input.showPicker === "function") input.showPicker();
       else input.click();
@@ -89,11 +87,8 @@ export default function EmployeeProfile() {
         maxBytes: 100 * 1024,
       });
       const saved = await saveProfile({ avatar: compressed });
-      // The server is the source of truth. Prefer the returned value and fall
-      // back to the exact compressed data URL if an older API omits it.
       const storedAvatar = saved.employee?.avatar;
       setAvatar(typeof storedAvatar === "string" && storedAvatar.startsWith("data:image/") ? storedAvatar : compressed);
-      try { await getBackendEmployeeProfile(); } catch { /* saved response is enough */ }
       window.dispatchEvent(new Event("hadir:cloud-data-changed"));
       window.dispatchEvent(new Event("hadir:d1-view-changed"));
       setMessage("تم حفظ الصورة الشخصية بنجاح، وستظهر مباشرة في واجهة الحضور.");
