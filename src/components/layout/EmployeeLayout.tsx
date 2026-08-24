@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, UserRound, X } from "lucide-react";
-import { Brand } from "@/components/Brand";
+import Brand from "@/components/Brand";
 import NotificationBell from "@/components/NotificationBell";
 import { currentSession } from "@/lib/auth";
 
