@@ -27,20 +27,19 @@ export default function EmployeeLayout({ title = "لوحة الموظف", subtit
       <div className="mx-auto flex min-h-[76px] max-w-7xl items-center justify-between gap-3 px-2 sm:px-4">
         <Link to="/employee" aria-label="حاضر" className="shrink-0"><Brand /></Link>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5" dir="rtl">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5" aria-label="أدوات النظام">
+            <nav className="flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-x-auto" aria-label="أدوات النظام">
+              <Link to="/weather" title="الطقس" aria-label="الطقس" className={utilityClass}><CloudSun className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">الطقس</span></Link>
+              <Link to="/prayer" title="القبلة" aria-label="القبلة" className={utilityClass}><Compass className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">القبلة</span></Link>
+              <Link to="/ai" title="المساعد" aria-label="المساعد" className={utilityClass}><Bot className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">المساعد</span></Link>
+              <div className="shrink-0"><NotificationBell userId={session?.employeeId ? String(session.employeeId) : undefined} onlyBell /></div>
+          </nav>
           <div className="flex shrink-0 items-center gap-1.5" aria-label="التحكم السريع">
             <button type="button" title="القائمة" aria-label="القائمة" aria-expanded={menuOpen} onClick={() => setMenuOpen(v => !v)} className={cn(utilityClass, menuOpen && "border-primary/40 bg-primary/5 text-primary")}>
               {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
               <span className="mt-0.5 text-[11px] font-semibold leading-none">القائمة</span>
             </button>
-            <div className="shrink-0">
-              <NotificationBell userId={session?.employeeId ? String(session.employeeId) : undefined} onlyBell />
-            </div>
           </div>
-          <nav className="flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-x-auto" aria-label="أدوات النظام">
-            <Link to="/weather" title="الطقس" aria-label="الطقس" className={utilityClass}><CloudSun className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">الطقس</span></Link>
-            <Link to="/prayer" title="القبلة" aria-label="القبلة" className={utilityClass}><Compass className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">القبلة</span></Link>
-            <Link to="/ai" title="المساعد" aria-label="المساعد" className={utilityClass}><Bot className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">المساعد</span></Link>
-          </nav>
         </div>
       </div>
       <div className="border-t border-border/60"><nav className="mx-auto flex max-w-7xl items-stretch gap-1 overflow-x-auto px-2 py-1.5 sm:justify-center sm:px-4" aria-label="تنقل الموظف">{NAV.map(n => { const Icon = n.icon; return <NavLink key={n.to} to={n.to} end={n.end as any} aria-label={n.label} title={n.label} className={({ isActive }) => cn("flex min-w-[86px] shrink-0 flex-col items-center justify-center rounded-xl px-2 py-1.5 text-center transition", isActive ? "bg-primary/15 text-primary ring-1 ring-primary/35 shadow-sm" : "text-foreground/80 hover:bg-secondary hover:text-foreground")}><Icon className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-none">{n.label}</span></NavLink>; })}</nav></div>
