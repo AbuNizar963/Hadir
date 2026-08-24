@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { NavLink, useNavigate, Link } from "react-router-dom";
 import { BarChart3, Bell, Bot, CheckCheck, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, Menu, Monitor, Moon, Palette, Settings, Sun, Trash2, Users, Wrench, X, CloudSun, Compass } from "lucide-react";
 import Brand from "@/components/Brand";
+import SessionWelcome from "@/components/SessionWelcome";
 import { cn } from "@/lib/utils";
 import { clearNotifications, getNotifications, markAllAsRead, markAsRead as markNotificationAsRead, removeNotification } from "@/lib/notifications";
 import type { AppNotification } from "@/lib/notifications";
@@ -217,6 +218,7 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">{children}</main>
+      <SessionWelcome />
 
       {showNotifications && (
         <div className="fixed inset-0 z-[80] bg-black/40 p-3 sm:p-5" onClick={() => setShowNotifications(false)}>

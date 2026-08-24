@@ -4,6 +4,7 @@ import { BarChart3, Bot, CloudSun, Compass, LayoutDashboard, Menu, UserRound, X,
 import Brand from "@/components/Brand";
 import { cn } from "@/lib/utils";
 import { currentSession } from "@/lib/auth";
+import SessionWelcome from "@/components/SessionWelcome";
 
 const NAV = [
   { to: "/employee", label: "لوحة الموظف", icon: LayoutDashboard, end: true },
@@ -110,6 +111,7 @@ export default function EmployeeLayout({ title = "لوحة الموظف", subtit
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">{children}</main>
+      <SessionWelcome />
     </div>
   );
 }
