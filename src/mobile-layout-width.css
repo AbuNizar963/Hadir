@@ -1,0 +1,61 @@
+/* Shared mobile canvas for OWNER and EMPLOYEE.
+   Keep only a small safety gutter while allowing cards/widgets to use the full viewport. */
+@media (max-width: 639px) {
+  html, body, #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  header.mx-auto.max-w-7xl,
+  main.mx-auto.max-w-7xl,
+  main.max-w-xl.mx-auto,
+  .mx-auto.max-w-7xl {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  header.mx-auto.max-w-7xl,
+  main.mx-auto.max-w-7xl,
+  main.max-w-xl.mx-auto {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  /* Employee home / other main cards: never inherit a wider fixed gutter. */
+  main.max-w-xl.mx-auto.px-4,
+  main.max-w-xl.mx-auto.px-5,
+  main.max-w-xl.mx-auto.px-4.sm\:px-5,
+  main.max-w-xl.mx-auto.px-5.sm\:px-6 {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  /* The shared content canvas is allowed to fill all available width. */
+  main > .w-full,
+  main > section.w-full,
+  main > .grid,
+  main > section > .grid {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Green bordered cards and HUD/data cards fill their parent without a
+     second horizontal gutter. */
+  main .hud-card,
+  main .data-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* Prevent flex/grid children from forcing the canvas wider than the viewport. */
+  main .flex,
+  main .grid,
+  main [class*="grid-cols"] {
+    min-width: 0;
+  }
+}
