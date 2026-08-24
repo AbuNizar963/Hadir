@@ -17,7 +17,6 @@ import ManagerRequests from "@/pages/ManagerRequests";
 import ManagerAudit from "@/pages/ManagerAudit";
 import ManagerSettings from "@/pages/ManagerSettings";
 import ManagerReports from "@/pages/ManagerReports";
-import ContextWidgets from "@/components/ContextWidgets";
 import EmployeeAIButton from "@/components/EmployeeAIButton";
 import EmployeeLayout from "@/components/layout/EmployeeLayout";
 import NotFound from "@/pages/NotFound";
@@ -56,6 +55,5 @@ export default function App() {
       <Route path="/manager-home" element={<Navigate to="/manager" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
-    <ContextWidgets />
   </BrowserRouter>;
 }
