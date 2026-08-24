@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import Brand from "@/components/Brand";
 import { currentSession } from "@/lib/auth";
 import { getSettings, type RequestType } from "@/lib/storage";
 import { backendEnabled, getBackendAttendance, getBackendEmployeeProfile, getBackendLocations, createBackendRequest } from "@/lib/backend";
