@@ -15,6 +15,7 @@ const THEME_KEY = "hadir.theme";
 const NAV = [
   { to: "/manager", label: "لوحة القيادة", icon: LayoutDashboard, end: true, editRoles: ["owner", "manager", "supervisor"] },
   { to: "/manager/requests", label: "إدارة الطلبات", icon: ClipboardList, editRoles: ["owner", "manager", "supervisor"] },
+  { to: "/manager/employees", label: "الموظفون", icon: Users, editRoles: ["owner", "manager", "supervisor"] },
   { to: "/manager/audit", label: "سجل التدقيق", icon: ClipboardCheck, editRoles: ["owner", "manager", "supervisor"] },
   { to: "/manager/reports", label: "التقارير", icon: BarChart3, editRoles: ["owner", "manager"] },
   { to: "/manager/settings", label: "الإعدادات", icon: Settings, editRoles: ["owner"] },
