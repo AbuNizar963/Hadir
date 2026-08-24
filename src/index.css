@@ -94,15 +94,49 @@ main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(4) { order: 2; 
 main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(5) { order: 4; }
 
 /* Employee home: use the same full-width content canvas as the owner/manager layout. */
-main.max-w-xl.mx-auto.px-4.sm\:px-5.pb-16.space-y-4 {
+main.max-w-xl.mx-auto.px-4.sm\\:px-5.pb-16.space-y-4 {
   width: 100%;
   max-width: 80rem;
   margin-inline: auto;
   padding-inline: 1rem;
 }
 @media (min-width: 640px) {
-  main.max-w-xl.mx-auto.px-4.sm\:px-5.pb-16.space-y-4 { padding-inline: 1.5rem; }
+  main.max-w-xl.mx-auto.px-4.sm\\:px-5.pb-16.space-y-4 { padding-inline: 1.5rem; }
 }
 @media (min-width: 1024px) {
-  main.max-w-xl.mx-auto.px-4.sm\:px-5.pb-16.space-y-4 { padding-inline: 2.5rem; }
+  main.max-w-xl.mx-auto.px-4.sm\\:px-5.pb-16.space-y-4 { padding-inline: 2.5rem; }
+}
+
+/* Unified mobile canvas: keep OWNER and EMPLOYEE content wide on phones without touching desktop layout. */
+@media (max-width: 639px) {
+  header.mx-auto.max-w-7xl,
+  main.mx-auto.max-w-7xl,
+  main.max-w-xl.mx-auto,
+  .mx-auto.max-w-7xl {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+  }
+
+  header.mx-auto.max-w-7xl,
+  main.mx-auto.max-w-7xl,
+  main.max-w-xl.mx-auto {
+    padding-inline: 0.75rem;
+  }
+
+  /* Do not let legacy max-w-xl utility combinations recreate the narrow mobile canvas. */
+  main.max-w-xl.mx-auto.px-4.sm\\:px-5.pb-16.space-y-4,
+  main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+    padding-inline: 0.75rem;
+  }
+
+  /* Cards/grids fill the available canvas while retaining their own internal padding. */
+  main.max-w-xl.mx-auto > .w-full,
+  main.mx-auto.max-w-7xl > .w-full {
+    width: 100%;
+    min-width: 0;
+  }
 }
