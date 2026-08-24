@@ -1,5 +1,5 @@
-/* HADIR · Settings redesign
-   Scoped to the Settings route so existing application pages are untouched. */
+/* HADIR · Settings information architecture
+   Visual organization only: existing settings logic and controls remain untouched. */
 body:has(a[href="/manager/settings"][aria-current="page"]) main {
   background:
     radial-gradient(circle at 92% 0%, hsl(var(--primary) / .07), transparent 28rem),
@@ -11,9 +11,22 @@ body:has(a[href="/manager/settings"][aria-current="page"]) main > div {
   margin-inline: auto;
 }
 
+/* The settings page is intentionally grouped by responsibility:
+   1) People & access
+   2) Locations & attendance access
+   3) System diagnostics
+   4) Danger zone
+*/
+body:has(a[href="/manager/settings"][aria-current="page"]) main > div > .space-y-5 {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card {
   position: relative;
   overflow: hidden;
+  margin-bottom: 14px;
   border: 1px solid hsl(var(--border) / .72);
   background: linear-gradient(145deg, hsl(var(--card) / .98), hsl(var(--card) / .84));
   box-shadow: 0 12px 34px hsl(var(--foreground) / .055), inset 0 1px 0 hsl(var(--background) / .72);
@@ -26,6 +39,7 @@ body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card:hover {
   box-shadow: 0 16px 42px hsl(var(--foreground) / .075), 0 0 0 1px hsl(var(--primary) / .035);
 }
 
+/* Shared card typography */
 body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card > .text-xs.mono {
   display: flex;
   align-items: center;
@@ -35,17 +49,102 @@ body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card > .text-xs.
   padding-bottom: 13px;
   border-bottom: 1px solid hsl(var(--border) / .62);
   font-size: 11px;
-  letter-spacing: .09em;
+  letter-spacing: .06em;
 }
 
 body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card > .text-xs.mono::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   flex: 0 0 auto;
   border-radius: 999px;
   background: hsl(var(--primary));
   box-shadow: 0 0 0 5px hsl(var(--primary) / .10);
+}
+
+/* Explicit visual grouping without duplicating or moving the existing controls. */
+body:has(a[href="/manager/settings"][aria-current="page"]) .space-y-5::before {
+  content: "إدارة النظام  ·  الحسابات والصلاحيات  ·  الوصول";
+  display: block;
+  order: -100;
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  border: 1px solid hsl(var(--primary) / .16);
+  border-radius: 14px;
+  background: linear-gradient(90deg, hsl(var(--primary) / .08), transparent);
+  color: hsl(var(--primary));
+  font-size: 11px;
+  font-weight: 850;
+}
+
+/* First card: account management component */
+body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card:first-child {
+  border-color: hsl(var(--primary) / .22);
+  background: linear-gradient(135deg, hsl(var(--primary) / .055), hsl(var(--card) / .96) 48%);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card:first-child::after {
+  content: "الحسابات · الصلاحيات";
+  position: absolute;
+  inset-inline-start: 20px;
+  top: 18px;
+  padding: 6px 10px;
+  border: 1px solid hsl(var(--primary) / .18);
+  border-radius: 999px;
+  background: hsl(var(--primary) / .07);
+  color: hsl(var(--primary));
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* Profile belongs immediately after account administration. */
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(2) {
+  border-inline-start: 4px solid hsl(var(--primary) / .45);
+}
+
+/* Diagnostics is a technical/system function, not an account setting. */
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:has(.text-xs.mono:is(:where(*))) {
+  scroll-margin-top: 140px;
+}
+
+/* Location cards share one visual family so GPS and additional sites are perceived as one feature. */
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(4),
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(5) {
+  background: linear-gradient(145deg, hsl(var(--card) / .98), hsl(var(--primary) / .025));
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(4) {
+  border-inline-start: 4px solid hsl(var(--primary) / .42);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(5) {
+  border-inline-start: 4px solid hsl(var(--primary) / .25);
+}
+
+/* QR is an attendance-access feature, visually separated from physical locations. */
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(6) {
+  border-color: hsl(var(--primary) / .28);
+  background: linear-gradient(145deg, hsl(var(--primary) / .045), hsl(var(--card) / .97));
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(6) > .grid > div:last-child {
+  border: 1px solid hsl(var(--border) / .7);
+  border-radius: 18px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0,0,0,.07);
+}
+
+/* Keep system diagnostics visually distinct when the owner sees it. */
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:has(button) details {
+  border-color: hsl(var(--border) / .75);
+  border-radius: 14px;
+  transition: border-color .18s ease, background .18s ease;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) details:hover {
+  border-color: hsl(var(--primary) / .3);
+  background: hsl(var(--primary) / .025);
 }
 
 body:has(a[href="/manager/settings"][aria-current="page"]) .input {
@@ -95,60 +194,6 @@ body:has(a[href="/manager/settings"][aria-current="page"]) .btn-primary {
   box-shadow: 0 8px 22px hsl(var(--primary) / .18);
 }
 
-/* Account-management panel gets the same visual language even though it is a separate component. */
-body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card:first-child {
-  border-color: hsl(var(--primary) / .22);
-  background: linear-gradient(135deg, hsl(var(--primary) / .055), hsl(var(--card) / .96) 48%);
-}
-
-body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card:first-child::after {
-  content: "إدارة النظام · صلاحيات وحسابات";
-  position: absolute;
-  inset-inline-start: 20px;
-  top: 18px;
-  padding: 6px 10px;
-  border: 1px solid hsl(var(--primary) / .18);
-  border-radius: 999px;
-  background: hsl(var(--primary) / .07);
-  color: hsl(var(--primary));
-  font-size: 10px;
-  font-weight: 800;
-}
-
-body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(2),
-body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(3),
-body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(4),
-body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(5) {
-  scroll-margin-top: 160px;
-}
-
-body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(3) {
-  background: linear-gradient(145deg, hsl(var(--primary) / .045), hsl(var(--card) / .96));
-}
-
-body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(5) {
-  background: linear-gradient(145deg, hsl(var(--card) / .98), hsl(var(--primary) / .025));
-}
-
-body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(5) > .grid > div:last-child {
-  border: 1px solid hsl(var(--border) / .7);
-  border-radius: 18px;
-  padding: 20px;
-  background: #fff;
-  box-shadow: 0 10px 30px rgba(0,0,0,.07);
-}
-
-body:has(a[href="/manager/settings"][aria-current="page"]) details {
-  border-color: hsl(var(--border) / .75);
-  border-radius: 14px;
-  transition: border-color .18s ease, background .18s ease;
-}
-
-body:has(a[href="/manager/settings"][aria-current="page"]) details:hover {
-  border-color: hsl(var(--primary) / .3);
-  background: hsl(var(--primary) / .025);
-}
-
 body:has(a[href="/manager/settings"][aria-current="page"]) .border-dashed {
   min-height: 58px;
   border-width: 1.5px;
@@ -173,11 +218,12 @@ body:has(a[href="/manager/settings"][aria-current="page"]) .text-destructive {
     display: none;
   }
 
-  body:has(a[href="/manager/settings"][aria-current="page"]) .grid.grid-cols-3 {
+  body:has(a[href="/manager/settings"][aria-current="page"]) .grid.grid-cols-3,
+  body:has(a[href="/manager/settings"][aria-current="page"]) .grid.md\:grid-cols-2 {
     grid-template-columns: 1fr;
   }
 
-  body:has(a[href="/manager/settings"][aria-current="page"]) .grid.md\:grid-cols-2 {
-    grid-template-columns: 1fr;
+  body:has(a[href="/manager/settings"][aria-current="page"]) .space-y-5::before {
+    font-size: 10px;
   }
 }
