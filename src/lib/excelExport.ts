@@ -53,7 +53,34 @@ export function styleExcelTable(
   });
 }
 
-export function setExcelRtl(ws: XLSX.WorkSheet): void {\n  (ws as XLSX.WorkSheet & { "!rtl"?: boolean })["!rtl"] = true;\n  const range = XLSX.utils.decode_range(ws["!ref"] || "A1:A1");\n  for (let r = range.s.r; r <= range.e.r; r += 1) {\n    for (let c = range.s.c; c <= range.e.c; c += 1) {\n      const cell = ws[XLSX.utils.encode_cell({ r, c })];\n      if (!cell) continue;\n      cell.s = { ...(cell.s || {}), alignment: { ...(cell.s?.alignment || {}), horizontal: "right", vertical: "center", readingOrder: 2, wrapText: true } };\n    }\n  }\n}\n\nexport function autoFitColumns(ws: XLSX.WorkSheet, rows: ExcelCell[][], min = 12, max = 45) {
+export function setExcelRtl(wb: XLSX.WorkBook, ws: XLSX.WorkSheet): void {
+  // Excel's sheet-view direction is the part that makes column A appear on the right.
+  // Cell readingOrder alone only affects text flow, not the worksheet layout.
+  const book = wb as XLSX.WorkBook & { Workbook?: { Views?: Array<{ RTL?: boolean }> } };
+  book.Workbook = book.Workbook || {};
+  book.Workbook.Views = [{ RTL: true }];
+
+  ws["!rtl"] = true as never;
+  const range = XLSX.utils.decode_range(ws["!ref"] || "A1:A1");
+  for (let r = range.s.r; r <= range.e.r; r += 1) {
+    for (let col = range.s.c; col <= range.e.c; col += 1) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c: col })];
+      if (!cell) continue;
+      cell.s = {
+        ...(cell.s || {}),
+        alignment: {
+          ...(cell.s?.alignment || {}),
+          horizontal: "right",
+          vertical: "center",
+          readingOrder: 2,
+          wrapText: true,
+        },
+      };
+    }
+  }
+}
+
+export function autoFitColumns(ws: XLSX.WorkSheet, rows: ExcelCell[][], min = 12, max = 45) {
   const count = Math.max(0, ...rows.map((row) => row.length));
   ws["!cols"] = Array.from({ length: count }, (_, c) => {
     const width = Math.max(min, Math.min(max, ...rows.map((row) => textLength(row[c]) + 3)));
