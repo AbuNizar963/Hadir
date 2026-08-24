@@ -9,7 +9,6 @@ function greeting(hour: number) {
   return "ليل سعيد";
 }
 
-/** Global contextual layer only. Navigation belongs to the page/layout that owns it. */
 export default function ContextWidgets() {
   const location = useLocation();
   const session = currentSession();
@@ -17,7 +16,6 @@ export default function ContextWidgets() {
   const [show, setShow] = useState(false);
   const [now, setNow] = useState(new Date());
   const active = location.pathname.startsWith("/employee") || (location.pathname.startsWith("/manager") && !location.pathname.includes("/login"));
-
   const message = useMemo(() => greeting(now.getHours()), [now]);
 
   useEffect(() => {
@@ -44,15 +42,15 @@ export default function ContextWidgets() {
     };
   }, [location.pathname]);
 
-  if (!active || !session) return null;
-
-  return (
-    <div className="fixed top-3 right-3 z-[80] w-[min(20rem,calc(100vw-1.5rem))] pointer-events-none" aria-live="polite">
-      <div className={`hud-card p-3 shadow-xl transition-all duration-300 ${show ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0"}`}>
-        <div className="text-xs text-muted-foreground">{message}</div>
-        <div className="font-black mt-0.5 truncate">{session.name || "مرحبًا بك"} 👋</div>
-        <div className="text-[10px] text-muted-foreground mt-1">نتمنى لك يومًا موفقًا</div>
+  return <>
+    {active && session && (
+      <div className="fixed top-3 right-3 z-[80] w-[min(20rem,calc(100vw-1.5rem))] pointer-events-none">
+        <div className={`hud-card p-3 shadow-xl transition-all duration-300 ${show ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0"}`}>
+          <div className="text-xs text-muted-foreground">{message}</div>
+          <div className="font-black mt-0.5 truncate">{session.name || "مرحبًا بك"} 👋</div>
+          <div className="text-[10px] text-muted-foreground mt-1">نتمنى لك يومًا موفقًا</div>
+        </div>
       </div>
-    </div>
-  );
+    )}
+  </>;
 }
