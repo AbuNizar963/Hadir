@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { BarChart3, Bell, CheckCheck, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, Menu, Monitor, Moon, Palette, Settings, Sun, Trash2, Users, Wrench, X } from "lucide-react";
+import { NavLink, useNavigate, Link } from "react-router-dom";
+import { BarChart3, Bell, Bot, CheckCheck, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, Menu, Monitor, Moon, Palette, Settings, Sun, Trash2, Users, Wrench, X, CloudSun, Compass } from "lucide-react";
 import Brand from "@/components/Brand";
 import { cn } from "@/lib/utils";
 import { clearNotifications, getNotifications, markAllAsRead, markAsRead as markNotificationAsRead, removeNotification } from "@/lib/notifications";
@@ -11,10 +11,10 @@ import { getDiagnostics, clearDiagnostics, type DiagnosticEntry } from "@/lib/sy
 
 const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
 const THEME_KEY = "hadir.theme";
+
 const NAV = [
-  { to: "/manager", label: "لوحة القيادة", icon: LayoutDashboard, end: true },
-  { to: "/manager/requests", label: "طلبات الموظفين", icon: ClipboardList, editRoles: ["owner", "manager", "supervisor"] },
-  { to: "/manager/employees", label: "الموظفون", icon: Users, editRoles: ["owner", "manager"] },
+  { to: "/manager", label: "لوحة القيادة", icon: LayoutDashboard, end: true, editRoles: ["owner", "manager", "supervisor"] },
+  { to: "/manager/requests", label: "إدارة الطلبات", icon: ClipboardList, editRoles: ["owner", "manager", "supervisor"] },
   { to: "/manager/audit", label: "سجل التدقيق", icon: ClipboardCheck, editRoles: ["owner", "manager", "supervisor"] },
   { to: "/manager/reports", label: "التقارير", icon: BarChart3, editRoles: ["owner", "manager"] },
   { to: "/manager/settings", label: "الإعدادات", icon: Settings, editRoles: ["owner"] },
@@ -78,6 +78,7 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
     applyTheme(theme);
     try { localStorage.setItem(THEME_KEY, theme); } catch { /* ignore storage errors */ }
   }, [theme]);
+
   useEffect(() => {
     if (theme !== "system") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -89,7 +90,14 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
   const unreadCount = notifications.filter(n => !n.read).length;
   const logout = () => { localStorage.removeItem("managerAuth"); backendLogout(); setManagerSession(null); nav("/manager/login"); };
   const filteredNav = NAV.filter(n => !n.editRoles || n.editRoles.includes(currentRole));
-  const openDiagnostics = () => { setDiagnostics(getDiagnostics()); setShowDiagnostics(true); setMenuOpen(false); setThemeMenuOpen(false); };
+
+  const openDiagnostics = () => {
+    setDiagnostics(getDiagnostics());
+    setShowDiagnostics(true);
+    setMenuOpen(false);
+    setThemeMenuOpen(false);
+  };
+
   const notificationRoute = (n: AppNotification) => {
     const text = `${n.title} ${n.body}`.toLowerCase();
     if (n.type === "error" || text.includes("خطأ") || text.includes("فشل")) return "/manager/audit";
@@ -99,6 +107,7 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
     if (text.includes("إعداد") || text.includes("settings")) return "/manager/settings";
     return null;
   };
+
   const notificationTitle = (n: AppNotification) => {
     if (n.title === "طلب موظف جديد") {
       const m = n.body.match(/طلب\s+(استئذان|إجازة|انصراف)/);
@@ -106,6 +115,7 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
     }
     return n.title;
   };
+
   const reloadNotifications = useCallback(async () => {
     try {
       const server = await loadServerNotifications();
@@ -115,9 +125,11 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
       setNotifications(all.filter(n => n.userId === currentUserId || n.userId === "manager" || n.userId === "admin" || n.userId === "all"));
     }
   }, [currentUserId]);
+
   const setThemeAndKeepMenu = (value: "light" | "dark" | "system") => { setTheme(value); setThemeMenuOpen(false); };
 
   useEffect(() => { if (showNotifications) void reloadNotifications(); }, [showNotifications, reloadNotifications]);
+
   useEffect(() => {
     if (!showNotifications) return;
     const onChanged = () => void reloadNotifications();
@@ -125,45 +137,113 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
     return () => window.removeEventListener("hadir:notifications-changed", onChanged);
   }, [showNotifications, reloadNotifications]);
 
-  const renderNav = (mobile = false) => filteredNav.map(n => {
-    const Icon = n.icon;
-    return <NavLink key={n.to} to={n.to} end={n.end as any} aria-label={n.label} title={n.label} className={({ isActive }) => cn(
-      mobile ? "min-w-0 rounded-xl px-2 py-2 text-center text-[10px] font-semibold" : "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition",
-      isActive ? "bg-primary/15 text-primary border border-primary/30 shadow-sm" : "text-foreground/80 hover:bg-secondary hover:text-foreground"
-    )}>
-      <span className={cn("grid shrink-0 place-items-center rounded-lg bg-background/40 border border-border/50", mobile ? "mx-auto h-7 w-7" : "h-8 w-8")} aria-hidden="true"><Icon className={mobile ? "h-4 w-4" : "h-[18px] w-[18px]"} strokeWidth={1.9} /></span>
-      <span className={mobile ? "block mt-0.5 truncate" : "flex-1"}>{n.label}</span>
-      {n.to === "/manager/requests" && unreadCount > 0 && !mobile && <span className="badge bg-primary/15 text-primary">{unreadCount}</span>}
-    </NavLink>;
-  });
+  const utilityButton = (to: string, label: string, Icon: typeof CloudSun) => (
+    <Link to={to} title={label} aria-label={label} className="group flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-background/70 text-foreground/85 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary">
+      <Icon className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
+      <span className="mt-0.5 text-[11px] font-semibold leading-none">{label}</span>
+    </Link>
+  );
 
-  return <div className="min-h-screen bg-background text-foreground">
-    <aside className="fixed top-0 right-0 bottom-0 w-64 border-l border-border/70 bg-sidebar/95 backdrop-blur-md hidden lg:flex flex-col z-40">
-      <div className="p-5 border-b border-border/60 flex items-center justify-between"><Brand /></div>
-      {managerSession && <div className="px-5 py-2.5 border-b border-border/40 text-xs text-muted-foreground bg-secondary/30">مرحباً، <span className="font-bold text-foreground">{managerSession.name || currentRole}</span></div>}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">{renderNav()}</nav>
-      <div className="p-3 border-t border-border/50 space-y-1">
-        <button type="button" onClick={() => setShowNotifications(true)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm hover:bg-secondary"><span className="flex items-center gap-2"><Bell className="h-4 w-4" />الإشعارات</span>{unreadCount > 0 && <span className="badge bg-primary/15 text-primary">{unreadCount}</span>}</button>
-        <button type="button" onClick={() => { setMenuOpen(v => !v); setThemeMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm text-right hover:bg-secondary"><Menu className="h-4 w-4" />القائمة</button>
-        {menuOpen && <div className="mt-1 rounded-xl border border-border bg-card p-2 shadow-lg">
-          {currentRole === "owner" && <button onClick={openDiagnostics} className="flex w-full items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-primary"><Wrench className="h-4 w-4" />سجل الأخطاء ({getDiagnostics().filter(x => x.level === "error").length})</button>}
-          <div className="border-t my-1" />
-          <button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-secondary text-sm font-semibold"><span className="flex items-center gap-2"><Palette className="h-4 w-4" />المظهر</span><span className="text-muted-foreground text-xs">{theme === "dark" ? "داكن" : theme === "light" ? "فاتح" : "تلقائي"}⌄</span></button>
-          {themeMenuOpen && <div className="mt-1 mr-2 border-r border-border pr-2 space-y-1"><button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}><Moon className="h-4 w-4" />الوضع الداكن</button><button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}><Sun className="h-4 w-4" />الوضع الفاتح</button><button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}><Monitor className="h-4 w-4" />تلقائي حسب النظام</button></div>}
-          <button onClick={logout} className="w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-red-600"><LogOut className="h-4 w-4" />تسجيل خروج</button>
-        </div>}
+  return (
+    <div className="min-h-screen bg-background text-foreground" dir="rtl">
+      <div className="sticky top-0 z-[60] border-b border-border/70 bg-background/95 backdrop-blur-md">
+        <div className="mx-auto flex min-h-[76px] max-w-7xl items-center justify-between gap-3 px-2 sm:px-4">
+          <Link to="/manager" aria-label="حاضر" className="shrink-0">
+            <Brand />
+          </Link>
+          <nav className="flex items-center gap-1.5 overflow-x-auto" aria-label="أدوات النظام">
+            <button type="button" title="القائمة" aria-label="القائمة" aria-expanded={menuOpen} onClick={() => { setMenuOpen(v => !v); setThemeMenuOpen(false); }} className="group flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-background/70 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary">
+              {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+              <span className="mt-0.5 text-[11px] font-semibold leading-none">القائمة</span>
+            </button>
+            {utilityButton("/weather", "الطقس", CloudSun)}
+            {utilityButton("/prayer", "القبلة", Compass)}
+            {utilityButton("/ai", "المساعد", Bot)}
+            <button type="button" onClick={() => setShowNotifications(true)} title="الإشعارات" aria-label="الإشعارات" className="relative hidden h-12 w-12 shrink-0 place-items-center rounded-xl border border-border/70 bg-background/70 hover:border-primary/40 hover:bg-primary/5 sm:grid">
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">{unreadCount}</span>}
+            </button>
+          </nav>
+        </div>
+
+        <div className="border-t border-border/60">
+          <nav className="mx-auto flex max-w-7xl items-stretch gap-1 overflow-x-auto px-2 py-1.5 sm:justify-center sm:px-4" aria-label="إدارة النظام">
+            {filteredNav.map(n => {
+              const Icon = n.icon;
+              return (
+                <NavLink key={n.to} to={n.to} end={n.end as any} aria-label={n.label} title={n.label} className={({ isActive }) => cn(
+                  "flex min-w-[86px] shrink-0 flex-col items-center justify-center rounded-xl px-2 py-1.5 text-center transition",
+                  isActive ? "bg-primary/15 text-primary ring-1 ring-primary/35 shadow-sm" : "text-foreground/80 hover:bg-secondary hover:text-foreground"
+                )}>
+                  <Icon className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
+                  <span className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-none">{n.label}</span>
+                  {n.to === "/manager/requests" && unreadCount > 0 && <span className="mt-1 rounded-full bg-destructive/15 px-1.5 text-[9px] font-bold text-destructive">{unreadCount}</span>}
+                </NavLink>
+              );
+            })}
+          </nav>
+        </div>
       </div>
-    </aside>
-    <div className="lg:mr-64">
-      <div className="lg:hidden sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border/60">
-        <div className="px-4 py-3 flex items-center justify-between"><Brand /><button onClick={() => { setMenuOpen(v => !v); setThemeMenuOpen(false); }} aria-label="فتح القائمة" className="p-2 rounded-lg border border-border text-sm font-semibold"><Menu className="h-5 w-5" /></button></div>
-        <div className="px-2 pb-2 grid grid-cols-3 sm:grid-cols-6 gap-1 overflow-x-auto">{renderNav(true)}</div>
-        {menuOpen && <div className="absolute left-3 top-14 w-60 bg-card border border-border rounded-xl shadow-lg p-2 z-50"><button onClick={() => { setShowNotifications(true); setMenuOpen(false); setThemeMenuOpen(false); }} className="w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm"><Bell className="h-4 w-4" />الإشعارات {unreadCount > 0 && `(${unreadCount})`}</button>{currentRole === "owner" && <button onClick={openDiagnostics} className="w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-primary"><Wrench className="h-4 w-4" />سجل الأخطاء ({diagnostics.filter(x => x.level === "error").length})</button>}<div className="border-t my-1" /><button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-secondary text-sm font-semibold"><span className="flex items-center gap-2"><Palette className="h-4 w-4" />المظهر</span><span className="text-muted-foreground text-xs">{theme === "dark" ? "داكن" : theme === "light" ? "فاتح" : "تلقائي"}⌄</span></button>{themeMenuOpen && <div className="mt-1 mr-2 border-r border-border pr-2 space-y-1"><button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "dark" && "bg-primary/10 text-primary")}><Moon className="h-4 w-4" />الوضع الداكن</button><button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "light" && "bg-primary/10 text-primary")}><Sun className="h-4 w-4" />الوضع الفاتح</button><button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm", theme === "system" && "bg-primary/10 text-primary")}><Monitor className="h-4 w-4" />تلقائي حسب النظام</button></div>}<button onClick={logout} className="w-full flex items-center gap-2 text-right px-3 py-2 rounded-lg hover:bg-secondary text-sm text-red-600"><LogOut className="h-4 w-4" />تسجيل خروج</button></div>}
-      </div>
-      <header className="px-5 lg:px-10 pt-6 pb-4 border-b border-border/40 mb-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><div className="text-xs text-muted-foreground mono">HADIR · {currentRole.toUpperCase()}</div><h1 className="text-2xl md:text-3xl font-extrabold mt-1">{title}</h1>{subtitle && <div className="text-sm text-muted-foreground mt-1">{subtitle}</div>}</div>{actions}</div></header>
-      <main className="px-5 lg:px-10 pb-16">{children}</main>
+
+      {menuOpen && (
+        <div className="sticky top-[138px] z-50 border-b border-border/60 bg-card/98 shadow-lg">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-start gap-2 px-3 py-2" dir="rtl">
+            <button type="button" onClick={() => { setShowNotifications(true); setMenuOpen(false); }} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary"><Bell className="mr-1 inline h-4 w-4" />الإشعارات {unreadCount > 0 && `(${unreadCount})`}</button>
+            {currentRole === "owner" && <button type="button" onClick={openDiagnostics} className="rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-secondary"><Wrench className="mr-1 inline h-4 w-4" />سجل الأخطاء ({getDiagnostics().filter(x => x.level === "error").length})</button>}
+            <div className="relative">
+              <button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary"><Palette className="mr-1 inline h-4 w-4" />المظهر</button>
+              {themeMenuOpen && <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-border bg-card p-1 shadow-xl">
+                <button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-secondary", theme === "dark" && "bg-primary/10 text-primary")}><Moon className="mr-2 inline h-4 w-4" />داكن</button>
+                <button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-secondary", theme === "light" && "bg-primary/10 text-primary")}><Sun className="mr-2 inline h-4 w-4" />فاتح</button>
+                <button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-secondary", theme === "system" && "bg-primary/10 text-primary")}><Monitor className="mr-2 inline h-4 w-4" />تلقائي</button>
+              </div>}
+            </div>
+            <button type="button" onClick={logout} className="rounded-lg px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10"><LogOut className="mr-1 inline h-4 w-4" />تسجيل خروج</button>
+            <Link to="/manager/employees" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary"><Users className="mr-1 inline h-4 w-4" />الموظفون</Link>
+          </div>
+        </div>
+      )}
+
+      <header className="mx-auto max-w-7xl border-b border-border/40 px-4 pb-5 pt-7 sm:px-6 lg:px-10">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">HADIR · {currentRole.toUpperCase()}</div>
+            <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>
+            {subtitle && <div className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{subtitle}</div>}
+          </div>
+          {actions}
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">{children}</main>
+
+      {showNotifications && (
+        <div className="fixed inset-0 z-[80] bg-black/40 p-3 sm:p-5" onClick={() => setShowNotifications(false)}>
+          <div className="absolute left-3 top-3 w-[24rem] max-w-[calc(100%-1.5rem)] max-h-[82vh] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:left-5 sm:top-5" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-border/60 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div><div className="font-bold">الإشعارات</div><div className="mt-1 text-[11px] text-muted-foreground">يتم الاحتفاظ بالإشعارات لمدة شهر واحد.</div></div>
+                <button type="button" onClick={() => setShowNotifications(false)} className="rounded-lg px-2 py-1 hover:bg-secondary" aria-label="إغلاق"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button type="button" disabled={unreadCount === 0} onClick={() => { markAllAsRead(currentUserId); setNotifications(p => p.map(x => x.userId === currentUserId ? { ...x, read: true } : x)); }} className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold disabled:opacity-40"><CheckCheck className="h-4 w-4" />تحديد الكل كمقروء</button>
+                <button type="button" disabled={notifications.length === 0} onClick={() => { clearNotifications(currentUserId); setNotifications([]); }} className="flex items-center gap-1 rounded-lg border border-destructive/30 text-destructive px-3 py-2 text-xs font-semibold disabled:opacity-40"><Trash2 className="h-4 w-4" />حذف الكل</button>
+              </div>
+            </div>
+            {notifications.length === 0 ? <div className="p-6 text-center text-sm text-muted-foreground">لا توجد إشعارات.</div> : <div className="max-h-[58vh] space-y-1 overflow-y-auto p-2">{notifications.map(n => <div key={n.id} className={cn("flex gap-1 rounded-xl", !n.read && "bg-primary/5")}><button onClick={() => { markNotificationAsRead(n.id); setNotifications(p => p.map(x => x.id === n.id ? { ...x, read: true } : x)); setShowNotifications(false); const route = notificationRoute(n); if (route) nav(route); }} className="min-w-0 flex-1 rounded-lg p-3 text-right text-sm hover:bg-secondary"><div className="flex items-center gap-2"><span className={cn("h-2 w-2 shrink-0 rounded-full", n.read ? "bg-muted" : "bg-primary")} /><div className="truncate font-bold">{notificationTitle(n)}</div></div><div className="mt-1 text-xs text-muted-foreground">{n.body}</div><div className="mt-1 text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleString("ar-SA")}</div></button><button type="button" title="حذف الإشعار" aria-label="حذف الإشعار" onClick={() => { removeNotification(n.id); setNotifications(p => p.filter(x => x.id !== n.id)); }} className="mt-2 self-start rounded-lg px-2 py-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button></div>)}</div>}
+          </div>
+        </div>
+      )}
+
+      {showDiagnostics && (
+        <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/50 p-4" onClick={() => setShowDiagnostics(false)}>
+          <div dir="rtl" className="mt-8 w-full max-w-3xl rounded-2xl border border-primary/30 bg-card p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between gap-3"><div><div className="text-xs font-bold mono text-primary">DIAGNOSTICS · OWNER ONLY</div><h2 className="mt-1 text-xl font-extrabold">سجل أخطاء النظام</h2></div><button type="button" className="btn-secondary" onClick={() => setShowDiagnostics(false)}>إغلاق</button></div>
+            <div className="mb-4 flex gap-2"><span className="rounded-lg border px-2 py-1 text-xs">الأخطاء: {diagnostics.filter(x => x.level === "error").length}</span><span className="rounded-lg border px-2 py-1 text-xs">الإجمالي: {diagnostics.length}</span><button type="button" className="btn-secondary mr-auto text-xs" onClick={() => { clearDiagnostics(); setDiagnostics([]); }}>مسح السجل</button></div>
+            {diagnostics.length === 0 ? <div className="rounded-xl border p-5 text-sm text-muted-foreground">لا توجد أخطاء مسجلة حاليًا.</div> : <div className="max-h-[65vh] space-y-2 overflow-auto">{diagnostics.map(d => <details key={d.id} className="rounded-xl border bg-secondary/20 p-3"><summary className="cursor-pointer text-sm"><b className="mono">{d.code}</b> · {new Date(d.timestamp).toLocaleString("ar-SA")} · {d.message}</summary><pre dir="ltr" className="mt-3 overflow-auto whitespace-pre-wrap break-words text-[11px] mono">{JSON.stringify({ level: d.level, code: d.code, timestamp: d.timestamp, message: d.message, stack: d.stack, context: d.context }, null, 2)}</pre></details>)}</div>}
+          </div>
+        </div>
+      )}
     </div>
-    {showNotifications && <div className="fixed inset-0 z-50 bg-black/30" onClick={() => setShowNotifications(false)}><div className="absolute left-4 top-4 w-[24rem] max-w-[calc(100%-2rem)] max-h-[80vh] overflow-hidden bg-card border border-border rounded-2xl shadow-xl" onClick={e => e.stopPropagation()}><div className="p-4 border-b border-border/60"><div className="flex items-center justify-between gap-2"><div><div className="font-bold">الإشعارات</div><div className="text-[11px] text-muted-foreground mt-1">يتم الاحتفاظ بالإشعارات لمدة شهر واحد.</div></div><button type="button" onClick={() => setShowNotifications(false)} className="rounded-lg px-2 py-1 hover:bg-secondary" aria-label="إغلاق"><X className="h-4 w-4" /></button></div><div className="flex gap-2 mt-3"><button type="button" disabled={unreadCount === 0} onClick={() => { markAllAsRead(currentUserId); setNotifications(p => p.map(x => x.userId === currentUserId ? { ...x, read: true } : x)); }} className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold disabled:opacity-40"><CheckCheck className="h-4 w-4" />تحديد الكل كمقروء</button><button type="button" disabled={notifications.length === 0} onClick={() => { clearNotifications(currentUserId); setNotifications([]); }} className="flex items-center gap-1 rounded-lg border border-destructive/30 text-destructive px-3 py-2 text-xs font-semibold disabled:opacity-40"><Trash2 className="h-4 w-4" />حذف الكل</button></div></div>{notifications.length === 0 ? <div className="p-6 text-sm text-muted-foreground text-center">لا توجد إشعارات.</div> : <div className="p-2 max-h-[58vh] overflow-y-auto space-y-1">{notifications.map(n => <div key={n.id} className={cn("flex gap-1 rounded-xl transition", !n.read && "bg-primary/5")}><button onClick={() => { markNotificationAsRead(n.id); setNotifications(p => p.map(x => x.id === n.id ? { ...x, read: true } : x)); setShowNotifications(false); const route = notificationRoute(n); if (route) nav(route); }} className="min-w-0 flex-1 text-right p-3 rounded-lg hover:bg-secondary text-sm"><div className="flex items-center gap-2"><span className={cn("h-2 w-2 rounded-full shrink-0", n.read ? "bg-muted" : "bg-primary")} /><div className="font-bold truncate">{notificationTitle(n)}</div></div><div className="text-xs text-muted-foreground mt-1">{n.body}</div><div className="text-[10px] text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString("ar-SA")}</div></button><button type="button" title="حذف الإشعار" aria-label="حذف الإشعار" onClick={() => { removeNotification(n.id); setNotifications(p => p.filter(x => x.id !== n.id)); }} className="self-start mt-2 rounded-lg px-2 py-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button></div>)}</div>}</div></div>}
-    {showDiagnostics && <div className="fixed inset-0 z-[60] bg-black/50 p-4 flex items-start justify-center overflow-auto" onClick={() => setShowDiagnostics(false)}><div dir="rtl" className="w-full max-w-3xl mt-8 bg-card border border-primary/30 rounded-2xl shadow-2xl p-5" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between gap-3 mb-4"><div><div className="text-xs mono text-primary font-bold">DIAGNOSTICS · OWNER ONLY</div><h2 className="text-xl font-extrabold mt-1">سجل أخطاء النظام</h2></div><button type="button" className="btn-secondary" onClick={() => setShowDiagnostics(false)}>إغلاق</button></div><div className="flex gap-2 mb-4"><span className="text-xs rounded-lg border px-2 py-1">الأخطاء: {diagnostics.filter(x => x.level === "error").length}</span><span className="text-xs rounded-lg border px-2 py-1">الإجمالي: {diagnostics.length}</span><button type="button" className="btn-secondary mr-auto text-xs" onClick={() => { clearDiagnostics(); setDiagnostics([]); }}>مسح السجل</button></div>{diagnostics.length === 0 ? <div className="p-5 rounded-xl border text-sm text-muted-foreground">لا توجد أخطاء مسجلة حاليًا.</div> : <div className="space-y-2 max-h-[65vh] overflow-auto">{diagnostics.map(d => <details key={d.id} className="border rounded-xl p-3 bg-secondary/20"><summary className="cursor-pointer text-sm"><b className="mono">{d.code}</b> · {new Date(d.timestamp).toLocaleString("ar-SA")} · {d.message}</summary><pre dir="ltr" className="mt-3 whitespace-pre-wrap break-words text-[11px] mono overflow-auto">{JSON.stringify({ level: d.level, code: d.code, timestamp: d.timestamp, message: d.message, stack: d.stack, context: d.context }, null, 2)}</pre></details>)}</div>}</div></div>}
-  </div>;
+  );
 }
