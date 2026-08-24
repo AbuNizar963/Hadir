@@ -13,7 +13,7 @@ const NAV = [
   { to: "/employee/profile", label: "الملف الشخصي", icon: UserRound },
 ];
 
-export default function EmployeeLayout({ children }: { children: ReactNode }) {
+export default function EmployeeLayout({ title = "لوحة الموظف", subtitle, actions, children }: { title?: string; subtitle?: string; actions?: ReactNode; children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const session = currentSession();
 
@@ -98,7 +98,18 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-          <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">{children}</main>
+          <header className="mx-auto max-w-7xl border-b border-border/40 px-4 pb-5 pt-7 sm:px-6 lg:px-10">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">HADIR · EMPLOYEE</div>
+            <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>
+            {subtitle && <div className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{subtitle}</div>}
+          </div>
+          {actions}
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">{children}</main>
     </div>
   );
 }
