@@ -8,48 +8,8 @@
   }
 }
 
-/* Employee / shared utility controls: icon first, label directly underneath. */
-button[aria-label="المساعد الذكي"],
-button[aria-label="الطقس"],
-button[aria-label="مواقيت الصلاة والقبلة"],
-button[aria-label="الإشعارات"] {
-  height: 3.75rem !important;
-  width: 4.5rem !important;
-  min-width: 4.5rem !important;
-  display: inline-flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 1px !important;
-  padding: 3px 4px !important;
-  line-height: 1 !important;
-  position: relative !important;
-}
-
-button[aria-label="المساعد الذكي"]::after,
-button[aria-label="الطقس"]::after,
-button[aria-label="مواقيت الصلاة والقبلة"]::after,
-button[aria-label="الإشعارات"]::after {
-  display: block;
-  font-size: 9px;
-  line-height: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  margin-top: 1px;
-  color: hsl(var(--muted-foreground));
-}
-button[aria-label="المساعد الذكي"]::after { content: "المساعد"; }
-button[aria-label="الطقس"]::after { content: "الطقس"; }
-button[aria-label="مواقيت الصلاة والقبلة"]::after { content: "الصلاة والقبلة"; }
-button[aria-label="الإشعارات"]::after { content: "الإشعارات"; }
-
-@media (max-width: 639px) {
-  button[aria-label="المساعد الذكي"],
-  button[aria-label="الطقس"],
-  button[aria-label="مواقيت الصلاة والقبلة"],
-  button[aria-label="الإشعارات"] {
-    height: 3.5rem !important;
-    width: 4.1rem !important;
-    min-width: 4.1rem !important;
-  }
-}
+/*
+ * Labels are rendered by the React navigation components themselves.
+ * Do not size utility buttons or inject labels with ::after here.
+ * This stylesheet must not compete with Header/ManagerLayout flex sizing.
+ */
