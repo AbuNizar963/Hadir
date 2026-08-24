@@ -1,0 +1,183 @@
+/* HADIR · Settings redesign
+   Scoped to the Settings route so existing application pages are untouched. */
+body:has(a[href="/manager/settings"][aria-current="page"]) main {
+  background:
+    radial-gradient(circle at 92% 0%, hsl(var(--primary) / .07), transparent 28rem),
+    radial-gradient(circle at 5% 18%, hsl(var(--primary) / .035), transparent 24rem);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) main > div {
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / .72);
+  background: linear-gradient(145deg, hsl(var(--card) / .98), hsl(var(--card) / .84));
+  box-shadow: 0 12px 34px hsl(var(--foreground) / .055), inset 0 1px 0 hsl(var(--background) / .72);
+  border-radius: 20px;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card:hover {
+  border-color: hsl(var(--primary) / .28);
+  box-shadow: 0 16px 42px hsl(var(--foreground) / .075), 0 0 0 1px hsl(var(--primary) / .035);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card > .text-xs.mono {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  margin-bottom: 18px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid hsl(var(--border) / .62);
+  font-size: 11px;
+  letter-spacing: .09em;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card > .text-xs.mono::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  box-shadow: 0 0 0 5px hsl(var(--primary) / .10);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .input {
+  min-height: 46px;
+  border-radius: 12px;
+  border: 1px solid hsl(var(--border) / .9);
+  background: hsl(var(--background) / .72);
+  padding-inline: 13px;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .input:hover {
+  border-color: hsl(var(--primary) / .38);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .input:focus {
+  outline: none;
+  border-color: hsl(var(--primary) / .72);
+  background: hsl(var(--background) / .95);
+  box-shadow: 0 0 0 4px hsl(var(--primary) / .10);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) label.block.text-xs.text-muted-foreground {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  color: hsl(var(--foreground) / .72);
+  font-weight: 650;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .btn-primary,
+body:has(a[href="/manager/settings"][aria-current="page"]) .btn-secondary,
+body:has(a[href="/manager/settings"][aria-current="page"]) .btn-danger {
+  min-height: 44px;
+  border-radius: 12px;
+  font-weight: 750;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .btn-primary:hover,
+body:has(a[href="/manager/settings"][aria-current="page"]) .btn-secondary:hover,
+body:has(a[href="/manager/settings"][aria-current="page"]) .btn-danger:hover {
+  transform: translateY(-1px);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .btn-primary {
+  box-shadow: 0 8px 22px hsl(var(--primary) / .18);
+}
+
+/* Account-management panel gets the same visual language even though it is a separate component. */
+body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card:first-child {
+  border-color: hsl(var(--primary) / .22);
+  background: linear-gradient(135deg, hsl(var(--primary) / .055), hsl(var(--card) / .96) 48%);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card:first-child::after {
+  content: "إدارة النظام · صلاحيات وحسابات";
+  position: absolute;
+  inset-inline-start: 20px;
+  top: 18px;
+  padding: 6px 10px;
+  border: 1px solid hsl(var(--primary) / .18);
+  border-radius: 999px;
+  background: hsl(var(--primary) / .07);
+  color: hsl(var(--primary));
+  font-size: 10px;
+  font-weight: 800;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(2),
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(3),
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(4),
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(5) {
+  scroll-margin-top: 160px;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(3) {
+  background: linear-gradient(145deg, hsl(var(--primary) / .045), hsl(var(--card) / .96));
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(5) {
+  background: linear-gradient(145deg, hsl(var(--card) / .98), hsl(var(--primary) / .025));
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) section.hud-card:nth-of-type(5) > .grid > div:last-child {
+  border: 1px solid hsl(var(--border) / .7);
+  border-radius: 18px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0,0,0,.07);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) details {
+  border-color: hsl(var(--border) / .75);
+  border-radius: 14px;
+  transition: border-color .18s ease, background .18s ease;
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) details:hover {
+  border-color: hsl(var(--primary) / .3);
+  background: hsl(var(--primary) / .025);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .border-dashed {
+  min-height: 58px;
+  border-width: 1.5px;
+  background: hsl(var(--background) / .35);
+}
+
+body:has(a[href="/manager/settings"][aria-current="page"]) .text-destructive {
+  font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  body:has(a[href="/manager/settings"][aria-current="page"]) main > div {
+    padding-inline: 2px;
+  }
+
+  body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card {
+    border-radius: 16px;
+    box-shadow: 0 8px 24px hsl(var(--foreground) / .045);
+  }
+
+  body:has(a[href="/manager/settings"][aria-current="page"]) .hud-card:first-child::after {
+    display: none;
+  }
+
+  body:has(a[href="/manager/settings"][aria-current="page"]) .grid.grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+
+  body:has(a[href="/manager/settings"][aria-current="page"]) .grid.md\:grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+}
