@@ -1,15 +1,101 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, BrainCircuit, CloudSun, Landmark, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getNotifications, markAllAsRead, markAsRead, removeNotification, clearNotifications, NOTIFICATIONS_CHANGED_EVENT, type AppNotification } from "@/lib/notifications";
+
 interface Props { userId?: string; onlyBell?: boolean; }
-const API_URL=String(import.meta.env.VITE_API_URL||"https://hadir-api.abunizar963.workers.dev").replace(/\/$/,"");
-function token(){return localStorage.getItem("hadir.api.token.admin")||localStorage.getItem("hadir.api.token.employee")||"";}
-async function backendNotifications():Promise<AppNotification[]>{const t=token();if(!t)return[];try{const r=await fetch(`${API_URL}/api/notifications`,{headers:{authorization:`Bearer ${t}`},cache:"no-store"});if(!r.ok)return[];const rows=await r.json() as any[];return Array.isArray(rows)?rows.map(n=>({id:String(n.id),userId:String(n.recipientId||""),title:String(n.title||"إشعار"),body:String(n.body||""),type:(n.severity==="danger"?"error":n.severity==="warning"?"warning":n.severity==="success"?"success":"info") as AppNotification["type"],read:Boolean(n.readAt),createdAt:String(n.createdAt)})):[];}catch{return[];}}
-export default function NotificationBell({userId,onlyBell=false}:Props){const[open,setOpen]=useState(false);const[items,setItems]=useState<AppNotification[]>([]);const wrapRef=useRef<HTMLDivElement>(null);const[menuPosition,setMenuPosition]=useState<{top:number;right:number}|null>(null);const navigate=useNavigate();const refresh=useMemo(()=>async()=>{const remote=await backendNotifications();setItems(remote.length||token()?remote:(userId?getNotifications(userId):[]));},[userId]);useEffect(()=>{void refresh();const sync=()=>void refresh();window.addEventListener(NOTIFICATIONS_CHANGED_EVENT,sync);window.addEventListener("storage",sync);const timer=window.setInterval(sync,10000);return()=>{window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT,sync);window.removeEventListener("storage",sync);window.clearInterval(timer);};},[refresh]);useEffect(()=>{if(!open)return;const updatePosition=()=>{const el=wrapRef.current;if(!el)return;const rect=el.getBoundingClientRect();setMenuPosition({top:rect.bottom+8,right:Math.max(8,window.innerWidth-rect.right)});};updatePosition();window.addEventListener("resize",updatePosition);window.addEventListener("scroll",updatePosition,true);const f=(e:MouseEvent)=>{if(wrapRef.current&&!wrapRef.current.contains(e.target as Node)){const target=e.target as HTMLElement;const panel=document.getElementById("hadir-notification-panel");if(!panel||!panel.contains(target))setOpen(false)}};document.addEventListener("mousedown",f);return()=>{window.removeEventListener("resize",updatePosition);window.removeEventListener("scroll",updatePosition,true);document.removeEventListener("mousedown",f)}},[open]);const unreadCount=useMemo(()=>items.filter(n=>!n.read).length,[items]);const handle=async(n:AppNotification)=>{const t=token();if(t)await fetch(`${API_URL}/api/notifications/read`,{method:"POST",headers:{authorization:`Bearer ${t}`,"content-type":"application/json"},body:JSON.stringify({id:n.id})}).catch(()=>undefined);markAsRead(n.id);void refresh();setOpen(false);const route=notificationRoute(n);if(route)navigate(route)};if(!userId)return null;return <div className="flex items-center gap-2" dir="rtl">
- {onlyBell?null:<><ToolButton label="المساعد الذكي" onClick={()=>navigate("/ai")}><BrainCircuit className="h-5 w-5"/><span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse"/></ToolButton><ToolButton label="الطقس" onClick={()=>navigate("/weather")}><CloudSun className="h-5 w-5"/><span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse"/></ToolButton><ToolButton label="مواقيت الصلاة والقبلة" onClick={()=>navigate("/prayer")}><Landmark className="h-5 w-5"/><span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse"/></ToolButton></>}
- <div className="relative" ref={wrapRef}><button type="button" onClick={()=>setOpen(v=>!v)} className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="الإشعارات" aria-expanded={open}><Bell className="h-5 w-5"/>{unreadCount>0&&<span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold grid place-items-center mono">{unreadCount>99?"99+":unreadCount}</span>}</button>{open&&menuPosition&&<div id="hadir-notification-panel" style={{top:menuPosition.top,right:menuPosition.right}} className="fixed w-80 sm:w-96 max-h-[70vh] overflow-hidden rounded-2xl border border-border bg-background shadow-2xl z-[100] flex flex-col"><div className="flex items-center justify-between p-3 border-b border-border shrink-0"><div className="text-sm font-extrabold">الإشعارات</div><div className="flex items-center gap-2">{unreadCount>0&&<button type="button" onClick={async()=>{const t=token();if(t)await fetch(`${API_URL}/api/notifications/read`,{method:"POST",headers:{authorization:`Bearer ${t}`,"content-type":"application/json"},body:"{}"}).catch(()=>undefined);markAllAsRead(userId);void refresh();}} className="text-[11px] text-primary font-semibold">تعليم الكل كمقروء</button>}{items.length>0&&<button type="button" onClick={()=>{clearNotifications(userId);void refresh()}} className="text-[11px] text-destructive font-semibold">مسح المحلي</button>}</div></div><div className="overflow-y-auto flex-1">{items.length===0?<div className="p-6 text-center text-xs text-muted-foreground">لا توجد إشعارات حالياً.</div>:<ul className="divide-y divide-border">{items.map(n=><li key={n.id} onClick={()=>void handle(n)} className={`p-3 cursor-pointer transition hover:bg-secondary/50 ${!n.read?"bg-primary/5":""}`}><div className="flex items-start gap-2"><TypeDot type={n.type}/><div className="flex-1 min-w-0"><div className="flex items-start justify-between gap-2"><div className="text-sm font-bold truncate">{n.title}</div><button type="button" onClick={e=>{e.stopPropagation();removeNotification(n.id);void refresh()}} className="text-muted-foreground hover:text-destructive shrink-0" aria-label="حذف"><X className="h-4 w-4"/></button></div><div className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.body}</div><div className="text-[10px] text-muted-foreground mono mt-1">{formatWhen(n.createdAt)}</div></div></div></li>)}</ul>}</div></div>}</div></div>}
-function ToolButton({label,onClick,children}:{label:string;onClick:()=>void;children:React.ReactNode}){return <button type="button" onClick={onClick} className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-all hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label={label}>{children}</button>}
-function notificationRoute(n:AppNotification){const text=`${n.title} ${n.body}`.toLowerCase();if(text.includes("إعادة ربط")||text.includes("هاتف جديد"))return"/manager/employees";if(text.includes("طلب")||text.includes("إجازة")||text.includes("استئذان"))return"/manager/requests";if(n.type==="error")return"/manager/audit";if(text.includes("تقرير"))return"/manager/reports";if(text.includes("موظف"))return"/manager/employees";return"";}
-function TypeDot({type}:{type:AppNotification["type"]}){const color=type==="success"?"bg-primary":type==="warning"?"bg-[hsl(var(--warning))]":type==="error"?"bg-destructive":"bg-accent";return<span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${color}`} aria-hidden="true"/>;}
-function formatWhen(iso:string){const d=new Date(iso);const m=Math.floor((Date.now()-d.getTime())/60000);if(m<1)return"الآن";if(m<60)return`قبل ${m} دقيقة`;const h=Math.floor(m/60);if(h<24)return`قبل ${h} ساعة`;const day=Math.floor(h/24);if(day<7)return`قبل ${day} يوم`;return d.toLocaleDateString("ar-EG");}
+const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+function token() { return localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token.employee") || ""; }
+async function backendNotifications(): Promise<AppNotification[]> {
+  const t = token();
+  if (!t) return [];
+  try {
+    const r = await fetch(`${API_URL}/api/notifications`, { headers: { authorization: `Bearer ${t}` }, cache: "no-store" });
+    if (!r.ok) return [];
+    const rows = await r.json() as any[];
+    return Array.isArray(rows) ? rows.map(n => ({ id: String(n.id), userId: String(n.recipientId || ""), title: String(n.title || "إشعار"), body: String(n.body || ""), type: (n.severity === "danger" ? "error" : n.severity === "warning" ? "warning" : n.severity === "success" ? "success" : "info") as AppNotification["type"], read: Boolean(n.readAt), createdAt: String(n.createdAt) })) : [];
+  } catch { return []; }
+}
+
+export default function NotificationBell({ userId, onlyBell = false }: Props) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const navigate = useNavigate();
+  const refresh = useMemo(() => async () => {
+    const remote = await backendNotifications();
+    setItems(remote.length || token() ? remote : (userId ? getNotifications(userId) : []));
+  }, [userId]);
+
+  useEffect(() => {
+    void refresh();
+    const sync = () => void refresh();
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, sync);
+    window.addEventListener("storage", sync);
+    const timer = window.setInterval(sync, 10000);
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", sync);
+      window.clearInterval(timer);
+    };
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = previous; document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  const unreadCount = useMemo(() => items.filter(n => !n.read).length, [items]);
+  const handle = async (n: AppNotification) => {
+    const t = token();
+    if (t) await fetch(`${API_URL}/api/notifications/read`, { method: "POST", headers: { authorization: `Bearer ${t}`, "content-type": "application/json" }, body: JSON.stringify({ id: n.id }) }).catch(() => undefined);
+    markAsRead(n.id);
+    void refresh();
+    setOpen(false);
+    const route = notificationRoute(n);
+    if (route) navigate(route);
+  };
+
+  if (!userId) return null;
+  return <div className="flex items-center gap-2" dir="rtl">
+    {onlyBell ? null : <>
+      <ToolButton label="المساعد الذكي" onClick={() => navigate("/ai")}><BrainCircuit className="h-5 w-5" /><span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /></ToolButton>
+      <ToolButton label="الطقس" onClick={() => navigate("/weather")}><CloudSun className="h-5 w-5" /><span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /></ToolButton>
+      <ToolButton label="مواقيت الصلاة والقبلة" onClick={() => navigate("/prayer")}><Landmark className="h-5 w-5" /><span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /></ToolButton>
+    </>}
+
+    <button type="button" onClick={() => setOpen(true)} className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label="الإشعارات" aria-expanded={open}>
+      <Bell className="h-5 w-5" />
+      {unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold grid place-items-center mono">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+    </button>
+
+    {open && <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/55 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="الإشعارات" onMouseDown={e => { if (e.target === e.currentTarget) setOpen(false); }}>
+      <div className="flex w-full max-w-lg max-h-[min(78vh,680px)] flex-col overflow-hidden rounded-3xl border border-primary/25 bg-background shadow-2xl ring-1 ring-primary/10" dir="rtl">
+        <div className="flex shrink-0 items-center justify-between border-b border-border/70 bg-primary/[0.035] p-4 sm:p-5">
+          <div>
+            <div className="mono text-[10px] font-bold tracking-widest text-primary">HADIR · NOTIFICATIONS</div>
+            <h2 className="mt-1 text-lg font-black">الإشعارات</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && <button type="button" onClick={async () => { const t = token(); if (t) await fetch(`${API_URL}/api/notifications/read`, { method: "POST", headers: { authorization: `Bearer ${t}`, "content-type": "application/json" }, body: "{}" }).catch(() => undefined); markAllAsRead(userId); void refresh(); }} className="rounded-lg px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10">تعليم الكل كمقروء</button>}
+            {items.length > 0 && <button type="button" onClick={() => { clearNotifications(userId); void refresh(); }} className="rounded-lg px-2 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/10">مسح المحلي</button>}
+            <button type="button" onClick={() => setOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl border border-border/70 bg-background hover:bg-secondary" aria-label="إغلاق"><X className="h-5 w-5" /></button>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {items.length === 0 ? <div className="p-12 text-center text-xs text-muted-foreground">لا توجد إشعارات حالياً.</div> : <ul className="divide-y divide-border">{items.map(n => <li key={n.id} onClick={() => void handle(n)} className={`cursor-pointer p-4 transition hover:bg-secondary/50 ${!n.read ? "bg-primary/5" : ""}`}>
+            <div className="flex items-start gap-3"><TypeDot type={n.type} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div className="truncate text-sm font-bold">{n.title}</div><button type="button" onClick={e => { e.stopPropagation(); removeNotification(n.id); void refresh(); }} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="حذف"><X className="h-4 w-4" /></button></div><div className="mt-1 text-xs leading-relaxed text-muted-foreground">{n.body}</div><div className="mono mt-1 text-[10px] text-muted-foreground">{formatWhen(n.createdAt)}</div></div></div>
+          </li>)}</ul>}
+        </div>
+      </div>
+    </div>}
+  </div>;
+}
+
+function ToolButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) { return <button type="button" onClick={onClick} className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-all hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/40" aria-label={label}>{children}</button>; }
+function notificationRoute(n: AppNotification) { const text = `${n.title} ${n.body}`.toLowerCase(); if (text.includes("إعادة ربط") || text.includes("هاتف جديد")) return "/manager/employees"; if (text.includes("طلب") || text.includes("إجازة") || text.includes("استئذان")) return "/manager/requests"; if (n.type === "error") return "/manager/audit"; if (text.includes("تقرير")) return "/manager/reports"; if (text.includes("موظف")) return "/manager/employees"; return ""; }
+function TypeDot({ type }: { type: AppNotification["type"] }) { const color = type === "success" ? "bg-primary" : type === "warning" ? "bg-[hsl(var(--warning))]" : type === "error" ? "bg-destructive" : "bg-accent"; return <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${color}`} aria-hidden="true" />; }
+function formatWhen(iso: string) { const d = new Date(iso); const m = Math.floor((Date.now() - d.getTime()) / 60000); if (m < 1) return "الآن"; if (m < 60) return `قبل ${m} دقيقة`; const h = Math.floor(m / 60); if (h < 24) return `قبل ${h} ساعة`; const day = Math.floor(h / 24); if (day < 7) return `قبل ${day} يوم`; return d.toLocaleDateString("ar-EG"); }
