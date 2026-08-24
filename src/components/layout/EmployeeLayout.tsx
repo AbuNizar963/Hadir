@@ -98,11 +98,7 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <header className="mx-auto max-w-7xl border-b border-border/40 px-4 pb-5 pt-7 sm:px-6 lg:px-10">
-        <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">HADIR · EMPLOYEE</div>
-      </header>
-
-      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">{children}</main>
+          <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">{children}</main>
     </div>
   );
 }
