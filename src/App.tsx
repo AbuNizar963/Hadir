@@ -3,7 +3,7 @@ import Landing from "@/pages/Landing";
 import EmployeeLogin from "@/features/auth/employee/EmployeeLogin";
 import EmployeeHome from "@/pages/EmployeeHome";
 import EmployeeHistory from "@/pages/EmployeeHistory";
-import EmployeeScan from "@/pages/EmployeeScan";
+import EmployeeScanAutoFlow from "@/pages/EmployeeScanAutoFlow";
 import EmployeeProfile from "@/pages/EmployeeProfile";
 import EmployeeCenter from "@/pages/EmployeeCenter";
 import EmployeePremium from "@/pages/EmployeePremium";
@@ -41,7 +41,7 @@ export default function App() {
       <Route path="/employee/premium" element={<EmployeeShell><EmployeePremium /></EmployeeShell>} />
       <Route path="/employee/profile" element={<EmployeeShell><EmployeeProfile /></EmployeeShell>} />
       <Route path="/employee/history" element={<EmployeeShell><EmployeeHistory /></EmployeeShell>} />
-      <Route path="/employee/scan/:type" element={<EmployeeShell><EmployeeScan /></EmployeeShell>} />
+      <Route path="/employee/scan/:type" element={<EmployeeShell><EmployeeScanAutoFlow /></EmployeeShell>} />
 
       <Route path="/manager/login" element={<ManagerLogin />} />
       <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
