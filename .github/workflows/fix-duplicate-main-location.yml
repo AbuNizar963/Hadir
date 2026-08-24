@@ -1,0 +1,35 @@
+name: Fix duplicate main office location
+on:
+  push:
+    branches: [main]
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, 'fix: deduplicate main office location option') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deduplicate main office option
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/ManagerEmployees.tsx')
+          s = p.read_text(encoding='utf-8')
+          old = 'const rotationDays=Array.from({length:31},(_,i)=>i+1);'
+          new = old + '\nfunction uniqueLocations(items:Location[]):Location[]{const seen=new Set<string>();return items.filter((item)=>{const key=String(item.id||item.name||\"\").trim().toLowerCase();if(key===\"main\"||String(item.name||\"\").trim()===\"المقر الرئيسي\"){const mainKey=\"__main_office__\";if(seen.has(mainKey))return false;seen.add(mainKey);return true;}if(seen.has(key))return false;seen.add(key);return true;});}'
+          if old not in s:
+              raise SystemExit('anchor not found')
+          s = s.replace(old, new, 1)
+          old2 = 'setLocations(prev=>JSON.stringify(prev)===JSON.stringify(nextLocations)?prev:nextLocations)'
+          new2 = 'setLocations(prev=>JSON.stringify(prev)===JSON.stringify(uniqueLocations(nextLocations))?prev:uniqueLocations(nextLocations))'
+          if old2 not in s:
+              raise SystemExit('locations setter anchor not found')
+          s = s.replace(old2, new2, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerEmployees.tsx
+          git commit -m "fix: deduplicate main office location option"
+          git push
