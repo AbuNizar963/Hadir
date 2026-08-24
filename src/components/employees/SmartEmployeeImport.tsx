@@ -20,18 +20,17 @@ const aliases={name:["name","fullname","full_name","employee_name","employeename
 function scoreHeader(value:unknown,words:string[]){const n=normalize(value);return words.some(w=>normalize(w)===n)?100:words.some(w=>n.includes(normalize(w)))?60:0;}
 function detectMapping(rows:Row[]):Mapping{if(!rows.length)throw new Error("الملف لا يحتوي على بيانات.");const keys=Object.keys(rows[0]);const ns=keys.map(k=>[scoreHeader(k,aliases.name),k] as const).sort((a,b)=>b[0]-a[0]);const js=keys.map(k=>[scoreHeader(k,aliases.job),k] as const).sort((a,b)=>b[0]-a[0]);let name=ns[0]?.[0]?ns[0][1]:undefined;let jobNumber=js[0]?.[0]?js[0][1]:undefined;const sample=rows.slice(0,Math.min(100,rows.length));const candidates=keys.map(k=>{const vals=sample.map(r=>text(r[k])).filter(Boolean);const unique=new Set(vals).size;const numeric=vals.filter(isLikelyJob).length/Math.max(vals.length,1);const names=vals.filter(isLikelyName).length/Math.max(vals.length,1);return{k,numeric,names,uniqueRatio:unique/Math.max(vals.length,1),avg:vals.reduce((n,v)=>n+v.length,0)/Math.max(vals.length,1)};});if(!name)name=[...candidates].sort((a,b)=>(b.names*70+b.uniqueRatio*10+b.avg)-(a.names*70+a.uniqueRatio*10+a.avg))[0]?.k;if(!jobNumber)jobNumber=[...candidates].filter(c=>c.k!==name).sort((a,b)=>(b.numeric*80+b.uniqueRatio*20)-(a.numeric*80+a.uniqueRatio*20))[0]?.k;if(!name||!jobNumber||name===jobNumber)throw new Error("تعذر تحديد عمود الاسم والرقم الوظيفي تلقائيًا.");return{name,jobNumber};}
 function exportEmployees(rows:Employee[]){
- const headers=["م","الاسم","الرقم الوظيفي","الحالة","الصلاحية","نوع الدوام","بداية الدوام","نهاية الدوام","سماح التأخير (دقيقة)","أيام الدوام","أيام العمل بالتناوب","أيام الراحة بالتناوب","تاريخ أول مناوبة","موقع العمل","التخصصات","نوع الهاتف / الجهاز","حالة الجهاز"] as ExcelCell[];
- const body:ExcelCell[][]=rows.map((e,index)=>[index+1,e.name,e.jobNumber,e.status==="active"?"فعال":"موقوف",e.role==="manager"?"مدير":e.role==="supervisor"?"مشرف":"موظف",e.scheduleType==="ROTATION"?"تناوبي":"إداري",e.workStartTime??"",e.workEndTime??"",e.gracePeriodMinutes??0,(e.workDays??[]).join(", "),e.rotationDaysOn??"",e.rotationDaysOff??"",e.rotationStartDate??"",e.locationId??"",(e.specialties??[]).join(", "),e.deviceLabel??"غير مرتبط",e.deviceId?"موثق":"غير موثق"]);
- const summary:ExcelCell[][]=[["ملخص الموظفين",""],["عدد الموظفين",rows.length],["فعال",rows.filter(e=>e.status==="active").length],["موقوف",rows.filter(e=>e.status!=="active").length],["إداري",rows.filter(e=>e.scheduleType!=="ROTATION").length],["تناوبي",rows.filter(e=>e.scheduleType==="ROTATION").length],["أجهزة موثقة",rows.filter(e=>Boolean(e.deviceId)).length],["تاريخ التصدير",new Date().toLocaleString("ar-SA")]];
+ const headers=["م","الرقم الذاتي","الاسم","الرقم الوظيفي","نوع الدوام","الحالة","وقت بداية الدوام","وقت نهاية الدوام","التخصصات"] as ExcelCell[];
+ const body:ExcelCell[][]=rows.map((e,index)=>[index+1,e.id,e.name,e.jobNumber,e.scheduleType==="ROTATION"?"تناوبي":"إداري",e.status==="active"?"فعال":"موقوف",e.workStartTime??e.rotationStartTime??"",e.workEndTime??e.rotationEndTime??"",(e.specialties??[]).join(", ")||"—"]);
  const wb=ExportXLSX.utils.book_new();
  const ws=ExportXLSX.utils.aoa_to_sheet([[`بيانات الموظفين - ${new Date().toLocaleDateString("ar-SA")}`],[],headers,...body]);
- const wsSummary=ExportXLSX.utils.aoa_to_sheet(summary);
  ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:headers.length-1}}];
  ws["!autofilter"]={ref:`A3:${ExportXLSX.utils.encode_col(headers.length-1)}${Math.max(3,body.length+3)}`};
- styleExcelTable(ws,2,body.length+2,0,headers.length-1,2,0); styleReportWorkbook(ws,undefined,3,body.length+2); autoFitColumns(ws,[headers,...body],10,42);
- styleExcelTable(wsSummary,0,summary.length-1,0,1,0); autoFitColumns(wsSummary,summary,14,42);
- setExcelRtl(wb,wsSummary); setExcelRtl(wb,ws);
- ExportXLSX.utils.book_append_sheet(wb,wsSummary,"ملخص"); ExportXLSX.utils.book_append_sheet(wb,ws,"الموظفون");
+ styleExcelTable(ws,2,body.length+2,0,headers.length-1,2,0);
+ styleReportWorkbook(ws,undefined,3,body.length+2);
+ autoFitColumns(ws,[headers,...body],10,42);
+ setExcelRtl(wb,ws);
+ ExportXLSX.utils.book_append_sheet(wb,ws,"الموظفون");
  ExportXLSX.writeFile(wb,`Hadir-Employees-${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
