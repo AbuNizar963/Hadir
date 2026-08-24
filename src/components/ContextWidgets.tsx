@@ -73,8 +73,7 @@ export default function ContextWidgets() {
   return (
     <>
       <style>{`
-        /* Employee menu is owned here on /employee only.
-           Page-local copies are hidden so icons never stack. */
+        /* Employee menu is owned here on /employee only. Page-local copies are hidden so icons never stack. */
         body[data-hadir-home="true"] header.max-w-xl button[aria-label="فتح قائمة الموظف"],
         body[data-hadir-scan="true"] header.max-w-xl button[aria-label="فتح قائمة الموظف"] {
           display: none !important;
