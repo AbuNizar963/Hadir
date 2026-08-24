@@ -4,6 +4,7 @@ import App from "./App";
 import "./index.css";
 import "./live-ui.css";
 import "./label-visibility.css";
+import "./settings-page.css";
 import { seedIfEmpty } from "@/lib/storage";
 import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnostics";
 import { startRealtimeSync } from "@/lib/realtime";
