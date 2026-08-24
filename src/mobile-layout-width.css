@@ -1,5 +1,5 @@
 /* Shared mobile canvas for OWNER and EMPLOYEE.
-   Keep only a small safety gutter while allowing cards/widgets to use the full viewport. */
+   Use a minimal 4px safety gutter while allowing cards/widgets to use the full viewport. */
 @media (max-width: 639px) {
   html, body, #root {
     width: 100%;
@@ -10,18 +10,33 @@
   header.mx-auto.max-w-7xl,
   main.mx-auto.max-w-7xl,
   main.max-w-xl.mx-auto,
-  .mx-auto.max-w-7xl {
+  .mx-auto.max-w-7xl,
+  .hadir-shell-frame {
     width: 100%;
     max-width: 100%;
     margin-left: 0;
     margin-right: 0;
+    box-sizing: border-box;
   }
 
   header.mx-auto.max-w-7xl,
   main.mx-auto.max-w-7xl,
-  main.max-w-xl.mx-auto {
-    padding-left: 6px;
-    padding-right: 6px;
+  main.max-w-xl.mx-auto,
+  .hadir-shell-frame {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  /* Override larger shell gutters introduced by the shared desktop layout. */
+  .min-h-screen.bg-background.text-foreground[dir="rtl"] > header,
+  .min-h-screen.bg-background.text-foreground[dir="rtl"] > main {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 4px;
+    padding-right: 4px;
+    box-sizing: border-box;
   }
 
   /* Employee home / other main cards: never inherit a wider fixed gutter. */
@@ -29,8 +44,11 @@
   main.max-w-xl.mx-auto.px-5,
   main.max-w-xl.mx-auto.px-4.sm\:px-5,
   main.max-w-xl.mx-auto.px-5.sm\:px-6 {
-    padding-left: 6px;
-    padding-right: 6px;
+    width: 100%;
+    max-width: 100%;
+    padding-left: 4px;
+    padding-right: 4px;
+    box-sizing: border-box;
   }
 
   /* The shared content canvas is allowed to fill all available width. */
@@ -40,12 +58,13 @@
   main > section > .grid {
     width: 100%;
     min-width: 0;
+    max-width: 100%;
   }
 
-  /* Green bordered cards and HUD/data cards fill their parent without a
-     second horizontal gutter. */
+  /* Green bordered cards, HUD/data cards and tables fill their parent. */
   main .hud-card,
-  main .data-card {
+  main .data-card,
+  main table {
     width: 100%;
     max-width: 100%;
     min-width: 0;
