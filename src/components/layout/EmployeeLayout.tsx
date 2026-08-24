@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Bot, CloudSun, Compass, LayoutDashboard, Menu, UserRound, X, Clock3, CreditCard, Building2, LogOut } from "lucide-react";
 import Brand from "@/components/Brand";
+import NotificationBell from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 import { currentSession } from "@/lib/auth";
 import { backendLogout } from "@/lib/backend";
@@ -56,6 +57,7 @@ export default function EmployeeLayout({ title = "لوحة الموظف", subtit
               {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
               <span className="mt-0.5 text-[11px] font-semibold leading-none">القائمة</span>
             </button>
+            <NotificationBell userId={session?.employeeId ? String(session.employeeId) : undefined} />
             <Link to="/weather" title="الطقس" aria-label="الطقس" className={utilityClass}><CloudSun className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">الطقس</span></Link>
             <Link to="/prayer" title="القبلة" aria-label="القبلة" className={utilityClass}><Compass className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">القبلة</span></Link>
             <Link to="/ai" title="المساعد" aria-label="المساعد" className={utilityClass}><Bot className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">المساعد</span></Link>
