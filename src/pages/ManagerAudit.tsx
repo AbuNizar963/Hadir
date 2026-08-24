@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { XLSX, autoFitColumns, styleExcelTable, type ExcelCell } from "@/lib/excelExport";
+import { XLSX, autoFitColumns, styleExcelTable, styleReportWorkbook, setExcelRtl, type ExcelCell } from "@/lib/excelExport";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getAudit } from "@/lib/storage";
 import { formatDateTime } from "@/lib/utils";
@@ -14,7 +14,7 @@ function safeDate(value: unknown): string { try{return value?formatDateTime(Stri
 function exportExcel(rows: AuditEntry[], scope: "filtered"|"all") {
   const headers=["م","الوقت","الموظف","الرقم الوظيفي","العملية","النتيجة","السبب","الجهاز","IP","خط العرض","خط الطول","المسافة (م)"];
   const body: ExcelCell[][]=rows.map((a,index)=>[index+1,safeDate(a.timestamp),a.actorName??"",a.jobNumber??"",actionLabel(a.action),a.result==="success"?"نجاح":"رفض",a.reason??"",a.deviceId??"",a.ip??"",a.lat??"",a.lng??"",a.distanceMeters??""]);
-  const summary=[
+  const summary: ExcelCell[][]=[
     ["ملخص سجل التدقيق",""],
     ["عدد السجلات",rows.length],
     ["نجاح",rows.filter(a=>a.result==="success").length],
@@ -24,14 +24,19 @@ function exportExcel(rows: AuditEntry[], scope: "filtered"|"all") {
     ["تاريخ التصدير",new Date().toLocaleString("ar-SA")],
   ];
   const wb=XLSX.utils.book_new();
-  const wsSummary=XLSX.utils.aoa_to_sheet(summary); const wsData=XLSX.utils.aoa_to_sheet([headers,...body]);
-  wsSummary["A1"].s={font:{bold:true}};
-  wsData["!autofilter"]={ref:`A1:${XLSX.utils.encode_col(headers.length-1)}${Math.max(1,body.length+1)}`};
-  autoFitColumns(wsSummary,summary as ExcelCell[][],14,42);
+  const wsSummary=XLSX.utils.aoa_to_sheet(summary);
+  const wsData=XLSX.utils.aoa_to_sheet([[`سجل التدقيق - ${new Date().toLocaleDateString("ar-SA")}`],[],headers,...body]);
+  wsData["!merges"]=[{s:{r:0,c:0},e:{r:0,c:headers.length-1}}];
+  wsData["!autofilter"]={ref:`A3:${XLSX.utils.encode_col(headers.length-1)}${Math.max(3,body.length+3)}`};
+  styleExcelTable(wsData,2,body.length+2,0,headers.length-1,2,0);
+  styleReportWorkbook(wsData,undefined,3,body.length+2);
   autoFitColumns(wsData,[headers,...body],10,42);
-  styleExcelTable(wsData,0,body.length,0,headers.length-1,0,0);
-  XLSX.utils.book_append_sheet(wb,wsSummary,"ملخص"); XLSX.utils.book_append_sheet(wb,wsData,"سجل التدقيق");
-  XLSX.writeFile(wb,`audit-${new Date().toISOString().slice(0,10)}.xlsx`);
+  styleExcelTable(wsSummary,0,summary.length-1,0,1,0);
+  autoFitColumns(wsSummary,summary,14,42);
+  setExcelRtl(wb,wsSummary); setExcelRtl(wb,wsData);
+  XLSX.utils.book_append_sheet(wb,wsSummary,"ملخص");
+  XLSX.utils.book_append_sheet(wb,wsData,"سجل التدقيق");
+  XLSX.writeFile(wb,`Hadir-Audit-${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 export default function ManagerAudit() {
