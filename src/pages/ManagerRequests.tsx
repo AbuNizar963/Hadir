@@ -1,5 +1,4 @@
 import { memo, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getBackendRequests, updateBackendRequest } from "@/lib/backend";
 
@@ -50,7 +49,7 @@ export default function ManagerRequests() {
     <ManagerLayout
       title="طلبات الموظفين"
       subtitle="إجازات واستئذان وانصراف · تتم المزامنة مع الخادم تلقائيًا دون إعادة تحميل الواجهة."
-      actions={<div className="flex items-center gap-2"><button onClick={() => void load(false)} className="btn-secondary text-xs">تحديث</button><Link to="/manager" className="btn-ghost text-xs">لوحة القيادة</Link></div>}
+      actions={<button onClick={() => void load(false)} className="btn-secondary text-xs">تحديث</button>}
     >
       <section className="hud-card p-5 border-primary/25"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-extrabold">طلبات بانتظار المراجعة</h2><p className="text-xs text-muted-foreground mt-1">تظهر الطلبات الجديدة هنا مباشرة دون مغادرة الهيكل الرئيسي.</p></div><span className="badge bg-primary/15 text-primary">{pending.length} بانتظار المراجعة</span></div></section>
       {error && <div className="hud-card p-4 text-sm border-destructive/30 mt-4"><b className="text-destructive">تعذر المزامنة:</b><span className="text-muted-foreground"> {error}</span></div>}
