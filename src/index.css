@@ -52,7 +52,6 @@
   .radar-core::before { content:""; position:absolute; inset:-7px; border:1px solid hsl(0 90% 60%/.65); border-radius:50%; animation:radar-location-ping 1.8s ease-out infinite; }
   .radar-core::after { content:""; position:absolute; inset:-14px; border:1px solid hsl(0 90% 60%/.28); border-radius:50%; animation:radar-location-ping 1.8s ease-out .55s infinite; }
   .radar-status { animation:radar-status-pulse 1.35s ease-in-out infinite; }
-  /* Shared premium data surfaces. Existing color tokens are deliberately reused. */
   .data-card { @apply relative rounded-2xl border border-border/70 bg-card/75 p-4 sm:p-5; box-shadow:0 8px 28px hsl(222 40% 3%/.14); transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease; }
   .data-card:hover { transform:translateY(-1px); box-shadow:0 14px 36px hsl(222 40% 3%/.18); border-color:hsl(var(--primary)/.25); }
   .data-icon { @apply grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border/70 bg-secondary/70 text-primary; box-shadow:inset 0 1px 0 hsl(var(--foreground)/.04); }
@@ -93,3 +92,17 @@ main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(2) { order: 3; 
 main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(3) { order: 1; }
 main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(4) { order: 2; }
 main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(5) { order: 4; }
+
+/* Employee home: use the same full-width content canvas as the owner/manager layout. */
+main.max-w-xl.mx-auto.px-4.sm\:px-5.pb-16.space-y-4 {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+@media (min-width: 640px) {
+  main.max-w-xl.mx-auto.px-4.sm\:px-5.pb-16.space-y-4 { padding-inline: 1.5rem; }
+}
+@media (min-width: 1024px) {
+  main.max-w-xl.mx-auto.px-4.sm\:px-5.pb-16.space-y-4 { padding-inline: 2.5rem; }
+}
