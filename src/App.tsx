@@ -27,7 +27,7 @@ import RequireManagerRole from "@/components/RequireManagerRole";
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
 const EmployeeShell = ({ children }: { children: React.ReactNode }) => <ProtectedEmployee><EmployeeLayout>{children}</EmployeeLayout></ProtectedEmployee>;
-const EmployeeHomeWithAI = () => <ProtectedEmployee><EmployeeHome /><EmployeeAIButton /></ProtectedEmployee>;
+const EmployeeHomeWithAI = () => <ProtectedEmployee><EmployeeLayout><EmployeeHome /><EmployeeAIButton /></EmployeeLayout></ProtectedEmployee>;
 const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
 
 export default function App() {
