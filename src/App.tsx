@@ -7,7 +7,6 @@ import EmployeeScan from "@/pages/EmployeeScan";
 import EmployeeProfile from "@/pages/EmployeeProfile";
 import EmployeeCenter from "@/pages/EmployeeCenter";
 import EmployeePremium from "@/pages/EmployeePremium";
-import ManagerProCenter from "@/pages/ManagerProCenter";
 import WeatherPage from "@/pages/WeatherPage";
 import PrayerPage from "@/pages/PrayerPage";
 import AIAssistant from "@/pages/AIAssistant";
@@ -18,7 +17,6 @@ import ManagerRequests from "@/pages/ManagerRequests";
 import ManagerAudit from "@/pages/ManagerAudit";
 import ManagerSettings from "@/pages/ManagerSettings";
 import ManagerReports from "@/pages/ManagerReports";
-import ManagerWorkforce from "@/pages/ManagerWorkforce";
 import ContextWidgets from "@/components/ContextWidgets";
 import EmployeeAIButton from "@/components/EmployeeAIButton";
 import EmployeeLayout from "@/components/layout/EmployeeLayout";
@@ -50,8 +48,6 @@ export default function App() {
 
       <Route path="/manager/login" element={<ManagerLogin />} />
       <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
-      <Route path="/manager/pro" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerProCenter /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/workforce" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerWorkforce /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/employees" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerEmployees /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/requests" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerRequests /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/audit" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerAudit /></RequireManagerRole></ManagerOnly>} />
