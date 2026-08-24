@@ -10,10 +10,10 @@ This document tracks the production-hardening audit without removing working fea
 - Every change must pass TypeScript, lint, build, and relevant workflow checks.
 
 ## Current findings
-- Manager navigation and ContextWidgets both provide fixed/top-level UI controls.
-- ManagerLayout still contains text-symbol icons instead of the project's SVG icon system.
-- Navigation-label CSS injects labels through pseudo-elements, creating a second presentation layer.
-- The repository contains many narrowly scoped repair workflows that require consolidation review.
+- Role navigation is now owned by ManagerLayout/EmployeeLayout; the former global ContextWidgets mount has been removed while its session-welcome behavior remains available through the role layouts.
+- Navigation labels are rendered by React navigation components; label-visibility CSS is now limited to visibility enforcement and does not inject UI.
+- Five obsolete self-modifying repair workflows were removed because they could rewrite source on pushes and duplicate the canonical CI checks.
+- Canonical validation is concentrated in ci.yml plus focused read-only verification workflows.
 
 ## Workstreams
 1. Layout and navigation ownership
