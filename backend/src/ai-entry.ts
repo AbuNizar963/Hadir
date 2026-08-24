@@ -16,81 +16,11 @@ type Env = {
 };
 
 const SESSION_COOKIE = "hadir_session";
-
-function readCookie(request: Request, name: string) {
-  const cookies = request.headers.get("cookie") || "";
-  const item = cookies.split(";").map((v) => v.trim()).find((v) => v.startsWith(`${name}=`));
-  return item ? decodeURIComponent(item.slice(name.length + 1)) : "";
-}
-
-async function hashToken(token: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  let binary = "";
-  for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function getActor(request: Request, env: Env) {
-  const token = (readCookie(request, SESSION_COOKIE) || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "").trim();
-  if (!token) return null;
-  try {
-    const tokenHash = await hashToken(token);
-    const session = await env.DB.prepare("SELECT user_id AS userId,user_type AS userType,role FROM auth_sessions WHERE token_hash=? LIMIT 1").bind(tokenHash).first<any>();
-    if (!session) return null;
-    if (session.userType === "employee") {
-      return await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,role FROM employees WHERE id=? AND status='active' LIMIT 1").bind(session.userId).first<any>();
-    }
-    return await env.DB.prepare("SELECT id,username,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1").bind(session.userId).first<any>();
-  } catch {
-    return null;
-  }
-}
-
-function json(data: unknown, status = 200, origin = "*") {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "access-control-allow-origin": origin,
-      "access-control-allow-credentials": "true",
-      "cache-control": "no-store"
-    }
-  });
-}
-
-async function buildAIContext(actor: any, env: Env) {
-  if (actor?.role === "staff") {
-    const employee = await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,schedule_type AS scheduleType,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_days_json AS workDaysJson FROM employees WHERE id=? LIMIT 1").bind(actor.id).first<any>();
-    const attendance = await env.DB.prepare("SELECT type,timestamp,lat,lng,distance_meters AS distanceMeters,location_id AS locationId FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1000").bind(actor.id).all<any>();
-    const requests = await env.DB.prepare("SELECT type,reason,status,created_at AS createdAt FROM requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 100").bind(actor.id).all<any>();
-    const escapes = await env.DB.prepare("SELECT status,timestamp,reason FROM escape_events WHERE employee_id=? ORDER BY timestamp DESC LIMIT 100").bind(actor.id).all<any>();
-    return { employee, attendance: attendance.results || [], requests: requests.results || [], escapes: escapes.results || [] };
-  }
-
-  if (!["owner", "manager", "supervisor"].includes(String(actor?.role || ""))) return null;
-  const employees = await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,schedule_type AS scheduleType,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_days_json AS workDaysJson FROM employees ORDER BY name LIMIT 5000").all<any>();
-  const attendance = await env.DB.prepare("SELECT employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,type,timestamp,distance_meters AS distanceMeters,location_id AS locationId FROM attendance ORDER BY timestamp DESC LIMIT 5000").all<any>();
-  const escapes = await env.DB.prepare("SELECT employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,status,timestamp,reason FROM escape_events ORDER BY timestamp DESC LIMIT 2000").all<any>();
-  const requests = await env.DB.prepare("SELECT employee_id AS employeeId,employee_name AS employeeName,type,reason,status,created_at AS createdAt FROM requests ORDER BY created_at DESC LIMIT 1000").all<any>();
-  return { employees: employees.results || [], attendance: attendance.results || [], escapes: escapes.results || [], requests: requests.results || [] };
-}
-
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    const url = new URL(request.url);
-    const origin = String(env.APP_ORIGIN || request.headers.get("origin") || "*").replace(/\/$/, "");
-    if (url.pathname === "/api/ai" && request.method === "POST") {
-      const actor = await getActor(request, env);
-      if (!actor) return json({ ok: false, error: "غير مصرح" }, 401, origin);
-      const role = actor.role === "staff" ? "employee" : actor.role;
-      const data = await buildAIContext(actor, env);
-      if (!data) return json({ ok: false, error: "لا توجد صلاحية لاستخدام المساعد" }, 403, origin);
-      const body = await request.json().catch(() => ({})) as any;
-      const question = String(body?.question || "").trim();
-      if (!question) return json({ ok: false, error: "السؤال فارغ" }, 400, origin);
-      const response = await handleAI(new Request(request, { body: JSON.stringify({ role, question, data }) }), env);
-      return response;
-    }
-    return entry.fetch(request, env, ctx);
-  }
-};
+function readCookie(request: Request, name: string) { const cookies=request.headers.get("cookie")||""; const item=cookies.split(";").map(v=>v.trim()).find(v=>v.startsWith(`${name}=`)); return item?decodeURIComponent(item.slice(name.length+1)):""; }
+async function hashToken(token: string) { const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token)); let binary=""; for(const byte of new Uint8Array(digest))binary+=String.fromCharCode(byte); return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,""); }
+async function getActor(request: Request,env: Env){const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\s+/i,"")||"").trim();if(!token)return null;try{const tokenHash=await hashToken(token);const session=await env.DB.prepare("SELECT user_id AS userId,user_type AS userType,role FROM auth_sessions WHERE token_hash=? LIMIT 1").bind(tokenHash).first<any>();if(!session)return null;if(session.userType==="employee")return await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,role FROM employees WHERE id=? AND status='active' LIMIT 1").bind(session.userId).first<any>();return await env.DB.prepare("SELECT id,username,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1").bind(session.userId).first<any>();}catch{return null;}}
+function json(data:unknown,status=200,origin="*"){return new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","access-control-allow-origin":origin,"access-control-allow-credentials":"true","cache-control":"no-store"}});}
+async function buildAIContext(actor:any,env:Env){
+ if(actor?.role==="staff"){const employee=await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,schedule_type AS scheduleType,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_days_json AS workDaysJson FROM employees WHERE id=? LIMIT 1").bind(actor.id).first<any>();const attendance=await env.DB.prepare("SELECT type,timestamp,lat,lng,distance_meters AS distanceMeters,location_id AS locationId FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1000").bind(actor.id).all<any>();const requests=await env.DB.prepare("SELECT type,reason,status,created_at AS createdAt FROM requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 100").bind(actor.id).all<any>();const escapes=await env.DB.prepare("SELECT status,timestamp,reason FROM escape_events WHERE employee_id=? ORDER BY timestamp DESC LIMIT 100").bind(actor.id).all<any>();return{employee,attendance:attendance.results||[],requests:requests.results||[],escapes:escapes.results||[]};}
+ if(!["owner","manager","supervisor"].includes(String(actor?.role||"")))return null;const employees=await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,schedule_type AS scheduleType,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_days_json AS workDaysJson FROM employees ORDER BY name LIMIT 5000").all<any>();const attendance=await env.DB.prepare("SELECT employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,type,timestamp,distance_meters AS distanceMeters,location_id AS locationId FROM attendance ORDER BY timestamp DESC LIMIT 5000").all<any>();const escapes=await env.DB.prepare("SELECT employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,status,timestamp,reason FROM escape_events ORDER BY timestamp DESC LIMIT 2000").all<any>();const requests=await env.DB.prepare("SELECT employee_id AS employeeId,employee_name AS employeeName,type,reason,status,created_at AS createdAt FROM requests ORDER BY created_at DESC LIMIT 1000").all<any>();return{employees:employees.results||[],attendance:attendance.results||[],escapes:escapes.results||[],requests:requests.results||[]};}
+export default {async fetch(request:Request,env:Env,ctx:ExecutionContext){const url=new URL(request.url);const origin=String(env.APP_ORIGIN||request.headers.get("origin")||"*").replace(/\/$/,"");if(url.pathname==="/api/ai"&&request.method==="POST"){const actor=await getActor(request,env);if(!actor)return json({ok:false,error:"غير مصرح"},401,origin);const role=actor.role==="staff"?"employee":"manager";const data=await buildAIContext(actor,env);if(!data)return json({ok:false,error:"لا توجد صلاحية لاستخدام المساعد"},403,origin);const body=await request.json().catch(()=>({})) as any;const question=String(body?.question||"").trim();if(!question)return json({ok:false,error:"السؤال فارغ"},400,origin);return handleAI(new Request(request,{body:JSON.stringify({role,question,data})}),env);}return entry.fetch(request,env,ctx);}};
