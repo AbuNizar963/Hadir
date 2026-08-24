@@ -29,7 +29,7 @@ import RequireManagerRole from "@/components/RequireManagerRole";
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
 const EmployeeShell = ({ children }: { children: React.ReactNode }) => <ProtectedEmployee><EmployeeLayout>{children}</EmployeeLayout></ProtectedEmployee>;
-const EmployeeHomeWithAI = () => <><EmployeeHome /><EmployeeAIButton /></>;
+const EmployeeHomeWithAI = () => <ProtectedEmployee><EmployeeHome /><EmployeeAIButton /></ProtectedEmployee>;
 const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
 
 export default function App() {
@@ -41,7 +41,7 @@ export default function App() {
       <Route path="/prayer" element={<PrayerPage />} />
       <Route path="/ai" element={<AIAssistant />} />
 
-      <Route path="/employee" element={<EmployeeShell><EmployeeHomeWithAI /></EmployeeShell>} />
+      <Route path="/employee" element={<EmployeeHomeWithAI />} />
       <Route path="/employee/center" element={<EmployeeShell><EmployeeCenter /></EmployeeShell>} />
       <Route path="/employee/premium" element={<EmployeeShell><EmployeePremium /></EmployeeShell>} />
       <Route path="/employee/profile" element={<EmployeeShell><EmployeeProfile /></EmployeeShell>} />
