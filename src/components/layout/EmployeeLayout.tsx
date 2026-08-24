@@ -1,9 +1,10 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
-import { Bot, CloudSun, Compass, LayoutDashboard, Menu, UserRound, X, Clock3, CreditCard, Building2 } from "lucide-react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Bot, CloudSun, Compass, LayoutDashboard, Menu, UserRound, X, Clock3, CreditCard, Building2, LogOut } from "lucide-react";
 import Brand from "@/components/Brand";
 import { cn } from "@/lib/utils";
 import { currentSession } from "@/lib/auth";
+import { backendLogout } from "@/lib/backend";
 import SessionWelcome from "@/components/SessionWelcome";
 
 const NAV = [
@@ -19,6 +20,7 @@ const utilityClass = "group flex h-12 w-20 shrink-0 flex-col items-center justif
 export default function EmployeeLayout({ title = "لوحة الموظف", subtitle, actions, children }: { title?: string; subtitle?: string; actions?: ReactNode; children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const session = currentSession();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -26,6 +28,23 @@ export default function EmployeeLayout({ title = "لوحة الموظف", subtit
       document.documentElement.classList.add("dark");
     }
   }, []);
+
+  const logout = async () => {
+    try {
+      await backendLogout();
+    } catch {
+      // لا نمنع تسجيل الخروج المحلي إذا تعذر الاتصال بالخادم.
+    }
+    try {
+      localStorage.removeItem("hadir.api.token.employee");
+      localStorage.removeItem("hadir.employee.session");
+      localStorage.removeItem("employeeAuth");
+    } catch {
+      // ignore storage errors
+    }
+    setMenuOpen(false);
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground" dir="rtl">
@@ -67,6 +86,10 @@ export default function EmployeeLayout({ title = "لوحة الموظف", subtit
           <Link to="/employee/scan/attendance" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary">تسجيل الحضور</Link>
           <Link to="/employee/scan/departure" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary">تسجيل الانصراف</Link>
           <span className="rounded-lg px-3 py-2 text-xs text-muted-foreground">{session?.employeeId ? "حساب الموظف" : "الموظف"}</span>
+          <button type="button" onClick={() => void logout()} className="rounded-lg px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10">
+            <LogOut className="mr-1 inline h-4 w-4" aria-hidden="true" />
+            تسجيل خروج
+          </button>
         </div>
       </div>}
 
