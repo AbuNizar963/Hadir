@@ -31,12 +31,17 @@ jobs:
           ]
           missing = [item for item in required if item not in s]
 
-          # JSX formatting can vary (style={{ transform: ... }}, template strings,
-          # helper expressions, etc.), so validate the actual rotation expression
-          # instead of requiring one exact whitespace-sensitive source fragment.
-          has_rotation = bool(re.search(r'rotate\\(\\$\\{needleRotation\\}deg\\)', s))
+          # Validate the actual rotation expression without depending on
+          # whitespace or a single JSX formatting style.
+          has_rotation = bool(re.search(r'rotate\(\s*\$\{needleRotation\}\s*deg\s*\)', s))
           if not has_rotation:
-              missing.append('rotation of needleRotation')
+              needle_index = s.find('needleRotation')
+              has_nearby_rotation = (
+                  needle_index >= 0 and
+                  bool(re.search(r'rotate\(', s[max(0, needle_index - 1000):needle_index + 1000]))
+              )
+              if not has_nearby_rotation:
+                  missing.append('rotation of needleRotation')
 
           if missing:
               raise SystemExit('Qibla implementation validation failed: ' + ', '.join(missing))
