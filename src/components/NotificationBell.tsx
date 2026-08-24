@@ -72,20 +72,19 @@ export default function NotificationBell({ userId, onlyBell = false }: Props) {
       {unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold grid place-items-center mono">{unreadCount > 99 ? "99+" : unreadCount}</span>}
     </button>
 
-    {open && <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/55 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="الإشعارات" onMouseDown={e => { if (e.target === e.currentTarget) setOpen(false); }}>
-      <div className="flex w-full max-w-lg max-h-[min(78vh,680px)] flex-col overflow-hidden rounded-3xl border border-primary/25 bg-background shadow-2xl ring-1 ring-primary/10" dir="rtl">
-        <div className="flex shrink-0 items-center justify-between border-b border-border/70 bg-primary/[0.035] p-4 sm:p-5">
-          <div>
-            <div className="mono text-[10px] font-bold tracking-widest text-primary">HADIR · NOTIFICATIONS</div>
-            <h2 className="mt-1 text-lg font-black">الإشعارات</h2>
+    {open && <div className="fixed inset-0 z-[80] bg-black/40 p-3 sm:p-5" role="dialog" aria-modal="true" aria-label="الإشعارات" onMouseDown={e => { if (e.target === e.currentTarget) setOpen(false); }}>
+      <div className="absolute left-3 top-3 w-[24rem] max-w-[calc(100%-1.5rem)] max-h-[82vh] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:left-5 sm:top-5" dir="rtl" onMouseDown={e => e.stopPropagation()}>
+        <div className="border-b border-border/60 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div><div className="font-bold">الإشعارات</div><div className="mt-1 text-[11px] text-muted-foreground">يتم الاحتفاظ بالإشعارات لمدة شهر واحد.</div></div>
+            <button type="button" onClick={() => setOpen(false)} className="rounded-lg px-2 py-1 hover:bg-secondary" aria-label="إغلاق"><X className="h-4 w-4" /></button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="mt-3 flex gap-2">
             {unreadCount > 0 && <button type="button" onClick={async () => { const t = token(); if (t) await fetch(`${API_URL}/api/notifications/read`, { method: "POST", headers: { authorization: `Bearer ${t}`, "content-type": "application/json" }, body: "{}" }).catch(() => undefined); markAllAsRead(userId); void refresh(); }} className="rounded-lg px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10">تعليم الكل كمقروء</button>}
             {items.length > 0 && <button type="button" onClick={() => { clearNotifications(userId); void refresh(); }} className="rounded-lg px-2 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/10">مسح المحلي</button>}
-            <button type="button" onClick={() => setOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl border border-border/70 bg-background hover:bg-secondary" aria-label="إغلاق"><X className="h-5 w-5" /></button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="max-h-[calc(82vh-105px)] overflow-y-auto">
           {items.length === 0 ? <div className="p-12 text-center text-xs text-muted-foreground">لا توجد إشعارات حالياً.</div> : <ul className="divide-y divide-border">{items.map(n => <li key={n.id} onClick={() => void handle(n)} className={`cursor-pointer p-4 transition hover:bg-secondary/50 ${!n.read ? "bg-primary/5" : ""}`}>
             <div className="flex items-start gap-3"><TypeDot type={n.type} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div className="truncate text-sm font-bold">{n.title}</div><button type="button" onClick={e => { e.stopPropagation(); removeNotification(n.id); void refresh(); }} className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="حذف"><X className="h-4 w-4" /></button></div><div className="mt-1 text-xs leading-relaxed text-muted-foreground">{n.body}</div><div className="mono mt-1 text-[10px] text-muted-foreground">{formatWhen(n.createdAt)}</div></div></div>
           </li>)}</ul>}
