@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Bot, CloudSun, Compass, LogOut, Menu, Paperclip, UserRound } from "lucide-react";
+import { CloudSun, Compass, LogOut, Menu, Paperclip, UserRound } from "lucide-react";
 import { currentSession, logoutEmployee } from "@/lib/auth";
-import { getManagerSession } from "@/lib/storage";
 
 function greeting(hour: number) {
   if (hour >= 5 && hour < 12) return "صباح الخير";
@@ -16,13 +15,11 @@ export default function ContextWidgets() {
   const nav = useNavigate();
   const session = currentSession();
   const sessionLoginAt = session?.loginAt;
-  const managerSession = getManagerSession();
   const [show, setShow] = useState(false);
   const [employeeMenuOpen, setEmployeeMenuOpen] = useState(false);
   const [now, setNow] = useState(new Date());
   const active = location.pathname.startsWith("/employee") || (location.pathname.startsWith("/manager") && !location.pathname.includes("/login"));
   const employee = location.pathname === "/employee" && Boolean(session);
-  const manager = location.pathname.startsWith("/manager") && !location.pathname.includes("/login") && Boolean(managerSession);
   const message = useMemo(() => greeting(now.getHours()), [now]);
 
   useEffect(() => {
@@ -76,8 +73,8 @@ export default function ContextWidgets() {
   return (
     <>
       <style>{`
-        /* The employee menu is owned by ContextWidgets on /employee only.
-           Hide page-local copies so icons never stack on top of each other. */
+        /* Employee menu is owned here on /employee only.
+           Page-local copies are hidden so icons never stack. */
         body[data-hadir-home="true"] header.max-w-xl button[aria-label="فتح قائمة الموظف"],
         body[data-hadir-scan="true"] header.max-w-xl button[aria-label="فتح قائمة الموظف"] {
           display: none !important;
@@ -105,32 +102,12 @@ export default function ContextWidgets() {
               <div className="my-1 border-t border-border/60" /><div className="px-3 pb-1 pt-2 text-[10px] font-black text-muted-foreground">الملحقات</div>
               <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/weather"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><CloudSun className="h-5 w-5 text-sky-400" /><span>الطقس</span></button>
               <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/prayer"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><Compass className="h-5 w-5 text-emerald-400" /><span>مواقيت الصلاة والقبلة</span></button>
-              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/ai"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><Bot className="h-5 w-5 text-violet-400" /><span>المساعد الذكي</span></button>
+              <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/ai"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><span className="grid h-5 w-5 place-items-center text-violet-400 font-black">AI</span><span>المساعد الذكي</span></button>
               <button type="button" onClick={() => { setEmployeeMenuOpen(false); nav("/employee/history"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold hover:bg-secondary"><Paperclip className="h-5 w-5 text-amber-400" /><span>الملحقات وسجل العمل</span></button>
               <div className="my-1 border-t border-border/60" />
               <button type="button" onClick={employeeLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-bold text-destructive hover:bg-destructive/10"><LogOut className="h-5 w-5" /><span>تسجيل الخروج</span></button>
             </div>
           )}
-        </div>
-      )}
-
-      {manager && (
-        <div
-          dir="ltr"
-          data-hadir-manager-tools
-          aria-label="اختصارات الإدارة"
-          className="fixed z-[120] top-3 left-16 flex items-center gap-1 pointer-events-auto lg:top-3 lg:left-auto lg:right-[18rem]"
-        >
-          <button type="button" onClick={() => nav("/ai")} aria-label="فتح المساعد الذكي" title="المساعد الذكي" className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary shadow-lg hover:bg-primary/15 hover:-translate-y-0.5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/40">
-            <Bot className="h-5 w-5" aria-hidden="true" />
-            <span className="absolute bottom-1 left-1 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" aria-hidden="true" />
-          </button>
-          <button type="button" onClick={() => nav("/weather")} aria-label="فتح الطقس" title="الطقس" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-sky-400/25 bg-sky-500/10 text-sky-300 shadow-lg hover:bg-sky-500/15 hover:-translate-y-0.5 transition-all focus:outline-none focus:ring-2 focus:ring-sky-400/40">
-            <CloudSun className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <button type="button" onClick={() => nav("/prayer")} aria-label="فتح مواقيت الصلاة واتجاه القبلة" title="الصلاة والقبلة" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-emerald-400/25 bg-emerald-500/10 text-emerald-300 shadow-lg hover:bg-emerald-500/15 hover:-translate-y-0.5 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400/40">
-            <Compass className="h-5 w-5" aria-hidden="true" />
-          </button>
         </div>
       )}
     </>
