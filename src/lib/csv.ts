@@ -19,7 +19,10 @@ export function downloadCSV(
 
   const headerLine = headers.map(escape).join(",");
   const bodyLines = rows.map((row) => row.map(escape).join(","));
-  const csvContent = [headerLine, ...bodyLines].join("\r\n");\n\n  // Excel does not reliably persist worksheet direction in CSV; use an RTL-friendly\n  // Excel hint via a leading RTL mark while preserving the UTF-8 BOM.\n  const rtlMark = "\u200F";
+  const csvContent = [headerLine, ...bodyLines].join("\r\n");
+
+  // Excel does not reliably persist worksheet direction in CSV; use an RTL-friendly hint.
+  const rtlMark = "\u200F";
 
   // Prefix UTF-8 BOM so Excel opens Arabic text without corruption.
   const BOM = "\uFEFF";
