@@ -1,16 +1,27 @@
 PRAGMA foreign_keys = ON;
 
--- Workforce-management foundation. All event-like records are append-friendly for auditability.
-CREATE TABLE IF NOT EXISTS notifications (
+-- 0003 created a legacy notifications table using user_id/message.
+-- Workforce modules use recipient_id/body/severity. Rebuild the table so
+-- existing production notifications are preserved while the new contract
+-- is applied safely on D1/SQLite.
+ALTER TABLE notifications RENAME TO notifications_legacy;
+
+CREATE TABLE notifications (
   id TEXT PRIMARY KEY,
   recipient_id TEXT NOT NULL,
-  type TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'info',
   title TEXT NOT NULL,
   body TEXT NOT NULL,
   severity TEXT NOT NULL DEFAULT 'info',
   read_at TEXT,
   created_at TEXT NOT NULL
 );
+
+INSERT INTO notifications (id, recipient_id, type, title, body, severity, read_at, created_at)
+SELECT id, user_id, type, title, message, 'info', read_at, created_at
+FROM notifications_legacy;
+
+DROP TABLE notifications_legacy;
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_id, read_at, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS violations (
