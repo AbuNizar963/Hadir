@@ -109,7 +109,7 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
         } else if (employeeSession || employeeToken) {
           setState("employee");
         } else {
-          setState(Boolean(token) ? "authorized" : "unauthorized");
+          setState(token ? "authorized" : "unauthorized");
         }
       }
     };
