@@ -11,68 +11,16 @@ import { XLSX, autoFitColumns, styleExcelTable, styleReportWorkbook, setExcelRtl
 import type { AttendanceRecord, Employee } from "@/types";
 
 type Mode = "daily" | "monthly" | "annual";
-type ReportRow = {
-  key: string;
-  name: string;
-  jobNumber: string;
-  checkIn: string;
-  checkOut: string;
-  late: number;
-  worked: number;
-  status: string;
-  detail: string;
-};
-type StoredReport = {
-  mode: Mode;
-  period: string;
-  generatedAt: string;
-  employeeCount: number;
-  rows: ReportRow[];
-};
+type ReportRow = { key: string; name: string; jobNumber: string; checkIn: string; checkOut: string; late: number; worked: number; status: string; detail: string };
+type StoredReport = { mode: Mode; period: string; generatedAt: string; employeeCount: number; rows: ReportRow[] };
+type Session = { inRecord?: AttendanceRecord; outRecord?: AttendanceRecord };
 
-function toDay(value: string) {
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(y, m - 1, d, 12);
-}
-
-function auditAttendance(items: any[]): AttendanceRecord[] {
-  return items
-    .filter((a) => a?.result === "success" && a?.employeeId && (a?.action === "check-in" || a?.action === "check-out"))
-    .map((a) => ({
-      id: String(a.id),
-      employeeId: String(a.employeeId),
-      jobNumber: String(a.jobNumber || ""),
-      employeeName: String(a.actorName || a.employeeName || ""),
-      type: a.action,
-      timestamp: String(a.timestamp),
-      lat: Number(a.lat || 0),
-      lng: Number(a.lng || 0),
-      distanceMeters: Number(a.distanceMeters || 0),
-      deviceId: String(a.deviceId || ""),
-      ip: String(a.ip || ""),
-      qrCode: "",
-    }));
-}
-
-function findSession(records: AttendanceRecord[], employeeId: string, start: Date | null, end: Date | null) {
-  if (!start) return { inRecord: undefined as AttendanceRecord | undefined, outRecord: undefined as AttendanceRecord | undefined };
-  const list = records
-    .filter((r) => r.employeeId === employeeId)
-    .sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp));
-  let inRecord: AttendanceRecord | undefined;
-  let outRecord: AttendanceRecord | undefined;
-  for (const record of list) {
-    const time = +new Date(record.timestamp);
-    if (record.type === "check-in" && time >= +start && (!end || time <= +end + 60000)) {
-      inRecord = record;
-      outRecord = undefined;
-    } else if (record.type === "check-out" && inRecord && time >= +new Date(inRecord.timestamp) && (!end || time <= +end + 60000)) {
-      outRecord = record;
-      break;
-    }
-  }
-  return { inRecord, outRecord };
-}
+const EMPTY_SESSION: Session = {};
+function toDay(value: string) { const [y, m, d] = value.split("-").map(Number); return new Date(y, m - 1, d, 12); }
+function dayKey(value: string | Date) { const d = typeof value === "string" ? new Date(value) : value; return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+function auditAttendance(items: any[]): AttendanceRecord[] { return items.filter((a) => a?.result === "success" && a?.employeeId && (a?.action === "check-in" || a?.action === "check-out")).map((a) => ({ id: String(a.id), employeeId: String(a.employeeId), jobNumber: String(a.jobNumber || ""), employeeName: String(a.actorName || a.employeeName || ""), type: a.action, timestamp: String(a.timestamp), lat: Number(a.lat || 0), lng: Number(a.lng || 0), distanceMeters: Number(a.distanceMeters || 0), deviceId: String(a.deviceId || ""), ip: String(a.ip || ""), qrCode: "" })); }
+function buildSessionIndex(records: AttendanceRecord[]) { const index = new Map<string, Session>(); for (const record of records) { const key = `${record.employeeId}|${dayKey(record.timestamp)}`; const current = index.get(key) || {}; if (record.type === "check-in" && (!current.inRecord || +new Date(record.timestamp) < +new Date(current.inRecord.timestamp))) current.inRecord = record; if (record.type === "check-out" && (!current.outRecord || +new Date(record.timestamp) > +new Date(current.outRecord.timestamp))) current.outRecord = record; index.set(key, current); } return index; }
+function findSession(index: Map<string, Session>, employeeId: string, start: Date | null, end: Date | null): Session { if (!start) return EMPTY_SESSION; const current = index.get(`${employeeId}|${dayKey(start)}`); if (!current) return EMPTY_SESSION; const inTime = current.inRecord ? +new Date(current.inRecord.timestamp) : 0; const outTime = current.outRecord ? +new Date(current.outRecord.timestamp) : 0; const min = +start; const max = end ? +end + 60000 : Number.POSITIVE_INFINITY; return { inRecord: current.inRecord && inTime >= min && inTime <= max ? current.inRecord : undefined, outRecord: current.outRecord && outTime >= min && outTime <= max && (!inTime || outTime >= inTime) ? current.outRecord : undefined }; }
 
 export default function ManagerReports() {
   const [mode, setMode] = useState<Mode>("daily");
@@ -86,222 +34,26 @@ export default function ManagerReports() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const settings = getSettings();
 
-  useEffect(() => {
-    let stopped = false;
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      const errors: string[] = [];
-      try {
-        const list = await getBackendEmployees();
-        if (!stopped && Array.isArray(list)) setEmployees(list);
-      } catch (e) {
-        errors.push(`الموظفون: ${e instanceof Error ? e.message : "فشل الجلب"}`);
-      }
-      try {
-        const audit = await getBackendAudit(5000);
-        if (!stopped && Array.isArray(audit)) setAttendance(auditAttendance(audit));
-      } catch (e) {
-        errors.push(`الحضور: ${e instanceof Error ? e.message : "فشل الجلب"}`);
-      }
-      if (!stopped) {
-        setLoading(false);
-        if (errors.length) setError(errors.join(" · "));
-      }
-    };
-    void load();
-    const timer = window.setInterval(() => void load(), 30000);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
-  }, []);
+  useEffect(() => { let stopped = false; const load = async () => { setLoading(true); setError(null); const errors: string[] = []; try { const list = await getBackendEmployees(); if (!stopped && Array.isArray(list)) setEmployees(list); } catch (e) { errors.push(`الموظفون: ${e instanceof Error ? e.message : "فشل الجلب"}`); } try { const audit = await getBackendAudit(2000); if (!stopped && Array.isArray(audit)) setAttendance(auditAttendance(audit)); } catch (e) { errors.push(`الحضور: ${e instanceof Error ? e.message : "فشل الجلب"}`); } if (!stopped) { setLoading(false); if (errors.length) setError(errors.join(" · ")); } }; void load(); const timer = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 60000); return () => { stopped = true; window.clearInterval(timer); }; }, []);
 
+  const sessionIndex = useMemo(() => buildSessionIndex(attendance), [attendance]);
   const rows = useMemo<ReportRow[]>(() => {
-    if (mode === "daily") {
-      const target = toDay(date);
-      return employees.map((employee) => {
-        const work = getEmployeeWorkPeriod(employee, target);
-        if (!work.isWorkDay) {
-          return { key: employee.id, name: employee.name, jobNumber: employee.jobNumber, checkIn: "—", checkOut: "—", late: 0, worked: 0, status: "راحة", detail: work.detail || "لا يوجد دوام مجدول" };
-        }
-        const session = findSession(attendance, employee.id, work.start, work.end);
-        const grace = employee.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10;
-        const late = session.inRecord && work.start
-          ? Math.max(0, Math.round((+new Date(session.inRecord.timestamp) - +work.start) / 60000) - grace)
-          : 0;
-        return {
-          key: employee.id,
-          name: employee.name,
-          jobNumber: employee.jobNumber,
-          checkIn: session.inRecord ? formatTime(session.inRecord.timestamp) : "—",
-          checkOut: session.outRecord ? formatTime(session.outRecord.timestamp) : "—",
-          late,
-          worked: session.inRecord ? minutesBetween(session.inRecord.timestamp, session.outRecord?.timestamp ?? new Date().toISOString()) : 0,
-          status: !session.inRecord ? "غياب" : !session.outRecord ? "حاضر · بدون انصراف" : "مكتمل",
-          detail: work.detail || "يوم عمل",
-        };
-      });
-    }
-
-    const [y, m] = mode === "monthly" ? month.split("-").map(Number) : [Number(year), 1];
-    const months = mode === "monthly" ? [m - 1] : Array.from({ length: 12 }, (_, i) => i);
-    return employees.map((employee) => {
-      let workDays = 0;
-      let restDays = 0;
-      let absent = 0;
-      let complete = 0;
-      let open = 0;
-      let late = 0;
-      let worked = 0;
-      for (const mo of months) {
-        const days = new Date(y, mo + 1, 0).getDate();
-        for (let d = 1; d <= days; d += 1) {
-          const work = getEmployeeWorkPeriod(employee, new Date(y, mo, d, 12));
-          if (!work.isWorkDay) {
-            restDays += 1;
-            continue;
-          }
-          workDays += 1;
-          const session = findSession(attendance, employee.id, work.start, work.end);
-          if (!session.inRecord) absent += 1;
-          else if (!session.outRecord) open += 1;
-          else {
-            complete += 1;
-            worked += minutesBetween(session.inRecord.timestamp, session.outRecord.timestamp);
-          }
-          if (session.inRecord && work.start) {
-            late += Math.max(0, Math.round((+new Date(session.inRecord.timestamp) - +work.start) / 60000) - (employee.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10));
-          }
-        }
-      }
-      return {
-        key: employee.id,
-        name: employee.name,
-        jobNumber: employee.jobNumber,
-        checkIn: "",
-        checkOut: "",
-        late,
-        worked,
-        status: complete ? "مكتمل" : absent ? "غياب" : "—",
-        detail: `عمل: ${workDays} · راحة: ${restDays} · غياب: ${absent} · مكتمل: ${complete} · بدون انصراف: ${open}`,
-      };
-    });
-  }, [mode, date, month, year, employees, attendance, settings]);
+    if (mode === "daily") { const target = toDay(date); return employees.map((employee) => { const work = getEmployeeWorkPeriod(employee, target); if (!work.isWorkDay) return { key: employee.id, name: employee.name, jobNumber: employee.jobNumber, checkIn: "—", checkOut: "—", late: 0, worked: 0, status: "راحة", detail: work.detail || "لا يوجد دوام مجدول" }; const session = findSession(sessionIndex, employee.id, work.start, work.end); const grace = employee.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10; const late = session.inRecord && work.start ? Math.max(0, Math.round((+new Date(session.inRecord.timestamp) - +work.start) / 60000) - grace) : 0; return { key: employee.id, name: employee.name, jobNumber: employee.jobNumber, checkIn: session.inRecord ? formatTime(session.inRecord.timestamp) : "—", checkOut: session.outRecord ? formatTime(session.outRecord.timestamp) : "—", late, worked: session.inRecord ? minutesBetween(session.inRecord.timestamp, session.outRecord?.timestamp ?? new Date().toISOString()) : 0, status: !session.inRecord ? "غياب" : !session.outRecord ? "حاضر · بدون انصراف" : "مكتمل", detail: work.detail || "يوم عمل" }; }); }
+    const [y, m] = mode === "monthly" ? month.split("-").map(Number) : [Number(year), 1]; const months = mode === "monthly" ? [m - 1] : Array.from({ length: 12 }, (_, i) => i);
+    return employees.map((employee) => { let workDays = 0, restDays = 0, absent = 0, complete = 0, open = 0, late = 0, worked = 0; for (const mo of months) { const days = new Date(y, mo + 1, 0).getDate(); for (let d = 1; d <= days; d += 1) { const work = getEmployeeWorkPeriod(employee, new Date(y, mo, d, 12)); if (!work.isWorkDay) { restDays += 1; continue; } workDays += 1; const session = findSession(sessionIndex, employee.id, work.start, work.end); if (!session.inRecord) absent += 1; else if (!session.outRecord) open += 1; else { complete += 1; worked += minutesBetween(session.inRecord.timestamp, session.outRecord.timestamp); } if (session.inRecord && work.start) late += Math.max(0, Math.round((+new Date(session.inRecord.timestamp) - +work.start) / 60000) - (employee.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10)); } } return { key: employee.id, name: employee.name, jobNumber: employee.jobNumber, checkIn: "", checkOut: "", late, worked, status: complete ? "مكتمل" : absent ? "غياب" : "—", detail: `عمل: ${workDays} · راحة: ${restDays} · غياب: ${absent} · مكتمل: ${complete} · بدون انصراف: ${open}` }; });
+  }, [mode, date, month, year, employees, sessionIndex, settings]);
 
   const period = mode === "daily" ? date : mode === "monthly" ? month : year;
   const reportKey = `report.${mode}.${period}`;
+  useEffect(() => { if (loading || !employees.length) return; let cancelled = false; const persist = async () => { try { const report: StoredReport = { mode, period, generatedAt: new Date().toISOString(), employeeCount: employees.length, rows }; await saveBackendSettings({ [reportKey]: report } as any); if (!cancelled) setSavedAt(new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })); } catch (e) { if (!cancelled) setError(`تعذر حفظ التقرير في D1: ${e instanceof Error ? e.message : "فشل الحفظ"}`); } }; void persist(); return () => { cancelled = true; }; }, [loading, employees, rows, mode, period, reportKey]);
 
-  useEffect(() => {
-    if (loading || !employees.length) return;
-    let cancelled = false;
-    const persist = async () => {
-      try {
-        const report: StoredReport = { mode, period, generatedAt: new Date().toISOString(), employeeCount: employees.length, rows };
-        await saveBackendSettings({ [reportKey]: report } as any);
-        if (!cancelled) setSavedAt(new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }));
-      } catch (e) {
-        if (!cancelled) setError(`تعذر حفظ التقرير في D1: ${e instanceof Error ? e.message : "فشل الحفظ"}`);
-      }
-    };
-    void persist();
-    return () => { cancelled = true; };
-  }, [loading, employees, rows, mode, period, reportKey]);
+  const exportCsv = () => { const headers: string[] = mode === "daily" ? ["م", "الموظف", "الرقم الوظيفي", "الحضور", "الانصراف", "التأخر", "ساعات العمل", "الحالة", "الجدول"] : ["م", "الموظف", "الرقم الوظيفي", "الملخص", "إجمالي التأخر", "إجمالي ساعات العمل"]; const data: CsvCell[][] = rows.map((row, i) => mode === "daily" ? [i + 1, row.name, row.jobNumber, row.checkIn, row.checkOut, row.late, formatDurationMinutes(row.worked), row.status, row.detail] : [i + 1, row.name, row.jobNumber, row.detail, row.late, formatDurationMinutes(row.worked)]); downloadCSV(`Hadir-${mode}-report-${period}`, headers, data); };
+  const exportExcel = () => { const headers: ExcelCell[] = mode === "daily" ? ["م", "الموظف", "الرقم الوظيفي", "الحضور", "الانصراف", "التأخر", "ساعات العمل", "الحالة", "الجدول"] : ["م", "الموظف", "الرقم الوظيفي", "الملخص", "إجمالي التأخر", "إجمالي ساعات العمل"]; const data: ExcelCell[][] = rows.map((row, i) => mode === "daily" ? [i + 1, row.name, row.jobNumber, row.checkIn, row.checkOut, row.late, formatDurationMinutes(row.worked), row.status, row.detail] : [i + 1, row.name, row.jobNumber, row.detail, row.late, formatDurationMinutes(row.worked)]); const ws = XLSX.utils.aoa_to_sheet([[`تقرير الحضور - ${period}`], [], headers, ...data]); ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } }]; autoFitColumns(ws, [headers, ...data], 10, 45); styleExcelTable(ws, 2, data.length + 2, 0, headers.length - 1, 3, 0); styleReportWorkbook(ws, mode === "daily" ? 7 : undefined, 3, data.length + 2); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "التقرير"); setExcelRtl(wb, ws); const url = URL.createObjectURL(new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array", compression: true })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })); const link = document.createElement("a"); link.href = url; link.download = `Hadir-${mode}-report-${period}.xlsx`; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); };
 
-  const exportCsv = () => {
-    const headers: string[] = mode === "daily"
-      ? ["م", "الموظف", "الرقم الوظيفي", "الحضور", "الانصراف", "التأخر", "ساعات العمل", "الحالة", "الجدول"]
-      : ["م", "الموظف", "الرقم الوظيفي", "الملخص", "إجمالي التأخر", "إجمالي ساعات العمل"];
-    const data: CsvCell[][] = rows.map((row, i) => mode === "daily"
-      ? [i + 1, row.name, row.jobNumber, row.checkIn, row.checkOut, row.late, formatDurationMinutes(row.worked), row.status, row.detail]
-      : [i + 1, row.name, row.jobNumber, row.detail, row.late, formatDurationMinutes(row.worked)]);
-    downloadCSV(`Hadir-${mode}-report-${period}`, headers, data);
-  };
-
-  const exportExcel = () => {
-    const headers: ExcelCell[] = mode === "daily"
-      ? ["م", "الموظف", "الرقم الوظيفي", "الحضور", "الانصراف", "التأخر", "ساعات العمل", "الحالة", "الجدول"]
-      : ["م", "الموظف", "الرقم الوظيفي", "الملخص", "إجمالي التأخر", "إجمالي ساعات العمل"];
-    const data: ExcelCell[][] = rows.map((row, i) => mode === "daily"
-      ? [i + 1, row.name, row.jobNumber, row.checkIn, row.checkOut, row.late, formatDurationMinutes(row.worked), row.status, row.detail]
-      : [i + 1, row.name, row.jobNumber, row.detail, row.late, formatDurationMinutes(row.worked)]);
-    const ws = XLSX.utils.aoa_to_sheet([[`تقرير الحضور - ${period}`], [], headers, ...data]);
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } }];
-    autoFitColumns(ws, [headers, ...data], 10, 45);
-    styleExcelTable(ws, 2, data.length + 2, 0, headers.length - 1, 3, 0);
-    styleReportWorkbook(ws, mode === "daily" ? 7 : undefined, 3, data.length + 2);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "التقرير");
-    setExcelRtl(wb, ws);
-    const url = URL.createObjectURL(new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array", compression: true })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Hadir-${mode}-report-${period}.xlsx`;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
-  return (
-    <ManagerLayout
-      title="التقارير"
-      subtitle={mode === "daily" ? `يومي · ${formatDate(date)}` : mode === "monthly" ? `شهري · ${month}` : `سنوي · ${year}`}
-      actions={
-        <div className="flex gap-2">
-          <Button onClick={exportExcel} disabled={!rows.length}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel</Button>
-          <Button onClick={exportCsv} variant="outline" disabled={!rows.length}><FileText className="ml-2 h-4 w-4" />CSV</Button>
-        </div>
-      }
-    >
-      <div className="hud-card p-4 mb-5 space-y-3">
-        <div className="flex flex-wrap gap-2 items-center">
-          {(["daily", "monthly", "annual"] as Mode[]).map((value) => (
-            <button key={value} onClick={() => setMode(value)} className={`px-4 py-2 rounded-lg text-sm font-bold ${mode === value ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-              {value === "daily" ? "يومي" : value === "monthly" ? "شهري" : "سنوي"}
-            </button>
-          ))}
-          {mode === "daily" && <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />}
-          {mode === "monthly" && <input type="month" className="input" value={month} onChange={(e) => setMonth(e.target.value)} />}
-          {mode === "annual" && <input type="number" className="input w-32" value={year} onChange={(e) => setYear(e.target.value)} />}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Database className="h-4 w-4 text-primary" />
-          <span>مصدر التقرير: D1 — الموظفون والحضور الدائم.</span>
-          {loading && <><Loader2 className="h-3 w-3 animate-spin" />جاري القراءة من D1...</>}
-          {savedAt && <span className="text-emerald-600 font-bold">محفوظ في D1 · {savedAt}</span>}
-        </div>
-        {error && <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">{error}</div>}
-      </div>
-
-      <div className="hud-card overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-secondary/40">
-            <tr>
-              <th className="p-3 text-right">م</th><th className="p-3 text-right">الموظف</th><th className="p-3 text-right">الرقم</th>
-              {mode === "daily" ? <>
-                <th className="p-3 text-right">الحضور</th><th className="p-3 text-right">الانصراف</th><th className="p-3 text-right">التأخر</th><th className="p-3 text-right">ساعات العمل</th><th className="p-3 text-right">الحالة</th><th className="p-3 text-right">الجدول</th>
-              </> : <>
-                <th className="p-3 text-right">الملخص</th><th className="p-3 text-right">التأخر</th><th className="p-3 text-right">ساعات العمل</th>
-              </>}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={row.key} className="border-t border-border/50">
-                <td className="p-3">{i + 1}</td>
-                <td className="p-3 font-bold">{row.name}</td>
-                <td className="p-3 mono">{row.jobNumber}</td>
-                {mode === "daily" ? <>
-                  <td className="p-3 mono">{row.checkIn}</td><td className="p-3 mono">{row.checkOut}</td><td className="p-3 mono">{row.late} د</td><td className="p-3 mono">{formatDurationMinutes(row.worked)}</td><td className="p-3">{row.status}</td><td className="p-3 text-xs">{row.detail}</td>
-                </> : <>
-                  <td className="p-3 text-xs">{row.detail}</td><td className="p-3 mono">{row.late} د</td><td className="p-3 mono">{formatDurationMinutes(row.worked)}</td>
-                </>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {loading && !rows.length && <div className="p-8 text-center text-muted-foreground">جاري تحميل بيانات التقارير من D1…</div>}
-        {!loading && !rows.length && <div className="p-8 text-center text-muted-foreground">لا توجد بيانات موظفين في D1 لعرض التقرير.</div>}
-      </div>
-    </ManagerLayout>
-  );
+  const daily = mode === "daily"; const title = daily ? `يومي · ${formatDate(date)}` : mode === "monthly" ? `شهري · ${month}` : `سنوي · ${year}`;
+  const headers = daily ? ["م", "الموظف", "الرقم", "الحضور", "الانصراف", "التأخر", "ساعات العمل", "الحالة", "الجدول"] : ["م", "الموظف", "الرقم", "ملخص الجدول", "التأخر", "ساعات العمل"];
+  return <ManagerLayout title="التقارير" subtitle={title} actions={<div className="flex flex-wrap gap-2"><Button onClick={exportExcel} disabled={!rows.length}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel</Button><Button onClick={exportCsv} variant="outline" disabled={!rows.length}><FileText className="ml-2 h-4 w-4" />CSV</Button></div>}>
+    <div className="hud-card p-4 mb-5 space-y-3"><div className="flex flex-wrap items-center gap-2"><div className="flex rounded-xl bg-secondary/50 p-1 border border-border/50">{(["daily", "monthly", "annual"] as Mode[]).map((value) => <button key={value} onClick={() => setMode(value)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap ${mode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{value === "daily" ? "يومي" : value === "monthly" ? "شهري" : "سنوي"}</button>)}</div>{daily && <input aria-label="تاريخ التقرير" type="date" className="input w-auto" value={date} onChange={(e) => setDate(e.target.value)} />}{mode === "monthly" && <input aria-label="شهر التقرير" type="month" className="input w-auto" value={month} onChange={(e) => setMonth(e.target.value)} />}{mode === "annual" && <input aria-label="سنة التقرير" type="number" min="2000" max="2100" className="input w-32" value={year} onChange={(e) => setYear(e.target.value)} />}</div><div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><Database className="h-4 w-4 text-primary shrink-0" /><span>مصدر التقرير: D1 — الموظفون والحضور الدائم.</span>{loading && <><Loader2 className="h-3 w-3 animate-spin" /><span>جاري القراءة من D1...</span></>}{savedAt && <span className="text-emerald-600 font-bold">محفوظ في D1 · {savedAt}</span>}</div>{error && <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive break-words">{error}</div>}</div>
+    <div className="hud-card overflow-hidden"><div className="overflow-x-auto overscroll-x-contain"><table className={`w-full table-fixed text-sm ${daily ? "min-w-[1120px]" : "min-w-[900px]"}`}><colgroup>{daily ? <><col className="w-12" /><col className="w-44" /><col className="w-28" /><col className="w-24" /><col className="w-24" /><col className="w-24" /><col className="w-28" /><col className="w-36" /><col className="w-[260px]" /></> : <><col className="w-12" /><col className="w-48" /><col className="w-28" /><col className="w-[420px]" /><col className="w-32" /><col className="w-36" /></>}</colgroup><thead className="bg-secondary/50 text-xs text-muted-foreground"><tr>{headers.map((header) => <th key={header} className="px-3 py-3 text-right font-bold whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={row.key} className="border-t border-border/50 align-middle hover:bg-secondary/20"><td className="px-3 py-3 mono font-bold whitespace-nowrap">{index + 1}</td><td className="px-3 py-3 font-semibold truncate" title={row.name}>{row.name}</td><td className="px-3 py-3 mono whitespace-nowrap">{row.jobNumber}</td>{daily ? <><td className="px-3 py-3 mono whitespace-nowrap">{row.checkIn}</td><td className="px-3 py-3 mono whitespace-nowrap">{row.checkOut}</td><td className="px-3 py-3 mono whitespace-nowrap">{row.late} د</td><td className="px-3 py-3 mono whitespace-nowrap">{formatDurationMinutes(row.worked)}</td><td className="px-3 py-3"><span className={`inline-flex max-w-full rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap ${row.status === "مكتمل" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : row.status === "غياب" ? "bg-red-500/15 text-red-700 dark:text-red-300" : row.status.includes("بدون") ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-sky-500/15 text-sky-700 dark:text-sky-300"}`}>{row.status}</span></td><td className="px-3 py-3 text-xs text-muted-foreground truncate" title={row.detail}>{row.detail}</td></> : <><td className="px-3 py-3 text-xs truncate" title={row.detail}>{row.detail}</td><td className="px-3 py-3 mono whitespace-nowrap">{row.late} د</td><td className="px-3 py-3 mono whitespace-nowrap">{formatDurationMinutes(row.worked)}</td></>}</tr>)}</tbody></table>{loading && !rows.length && <div className="p-10 text-center text-muted-foreground">جاري تحميل بيانات التقرير من D1…</div>}{!loading && !rows.length && <div className="p-10 text-center text-muted-foreground">لا توجد بيانات موظفين في D1 لعرض التقرير.</div>}</div></div>
+  </ManagerLayout>;
 }
