@@ -1,4 +1,4 @@
-import app from "./secureApp";
+import app, { sanitizeAuthResponse } from "./secureApp";
 import { HadirRealtime } from "./realtime";
 import { bindEmployeeDevice, clearEmployeeDevice, deviceStatus, registrationOptions, verifyRegistration } from "./deviceSecurity";
 import { handleWorkforce } from "./workforce";
@@ -32,13 +32,16 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
     const mutation=["POST","PUT","PATCH","DELETE"].includes(request.method)&&url.pathname.startsWith("/api/");
     if(url.pathname==="/api/auth/login"&&request.method==="POST"){
       const loginBody=await prepared.request.clone().json().catch(()=>({})) as any;
-      const response=await app.fetch(prepared.request,env,ctx);
+      const internalHeaders=new Headers(prepared.request.headers); internalHeaders.set("x-hadir-internal-auth","1");
+      const loginRequest=new Request(prepared.request,{headers:internalHeaders});
+      const response=await app.fetch(loginRequest,env,ctx);
       const data=await response.clone().json().catch(()=>({})) as any;
       if(response.ok&&data.kind==="employee"&&data.user?.id&&typeof data.token==="string"){
         const fingerprint=String(loginBody.deviceFingerprint||"").trim(); const deviceId=String(loginBody.deviceId||prepared.deviceId).trim(); const label=String(loginBody.deviceLabel||"متصفح الهاتف").trim(); const result=await bindEmployeeDevice(env,String(data.user.id),deviceId,label,fingerprint);
         if(!result.bound){ const logoutRequest=new Request(new URL("/api/auth/logout",request.url),{method:"POST",headers:new Headers({"authorization":`Bearer ${data.token}`,"content-type":"application/json","origin":origin}),body:"{}"}); await app.fetch(logoutRequest,env,ctx).catch(()=>undefined); await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),data.user.id,data.user.jobNumber||data.user.username||"",data.user.name||"","device-bind","rejected","الجهاز أو بصمة المتصفح غير مطابقة للجهاز المسجل",new Date().toISOString(),deviceId,request.headers.get("CF-Connecting-IP")||"unknown").run().catch(()=>undefined); return addDeviceCookie(new Response(JSON.stringify({ok:false,error:"هذا الحساب مرتبط بهاتف آخر. راجع الإدارة لفك ربط الجهاز."}),{status:403,headers:{...cors(origin),"content-type":"application/json; charset=utf-8"}}),prepared.deviceId,prepared.setCookie,origin); }
       }
-      return addDeviceCookie(response,prepared.deviceId,prepared.setCookie,origin);
+      const safe=typeof data.token==="string"?sanitizeAuthResponse(new Response(JSON.stringify((({token:_token,...rest})=>rest)(data)),{status:response.status,statusText:response.statusText,headers:response.headers}),data.token,origin):response;
+      return addDeviceCookie(safe,prepared.deviceId,prepared.setCookie,origin);
     }
     const actor=await actorFromSession(request,env);
     if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"){ const workforceResponse=await handleWorkforce(prepared.request,env,actor,url.pathname); if(workforceResponse.status!==404)return addDeviceCookie(workforceResponse,prepared.deviceId,prepared.setCookie,origin); }
