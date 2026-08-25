@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import EmployeeLogin from "@/features/auth/employee/EmployeeLogin";
-import { EmployeeCenter, EmployeeHistory, EmployeeHome, EmployeePremium, EmployeeProfile, EmployeeScanAutoFlow } from "@/features/employee/pages";
-import { ManagerAudit, ManagerDashboard, ManagerEmployees, ManagerReports, ManagerRequests, ManagerSettings } from "@/features/manager/pages";
-import { AIAssistant, Landing, NotFound, PrayerPage, WeatherPage } from "@/features/shared/pages";
-import ManagerLogin from "@/pages/ManagerLogin";
+import { EmployeeCenter, EmployeeHistory, EmployeeHome, EmployeePremium, EmployeeProfile, EmployeeScanAutoFlow } from "@/features/employee";
+import { ManagerAudit, ManagerDashboard, ManagerEmployees, ManagerLogin, ManagerReports, ManagerRequests, ManagerSettings } from "@/features/manager";
+import { AIAssistant, Landing, NotFound, PrayerPage, WeatherPage } from "@/features/shared";
 import EmployeeLayout from "@/components/layout/EmployeeLayout";
 import ProtectedEmployee from "@/components/ProtectedEmployee";
 import ProtectedManager from "@/components/ProtectedManager";
