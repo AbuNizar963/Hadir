@@ -22,7 +22,13 @@ jobs:
           from pathlib import Path
           import re
 
-          p = Path('src/pages/PrayerPage.tsx')
+          candidates = [
+              Path('src/features/shared/pages/PrayerPage.tsx'),
+              Path('src/pages/PrayerPage.tsx'),
+          ]
+          p = next((path for path in candidates if path.exists()), None)
+          if p is None:
+              raise SystemExit('Qibla implementation validation failed: PrayerPage.tsx not found')
           s = p.read_text(encoding='utf-8')
 
           required = [
@@ -31,14 +37,12 @@ jobs:
           ]
           missing = [item for item in required if item not in s]
 
-          # Validate the actual rotation expression without depending on
-          # whitespace or a single JSX formatting style.
-          has_rotation = bool(re.search(r'rotate\(\s*\$\{needleRotation\}\s*deg\s*\)', s))
+          has_rotation = bool(re.search(r'rotate\\(\\s*\\$\\{needleRotation\\}\\s*deg\\s*\\)', s))
           if not has_rotation:
               needle_index = s.find('needleRotation')
               has_nearby_rotation = (
                   needle_index >= 0 and
-                  bool(re.search(r'rotate\(', s[max(0, needle_index - 1000):needle_index + 1000]))
+                  bool(re.search(r'rotate\\(', s[max(0, needle_index - 1000):needle_index + 1000]))
               )
               if not has_nearby_rotation:
                   missing.append('rotation of needleRotation')
@@ -46,5 +50,5 @@ jobs:
           if missing:
               raise SystemExit('Qibla implementation validation failed: ' + ', '.join(missing))
 
-          print('Qibla compass implementation is present and uses bearing relative to device heading.')
+          print(f'Qibla compass implementation is present at {p} and uses bearing relative to device heading.')
           PY
