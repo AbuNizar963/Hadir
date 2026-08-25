@@ -21,10 +21,6 @@ function canAccess(actor: Actor, employeeId: string): boolean {
   return actor.role === "owner" || actor.role === "manager" || actor.id === employeeId;
 }
 
-function canWrite(actor: Actor, employeeId: string): boolean {
-  return actor.role === "owner" || actor.role === "manager" || actor.id === employeeId;
-}
-
 function keyFor(employeeId: string): string {
   return `employees/${encodeURIComponent(employeeId)}/avatar.webp`;
 }
@@ -60,7 +56,9 @@ export async function handleProfileImageRequest(
   }
 
   if (req.method === "POST") {
-    if (!canWrite(actor, employeeId)) return json({ error: "غير مصرح بتغيير صورة هذا الموظف" }, 403, origin);
+    if (actor.role !== "owner" && actor.role !== "manager") {
+      return json({ error: "المالك أو المدير فقط يستطيعان تغيير صورة الموظف" }, 403, origin);
+    }
 
     const contentType = (req.headers.get("content-type") || "").split(";", 1)[0].toLowerCase();
     if (contentType !== "multipart/form-data") {
@@ -96,7 +94,7 @@ export async function handleProfileImageRequest(
     });
 
     try {
-      await env.DB.prepare("UPDATE employees SET avatar_key=?,avatar=NULL WHERE id=?")
+      await env.DB.prepare("UPDATE employees SET avatar_key=? WHERE id=?")
         .bind(key, employeeId)
         .run();
     } catch (error) {
@@ -112,10 +110,12 @@ export async function handleProfileImageRequest(
   }
 
   if (req.method === "DELETE") {
-    if (!canWrite(actor, employeeId)) return json({ error: "غير مصرح بحذف صورة هذا الموظف" }, 403, origin);
+    if (actor.role !== "owner" && actor.role !== "manager") {
+      return json({ error: "المالك أو المدير فقط يستطيعان حذف صورة الموظف" }, 403, origin);
+    }
 
     await env.PROFILE_IMAGES.delete(key);
-    await env.DB.prepare("UPDATE employees SET avatar_key=NULL,avatar=NULL WHERE id=?").bind(employeeId).run();
+    await env.DB.prepare("UPDATE employees SET avatar_key=NULL WHERE id=?").bind(employeeId).run();
     return json({ ok: true }, 200, origin);
   }
 
