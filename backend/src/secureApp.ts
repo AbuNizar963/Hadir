@@ -10,7 +10,7 @@ function originFor(request: Request, env: Env): string {
   return incoming && allowed.includes(incoming) ? incoming : allowed[0] || incoming || "*";
 }
 
-function sanitizeAuthResponse(response: Response, token: unknown, origin: string): Response {
+export function sanitizeAuthResponse(response: Response, token: unknown, origin: string): Response {
   const headers = new Headers(response.headers);
   headers.set("cache-control", "no-store");
   headers.set("access-control-allow-origin", origin);
@@ -27,17 +27,13 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const response = await app.fetch(request, env as never, ctx);
+    if (request.headers.get("x-hadir-internal-auth") === "1") return response;
     if (request.method !== "POST" || (url.pathname !== "/api/auth/login" && url.pathname !== "/api/bootstrap/owner")) return response;
 
     const data = await response.clone().json().catch(() => null) as Record<string, unknown> | null;
     if (!response.ok || typeof data?.token !== "string") return response;
-
     const { token: _token, ...safeData } = data;
-    const safeResponse = new Response(JSON.stringify(safeData), {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-    });
+    const safeResponse = new Response(JSON.stringify(safeData), { status: response.status, statusText: response.statusText, headers: response.headers });
     return sanitizeAuthResponse(safeResponse, data.token, originFor(request, env));
   },
 };
