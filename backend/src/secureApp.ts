@@ -25,8 +25,9 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const internalAuth = request.headers.get("x-hadir-internal-auth") === "1";
+    const allowBearerForRevocation = url.pathname === "/api/auth/logout";
     const forwardedHeaders = new Headers(request.headers);
-    if (!internalAuth) forwardedHeaders.delete("authorization");
+    if (!internalAuth && !allowBearerForRevocation) forwardedHeaders.delete("authorization");
     const forwarded = new Request(request, { headers: forwardedHeaders });
     const response = await app.fetch(forwarded, env as never, ctx);
     if (internalAuth) return response;
