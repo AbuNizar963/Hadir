@@ -1,0 +1,24 @@
+import { seedIfEmpty } from "@/lib/storage";
+import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnostics";
+import { startRealtimeSync } from "@/lib/realtime";
+import { installApiCredentials } from "@/lib/apiCredentials";
+
+export function bootstrapApplication() {
+  installApiCredentials();
+  seedIfEmpty();
+  installGlobalDiagnostics();
+  startRealtimeSync();
+
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    window.addEventListener("load", () => {
+      const base = import.meta.env.BASE_URL || "/";
+      const swUrl = new URL("sw.js", new URL(base, window.location.origin)).toString();
+      const scope = new URL(base, window.location.origin).pathname;
+      navigator.serviceWorker.register(swUrl, { scope }).catch(() => undefined);
+    });
+  }
+
+  window.addEventListener("unhandledrejection", (event) => {
+    recordDiagnostic("error", "APP_UNHANDLED_REJECTION", "حدث خطأ غير معالج في التطبيق.", event.reason);
+  });
+}
