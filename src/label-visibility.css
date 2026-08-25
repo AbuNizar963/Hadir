@@ -1,0 +1,15 @@
+/* Navigation labels: keep every top navigation control self-describing. */
+@media (min-width: 640px) {
+  aside nav a > span:last-child,
+  header nav a > span:last-child {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+}
+
+/*
+ * Labels are rendered by the React navigation components themselves.
+ * Do not size utility buttons or inject labels with ::after here.
+ * This stylesheet must not compete with Header/ManagerLayout flex sizing.
+ */
