@@ -31,6 +31,9 @@ jobs:
       - name: Lint frontend
         run: bun run lint
 
+      - name: Security regression audit
+        run: bun run security:audit
+
       - name: Build frontend
         run: bun run build
 
