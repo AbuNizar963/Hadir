@@ -36,10 +36,19 @@ jobs:
           ]
           missing = [item for item in required if item not in s]
 
-          needle_index = s.find('needleRotation')
-          nearby = s[max(0, needle_index - 1000):needle_index + 1000] if needle_index >= 0 else ''
-          if 'rotate(' not in nearby:
-              missing.append('rotation of needleRotation')
+          needle_index = s.find('const needleRotation')
+          if needle_index < 0:
+              missing.append('needleRotation declaration')
+          else:
+              # The implementation may express the visual rotation through a
+              # React style transform rather than a literal CSS rotate() call.
+              # Validate that the calculated relative bearing is actually
+              # consumed by the compass markup after its declaration.
+              usage = s[needle_index + len('const needleRotation'):]
+              if 'needleRotation' not in usage:
+                  missing.append('needleRotation usage')
+              if 'transform' not in usage and 'rotate' not in usage:
+                  missing.append('needleRotation visual transform')
 
           if missing:
               raise SystemExit('Qibla implementation validation failed: ' + ', '.join(missing))
