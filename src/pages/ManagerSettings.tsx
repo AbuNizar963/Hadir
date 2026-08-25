@@ -1,0 +1,154 @@
+import { useEffect, useRef, useState } from "react";
+import ManagerLayout from "@/components/layout/ManagerLayout";
+import AdminAccountsPanel from "@/components/AdminAccountsPanel";
+import { getSettings, resetAll, saveSettings, setManagerSession } from "@/lib/storage";
+import { currentManager } from "@/lib/auth";
+import { saveBackendSettings, getBackendSettings, backendEnabled, createBootstrapOwner, saveBackendLocation, backendMe } from "@/lib/backend";
+import { getDiagnostics, clearDiagnostics, type DiagnosticEntry } from "@/lib/systemDiagnostics";
+import type { Settings, Location } from "@/types";
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block text-xs text-muted-foreground">{label}{children}</label>;
+}
+
+const PROJECT_LOGO = `${import.meta.env.BASE_URL}favicon.svg`;
+
+export default function ManagerSettings() {
+  const [s, setS] = useState<Settings>(getSettings());
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [showLocation, setShowLocation] = useState(false);
+  const [locName, setLocName] = useState("");
+  const [locLat, setLocLat] = useState(s.workSiteLat);
+  const [locLng, setLocLng] = useState(s.workSiteLng);
+  const [locRadius, setLocRadius] = useState(s.radiusMeters);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [loginUrl, setLoginUrl] = useState("");
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
+  const manager = currentManager();
+  const isOwner = manager?.role === "owner" || manager?.accountId === "bootstrap";
+
+  useEffect(() => {
+    setLoginUrl(`${window.location.origin}${import.meta.env.BASE_URL}login`);
+  }, []);
+
+  useEffect(() => {
+    if (!backendEnabled) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cloud = await getBackendSettings();
+        if (cancelled) return;
+        const merged = { ...getSettings(), ...cloud, adminAccounts: Array.isArray(cloud.adminAccounts) ? cloud.adminAccounts : getSettings().adminAccounts } as Settings;
+        saveSettings(merged);
+        setS(merged);
+        setLocLat(merged.workSiteLat);
+        setLocLng(merged.workSiteLng);
+        setLocRadius(merged.radiusMeters);
+      } catch (e) {
+        console.warn("تعذر تحميل إعدادات الخادم:", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const save = async () => {
+    setError(null);
+    setSaved(false);
+    const next = { ...s };
+    try {
+      const localRole = currentManager()?.role;
+      if (localRole !== "owner" && localRole !== "manager" && localRole !== "admin" && localRole !== undefined) {
+        setError("هذه العملية متاحة للمالك أو المدير فقط.");
+        return;
+      }
+      if (!Number.isFinite(Number(next.workSiteLat)) || !Number.isFinite(Number(next.workSiteLng)) || !Number.isFinite(Number(next.radiusMeters)) || Number(next.radiusMeters) <= 0) {
+        setError("إحداثيات موقع العمل والنطاق يجب أن تكون أرقامًا صحيحة، والنطاق أكبر من صفر.");
+        return;
+      }
+      const bootstrap = currentManager()?.accountId === "bootstrap";
+      if (bootstrap && backendEnabled) {
+        if (!next.ownerName?.trim() || !next.ownerUsername?.trim() || password.length < 6) {
+          setError("في أول إعداد يجب إدخال اسم المالك واسم المستخدم وكلمة مرور من 6 أحرف على الأقل.");
+          return;
+        }
+        const owner = await createBootstrapOwner({ name: next.ownerName.trim(), username: next.ownerUsername.trim(), password });
+        next.ownerPasswordHash = "";
+        next.adminAccounts = [{ id: owner.id, username: owner.username, passwordHash: "", name: owner.name, role: "owner", active: true, createdAt: new Date().toISOString() }];
+        setManagerSession({ loginAt: new Date().toISOString(), name: owner.name, role: "owner", jobNumber: owner.username, accountId: owner.id });
+      } else if (backendEnabled) {
+        const remote = await backendMe();
+        if (remote.user?.role !== "owner" && remote.user?.role !== "manager") {
+          setError("جلسة الإدارة الحالية ليست جلسة مالك أو مدير صالحة للحفظ. سجّل الدخول من جديد.");
+          return;
+        }
+        await saveBackendSettings(next);
+      }
+      if (backendEnabled) {
+        await saveBackendLocation({ id: "main", name: "المقر الرئيسي", lat: Number(next.workSiteLat), lng: Number(next.workSiteLng), radiusMeters: Number(next.radiusMeters) });
+        for (const location of next.locations || []) {
+          if (![location.lat, location.lng, location.radiusMeters].every(Number.isFinite) || Number(location.radiusMeters) <= 0) throw new Error(`بيانات الموقع «${location.name || location.id}» غير صالحة.`);
+          await saveBackendLocation(location);
+        }
+      } else {
+        saveSettings(next);
+      }
+      setS(next);
+      setPassword("");
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 1800);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر حفظ الإعدادات على الخادم");
+    }
+  };
+
+  const addLocation = () => {
+    if (!locName.trim()) return alert("يرجى إدخال اسم الموقع");
+    const location: Location = { id: `loc_${Date.now()}`, name: locName.trim(), lat: locLat, lng: locLng, radiusMeters: locRadius };
+    setS(prev => ({ ...prev, locations: [...(prev.locations || []), location] }));
+    setLocName("");
+    setShowLocation(false);
+  };
+  const removeLocation = (id: string) => setS(prev => ({ ...prev, locations: (prev.locations || []).filter(l => l.id !== id) }));
+  const getLocation = (target: "main" | "new") => {
+    if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع");
+    navigator.geolocation.getCurrentPosition(
+      p => target === "main" ? setS(prev => ({ ...prev, workSiteLat: p.coords.latitude, workSiteLng: p.coords.longitude })) : (setLocLat(p.coords.latitude), setLocLng(p.coords.longitude)),
+      e => alert("تعذر تحديد الموقع: " + e.message),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+  const generateQr = () => setS(prev => ({ ...prev, qrCode: `HADIR-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 7).toUpperCase()}` }));
+
+  const printQr = () => {
+    if (!printRef.current) return;
+    const safe = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
+    const logo = PROJECT_LOGO;
+    const logoHtml = `<img src="${safe(logo)}" alt="${safe(s.brandName || "حاضِر")}" />`;
+    const code = s.qrCode || loginUrl;
+    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=900x900&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=${encodeURIComponent(code)}`;
+    const w = window.open("", "_blank", "width=900,height=1200");
+    if (!w) return;
+    w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>رمز حضور · ${safe(s.brandName || "حاضِر")}</title><style>
+      @page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Tahoma,sans-serif}body{min-height:297mm}
+      .page{width:210mm;min-height:297mm;display:flex;align-items:center;justify-content:center;padding:14mm}.card{width:156mm;min-height:214mm;border:1px solid #d9dde5;border-radius:10mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14mm;gap:6mm}
+      .brand{font-size:28px;font-weight:800}.subtitle{font-size:13px;color:#667085}.qr-frame{position:relative;width:122mm;height:122mm;padding:4mm;border:3mm solid #16a34a;border-radius:8mm;background:#fff;display:grid;place-items:center;box-shadow:0 2mm 8mm rgba(22,163,74,.12)}.qr{position:relative;width:100%;height:100%;background:#fff;display:grid;place-items:center;overflow:hidden}.qr img.code{width:100%;height:100%;display:block}.logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24mm;height:24mm;border-radius:6mm;background:#fff;border:2.5mm solid #fff;box-shadow:0 1mm 5mm rgba(0,0,0,.2);display:grid;place-items:center;overflow:hidden}.logo img{width:100%;height:100%;object-fit:contain}.code{font-family:monospace;font-size:12px;letter-spacing:1px}.hint{font-size:11px;color:#667085}
+    </style></head><body><div class="page"><div class="card"><div class="brand">${safe(s.brandName || "حاضِر")}</div><div class="subtitle">رمز تسجيل الحضور والانصراف</div><div class="qr-frame"><div class="qr"><img class="code" src="${qr}" alt="QR"/><div class="logo">${logoHtml}</div></div></div><div class="code">${safe(code)}</div><div class="hint">وجّه كاميرا الهاتف إلى الرمز لإتمام التحقق</div></div></div><script>window.addEventListener('load',()=>{setTimeout(()=>{window.print();window.close()},350)})<\/script></body></html>`);
+    w.document.close();
+  };
+
+  const reset = () => { if (confirm("سيتم حذف بيانات النظام المحلية وإعادة التهيئة. هل أنت متأكد؟")) { resetAll(); setS(getSettings()); } };
+
+  return <ManagerLayout title="الإعدادات" subtitle="إعدادات النظام والصلاحيات — المالك والمدير"><div className="space-y-5">
+    <AdminAccountsPanel />
+    <section className="hud-card p-5 sm:p-6"><div className="text-xs mono text-primary font-bold mb-4">PROFILE · حساب المالك</div><div className="grid md:grid-cols-3 gap-3"><Field label="اسم المالك"><input className="input mt-1" value={s.ownerName || ""} onChange={e => setS({ ...s, ownerName: e.target.value })} placeholder="اسم المالك" /></Field><Field label="اسم المستخدم"><input className="input mono mt-1" value={s.ownerUsername || ""} onChange={e => setS({ ...s, ownerUsername: e.target.value })} placeholder="اسم المستخدم" /></Field><Field label="كلمة مرور جديدة"><input type="password" className="input mt-1" value={password} onChange={e => setPassword(e.target.value)} placeholder="6 أحرف على الأقل" /></Field></div></section>
+    {isOwner && <section className="hud-card p-5 sm:p-6 border-primary/30"><div className="text-xs mono text-primary font-bold mb-4">DIAGNOSTICS · تقرير أخطاء النظام · OWNER ONLY</div><p className="text-sm text-muted-foreground mb-3">سجل تقني محلي لأخطاء JavaScript والوعود غير المعالجة، مع رمز الخطأ والوقت وStack Trace والسياق. لا يظهر إلا للمالك.</p><div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary" onClick={() => { setDiagnostics(getDiagnostics()); setShowDiagnostics(true); }}>🛠️ فتح سجل الأخطاء ({getDiagnostics().filter(x => x.level === "error").length})</button><button type="button" className="btn-secondary" onClick={() => { clearDiagnostics(); setDiagnostics([]); }}>مسح السجل</button></div>{showDiagnostics && <div className="mt-4 space-y-2 max-h-[520px] overflow-auto">{diagnostics.length === 0 ? <div className="text-sm text-muted-foreground p-4 border rounded-xl">لا توجد أخطاء مسجلة.</div> : diagnostics.map(d => <details key={d.id} className="border rounded-xl p-3 bg-secondary/20"><summary className="cursor-pointer text-sm"><b>{d.code}</b> · {new Date(d.timestamp).toLocaleString("ar-SA")} · {d.message}</summary><pre className="mt-3 whitespace-pre-wrap break-words text-[11px] mono overflow-auto">{JSON.stringify({ level: d.level, code: d.code, timestamp: d.timestamp, message: d.message, stack: d.stack, context: d.context }, null, 2)}</pre></details>)}</div>}</section>}
+    <section className="hud-card p-5 sm:p-6"><div className="text-xs mono text-muted-foreground mb-4">GPS · الموقع الرئيسي</div><div className="grid md:grid-cols-3 gap-3"><Field label="خط العرض"><input type="number" step="0.000001" className="input mono mt-1" value={s.workSiteLat} onChange={e => setS({ ...s, workSiteLat: +e.target.value })} /></Field><Field label="خط الطول"><input type="number" step="0.000001" className="input mono mt-1" value={s.workSiteLng} onChange={e => setS({ ...s, workSiteLng: +e.target.value })} /></Field><Field label="النطاق بالمتر"><input type="number" min="20" max="2000" className="input mono mt-1" value={s.radiusMeters} onChange={e => setS({ ...s, radiusMeters: +e.target.value })} /></Field></div><button type="button" className="btn-secondary mt-3" onClick={() => getLocation("main")}>📍 استخدام موقعي الحالي</button></section>
+    <section className="hud-card p-5 sm:p-6"><div className="text-xs mono text-muted-foreground mb-4">LOCATIONS · مواقع العمل</div>{!showLocation ? <button type="button" className="btn-secondary w-full border-dashed" onClick={() => { setShowLocation(true); setLocLat(s.workSiteLat); setLocLng(s.workSiteLng); }}>+ إضافة موقع عمل</button> : <div className="space-y-3 p-4 rounded-xl bg-secondary/30"><Field label="اسم الموقع"><input className="input mt-1" value={locName} onChange={e => setLocName(e.target.value)} placeholder="مثال: الفرع الرئيسي" /></Field><div className="grid grid-cols-3 gap-2"><Field label="خط العرض"><input className="input mono mt-1" value={locLat} onChange={e => setLocLat(+e.target.value)} /></Field><Field label="خط الطول"><input className="input mono mt-1" value={locLng} onChange={e => setLocLng(+e.target.value)} /></Field><Field label="النطاق"><input className="input mono mt-1" value={locRadius} onChange={e => setLocRadius(+e.target.value)} /></Field></div><div className="flex gap-2"><button type="button" className="btn-secondary" onClick={() => getLocation("new")}>📍 GPS</button><button type="button" className="btn-primary" onClick={addLocation}>حفظ الموقع</button><button type="button" className="btn-secondary" onClick={() => setShowLocation(false)}>إلغاء</button></div></div>}<div className="mt-3 space-y-2">{(s.locations || []).map(l => <div key={l.id} className="flex justify-between items-center p-3 rounded-xl bg-secondary/30 text-sm"><span><b>{l.name}</b><span className="block text-[10px] mono text-muted-foreground">{l.lat.toFixed(5)}, {l.lng.toFixed(5)} · {l.radiusMeters}m</span></span><button type="button" className="text-destructive text-xs" onClick={() => removeLocation(l.id)}>حذف</button></div>)}</div></section>
+    <section className="hud-card p-5 sm:p-6"><div className="text-xs mono text-muted-foreground mb-4">QR · رمز الموقع</div><div className="grid md:grid-cols-2 gap-5 items-center"><div><Field label="رمز QR"><input className="input mono mt-1" value={s.qrCode} onChange={e => setS({ ...s, qrCode: e.target.value })} /><div className="flex gap-2 mt-3"><button type="button" className="btn-secondary" onClick={generateQr}>🔄 توليد جديد</button><button type="button" className="btn-primary" onClick={printQr}>🖨️ طباعة</button></div></Field></div><div ref={printRef} className="bg-white text-black rounded-xl p-5 text-center mx-auto"><b className="block text-xl mb-3">{s.brandName || "حاضِر"}</b><div className="relative w-64 h-64 mx-auto p-2 rounded-2xl border-[3mm] border-green-600 bg-white shadow-[0_8px_24px_rgba(22,163,74,.12)]"><div className="relative w-full h-full overflow-hidden"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=${encodeURIComponent(s.qrCode || loginUrl)}`} alt="QR" className="w-full h-full"/><div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-white border-4 border-white shadow-lg overflow-hidden grid place-items-center"><img src={PROJECT_LOGO} alt={s.brandName || "حاضِر"} className="w-full h-full object-contain" /></div></div></div><small className="block mt-3 font-mono">{s.qrCode}</small></div></div></section>
+    {error && <div className="p-3 rounded-xl border border-destructive/40 bg-destructive/10 text-destructive text-sm">{error}</div>}
+    <div className="flex flex-wrap gap-3 items-center"><button type="button" className="btn-primary px-6" onClick={save}>حفظ الإعدادات</button>{saved && <span className="text-primary text-sm">تم الحفظ ✓</span>}<div className="flex-1" /><button type="button" className="btn-danger text-xs" onClick={reset}>إعادة تعيين البيانات</button></div>
+  </div></ManagerLayout>;
+}
