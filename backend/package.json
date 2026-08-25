@@ -1,9 +1,0 @@
-{
-  "name": "hadir-api",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {"dev":"wrangler dev","check":"wrangler deploy --dry-run","deploy":"wrangler deploy","migrate":"wrangler d1 migrations apply Hadir --remote"},
-  "dependencies": {"@simplewebauthn/server":"^13.2.2"},
-  "devDependencies": {"wrangler":"4.123.0"}
-}
