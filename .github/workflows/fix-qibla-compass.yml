@@ -20,7 +20,6 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           candidates = [
               Path('src/features/shared/pages/PrayerPage.tsx'),
@@ -29,23 +28,18 @@ jobs:
           p = next((path for path in candidates if path.exists()), None)
           if p is None:
               raise SystemExit('Qibla implementation validation failed: PrayerPage.tsx not found')
-          s = p.read_text(encoding='utf-8')
 
+          s = p.read_text(encoding='utf-8')
           required = [
               'const needleRotation = bearing == null ? 0 : shortestDelta(bearing, heading);',
               'getQiblaBearingFromProvider',
           ]
           missing = [item for item in required if item not in s]
 
-          has_rotation = bool(re.search(r'rotate\\(\\s*\\$\\{needleRotation\\}\\s*deg\\s*\\)', s))
-          if not has_rotation:
-              needle_index = s.find('needleRotation')
-              has_nearby_rotation = (
-                  needle_index >= 0 and
-                  bool(re.search(r'rotate\\(', s[max(0, needle_index - 1000):needle_index + 1000]))
-              )
-              if not has_nearby_rotation:
-                  missing.append('rotation of needleRotation')
+          needle_index = s.find('needleRotation')
+          nearby = s[max(0, needle_index - 1000):needle_index + 1000] if needle_index >= 0 else ''
+          if 'rotate(' not in nearby:
+              missing.append('rotation of needleRotation')
 
           if missing:
               raise SystemExit('Qibla implementation validation failed: ' + ', '.join(missing))
