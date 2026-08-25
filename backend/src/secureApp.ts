@@ -17,19 +17,20 @@ export function sanitizeAuthResponse(response: Response, token: unknown, origin:
   headers.set("access-control-allow-credentials", "true");
   headers.set("access-control-allow-headers", "content-type, authorization, x-device-id");
   headers.set("access-control-allow-methods", "GET,POST,PATCH,PUT,DELETE,OPTIONS");
-  if (typeof token === "string" && token.length > 0) {
-    headers.append("Set-Cookie", `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${SESSION_MAX_AGE}; HttpOnly; Secure; SameSite=None`);
-  }
+  if (typeof token === "string" && token.length > 0) headers.append("Set-Cookie", `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${SESSION_MAX_AGE}; HttpOnly; Secure; SameSite=None`);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    const response = await app.fetch(request, env as never, ctx);
-    if (request.headers.get("x-hadir-internal-auth") === "1") return response;
+    const internalAuth = request.headers.get("x-hadir-internal-auth") === "1";
+    const forwardedHeaders = new Headers(request.headers);
+    if (!internalAuth) forwardedHeaders.delete("authorization");
+    const forwarded = new Request(request, { headers: forwardedHeaders });
+    const response = await app.fetch(forwarded, env as never, ctx);
+    if (internalAuth) return response;
     if (request.method !== "POST" || (url.pathname !== "/api/auth/login" && url.pathname !== "/api/bootstrap/owner")) return response;
-
     const data = await response.clone().json().catch(() => null) as Record<string, unknown> | null;
     if (!response.ok || typeof data?.token !== "string") return response;
     const { token: _token, ...safeData } = data;
