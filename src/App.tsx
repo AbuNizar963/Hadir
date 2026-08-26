@@ -7,6 +7,7 @@ import EmployeeScanAutoFlow from "@/pages/EmployeeScanAutoFlow";
 import EmployeeProfile from "@/pages/EmployeeProfile";
 import EmployeeCenter from "@/pages/EmployeeCenter";
 import EmployeePremium from "@/pages/EmployeePremium";
+import EmployeeNotifications from "@/pages/EmployeeNotifications";
 import WeatherPage from "@/pages/WeatherPage";
 import PrayerPage from "@/pages/PrayerPage";
 import AIAssistant from "@/pages/AIAssistant";
@@ -35,14 +36,13 @@ export default function App() {
       <Route path="/weather" element={<WeatherPage />} />
       <Route path="/prayer" element={<PrayerPage />} />
       <Route path="/ai" element={<AIAssistant />} />
-
       <Route path="/employee" element={<EmployeeShell><EmployeeHome /></EmployeeShell>} />
       <Route path="/employee/center" element={<EmployeeShell><EmployeeCenter /></EmployeeShell>} />
       <Route path="/employee/premium" element={<EmployeeShell><EmployeePremium /></EmployeeShell>} />
       <Route path="/employee/profile" element={<EmployeeShell><EmployeeProfile /></EmployeeShell>} />
       <Route path="/employee/history" element={<EmployeeShell><EmployeeHistory /></EmployeeShell>} />
+      <Route path="/employee/notifications" element={<EmployeeShell><EmployeeNotifications /></EmployeeShell>} />
       <Route path="/employee/scan/:type" element={<EmployeeShell><EmployeeScanAutoFlow /></EmployeeShell>} />
-
       <Route path="/manager/login" element={<ManagerLogin />} />
       <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
       <Route path="/manager/employees" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerEmployees /></RequireManagerRole></ManagerOnly>} />
