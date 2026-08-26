@@ -53,22 +53,27 @@ jobs:
           test -n "$VAPID_PRIVATE_KEY"
           test -n "$VAPID_SUBJECT"
           umask 077
-          cat > .secrets.env <<EOF
-          JWT_SECRET=$JWT_SECRET
-          OWNER_RECOVERY_CODE=$OWNER_RECOVERY_CODE
-          VAPID_PUBLIC_KEY=$VAPID_PUBLIC_KEY
-          VAPID_PRIVATE_KEY=$VAPID_PRIVATE_KEY
-          VAPID_SUBJECT=$VAPID_SUBJECT
-          EOF
+          python - <<'PY'
+          import json, os
+          values = {
+              "JWT_SECRET": os.environ["JWT_SECRET"],
+              "OWNER_RECOVERY_CODE": os.environ["OWNER_RECOVERY_CODE"],
+              "VAPID_PUBLIC_KEY": os.environ["VAPID_PUBLIC_KEY"],
+              "VAPID_PRIVATE_KEY": os.environ["VAPID_PRIVATE_KEY"],
+              "VAPID_SUBJECT": os.environ["VAPID_SUBJECT"],
+          }
+          with open('.secrets.json', 'w', encoding='utf-8') as f:
+              json.dump(values, f)
+          PY
 
       - name: Deploy hadir-api once
         working-directory: backend
-        run: npx wrangler deploy --secrets-file .secrets.env
+        run: npx wrangler deploy --secrets-file .secrets.json
 
       - name: Remove temporary secrets file
         if: always()
         working-directory: backend
-        run: rm -f .secrets.env
+        run: rm -f .secrets.json
 
       - name: Verify API health
         shell: bash
