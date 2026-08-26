@@ -7,6 +7,7 @@ import "./label-visibility.css";
 import "./settings-page.css";
 import "./layout-unified.css";
 import "./mobile-layout-width.css";
+import "./pull-to-refresh.css";
 import { seedIfEmpty } from "@/lib/storage";
 import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnostics";
 import { startRealtimeSync } from "@/lib/realtime";
