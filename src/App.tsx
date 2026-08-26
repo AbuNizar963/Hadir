@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Landing from "@/pages/Landing";
 import EmployeeLogin from "@/features/auth/employee/EmployeeLogin";
@@ -33,7 +34,7 @@ const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
 function PushSessionBridge() {
   const location = useLocation();
   const manager = getManagerSession();
-  React.useEffect(() => {
+  useEffect(() => {
     if (!location.pathname.startsWith("/manager") || location.pathname === "/manager/login" || !manager?.accountId) return;
     const key = `hadir.push.manager.${manager.accountId}`;
     if (sessionStorage.getItem(key) === "enabled") return;
