@@ -1,6 +1,9 @@
 name: Repair device rebind notifications
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
   workflow_run:
     workflows: ["Deploy Hadir API", "Install production Web Push"]
     types: [completed]
