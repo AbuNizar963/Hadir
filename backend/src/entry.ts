@@ -57,7 +57,7 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
     }
 
     const actor=await actorFromSession(request,env);
-    if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"){
+    if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"||url.pathname==="/api/device-rebind-requests"){
       const workforceResponse=await handleWorkforce(prepared.request,env,actor,url.pathname);
       if(workforceResponse.status!==404)return addDeviceCookie(workforceResponse,prepared.deviceId,prepared.setCookie,origin);
     }
