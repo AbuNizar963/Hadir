@@ -1,0 +1,46 @@
+name: One-shot fix device rebind admin auth
+
+on:
+  push:
+    paths:
+      - .github/workflows/fix-device-rebind-auth.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Fix workforce admin actor resolution
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("backend/src/entry.ts")
+          s = p.read_text(encoding="utf-8")
+          old = '    const actor=await actorFromSession(request,env);\n'
+          new = '''    const actor=await actorFromSession(request,env);\n    const workforceActor = (url.pathname === "/api/notifications" || url.pathname === "/api/notifications/read" || url.pathname === "/api/violations" || url.pathname.startsWith("/api/violations/") || url.pathname === "/api/workforce/live" || url.pathname === "/api/device-rebind-requests") ? await actorForAdministrativeAction(request,env) : actor;\n'''
+          if old not in s:
+              raise SystemExit("expected actor declaration not found")
+          s = s.replace(old, new, 1)
+          old_call = '      const workforceResponse=await handleWorkforce(prepared.request,env,actor,url.pathname);\n'
+          new_call = '      const workforceResponse=await handleWorkforce(prepared.request,env,workforceActor,url.pathname);\n'
+          if old_call not in s:
+              raise SystemExit("expected workforce call not found")
+          s = s.replace(old_call, new_call, 1)
+          p.write_text(s, encoding="utf-8")
+          PY
+
+      - name: Commit fix and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/entry.ts .github/workflows/fix-device-rebind-auth.yml
+          git rm .github/workflows/fix-device-rebind-auth.yml
+          git commit -m "fix: resolve admin actor for device rebind requests"
+          git push
