@@ -80,8 +80,6 @@ export default function EmployeeLayout({ title = "لوحة الموظف", subtit
 
       {menuOpen && <div className="sticky top-[138px] z-50 border-b border-border/60 bg-card/98 shadow-lg">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-3 py-2" dir="rtl">
-          <Link to="/employee" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary">لوحة الموظف</Link>
-          <Link to="/employee/profile" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary">الملف الشخصي</Link>
           <Link to="/employee/scan/attendance" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary">تسجيل الحضور</Link>
           <Link to="/employee/scan/departure" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary">تسجيل الانصراف</Link>
           <span className="rounded-lg px-3 py-2 text-xs text-muted-foreground">{session?.employeeId ? "حساب الموظف" : "الموظف"}</span>
