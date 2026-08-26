@@ -25,6 +25,7 @@ jobs:
       - name: Validate Cloudflare credentials
         working-directory: backend
         run: |
+          set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           npx wrangler whoami
@@ -41,11 +42,7 @@ jobs:
         working-directory: backend
         run: npx wrangler d1 migrations apply Hadir --remote
 
-      - name: Deploy hadir-api
-        working-directory: backend
-        run: npx wrangler deploy
-
-      - name: Sync Worker secrets
+      - name: Prepare Worker secrets
         working-directory: backend
         shell: bash
         run: |
@@ -55,11 +52,28 @@ jobs:
           test -n "$VAPID_PUBLIC_KEY"
           test -n "$VAPID_PRIVATE_KEY"
           test -n "$VAPID_SUBJECT"
-          printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET
-          printf '%s' "$OWNER_RECOVERY_CODE" | npx wrangler secret put OWNER_RECOVERY_CODE
-          printf '%s' "$VAPID_PUBLIC_KEY" | npx wrangler secret put VAPID_PUBLIC_KEY
-          printf '%s' "$VAPID_PRIVATE_KEY" | npx wrangler secret put VAPID_PRIVATE_KEY
-          printf '%s' "$VAPID_SUBJECT" | npx wrangler secret put VAPID_SUBJECT
+          umask 077
+          python - <<'PY'
+          import json, os
+          values = {
+              "JWT_SECRET": os.environ["JWT_SECRET"],
+              "OWNER_RECOVERY_CODE": os.environ["OWNER_RECOVERY_CODE"],
+              "VAPID_PUBLIC_KEY": os.environ["VAPID_PUBLIC_KEY"],
+              "VAPID_PRIVATE_KEY": os.environ["VAPID_PRIVATE_KEY"],
+              "VAPID_SUBJECT": os.environ["VAPID_SUBJECT"],
+          }
+          with open('.secrets.json', 'w', encoding='utf-8') as f:
+              json.dump(values, f)
+          PY
+
+      - name: Deploy hadir-api once
+        working-directory: backend
+        run: npx wrangler deploy --secrets-file .secrets.json
+
+      - name: Remove temporary secrets file
+        if: always()
+        working-directory: backend
+        run: rm -f .secrets.json
 
       - name: Verify API health
         shell: bash
