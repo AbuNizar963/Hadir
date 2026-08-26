@@ -53,16 +53,15 @@ export function getEmployeeWorkPeriod(employee: Employee | null | undefined, tar
   if (dayInCycle >= daysOn) return { isWorkDay: false, kind: "OFF", start: null, end: null, label: "راحة تناوبية", detail: `اليوم ${normalizeDigits(String(dayInCycle - daysOn + 1))} من ${normalizeDigits(String(daysOff))} في الراحة` };
   const periodStart = new Date(firstStart.getTime() + Math.floor(diff / cycleLength) * cycleLength * DAY_MS);
   const endClock = parseTime(employee.rotationEndTime || employee.workEndTime, "16:00");
-  let end = withTime(new Date(periodStart), endClock);
-  // Rotation shifts can cross midnight. For multi-day rotations, the end time is applied to the final work day.
-  if (daysOn === 1) {
-    if (end.getTime() <= periodStart.getTime()) end = new Date(end.getTime() + DAY_MS);
-  } else {
-    end = new Date(periodStart.getTime() + (daysOn - 1) * DAY_MS);
-    end = withTime(end, endClock);
-    if (end.getTime() <= periodStart.getTime()) end = new Date(end.getTime() + DAY_MS);
-  }
-  return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "مناوبة تناوبية", detail: `اليوم ${normalizeDigits(String(dayInCycle + 1))} من ${normalizeDigits(String(daysOn))} في المناوبة · ${formatTime(periodStart)} → ${formatTime(end)}` };
+
+  // A rotation is a continuous time interval. The number of work days is
+  // treated as a duration from the start instant, so 3 days starting Sunday
+  // at 09:00 ends Wednesday at 09:00 (not Tuesday at 09:00).
+  let end = new Date(periodStart.getTime() + daysOn * DAY_MS);
+  end = withTime(end, endClock);
+  if (end.getTime() <= periodStart.getTime()) end = new Date(end.getTime() + DAY_MS);
+
+  return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "مناوبة تناوبية", detail: `من ${formatDateTime(periodStart)} → ${formatDateTime(end)}` };
 }
 
 export function getActiveWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): WorkPeriod {
@@ -136,3 +135,4 @@ function withTime(date: Date, time: { hours: number; minutes: number }): Date { 
 function startOfDay(date: Date): Date { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
 function parseYYYYMMDD(value: string | null | undefined): Date | null { const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || "").trim()); if (!match) return null; const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])); if (date.getFullYear() !== Number(match[1]) || date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[3])) return null; return date; }
 function formatTime(date: Date): string { return normalizeDigits(date.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", hour12: false })); }
+function formatDateTime(date: Date): string { return `${normalizeDigits(date.toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" }))} ${formatTime(date)}`; }
