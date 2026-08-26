@@ -1,15 +1,16 @@
 name: Repair device rebind notifications
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["Deploy Hadir API", "Install production Web Push"]
+    types: [completed]
 
 permissions:
   contents: write
 
 jobs:
   repair:
-    if: ${{ !contains(github.event.head_commit.message, '[device-rebind-notification-fix]') }}
+    if: ${{ !contains(github.event.workflow_run.head_commit.message, '[device-rebind-notification-fix]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -53,5 +54,3 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "fix: show device rebind requests to admins [device-rebind-notification-fix]"
           git push origin HEAD:main
-
-# trigger repair after workflow installation
