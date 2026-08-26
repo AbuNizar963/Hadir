@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Landing from "@/pages/Landing";
 import EmployeeLogin from "@/features/auth/employee/EmployeeLogin";
 import EmployeeHome from "@/pages/EmployeeHome";
@@ -23,13 +23,30 @@ import NotFound from "@/pages/NotFound";
 import ProtectedEmployee from "@/components/ProtectedEmployee";
 import ProtectedManager from "@/components/ProtectedManager";
 import RequireManagerRole from "@/components/RequireManagerRole";
+import { getManagerSession } from "@/lib/storage";
+import { enableWebPush } from "@/lib/push";
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
 const EmployeeShell = ({ children }: { children: React.ReactNode }) => <ProtectedEmployee><EmployeeLayout>{children}</EmployeeLayout></ProtectedEmployee>;
 const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
 
+function PushSessionBridge() {
+  const location = useLocation();
+  const manager = getManagerSession();
+  React.useEffect(() => {
+    if (!location.pathname.startsWith("/manager") || location.pathname === "/manager/login" || !manager?.accountId) return;
+    const key = `hadir.push.manager.${manager.accountId}`;
+    if (sessionStorage.getItem(key) === "enabled") return;
+    void enableWebPush(String(manager.accountId)).then(result => {
+      if (result === "enabled") sessionStorage.setItem(key, "enabled");
+    });
+  }, [location.pathname, manager?.accountId]);
+  return null;
+}
+
 export default function App() {
   return <BrowserRouter basename={basename}>
+    <PushSessionBridge />
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<EmployeeLogin />} />
