@@ -57,8 +57,9 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
     }
 
     const actor=await actorFromSession(request,env);
+    const workforceActor = (url.pathname === "/api/notifications" || url.pathname === "/api/notifications/read" || url.pathname === "/api/violations" || url.pathname.startsWith("/api/violations/") || url.pathname === "/api/workforce/live" || url.pathname === "/api/device-rebind-requests") ? await actorForAdministrativeAction(request,env) : actor;
     if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"||url.pathname==="/api/device-rebind-requests"){
-      const workforceResponse=await handleWorkforce(prepared.request,env,actor,url.pathname);
+      const workforceResponse=await handleWorkforce(prepared.request,env,workforceActor,url.pathname);
       if(workforceResponse.status!==404)return addDeviceCookie(workforceResponse,prepared.deviceId,prepared.setCookie,origin);
     }
     if(url.pathname==="/api/device/status"&&request.method==="GET"){ if(!actor||actor.role!=="staff")return new Response(JSON.stringify({error:"غير مصرح"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}}); return new Response(JSON.stringify(await deviceStatus(env,actor.id)),{status:200,headers:{...cors(origin),"content-type":"application/json"}}); }
