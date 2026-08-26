@@ -9,23 +9,26 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  install:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[web-push-install]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
       - name: Verify Web Push implementation
         run: |
+          set -euo pipefail
           test -f backend/src/push.ts
           test -f backend/migrations/0010_web_push.sql
-          grep -q '@mmmike/web-push' backend/package.json
+          grep -q '"@mmmike/web-push"' backend/package.json
           grep -q '/api/push/public-key' backend/src/app.ts
           grep -q '/api/push/subscription' backend/src/app.ts
           grep -q 'push_subscriptions' backend/migrations/0010_web_push.sql
+          grep -q 'api/push/public-key' src/lib/push.ts
+
       - name: Install and verify backend
         working-directory: backend
         run: |
+          set -euo pipefail
           npm install --package-lock=false
           npm run check
-      - name: Verify frontend push integration
-        run: grep -q 'api/push/public-key' src/lib/push.ts
