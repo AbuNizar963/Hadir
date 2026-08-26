@@ -41,10 +41,9 @@ jobs:
         working-directory: backend
         run: npx wrangler d1 migrations apply Hadir --remote
 
-      # Wrangler blocks `secret put` until the Worker has a deployed version.
-      # Deploy once to establish the latest version, sync secrets, then deploy
-      # again so the production version is created with the current secrets.
-      - name: Bootstrap deploy hadir-api
+      # Wrangler requires an existing Worker before secret values can be put.
+      # Secrets are then updated in place; a second deploy is unnecessary.
+      - name: Deploy hadir-api
         working-directory: backend
         run: npx wrangler deploy
 
@@ -64,10 +63,6 @@ jobs:
           printf '%s' "$VAPID_PRIVATE_KEY" | npx wrangler secret put VAPID_PRIVATE_KEY
           printf '%s' "$VAPID_SUBJECT" | npx wrangler secret put VAPID_SUBJECT
 
-      - name: Deploy hadir-api
-        working-directory: backend
-        run: npx wrangler deploy
-
       - name: Verify D1 health
         shell: bash
         run: |
@@ -79,7 +74,7 @@ jobs:
           with open(sys.argv[1], encoding='utf-8') as f:
               data=json.load(f)
           assert data.get('ok') is True, data
-          assert data.get('d1') is True, data
+          assert data.get('database') == 'D1', data
           PY
 
       - name: Verify bootstrap compatibility
