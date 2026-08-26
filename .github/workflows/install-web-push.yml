@@ -6,129 +6,26 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  install:
+  verify:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[web-push-install]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply Web Push changes
-        shell: python
+      - name: Verify Web Push implementation
         run: |
-          from pathlib import Path
-          import json
-
-          # backend dependency
-          p = Path('backend/package.json')
-          data = json.loads(p.read_text())
-          data.setdefault('dependencies', {})['@mmmike/web-push'] = '^1.3.0'
-          p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
-
-          # Worker push sender
-          Path('backend/src/push.ts').write_text(r'''import { sendPushNotification, type PushSubscriptionData } from "@mmmike/web-push/send";
-
-          export type PushEnv = { VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; VAPID_SUBJECT?: string };
-
-          export async function sendUserPush(env: PushEnv, subscription: PushSubscriptionData, payload: { title: string; body: string; url?: string; tag?: string; type?: string }) {
-            const publicKey = String(env.VAPID_PUBLIC_KEY || "").trim();
-            const privateKey = String(env.VAPID_PRIVATE_KEY || "").trim();
-            const subject = String(env.VAPID_SUBJECT || "").trim();
-            if (!publicKey || !privateKey || !subject) return { ok: false, configured: false };
-            try {
-              const result = await sendPushNotification(subscription, {
-                title: payload.title,
-                body: payload.body,
-                icon: "/icons/icon-192.png",
-                badge: "/icons/icon-192.png",
-                tag: payload.tag || `hadir-${payload.type || "notification"}`,
-                data: { url: payload.url || "/", type: payload.type || "info" },
-              }, { publicKey, privateKey, subject });
-              return { ok: Boolean(result), configured: true };
-            } catch (error) {
-              const status = Number((error as any)?.status || (error as any)?.statusCode || 0);
-              return { ok: false, configured: true, status, error: error instanceof Error ? error.message : String(error) };
-            }
-          }
-          ''')
-
-          # App integration
-          p = Path('backend/src/app.ts')
-          s = p.read_text()
-          if 'from "./push"' not in s:
-            s = 'import { sendUserPush } from "./push";\n' + s
-          s = s.replace('PROFILE_IMAGES?: R2Bucket };', 'PROFILE_IMAGES?: R2Bucket; VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; VAPID_SUBJECT?: string };', 1)
-
-          old_schema = '''async function ensureWorkflowSchema(db: D1Database) { await db.batch([db.prepare("CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,type TEXT NOT NULL DEFAULT 'info',read_at TEXT,created_at TEXT NOT NULL)"),db.prepare("CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id,created_at DESC)")]); }'''
-          new_schema = '''async function ensureWorkflowSchema(db: D1Database) { await db.batch([db.prepare("CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,type TEXT NOT NULL DEFAULT 'info',read_at TEXT,created_at TEXT NOT NULL)"),db.prepare("CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id,created_at DESC)"),db.prepare("CREATE TABLE IF NOT EXISTS push_subscriptions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,endpoint TEXT NOT NULL UNIQUE,p256dh TEXT NOT NULL,auth TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)"),db.prepare("CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)")]); }'''
-          if old_schema not in s: raise SystemExit('ensureWorkflowSchema pattern not found')
-          s = s.replace(old_schema, new_schema, 1)
-
-          old_notify = '''async function notify(db: D1Database, userId: string, title: string, message: string, type = "info") { await db.prepare("INSERT INTO notifications(id,user_id,title,message,type,created_at) VALUES(?,?,?,?,?,?)").bind(uid(), userId, title, message, type, new Date().toISOString()).run(); }'''
-          new_notify = '''async function notify(db: D1Database, userId: string, title: string, message: string, type = "info", env?: Env, url = "/") {
-            const id = uid(); const now = new Date().toISOString();
-            await db.prepare("INSERT INTO notifications(id,user_id,title,message,type,created_at) VALUES(?,?,?,?,?,?)").bind(id, userId, title, message, type, now).run();
-            if (!env) return;
-            const rows = await db.prepare("SELECT id,endpoint,p256dh,auth FROM push_subscriptions WHERE user_id=?").bind(userId).all<any>();
-            for (const row of rows.results || []) {
-              const result = await sendUserPush(env, { endpoint: String(row.endpoint), keys: { p256dh: String(row.p256dh), auth: String(row.auth) } }, { title, body: message, url, type, tag: `hadir-${type}` });
-              if (result.status === 404 || result.status === 410) await db.prepare("DELETE FROM push_subscriptions WHERE id=?").bind(row.id).run().catch(()=>undefined);
-            }
-          }'''
-          if old_notify not in s: raise SystemExit('notify pattern not found')
-          s = s.replace(old_notify, new_notify, 1)
-
-          marker = ' if(path==="/api/attendance")return handleAttendance(req,env,actor,origin);'
-          routes = ''' if(path==="/api/push/public-key"&&req.method==="GET"){ return json({configured:Boolean(String(env.VAPID_PUBLIC_KEY||"").trim()),publicKey:String(env.VAPID_PUBLIC_KEY||"").trim()||null},200,origin); }
-          if(path==="/api/push/subscription"&&(req.method==="POST"||req.method==="DELETE")){
-            if(!actor)return json({error:"غير مصرح"},401,origin);
-            if(req.method==="DELETE"){ const b=await req.json().catch(()=>({})) as any; const endpoint=String(b.endpoint||"").trim(); if(endpoint) await env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id=? AND endpoint=?").bind(actor.id,endpoint).run(); else await env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id=?").bind(actor.id).run(); return json({ok:true},200,origin); }
-            const b=await req.json().catch(()=>({})) as any; const subscription=b.subscription||b; const endpoint=String(subscription.endpoint||"").trim(); const p256dh=String(subscription?.keys?.p256dh||"").trim(); const auth=String(subscription?.keys?.auth||"").trim(); if(!endpoint||!p256dh||!auth)return json({error:"اشتراك Push غير صالح"},400,origin);
-            if(!/^https:\\/\\//i.test(endpoint))return json({error:"عنوان Push غير صالح"},400,origin);
-            const now=new Date().toISOString(); await env.DB.prepare("INSERT INTO push_subscriptions(id,user_id,endpoint,p256dh,auth,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,p256dh=excluded.p256dh,auth=excluded.auth,updated_at=excluded.updated_at").bind(uid(),actor.id,endpoint,p256dh,auth,now,now).run(); return json({ok:true},200,origin);
-          }
-          '''
-          if marker not in s: raise SystemExit('attendance marker not found')
-          s = s.replace(marker, routes + marker, 1)
-          p.write_text(s)
-
-          # Frontend obtains the public VAPID key from the API, so no extra UI/config field is needed.
-          p = Path('src/lib/push.ts')
-          s = p.read_text()
-          s = s.replace('  if (!VAPID_PUBLIC_KEY) return "unconfigured";\n\n  try {', '''  try {
-            let vapidPublicKey = VAPID_PUBLIC_KEY;
-            if (!vapidPublicKey) {
-              const keyResponse = await fetch(`${API_URL}/api/push/public-key`, { credentials: "include", cache: "no-store" });
-              if (keyResponse.ok) vapidPublicKey = String(((await keyResponse.json()) as any)?.publicKey || "").trim();
-            }
-            if (!vapidPublicKey) return "unconfigured";''')
-          s = s.replace('applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),', 'applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),')
-          p.write_text(s)
-
-          Path('backend/migrations/0010_web_push.sql').write_text('''CREATE TABLE IF NOT EXISTS push_subscriptions (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            endpoint TEXT NOT NULL UNIQUE,
-            p256dh TEXT NOT NULL,
-            auth TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-          );
-          CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
-          ''')
-      - name: Install and verify
+          test -f backend/src/push.ts
+          test -f backend/migrations/0010_web_push.sql
+          grep -q '@mmmike/web-push' backend/package.json
+          grep -q '/api/push/public-key' backend/src/app.ts
+          grep -q '/api/push/subscription' backend/src/app.ts
+          grep -q 'push_subscriptions' backend/migrations/0010_web_push.sql
+      - name: Install and verify backend
+        working-directory: backend
         run: |
-          cd backend
           npm install --package-lock=false
-          npx tsc --noEmit 2>/dev/null || true
-          cd ..
-          git diff --check
-      - name: Commit implementation
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/package.json backend/src/push.ts backend/src/app.ts backend/migrations/0010_web_push.sql src/lib/push.ts
-          git diff --cached --quiet && exit 0
-          git commit -m "feat: add production Web Push delivery"
-          git push
+          npm run check
+      - name: Verify frontend push integration
+        run: grep -q 'api/push/public-key' src/lib/push.ts
