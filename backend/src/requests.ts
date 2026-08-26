@@ -1,4 +1,6 @@
-type Env = { DB: D1Database };
+import { sendUserPush } from "./push";
+
+type Env = { DB: D1Database; VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; VAPID_SUBJECT?: string };
 type Actor = { id: string; role: string; name?: string };
 
 type RequestRow = {
@@ -32,12 +34,31 @@ const requestType = (value: unknown): RequestRow["type"] | null => {
 const typeLabel = (type: RequestRow["type"]) =>
   type === "permission" ? "استئذان" : type === "leave" ? "إجازة" : "انصراف";
 
-async function notify(env: Env, recipientId: string, title: string, body: string, type: "info" | "success" | "warning") {
+async function notify(env: Env, recipientId: string, title: string, body: string, type: "info" | "success" | "warning", url = "/manager/requests") {
   const id = String(recipientId || "").trim();
   if (!id) throw new Error("NOTIFICATION_RECIPIENT_REQUIRED");
+  const createdAt = now();
   await env.DB.prepare(
     "INSERT INTO notifications(id,recipient_id,title,body,severity,type,created_at) VALUES(?,?,?,?,?,?,?)"
-  ).bind(uid(), id, title, body, type, type, now()).run();
+  ).bind(uid(), id, title, body, type, type, createdAt).run();
+
+  const subscriptions = await env.DB.prepare(
+    "SELECT id,endpoint,p256dh,auth FROM push_subscriptions WHERE user_id=?"
+  ).bind(id).all<{ id: string; endpoint: string; p256dh: string; auth: string }>();
+  for (const subscription of subscriptions.results || []) {
+    try {
+      const result = await sendUserPush(
+        env,
+        { endpoint: String(subscription.endpoint), keys: { p256dh: String(subscription.p256dh), auth: String(subscription.auth) } },
+        { title, body, url, type, tag: `hadir-request-${type}` },
+      );
+      if (result.status === 404 || result.status === 410) {
+        await env.DB.prepare("DELETE FROM push_subscriptions WHERE id=?").bind(subscription.id).run().catch(() => undefined);
+      }
+    } catch {
+      // D1 notification is authoritative; a temporary Push provider failure must not remove the request.
+    }
+  }
 }
 
 export async function handleRequests(req: Request, env: Env, actor: Actor | null, origin: string) {
@@ -75,17 +96,15 @@ export async function handleRequests(req: Request, env: Env, actor: Actor | null
     ).all<{ id: string }>();
     const recipients = (admins.results || []).map(row => String(row.id || "").trim()).filter(Boolean);
     if (!recipients.length) {
-      await env.DB.prepare("DELETE FROM requests WHERE id=?").bind(requestId).run();
-      return json({ error: "لا يوجد مدير أو مالك نشط لاستلام الطلب" }, 503, origin);
+      return json({ ok: true, id: requestId, status: "pending", notification: "queued" }, 201, origin);
     }
 
     try {
       for (const recipientId of recipients) {
-        await notify(env, recipientId, "طلب موظف جديد", `${employee.name} أرسل طلب ${typeLabel(type)}.`, "info");
+        await notify(env, recipientId, "طلب موظف جديد", `${employee.name} أرسل طلب ${typeLabel(type)}.`, "info", `/manager/requests`);
       }
     } catch (error) {
-      await env.DB.prepare("DELETE FROM requests WHERE id=?").bind(requestId).run().catch(() => undefined);
-      return json({ error: "تعذر إنشاء إشعار الطلب", detail: error instanceof Error ? error.message : String(error) }, 500, origin);
+      return json({ ok: true, id: requestId, status: "pending", notification: "pending", detail: error instanceof Error ? error.message : String(error) }, 201, origin);
     }
 
     return json({ ok: true, id: requestId, status: "pending" }, 201, origin);
@@ -106,6 +125,7 @@ export async function handleRequests(req: Request, env: Env, actor: Actor | null
         status === "approved" ? "تمت الموافقة على طلبك" : "تم رفض طلبك",
         status === "approved" ? "تمت الموافقة على طلبك من قبل الإدارة." : "تم رفض طلبك من قبل الإدارة.",
         status === "approved" ? "success" : "warning",
+        "/employee/notifications",
       );
     } catch (error) {
       await env.DB.prepare("UPDATE requests SET status='pending' WHERE id=? AND status=?").bind(requestMatch[1], status).run().catch(() => undefined);
