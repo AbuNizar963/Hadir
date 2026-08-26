@@ -1,4 +1,5 @@
-type Env = { DB: D1Database; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_RECOVERY_CODE?: string; PROFILE_IMAGES?: R2Bucket };
+import { sendUserPush } from "./push";
+type Env = { DB: D1Database; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_RECOVERY_CODE?: string; PROFILE_IMAGES?: R2Bucket; VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; VAPID_SUBJECT?: string };
 const original = (await import("./recovery")).default;
 const uid = () => crypto.randomUUID();
 const SESSION_COOKIE = "hadir_session";
@@ -16,8 +17,17 @@ function withSessionCookie(response: Response, token: string | null, origin = "*
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 async function actorFromOriginal(req: Request, env: Env) { const url = new URL(req.url); url.pathname = "/api/me"; url.search = ""; const probe = await original.fetch(new Request(url, { method: "GET", headers: req.headers }), env, {} as ExecutionContext); if (!probe.ok) return null; return (await probe.json().catch(() => ({})) as any).user || null; }
-async function ensureWorkflowSchema(db: D1Database) { await db.batch([db.prepare("CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,type TEXT NOT NULL DEFAULT 'info',read_at TEXT,created_at TEXT NOT NULL)"),db.prepare("CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id,created_at DESC)")]); }
-async function notify(db: D1Database, userId: string, title: string, message: string, type = "info") { await db.prepare("INSERT INTO notifications(id,user_id,title,message,type,created_at) VALUES(?,?,?,?,?,?)").bind(uid(), userId, title, message, type, new Date().toISOString()).run(); }
+async function ensureWorkflowSchema(db: D1Database) { await db.batch([db.prepare("CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,type TEXT NOT NULL DEFAULT 'info',read_at TEXT,created_at TEXT NOT NULL)"),db.prepare("CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id,created_at DESC)"),db.prepare("CREATE TABLE IF NOT EXISTS push_subscriptions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,endpoint TEXT NOT NULL UNIQUE,p256dh TEXT NOT NULL,auth TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)"),db.prepare("CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)")]); }
+async function notify(db: D1Database, userId: string, title: string, message: string, type = "info", env?: Env, url = "/") {
+  const id = uid(); const now = new Date().toISOString();
+  await db.prepare("INSERT INTO notifications(id,user_id,title,message,type,created_at) VALUES(?,?,?,?,?,?)").bind(id, userId, title, message, type, now).run();
+  if (!env) return;
+  const rows = await db.prepare("SELECT id,endpoint,p256dh,auth FROM push_subscriptions WHERE user_id=?").bind(userId).all<any>();
+  for (const row of rows.results || []) {
+    const result = await sendUserPush(env, { endpoint: String(row.endpoint), keys: { p256dh: String(row.p256dh), auth: String(row.auth) } }, { title, body: message, url, type, tag: `hadir-${type}` });
+    if (result.status === 404 || result.status === 410) await db.prepare("DELETE FROM push_subscriptions WHERE id=?").bind(row.id).run().catch(()=>undefined);
+  }
+}
 function avatarKey(employeeId: string) { return `employees/${employeeId}/avatar.webp`; }
 const EARTH_RADIUS_METERS = 6371000;
 function coordinate(value: unknown) { const n = Number(value); return Number.isFinite(n) ? Number(n.toFixed(7)) : NaN; }
@@ -52,6 +62,14 @@ export default { async fetch(req: Request, env: Env, ctx: ExecutionContext) {
  }
  if(avatarMatch&&req.method==="GET"){if(!env.PROFILE_IMAGES)return json({ok:false,error:"R2 binding PROFILE_IMAGES غير موجود"},503,origin);if(!actor)return json({error:"غير مصرح"},401,origin);const employeeId=decodeURIComponent(avatarMatch[1]);if(actor.role==="staff"&&actor.id!==employeeId)return json({error:"غير مصرح"},403,origin);const row=await env.DB.prepare("SELECT avatar FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<{avatar:string|null}>();if(!row)return json({error:"EMPLOYEE_NOT_FOUND"},404,origin);if(!row.avatar)return new Response(null,{status:404,headers:{"access-control-allow-origin":origin}});const object=await env.PROFILE_IMAGES.get(row.avatar);if(!object)return new Response(null,{status:404,headers:{"access-control-allow-origin":origin}});const headers=new Headers({"access-control-allow-origin":origin,"access-control-allow-credentials":"true","cache-control":"private, max-age=300"});object.writeHttpMetadata(headers);headers.set("etag",object.httpEtag);return new Response(object.body,{status:200,headers});}
  if(avatarMatch&&req.method==="DELETE"){if(!env.PROFILE_IMAGES)return json({ok:false,error:"R2 binding PROFILE_IMAGES غير موجود"},503,origin);if(!actor||!["owner","manager"].includes(actor.role))return json({error:"المالك أو المدير فقط"},403,origin);const employeeId=decodeURIComponent(avatarMatch[1]);const row=await env.DB.prepare("SELECT avatar FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<{avatar:string|null}>();if(!row)return json({error:"EMPLOYEE_NOT_FOUND"},404,origin);if(row.avatar)await env.PROFILE_IMAGES.delete(row.avatar);await env.DB.prepare("UPDATE employees SET avatar=NULL WHERE id=?").bind(employeeId).run();return json({ok:true},200,origin);}
+ if(path==="/api/push/public-key"&&req.method==="GET"){ return json({configured:Boolean(String(env.VAPID_PUBLIC_KEY||"").trim()),publicKey:String(env.VAPID_PUBLIC_KEY||"").trim()||null},200,origin); }
+if(path==="/api/push/subscription"&&(req.method==="POST"||req.method==="DELETE")){
+  if(!actor)return json({error:"غير مصرح"},401,origin);
+  if(req.method==="DELETE"){ const b=await req.json().catch(()=>({})) as any; const endpoint=String(b.endpoint||"").trim(); if(endpoint) await env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id=? AND endpoint=?").bind(actor.id,endpoint).run(); else await env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id=?").bind(actor.id).run(); return json({ok:true},200,origin); }
+  const b=await req.json().catch(()=>({})) as any; const subscription=b.subscription||b; const endpoint=String(subscription.endpoint||"").trim(); const p256dh=String(subscription?.keys?.p256dh||"").trim(); const auth=String(subscription?.keys?.auth||"").trim(); if(!endpoint||!p256dh||!auth)return json({error:"اشتراك Push غير صالح"},400,origin);
+  if(!/^https:\/\//i.test(endpoint))return json({error:"عنوان Push غير صالح"},400,origin);
+  const now=new Date().toISOString(); await env.DB.prepare("INSERT INTO push_subscriptions(id,user_id,endpoint,p256dh,auth,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,p256dh=excluded.p256dh,auth=excluded.auth,updated_at=excluded.updated_at").bind(uid(),actor.id,endpoint,p256dh,auth,now,now).run(); return json({ok:true},200,origin);
+}
  if(path==="/api/attendance")return handleAttendance(req,env,actor,origin);
  if(path==="/api/audit"&&req.method==="GET"){if(!actor||!["owner","manager","supervisor"].includes(actor.role))return json({error:"غير مصرح"},403,origin);const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),2000);const rows=await env.DB.prepare("SELECT id,employee_id AS employeeId,job_number AS jobNumber,actor_name AS actorName,action,result,reason,timestamp,device_id AS deviceId,ip,lat,lng,distance_meters AS distanceMeters FROM audit ORDER BY timestamp DESC LIMIT ?").bind(limit).all<any>();return json(rows.results||[],200,origin);}
  if(path==="/api/settings"&&req.method==="GET"){if(!actor||!["owner","manager","supervisor"].includes(actor.role))return json({error:"غير مصرح"},403,origin);const rows=await env.DB.prepare("SELECT key,value FROM settings ORDER BY key").all<any>();const out:any={};for(const r of rows.results||[]){try{out[r.key]=JSON.parse(r.value)}catch{out[r.key]=r.value}}return json(out,200,origin);}

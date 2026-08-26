@@ -10,9 +10,13 @@ function urlBase64ToUint8Array(value: string) {
 
 export async function enableWebPush(userId: string): Promise<"enabled" | "denied" | "unsupported" | "unconfigured" | "failed"> {
   if (!userId || typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return "unsupported";
-  if (!VAPID_PUBLIC_KEY) return "unconfigured";
-
   try {
+  let vapidPublicKey = VAPID_PUBLIC_KEY;
+  if (!vapidPublicKey) {
+    const keyResponse = await fetch(`${API_URL}/api/push/public-key`, { credentials: "include", cache: "no-store" });
+    if (keyResponse.ok) vapidPublicKey = String(((await keyResponse.json()) as any)?.publicKey || "").trim();
+  }
+  if (!vapidPublicKey) return "unconfigured";
     const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
     if (permission !== "granted") return "denied";
 
@@ -20,7 +24,7 @@ export async function enableWebPush(userId: string): Promise<"enabled" | "denied
     const existing = await registration.pushManager.getSubscription();
     const subscription = existing || await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
     });
 
     const response = await fetch(`${API_URL}/api/push/subscription`, {
