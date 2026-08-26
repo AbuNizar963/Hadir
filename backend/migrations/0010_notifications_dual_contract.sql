@@ -24,12 +24,12 @@ INSERT INTO notifications (
 )
 SELECT
   id,
-  recipient_id,
-  user_id,
+  COALESCE(NULLIF(recipient_id, ''), NULLIF(user_id, ''), ''),
+  COALESCE(NULLIF(user_id, ''), NULLIF(recipient_id, '')),
   type,
   title,
-  body,
-  message,
+  COALESCE(body, message, ''),
+  COALESCE(message, body, ''),
   severity,
   read_at,
   created_at
