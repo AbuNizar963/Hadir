@@ -23,9 +23,7 @@ export default class AppErrorBoundary extends Component<Props, State> {
     });
   }
 
-  handleReload = () => {
-    window.location.reload();
-  };
+  handleReload = () => window.location.reload();
 
   render() {
     if (!this.state.hasError) return this.props.children;
