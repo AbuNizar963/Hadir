@@ -46,6 +46,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -n "$JWT_SECRET"
+          test -n "$OWNER_RECOVERY_CODE"
+          test -n "$VAPID_PUBLIC_KEY"
+          test -n "$VAPID_PRIVATE_KEY"
+          test -n "$VAPID_SUBJECT"
           printf '%s' "$JWT_SECRET" | npx wrangler secret put JWT_SECRET
           printf '%s' "$OWNER_RECOVERY_CODE" | npx wrangler secret put OWNER_RECOVERY_CODE
           printf '%s' "$VAPID_PUBLIC_KEY" | npx wrangler secret put VAPID_PUBLIC_KEY
@@ -60,16 +65,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          response="$(curl -fsS --retry 5 --retry-delay 3 https://hadir-api.abunizar963.workers.dev/api/health)"
-          printf '%s\n' "$response"
-          python - <<'PY'
-          import json, os
-          data=json.loads(os.environ['HEALTH_RESPONSE'])
+          curl -fsS --retry 5 --retry-delay 3 https://hadir-api.abunizar963.workers.dev/api/health -o /tmp/health.json
+          cat /tmp/health.json
+          python - /tmp/health.json <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as f:
+              data=json.load(f)
           assert data.get('ok') is True, data
           assert data.get('d1') is True, data
           PY
-        env:
-          HEALTH_RESPONSE: ${{ '' }}
 
       - name: Verify bootstrap compatibility
         shell: bash
