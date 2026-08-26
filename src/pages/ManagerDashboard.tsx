@@ -4,7 +4,6 @@ import { getBackendAttendance, getBackendEmployees } from "@/lib/backend";
 import { getAttendance, getEmployees, getSettings } from "@/lib/storage";
 import { todayKey } from "@/lib/utils";
 import type { AttendanceRecord, Employee } from "@/types";
-import { Link } from "react-router-dom";
 
 type Filter = "all" | "present" | "absent" | "late";
 
@@ -53,7 +52,6 @@ export default function ManagerDashboard() {
     <ManagerLayout
       title="لوحة القيادة"
       subtitle={`نظرة مباشرة على حالة الدوام اليوم · ${new Date().toLocaleDateString("ar-EG", { weekday: "long", day: "2-digit", month: "long" })}`}
-      actions={<div className="flex flex-wrap gap-2"><Link to="/manager/reports" className="btn-secondary text-xs">التقارير</Link><Link to="/manager/requests" className="btn-secondary text-xs">طلبات الموظفين</Link></div>}
     >
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-6">
         <Kpi label="إجمالي الموظفين" value={activeEmployees.length} />
@@ -65,7 +63,6 @@ export default function ManagerDashboard() {
       <section className="hud-card p-5 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div><h2 className="text-lg font-extrabold">ملخص اليوم</h2><p className="text-xs text-muted-foreground mt-1">هذه الصفحة للمتابعة السريعة فقط. إدارة الطلبات والتقارير والموظفين لها صفحات مستقلة.</p></div>
-          <div className="flex gap-2"><Link to="/manager/reports" className="text-xs font-bold text-primary">فتح التقارير ←</Link><Link to="/manager/requests" className="text-xs font-bold text-primary">إدارة الطلبات ←</Link></div>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           <StatusCard label="حاضر" value={presentIds.size} tone="present" />
@@ -77,7 +74,6 @@ export default function ManagerDashboard() {
       <section className="hud-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div><div className="text-sm font-bold">حالة الموظفين اليوم</div><div className="text-xs text-muted-foreground mt-1">للمتابعة السريعة؛ التفاصيل والسجل الكامل في «الموظفون» و«التقارير».</div></div>
-          <Link to="/manager/employees" className="text-xs font-bold text-primary">فتح إدارة الموظفين ←</Link>
         </div>
         <div className="flex flex-wrap gap-2 mb-4">
           {(["all", "present", "absent", "late"] as Filter[]).map(v => <button key={v} onClick={() => setFilter(v)} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${filter === v ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{v === "all" ? "الكل" : v === "present" ? "الحاضرون" : v === "absent" ? "الغائبون" : "المتأخرون"}</button>)}
