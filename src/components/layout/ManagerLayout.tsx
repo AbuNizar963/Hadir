@@ -23,7 +23,6 @@ const NAV = [
 ];
 
 function adminToken() { return typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token.admin") || ""; }
-
 async function loadServerNotifications(): Promise<AppNotification[]> {
   const token = adminToken();
   if (!token) return [];
@@ -32,18 +31,8 @@ async function loadServerNotifications(): Promise<AppNotification[]> {
   const rows = await response.json() as Array<{ id: string; userId: string; title: string; message: string; type: AppNotification["type"]; readAt: string | null; createdAt: string }>;
   return rows.map(n => ({ id: n.id, userId: n.userId, title: n.title, body: n.message, type: n.type, read: Boolean(n.readAt), createdAt: n.createdAt }));
 }
-
-function readTheme(): "light" | "dark" | "system" {
-  if (typeof window === "undefined") return "system";
-  const value = localStorage.getItem(THEME_KEY);
-  return value === "light" || value === "dark" || value === "system" ? value : "system";
-}
-function applyTheme(theme: "light" | "dark" | "system") {
-  if (typeof document === "undefined") return;
-  const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark", dark);
-  document.documentElement.style.colorScheme = dark ? "dark" : "light";
-}
+function readTheme(): "light" | "dark" | "system" { if (typeof window === "undefined") return "system"; const value = localStorage.getItem(THEME_KEY); return value === "light" || value === "dark" || value === "system" ? value : "system"; }
+function applyTheme(theme: "light" | "dark" | "system") { if (typeof document === "undefined") return; const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches); document.documentElement.classList.toggle("dark", dark); document.documentElement.style.colorScheme = dark ? "dark" : "light"; }
 
 export default function ManagerLayout({ title, subtitle, actions, children }: { title: string; subtitle?: string; actions?: React.ReactNode; children: React.ReactNode }) {
   const nav = useNavigate();
@@ -57,196 +46,33 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
   const [theme, setTheme] = useState<"light" | "dark" | "system">(readTheme());
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
-
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const server = await loadServerNotifications();
-        if (active) setNotifications(server.filter(n => n.userId === currentUserId));
-      } catch {
-        try {
-          const all = getNotifications(currentUserId);
-          if (active) setNotifications(Array.isArray(all) ? all.filter(n => n.userId === currentUserId || n.userId === "manager" || n.userId === "admin" || n.userId === "all") : []);
-        } catch { if (active) setNotifications([]); }
-      }
-    };
-    void load();
-    const i = setInterval(() => void load(), 5000);
-    return () => { active = false; clearInterval(i); };
-  }, [currentUserId]);
-
-  useEffect(() => {
-    applyTheme(theme);
-    try { localStorage.setItem(THEME_KEY, theme); } catch { /* ignore storage errors */ }
-  }, [theme]);
-
-  useEffect(() => {
-    if (theme !== "system") return;
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => applyTheme("system");
-    media.addEventListener?.("change", onChange);
-    return () => media.removeEventListener?.("change", onChange);
-  }, [theme]);
-
+  useEffect(() => { let active = true; const load = async () => { try { const server = await loadServerNotifications(); if (active) setNotifications(server.filter(n => n.userId === currentUserId)); } catch { try { const all = getNotifications(currentUserId); if (active) setNotifications(Array.isArray(all) ? all.filter(n => n.userId === currentUserId || n.userId === "manager" || n.userId === "admin" || n.userId === "all") : []); } catch { if (active) setNotifications([]); } } }; void load(); const i = setInterval(() => void load(), 5000); return () => { active = false; clearInterval(i); }; }, [currentUserId]);
+  useEffect(() => { applyTheme(theme); try { localStorage.setItem(THEME_KEY, theme); } catch {} }, [theme]);
+  useEffect(() => { if (theme !== "system") return; const media = window.matchMedia("(prefers-color-scheme: dark)"); const onChange = () => applyTheme("system"); media.addEventListener?.("change", onChange); return () => media.removeEventListener?.("change", onChange); }, [theme]);
   const unreadCount = notifications.filter(n => !n.read).length;
   const logout = () => { localStorage.removeItem("managerAuth"); backendLogout(); setManagerSession(null); nav("/manager/login"); };
   const filteredNav = NAV.filter(n => !n.editRoles || n.editRoles.includes(currentRole));
-
-  const openDiagnostics = () => {
-    setDiagnostics(getDiagnostics());
-    setShowDiagnostics(true);
-    setMenuOpen(false);
-    setThemeMenuOpen(false);
-  };
-
-  const notificationRoute = (n: AppNotification) => {
-    const text = `${n.title} ${n.body}`.toLowerCase();
-    if (n.type === "error" || text.includes("خطأ") || text.includes("فشل")) return "/manager/audit";
-    if (text.includes("طلب") || text.includes("إجازة") || text.includes("استئذان") || text.includes("انصراف")) return "/manager/requests";
-    if (text.includes("تقرير") || text.includes("report")) return "/manager/reports";
-    if (text.includes("موظف") || text.includes("employee")) return "/manager/employees";
-    if (text.includes("إعداد") || text.includes("settings")) return "/manager/settings";
-    return null;
-  };
-
-  const notificationTitle = (n: AppNotification) => {
-    if (n.title === "طلب موظف جديد") {
-      const m = n.body.match(/طلب\s+(استئذان|إجازة|انصراف)/);
-      return m ? `طلب ${m[1]} جديد` : n.title;
-    }
-    return n.title;
-  };
-
-  const reloadNotifications = useCallback(async () => {
-    try {
-      const server = await loadServerNotifications();
-      setNotifications(server.filter(n => n.userId === currentUserId));
-    } catch {
-      const all = getNotifications(currentUserId);
-      setNotifications(all.filter(n => n.userId === currentUserId || n.userId === "manager" || n.userId === "admin" || n.userId === "all"));
-    }
-  }, [currentUserId]);
-
+  const openDiagnostics = () => { setDiagnostics(getDiagnostics()); setShowDiagnostics(true); setMenuOpen(false); setThemeMenuOpen(false); };
+  const notificationRoute = (n: AppNotification) => { const text = `${n.title} ${n.body}`.toLowerCase(); if (n.type === "error" || text.includes("خطأ") || text.includes("فشل")) return "/manager/audit"; if (text.includes("طلب") || text.includes("إجازة") || text.includes("استئذان") || text.includes("انصراف")) return "/manager/requests"; if (text.includes("تقرير") || text.includes("report")) return "/manager/reports"; if (text.includes("موظف") || text.includes("employee")) return "/manager/employees"; if (text.includes("إعداد") || text.includes("settings")) return "/manager/settings"; return null; };
+  const notificationTitle = (n: AppNotification) => { if (n.title === "طلب موظف جديد") { const m = n.body.match(/طلب\s+(استئذان|إجازة|انصراف)/); return m ? `طلب ${m[1]} جديد` : n.title; } return n.title; };
+  const reloadNotifications = useCallback(async () => { try { const server = await loadServerNotifications(); setNotifications(server.filter(n => n.userId === currentUserId)); } catch { const all = getNotifications(currentUserId); setNotifications(all.filter(n => n.userId === currentUserId || n.userId === "manager" || n.userId === "admin" || n.userId === "all")); } }, [currentUserId]);
   const setThemeAndKeepMenu = (value: "light" | "dark" | "system") => { setTheme(value); setThemeMenuOpen(false); };
-
   useEffect(() => { if (showNotifications) void reloadNotifications(); }, [showNotifications, reloadNotifications]);
-
-  useEffect(() => {
-    if (!showNotifications) return;
-    const onChanged = () => void reloadNotifications();
-    window.addEventListener("hadir:notifications-changed", onChanged);
-    return () => window.removeEventListener("hadir:notifications-changed", onChanged);
-  }, [showNotifications, reloadNotifications]);
-
-  const utilityButton = (to: string, label: string, Icon: typeof CloudSun) => (
-    <Link to={to} title={label} aria-label={label} className="group flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-background/70 text-foreground/85 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary">
-      <Icon className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
-      <span className="mt-0.5 text-[11px] font-semibold leading-none">{label}</span>
-    </Link>
-  );
-
-  return (
-    <div className="min-h-screen bg-background text-foreground" dir="rtl">
-      <div className="sticky top-0 z-[60] border-b border-border/70 bg-background/95 backdrop-blur-md">
-        <div className="mx-auto flex min-h-[76px] max-w-7xl items-center justify-between gap-3 px-2 sm:px-4">
-          <Link to="/manager" aria-label="حاضر" className="shrink-0">
-            <Brand />
-          </Link>
-          <nav className="flex items-center gap-1.5 overflow-x-auto" aria-label="أدوات النظام">
-            <button type="button" title="القائمة" aria-label="القائمة" aria-expanded={menuOpen} onClick={() => { setMenuOpen(v => !v); setThemeMenuOpen(false); }} className="group flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-background/70 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary">
-              {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
-              <span className="mt-0.5 text-[11px] font-semibold leading-none">القائمة</span>
-            </button>
-            {utilityButton("/weather", "الطقس", CloudSun)}
-            {utilityButton("/prayer", "القبلة", Compass)}
-            {utilityButton("/ai", "المساعد", Bot)}
-            <button type="button" onClick={() => setShowNotifications(true)} title="الإشعارات" aria-label="الإشعارات" className="relative hidden h-12 w-12 shrink-0 place-items-center rounded-xl border border-border/70 bg-background/70 hover:border-primary/40 hover:bg-primary/5 sm:grid">
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">{unreadCount}</span>}
-            </button>
-          </nav>
-        </div>
-
-        <div className="border-t border-border/60">
-          <nav className="mx-auto flex max-w-7xl items-stretch gap-1 overflow-x-auto px-2 py-1.5 sm:justify-center sm:px-4" aria-label="إدارة النظام">
-            {filteredNav.map(n => {
-              const Icon = n.icon;
-              return (
-                <NavLink key={n.to} to={n.to} end={n.end as any} aria-label={n.label} title={n.label} className={({ isActive }) => cn(
-                  "flex min-w-[86px] shrink-0 flex-col items-center justify-center rounded-xl px-2 py-1.5 text-center transition",
-                  isActive ? "bg-primary/15 text-primary ring-1 ring-primary/35 shadow-sm" : "text-foreground/80 hover:bg-secondary hover:text-foreground"
-                )}>
-                  <Icon className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
-                  <span className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-none">{n.label}</span>
-                  {n.to === "/manager/requests" && unreadCount > 0 && <span className="mt-1 rounded-full bg-destructive/15 px-1.5 text-[9px] font-bold text-destructive">{unreadCount}</span>}
-                </NavLink>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {menuOpen && (
-        <div className="sticky top-[138px] z-50 border-b border-border/60 bg-card/98 shadow-lg">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-start gap-2 px-3 py-2" dir="rtl">
-            <button type="button" onClick={() => { setShowNotifications(true); setMenuOpen(false); }} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary"><Bell className="mr-1 inline h-4 w-4" />الإشعارات {unreadCount > 0 && `(${unreadCount})`}</button>
-            {currentRole === "owner" && <button type="button" onClick={openDiagnostics} className="rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-secondary"><Wrench className="mr-1 inline h-4 w-4" />سجل الأخطاء ({getDiagnostics().filter(x => x.level === "error").length})</button>}
-            <div className="relative">
-              <button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary"><Palette className="mr-1 inline h-4 w-4" />المظهر</button>
-              {themeMenuOpen && <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-border bg-card p-1 shadow-xl">
-                <button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-secondary", theme === "dark" && "bg-primary/10 text-primary")}><Moon className="mr-2 inline h-4 w-4" />داكن</button>
-                <button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-secondary", theme === "light" && "bg-primary/10 text-primary")}><Sun className="mr-2 inline h-4 w-4" />فاتح</button>
-                <button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-secondary", theme === "system" && "bg-primary/10 text-primary")}><Monitor className="mr-2 inline h-4 w-4" />تلقائي</button>
-              </div>}
-            </div>
-            <button type="button" onClick={logout} className="rounded-lg px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10"><LogOut className="mr-1 inline h-4 w-4" />تسجيل خروج</button>
-            <Link to="/manager/employees" onClick={() => setMenuOpen(false)} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary"><Users className="mr-1 inline h-4 w-4" />الموظفون</Link>
-          </div>
-        </div>
-      )}
-
-      <header className="mx-auto max-w-7xl border-b border-border/40 px-4 pb-5 pt-7 sm:px-6 lg:px-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">HADIR · {currentRole.toUpperCase()}</div>
-            <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>
-            {subtitle && <div className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{subtitle}</div>}
-          </div>
-          {actions}
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">{children}</main>
-      <SessionWelcome />
-
-      {showNotifications && (
-        <div className="fixed inset-0 z-[80] bg-black/40 p-3 sm:p-5" onClick={() => setShowNotifications(false)}>
-          <div className="absolute left-3 top-3 w-[24rem] max-w-[calc(100%-1.5rem)] max-h-[82vh] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:left-5 sm:top-5" onClick={e => e.stopPropagation()}>
-            <div className="border-b border-border/60 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div><div className="font-bold">الإشعارات</div><div className="mt-1 text-[11px] text-muted-foreground">يتم الاحتفاظ بالإشعارات لمدة شهر واحد.</div></div>
-                <button type="button" onClick={() => setShowNotifications(false)} className="rounded-lg px-2 py-1 hover:bg-secondary" aria-label="إغلاق"><X className="h-4 w-4" /></button>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <button type="button" disabled={unreadCount === 0} onClick={() => { markAllAsRead(currentUserId); setNotifications(p => p.map(x => x.userId === currentUserId ? { ...x, read: true } : x)); }} className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold disabled:opacity-40"><CheckCheck className="h-4 w-4" />تحديد الكل كمقروء</button>
-                <button type="button" disabled={notifications.length === 0} onClick={() => { clearNotifications(currentUserId); setNotifications([]); }} className="flex items-center gap-1 rounded-lg border border-destructive/30 text-destructive px-3 py-2 text-xs font-semibold disabled:opacity-40"><Trash2 className="h-4 w-4" />حذف الكل</button>
-              </div>
-            </div>
-            {notifications.length === 0 ? <div className="p-6 text-center text-sm text-muted-foreground">لا توجد إشعارات.</div> : <div className="max-h-[58vh] space-y-1 overflow-y-auto p-2">{notifications.map(n => <div key={n.id} className={cn("flex gap-1 rounded-xl", !n.read && "bg-primary/5")}><button onClick={() => { markNotificationAsRead(n.id); setNotifications(p => p.map(x => x.id === n.id ? { ...x, read: true } : x)); setShowNotifications(false); const route = notificationRoute(n); if (route) nav(route); }} className="min-w-0 flex-1 rounded-lg p-3 text-right text-sm hover:bg-secondary"><div className="flex items-center gap-2"><span className={cn("h-2 w-2 shrink-0 rounded-full", n.read ? "bg-muted" : "bg-primary")} /><div className="truncate font-bold">{notificationTitle(n)}</div></div><div className="mt-1 text-xs text-muted-foreground">{n.body}</div><div className="mt-1 text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleString("ar-SA")}</div></button><button type="button" title="حذف الإشعار" aria-label="حذف الإشعار" onClick={() => { removeNotification(n.id); setNotifications(p => p.filter(x => x.id !== n.id)); }} className="mt-2 self-start rounded-lg px-2 py-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button></div>)}</div>}
-          </div>
-        </div>
-      )}
-
-      {showDiagnostics && (
-        <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/50 p-4" onClick={() => setShowDiagnostics(false)}>
-          <div dir="rtl" className="mt-8 w-full max-w-3xl rounded-2xl border border-primary/30 bg-card p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between gap-3"><div><div className="text-xs font-bold mono text-primary">DIAGNOSTICS · OWNER ONLY</div><h2 className="mt-1 text-xl font-extrabold">سجل أخطاء النظام</h2></div><button type="button" className="btn-secondary" onClick={() => setShowDiagnostics(false)}>إغلاق</button></div>
-            <div className="mb-4 flex gap-2"><span className="rounded-lg border px-2 py-1 text-xs">الأخطاء: {diagnostics.filter(x => x.level === "error").length}</span><span className="rounded-lg border px-2 py-1 text-xs">الإجمالي: {diagnostics.length}</span><button type="button" className="btn-secondary mr-auto text-xs" onClick={() => { clearDiagnostics(); setDiagnostics([]); }}>مسح السجل</button></div>
-            {diagnostics.length === 0 ? <div className="rounded-xl border p-5 text-sm text-muted-foreground">لا توجد أخطاء مسجلة حاليًا.</div> : <div className="max-h-[65vh] space-y-2 overflow-auto">{diagnostics.map(d => <details key={d.id} className="rounded-xl border bg-secondary/20 p-3"><summary className="cursor-pointer text-sm"><b className="mono">{d.code}</b> · {new Date(d.timestamp).toLocaleString("ar-SA")} · {d.message}</summary><pre dir="ltr" className="mt-3 overflow-auto whitespace-pre-wrap break-words text-[11px] mono">{JSON.stringify({ level: d.level, code: d.code, timestamp: d.timestamp, message: d.message, stack: d.stack, context: d.context }, null, 2)}</pre></details>)}</div>}
-          </div>
-        </div>
-      )}
+  useEffect(() => { if (!showNotifications) return; const onChanged = () => void reloadNotifications(); window.addEventListener("hadir:notifications-changed", onChanged); return () => window.removeEventListener("hadir:notifications-changed", onChanged); }, [showNotifications, reloadNotifications]);
+  const utilityButton = (to: string, label: string, Icon: typeof CloudSun) => (<Link to={to} title={label} aria-label={label} className="group flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-background/70 text-foreground/85 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"><Icon className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-0.5 text-[11px] font-semibold leading-none">{label}</span></Link>);
+  return (<div className="min-h-screen bg-background text-foreground" dir="rtl">
+    <div className="sticky top-0 z-[60] border-b border-border/70 bg-background/95 backdrop-blur-md">
+      <div className="mx-auto flex min-h-[76px] max-w-7xl items-center justify-between gap-3 px-2 sm:px-4"><Link to="/manager" aria-label="حاضر" className="shrink-0"><Brand /></Link><nav className="flex items-center gap-1.5 overflow-x-auto" aria-label="أدوات النظام"><button type="button" title="القائمة" aria-label="القائمة" aria-expanded={menuOpen} onClick={() => { setMenuOpen(v => !v); setThemeMenuOpen(false); }} className="group flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-background/70 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary">{menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}<span className="mt-0.5 text-[11px] font-semibold leading-none">القائمة</span></button>{utilityButton("/weather", "الطقس", CloudSun)}{utilityButton("/prayer", "القبلة", Compass)}{utilityButton("/ai", "المساعد", Bot)}<button type="button" onClick={() => setShowNotifications(true)} title="الإشعارات" aria-label="الإشعارات" className="relative hidden h-12 w-12 shrink-0 place-items-center rounded-xl border border-border/70 bg-background/70 hover:border-primary/40 hover:bg-primary/5 sm:grid"><Bell className="h-5 w-5" />{unreadCount > 0 && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">{unreadCount}</span>}</button></nav></div>
+      <div className="border-t border-border/60"><nav className="mx-auto flex max-w-7xl items-stretch gap-1 overflow-x-auto px-2 py-1.5 sm:justify-center sm:px-4" aria-label="إدارة النظام">{filteredNav.map(n => { const Icon = n.icon; return <NavLink key={n.to} to={n.to} end={n.end as any} aria-label={n.label} title={n.label} className={({ isActive }) => cn("flex min-w-[86px] shrink-0 flex-col items-center justify-center rounded-xl px-2 py-1.5 text-center transition", isActive ? "bg-primary/15 text-primary ring-1 ring-primary/35 shadow-sm" : "text-foreground/80 hover:bg-secondary hover:text-foreground")}><Icon className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" /><span className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-none">{n.label}</span>{n.to === "/manager/requests" && unreadCount > 0 && <span className="mt-1 rounded-full bg-destructive/15 px-1.5 text-[9px] font-bold text-destructive">{unreadCount}</span>}</NavLink>; })}</nav></div>
     </div>
-  );
+    {menuOpen && <div className="sticky top-[138px] z-50 border-b border-border/60 bg-card/98 shadow-lg"><div className="mx-auto flex max-w-7xl flex-wrap items-center justify-start gap-2 px-3 py-2" dir="rtl">
+      {currentRole === "owner" && <button type="button" onClick={openDiagnostics} className="rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-secondary"><Wrench className="mr-1 inline h-4 w-4" />سجل الأخطاء ({getDiagnostics().filter(x => x.level === "error").length})</button>}
+      <div className="relative"><button type="button" onClick={() => setThemeMenuOpen(v => !v)} aria-expanded={themeMenuOpen} className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-secondary"><Palette className="mr-1 inline h-4 w-4" />المظهر</button>{themeMenuOpen && <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-border bg-card p-1 shadow-xl"><button onClick={() => setThemeAndKeepMenu("dark")} className={cn("w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-secondary", theme === "dark" && "bg-primary/10 text-primary")}><Moon className="mr-2 inline h-4 w-4" />داكن</button><button onClick={() => setThemeAndKeepMenu("light")} className={cn("w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-secondary", theme === "light" && "bg-primary/10 text-primary")}><Sun className="mr-2 inline h-4 w-4" />فاتح</button><button onClick={() => setThemeAndKeepMenu("system")} className={cn("w-full rounded-lg px-3 py-2 text-right text-sm hover:bg-secondary", theme === "system" && "bg-primary/10 text-primary")}><Monitor className="mr-2 inline h-4 w-4" />تلقائي</button></div>}</div>
+      <button type="button" onClick={logout} className="rounded-lg px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10"><LogOut className="mr-1 inline h-4 w-4" />تسجيل خروج</button>
+    </div></div>}
+    <header className="mx-auto max-w-7xl border-b border-border/40 px-4 pb-5 pt-7 sm:px-6 lg:px-10"><div className="flex flex-wrap items-end justify-between gap-4"><div><div className="text-xs font-semibold tracking-widest text-muted-foreground mono">HADIR · {currentRole.toUpperCase()}</div><h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>{subtitle && <div className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{subtitle}</div>}</div>{actions}</div></header>
+    <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">{children}</main><SessionWelcome />
+    {showNotifications && <div className="fixed inset-0 z-[80] bg-black/40 p-3 sm:p-5" onClick={() => setShowNotifications(false)}><div className="absolute left-3 top-3 w-[24rem] max-w-[calc(100%-1.5rem)] max-h-[82vh] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:left-5 sm:top-5" onClick={e => e.stopPropagation()}><div className="border-b border-border/60 p-4"><div className="flex items-center justify-between gap-2"><div><div className="font-bold">الإشعارات</div><div className="mt-1 text-[11px] text-muted-foreground">يتم الاحتفاظ بالإشعارات لمدة شهر واحد.</div></div><button type="button" onClick={() => setShowNotifications(false)} className="rounded-lg px-2 py-1 hover:bg-secondary" aria-label="إغلاق"><X className="h-4 w-4" /></button></div><div className="mt-3 flex gap-2"><button type="button" disabled={unreadCount === 0} onClick={() => { markAllAsRead(currentUserId); setNotifications(p => p.map(x => x.userId === currentUserId ? { ...x, read: true } : x)); }} className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold disabled:opacity-40"><CheckCheck className="h-4 w-4" />تحديد الكل كمقروء</button><button type="button" disabled={notifications.length === 0} onClick={() => { clearNotifications(currentUserId); setNotifications([]); }} className="flex items-center gap-1 rounded-lg border border-destructive/30 text-destructive px-3 py-2 text-xs font-semibold disabled:opacity-40"><Trash2 className="h-4 w-4" />حذف الكل</button></div></div>{notifications.length === 0 ? <div className="p-6 text-center text-sm text-muted-foreground">لا توجد إشعارات.</div> : <div className="max-h-[58vh] space-y-1 overflow-y-auto p-2">{notifications.map(n => <div key={n.id} className={cn("flex gap-1 rounded-xl", !n.read && "bg-primary/5")}><button onClick={() => { markNotificationAsRead(n.id); setNotifications(p => p.map(x => x.id === n.id ? { ...x, read: true } : x)); setShowNotifications(false); const route = notificationRoute(n); if (route) nav(route); }} className="min-w-0 flex-1 rounded-lg p-3 text-right text-sm hover:bg-secondary"><div className="flex items-center gap-2"><span className={cn("h-2 w-2 shrink-0 rounded-full", n.read ? "bg-muted" : "bg-primary")} /><div className="truncate font-bold">{notificationTitle(n)}</div></div><div className="mt-1 text-xs text-muted-foreground">{n.body}</div><div className="mt-1 text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleString("ar-SA")}</div></button><button type="button" title="حذف الإشعار" aria-label="حذف الإشعار" onClick={() => { removeNotification(n.id); setNotifications(p => p.filter(x => x.id !== n.id)); }} className="mt-2 self-start rounded-lg px-2 py-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button></div>)}</div>}</div></div>}
+    {showDiagnostics && <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/50 p-4" onClick={() => setShowDiagnostics(false)}><div dir="rtl" className="mt-8 w-full max-w-3xl rounded-2xl border border-primary/30 bg-card p-5 shadow-2xl" onClick={e => e.stopPropagation()}><div className="mb-4 flex items-center justify-between gap-3"><div><div className="text-xs font-bold mono text-primary">DIAGNOSTICS · OWNER ONLY</div><h2 className="mt-1 text-xl font-extrabold">سجل أخطاء النظام</h2></div><button type="button" className="btn-secondary" onClick={() => setShowDiagnostics(false)}>إغلاق</button></div><div className="mb-4 flex gap-2"><span className="rounded-lg border px-2 py-1 text-xs">الأخطاء: {diagnostics.filter(x => x.level === "error").length}</span><span className="rounded-lg border px-2 py-1 text-xs">الإجمالي: {diagnostics.length}</span><button type="button" className="btn-secondary mr-auto text-xs" onClick={() => { clearDiagnostics(); setDiagnostics([]); }}>مسح السجل</button></div>{diagnostics.length === 0 ? <div className="rounded-xl border p-5 text-sm text-muted-foreground">لا توجد أخطاء مسجلة حاليًا.</div> : <div className="max-h-[65vh] space-y-2 overflow-auto">{diagnostics.map(d => <details key={d.id} className="rounded-xl border bg-secondary/20 p-3"><summary className="cursor-pointer text-sm"><b className="mono">{d.code}</b> · {new Date(d.timestamp).toLocaleString("ar-SA")} · {d.message}</summary><pre dir="ltr" className="mt-3 overflow-auto whitespace-pre-wrap break-words text-[11px] mono">{JSON.stringify({ level: d.level, code: d.code, timestamp: d.timestamp, message: d.message, stack: d.stack, context: d.context }, null, 2)}</pre></details>)}</div>}</div></div>}
+  </div>);
 }
