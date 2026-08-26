@@ -11,8 +11,8 @@ export async function sendUserPush(env: PushEnv, subscription: PushSubscriptionD
     const result = await sendPushNotification(subscription, {
       title: payload.title,
       body: payload.body,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
+      icon: "/favicon.svg",
+      badge: "/favicon.svg",
       tag: payload.tag || `hadir-${payload.type || "notification"}`,
       data: { url: payload.url || "/", type: payload.type || "info" },
     }, { publicKey, privateKey, subject });
