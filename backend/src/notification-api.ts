@@ -23,9 +23,9 @@ async function cleanup(db: D1Database) {
 }
 
 export async function handleNotificationApi(req: Request, env: Env, actor: Actor, origin: string): Promise<Response | null> {
-  if (!actor) return json({ error: "غير مصرح" }, 401, origin);
   const path = new URL(req.url).pathname.replace(/\/$/, "") || "/";
   if (!["/api/notifications", "/api/notifications/read", "/api/notifications/deleted"].includes(path)) return null;
+  if (!actor) return json({ error: "غير مصرح" }, 401, origin);
 
   await cleanup(env.DB);
   const userId = String(actor.id).trim();
