@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Patch admin authentication for workforce notifications
+      - name: Ensure device rebind requests reach workforce API
         shell: bash
         run: |
           python3 - <<'PY'
@@ -27,25 +27,17 @@ jobs:
 
           entry = Path('backend/src/entry.ts')
           text = entry.read_text()
-          old = '    const actor=await actorFromSession(request,env);\n    if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"){\n      const workforceResponse=await handleWorkforce(prepared.request,env,actor,url.pathname);'
-          new = '    const actor=await actorFromSession(request,env);\n    const workforceActor=await actorForAdministrativeAction(request,env);\n    if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"){\n      const workforceResponse=await handleWorkforce(prepared.request,env,workforceActor,url.pathname);'
-          if old not in text:
-              raise SystemExit('entry.ts target block not found')
-          entry.write_text(text.replace(old, new, 1))
 
-          bell = Path('src/components/NotificationBell.tsx')
-          text = bell.read_text()
-          old = 'async function backendNotifications():Promise<AppNotification[]>{try{const r=await fetch(`${API_URL}/api/notifications`,{credentials:"include",cache:"no-store"});'
-          new = 'function authHeaders(){const token=localStorage.getItem("hadir.api.token.admin")||localStorage.getItem("hadir.api.token.employee")||"";return token?{authorization:`Bearer ${token}`}:{}}\nasync function backendNotifications():Promise<AppNotification[]>{try{const r=await fetch(`${API_URL}/api/notifications`,{headers:authHeaders(),credentials:"include",cache:"no-store"});'
-          if old not in text:
-              raise SystemExit('NotificationBell fetch target not found')
-          text = text.replace(old, new, 1)
+          old = 'if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live")'
+          new = 'if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"||url.pathname==="/api/device-rebind-requests")'
 
-          old = 'async function markBackendAsRead(id?:string){await fetch(`${API_URL}/api/notifications/read`,{method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:JSON.stringify(id?{id}:{})}).catch(()=>undefined);}'
-          new = 'async function markBackendAsRead(id?:string){await fetch(`${API_URL}/api/notifications/read`,{method:"POST",credentials:"include",headers:{"content-type":"application/json",...authHeaders()},body:JSON.stringify(id?{id}:{})}).catch(()=>undefined);}'
-          if old not in text:
-              raise SystemExit('NotificationBell read target not found')
-          bell.write_text(text.replace(old, new, 1))
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('entry.ts workforce routing target not found')
+              text = text.replace(old, new, 1)
+              entry.write_text(text)
+          else:
+              print('device rebind routing already present')
           PY
 
       - name: Commit repair
@@ -53,7 +45,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/src/entry.ts src/components/NotificationBell.tsx
+          git add backend/src/entry.ts .github/workflows/repair-device-rebind-notifications.yml
           git diff --cached --quiet && exit 0
-          git commit -m "fix: show device rebind requests to admins [device-rebind-notification-fix]"
+          git commit -m "fix: route device rebind requests to workforce handler [device-rebind-notification-fix]"
           git push origin HEAD:main
