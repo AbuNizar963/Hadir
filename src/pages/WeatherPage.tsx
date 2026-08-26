@@ -18,6 +18,28 @@ export default function WeatherPage(){
  const[error,setError]=useState("");
  const[refreshing,setRefreshing]=useState(false);
  const[locating,setLocating]=useState(false);
+ useEffect(()=>{
+   const root=document.documentElement;
+   const body=document.body;
+   const previousRootBackground=root.style.backgroundColor;
+   const previousRootScheme=root.style.colorScheme;
+   const syncThemeSurface=()=>{
+     const background=getComputedStyle(body).backgroundColor;
+     if(background) root.style.backgroundColor=background;
+     root.style.colorScheme=root.classList.contains("dark")?"dark":"light";
+   };
+   syncThemeSurface();
+   const observer=new MutationObserver(syncThemeSurface);
+   observer.observe(root,{attributes:true,attributeFilter:["class"]});
+   const media=window.matchMedia("(prefers-color-scheme: dark)");
+   media.addEventListener?.("change",syncThemeSurface);
+   return()=>{
+     observer.disconnect();
+     media.removeEventListener?.("change",syncThemeSurface);
+     root.style.backgroundColor=previousRootBackground;
+     root.style.colorScheme=previousRootScheme;
+   };
+ },[]);
  const refresh=async(lat:number,lon:number)=>{const c=new AbortController();setRefreshing(true);try{setW(await getWeather(lat,lon,c.signal));setError("");}catch{setError("تعذر تحديث بيانات الطقس. تحقق من الاتصال بالإنترنت.");}finally{setRefreshing(false);}};
  const locate=()=>{
    if(!navigator.geolocation){setError("الموقع الجغرافي غير متاح في هذا المتصفح.");return;}
