@@ -1,0 +1,33 @@
+name: Sync Bun lockfile
+
+on:
+  push:
+    branches:
+      - fix/ci-frozen-lockfile
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+      - name: Regenerate lockfile
+        run: bun install
+      - name: Commit lockfile
+        run: |
+          if git diff --quiet -- bun.lock; then
+            echo "bun.lock is already synchronized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock
+          git commit -m "chore(ci): synchronize Bun lockfile"
+          git push
