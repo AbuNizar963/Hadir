@@ -42,39 +42,9 @@ export async function handleWorkforce(req:Request,env:Env,actor:Actor|null,pathn
   const att=await rows(env.DB,"SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=datetime('now','-1 day') ORDER BY timestamp DESC LIMIT 5000");const checkedIn=new Set((att as any[]).filter(x=>x.type==='check-in').map(x=>x.employeeId));const checkedOut=new Set((att as any[]).filter(x=>x.type==='check-out').map(x=>x.employeeId));const active=(employees as any[]).filter(x=>x.status==='active');
   return J({generatedAt:now(),summary:{total:employees.length,active:active.length,checkedIn:active.filter(x=>checkedIn.has(x.id)&&!checkedOut.has(x.id)).length,checkedOut:active.filter(x=>checkedOut.has(x.id)).length},employees,notifications,violations,leaveRequests,tasks,performance,payroll,anomalies,insights,escapes});
  }
-
  /* WORKFORCE_OWNER_CONTROLS_PATCH_V1 */
- if(pathname==="/api/workforce/live"&&method==="PATCH"&&actor?.role==="owner"){
-  const b=await req.json().catch(()=>({})) as any;
-  const employeeId=String(b.employeeId||"").trim();
-  if(!employeeId)return J({error:"رقم الموظف مطلوب"},400);
-  const employee=await env.DB.prepare("SELECT id,status FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
-  if(!employee)return J({error:"الموظف غير موجود"},404);
-  const sets:string[]=[];const values:any[]=[];
-  for(const key of ["isVip","autoCheckIn","autoCheckOut"] as const){if(typeof b[key]==="boolean"){sets.push(key==="isVip"?"is_vip=?":key==="autoCheckIn"?"auto_check_in=?":"auto_check_out=?");values.push(b[key]?1:0);}}
-  if(!sets.length)return J({error:"لا توجد تغييرات"},400);
-  values.push(employeeId);
-  await env.DB.prepare(`UPDATE employees SET ${sets.join(",")} WHERE id=?`).bind(...values).run();
-  const updated=await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
-  await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id(),employeeId,updated?.jobNumber||"",actor.name||"المالك","workforce-controls","success","تحديث إعدادات Workforce من بطاقة الموظف",now(),"OWNER_PANEL","unknown").run().catch(()=>undefined);
-  return J({ok:true,employee:updated});
- }
- if(pathname==="/api/workforce/live"&&method==="POST"&&actor?.role==="owner"){
-  const b=await req.json().catch(()=>({})) as any;
-  const employeeId=String(b.employeeId||"").trim();const type=String(b.type||"");
-  if(!employeeId||!["check-in","check-out"].includes(type))return J({error:"بيانات الإجراء غير صحيحة"},400);
-  const employee=await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,location_id AS locationId FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
-  if(!employee||employee.status!=="active")return J({error:"الموظف غير موجود أو موقوف"},404);
-  const last=await env.DB.prepare("SELECT type FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1").bind(employeeId).first<any>();
-  if(type==="check-in"&&last?.type==="check-in")return J({error:"الموظف مسجل حضور بالفعل"},409);
-  if(type==="check-out"&&last?.type!=="check-in")return J({error:"لا يوجد حضور مفتوح للموظف"},409);
-  const location=(await env.DB.prepare("SELECT id,lat,lng FROM locations WHERE id=? LIMIT 1").bind(employee.locationId||"main").first<any>()) || (await env.DB.prepare("SELECT id,lat,lng FROM locations ORDER BY name LIMIT 1").first<any>());
-  if(!location)return J({error:"لا يوجد موقع عمل محفوظ"},409);
-  const recordId=id();const timestamp=now();const deviceId=`admin-direct:${actor.id}`;
-  await env.DB.prepare("INSERT INTO attendance(id,employee_id,job_number,employee_name,type,timestamp,lat,lng,distance_meters,device_id,ip,qr_code,location_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(recordId,employee.id,employee.jobNumber,employee.name,type,timestamp,Number(location.lat),Number(location.lng),0,deviceId,"unknown","ADMIN_DIRECT",location.id).run();
-  await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip,lat,lng,distance_meters) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id(),employee.id,employee.jobNumber,actor.name||"المالك",type,"success",type==="check-in"?"تحضير مباشر من بطاقة الموظف":"انصراف مباشر من بطاقة الموظف",timestamp,deviceId,"unknown",Number(location.lat),Number(location.lng),0).run().catch(()=>undefined);
-  return J({ok:true,record:{id:recordId,employeeId:employee.id,jobNumber:employee.jobNumber,employeeName:employee.name,type,timestamp,lat:Number(location.lat),lng:Number(location.lng),distanceMeters:0,deviceId,qrCode:"ADMIN_DIRECT",locationId:location.id}},201);
- }
+ if(pathname==="/api/workforce/live"&&method==="PATCH"&&actor?.role==="owner"){const b=await req.json().catch(()=>({})) as any;const employeeId=String(b.employeeId||"").trim();if(!employeeId)return J({error:"رقم الموظف مطلوب"},400);const employee=await env.DB.prepare("SELECT id,status FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();if(!employee)return J({error:"الموظف غير موجود"},404);const sets:string[]=[];const values:any[]=[];for(const key of ["isVip","autoCheckIn","autoCheckOut"] as const){if(typeof b[key]==="boolean"){sets.push(key==="isVip"?"is_vip=?":key==="autoCheckIn"?"auto_check_in=?":"auto_check_out=?");values.push(b[key]?1:0);}}if(!sets.length)return J({error:"لا توجد تغييرات"},400);values.push(employeeId);await env.DB.prepare(`UPDATE employees SET ${sets.join(",")} WHERE id=?`).bind(...values).run();const updated=await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id(),employeeId,updated?.jobNumber||"",actor.name||"المالك","workforce-controls","success","تحديث إعدادات Workforce من بطاقة الموظف",now(),"OWNER_PANEL","unknown").run().catch(()=>undefined);return J({ok:true,employee:updated});}
+ if(pathname==="/api/workforce/live"&&method==="POST"&&actor?.role==="owner"){const b=await req.json().catch(()=>({})) as any;const employeeId=String(b.employeeId||"").trim();const type=String(b.type||"");if(!employeeId||!["check-in","check-out"].includes(type))return J({error:"بيانات الإجراء غير صحيحة"},400);const employee=await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,location_id AS locationId FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();if(!employee||employee.status!=="active")return J({error:"الموظف غير موجود أو موقوف"},404);const last=await env.DB.prepare("SELECT type FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1").bind(employeeId).first<any>();if(type==="check-in"&&last?.type==="check-in")return J({error:"الموظف مسجل حضور بالفعل"},409);if(type==="check-out"&&last?.type!=="check-in")return J({error:"لا يوجد حضور مفتوح للموظف"},409);const location=(await env.DB.prepare("SELECT id,lat,lng FROM locations WHERE id=? LIMIT 1").bind(employee.locationId||"main").first<any>()) || (await env.DB.prepare("SELECT id,lat,lng FROM locations ORDER BY name LIMIT 1").first<any>());if(!location)return J({error:"لا يوجد موقع عمل محفوظ"},409);const recordId=id();const timestamp=now();const deviceId=`admin-direct:${actor.id}`;await env.DB.prepare("INSERT INTO attendance(id,employee_id,job_number,employee_name,type,timestamp,lat,lng,distance_meters,device_id,ip,qr_code,location_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(recordId,employee.id,employee.jobNumber,employee.name,type,timestamp,Number(location.lat),Number(location.lng),0,deviceId,"unknown","ADMIN_DIRECT",location.id).run();await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip,lat,lng,distance_meters) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id(),employee.id,employee.jobNumber,actor.name||"المالك",type,"success",type==="check-in"?"تحضير مباشر من بطاقة الموظف":"انصراف مباشر من بطاقة الموظف",timestamp,deviceId,"unknown",Number(location.lat),Number(location.lng),0).run().catch(()=>undefined);return J({ok:true,record:{id:recordId,employeeId:employee.id,jobNumber:employee.jobNumber,employeeName:employee.name,type,timestamp,lat:Number(location.lat),lng:Number(location.lng),distanceMeters:0,deviceId,qrCode:"ADMIN_DIRECT",locationId:location.id}},201);}
  if(pathname==="/api/notifications"&&method==="GET")return J(await rows(env.DB,"SELECT id,recipient_id AS recipientId,recipient_id AS userId,title,body,severity,type,read_at AS readAt,created_at AS createdAt FROM notifications WHERE recipient_id=? ORDER BY created_at DESC LIMIT 100",actor.id));
  if(pathname==="/api/notifications/read"&&method==="POST"){const b=await req.json().catch(()=>({})) as any;if(b.id)await env.DB.prepare("UPDATE notifications SET read_at=? WHERE id=? AND recipient_id=?").bind(now(),b.id,actor.id).run();else await env.DB.prepare("UPDATE notifications SET read_at=? WHERE recipient_id=? AND read_at IS NULL").bind(now(),actor.id).run();return J({ok:true});}
  if(pathname==="/api/device-rebind-requests"&&method==="GET"){if(!admin(actor))return J({error:"غير مصرح"},403);return J(await rows(env.DB,"SELECT * FROM device_rebind_requests WHERE status='pending' ORDER BY created_at DESC LIMIT 100"));}
@@ -85,31 +55,34 @@ export async function handleWorkforce(req:Request,env:Env,actor:Actor|null,pathn
  if(pathname==="/api/ai/insights/generate"&&method==="POST"){if(!manage(actor))return J({error:"غير مصرح"},403);const total=Number((await env.DB.prepare("SELECT COUNT(*) c FROM employees WHERE status='active'").first<any>())?.c||0);const checked=Number((await env.DB.prepare("SELECT COUNT(DISTINCT employee_id) c FROM attendance WHERE type='check-in' AND timestamp>=datetime('now','-1 day')").first<any>())?.c||0);const rate=total?Math.round(checked/total*100):0;const r={id:id(),scope:"dashboard",scopeId:null,kind:"attendance-summary",title:"ملخص الحضور الذكي",summary:`نسبة الحضور خلال آخر 24 ساعة ${rate}% (${checked}/${total}).`,evidence:JSON.stringify({checked,total,rate}),confidence:.98,createdAt:now()};await env.DB.prepare("INSERT INTO ai_insights(id,scope,scope_id,kind,title,summary,evidence,confidence,created_at) VALUES(?,?,?,?,?,?,?,?,?)").bind(r.id,r.scope,r.scopeId,r.kind,r.title,r.summary,r.evidence,r.confidence,r.createdAt).run();return J({ok:true,insight:r},201);}
  if(pathname==="/api/anomalies/scan"&&method==="POST"){if(!manage(actor))return J({error:"غير مصرح"},403);const es=await rows(env.DB,"SELECT id FROM employees WHERE status='active'");const created:any[]=[];for(const e of es as any[]){const c=Number((await env.DB.prepare("SELECT COUNT(*) c FROM audit WHERE employee_id=? AND result='rejected' AND timestamp>=datetime('now','-7 day')").bind(e.id).first<any>())?.c||0);if(c>=3){const r={id:id(),employeeId:e.id,type:"repeated-rejected-actions",score:Math.min(100,50+c*10),evidence:`${c} محاولات مرفوضة خلال 7 أيام`,status:"new",detectedAt:now()};await env.DB.prepare("INSERT INTO anomaly_events(id,employee_id,type,score,evidence,status,detected_at) VALUES(?,?,?,?,?,?,?)").bind(r.id,r.employeeId,r.type,r.score,r.evidence,r.status,r.detectedAt).run();created.push(r);}}return J({ok:true,created});}
  if(pathname==="/api/escape-events"&&method==="POST"){if(!manage(actor))return J({error:"غير مصرح"},403);const b=await req.json().catch(()=>({})) as any;const eid=String(b.employeeId||""),s=String(b.status||"");if(!eid||!["escaped","returned"].includes(s))return J({error:"بيانات الهروب غير صحيحة"},400);const e=await env.DB.prepare("SELECT id,name,job_number AS jobNumber FROM employees WHERE id=?").bind(eid).first<any>();if(!e)return J({error:"EMPLOYEE_NOT_FOUND"},404);const last=await env.DB.prepare("SELECT status FROM escape_events WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1").bind(eid).first<any>();if((s==='escaped'&&last?.status==='escaped')||(s==='returned'&&last?.status!=='escaped'))return J({error:"تسلسل حالة الهروب غير صحيح"},409);const r={id:id(),employeeId:eid,jobNumber:e.jobNumber,employeeName:e.name,status:s,timestamp:now(),reason:b.reason?String(b.reason):null,actorId:actor.id,actorName:actor.name||null,lat:b.lat==null?null:Number(b.lat),lng:b.lng==null?null:Number(b.lng),createdAt:now()};await env.DB.prepare("INSERT INTO escape_events(id,employee_id,job_number,employee_name,status,timestamp,reason,actor_id,actor_name,lat,lng,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").bind(r.id,r.employeeId,r.jobNumber,r.employeeName,r.status,r.timestamp,r.reason,r.actorId,r.actorName,r.lat,r.lng,r.createdAt).run();await notify(env.DB,eid,s==='escaped'?"تم تسجيل الهروب":"تم تسجيل العودة",s==='escaped'?"تم تسجيل حالة هروب":"تم تسجيل عودتك للعمل",s==='escaped'?"danger":"success","escape");return J({ok:true,event:r},201);}
- if(pathname==="/api/workforce/reset-test-data"&&method==="POST"){
+ if((pathname==="/api/workforce/reset"||pathname==="/api/workforce/reset-test-data")&&method==="POST"){
   if(actor?.role!=="owner")return J({error:"غير مصرح"},403);
   const b=await req.json().catch(()=>({})) as any;
-  if(String(b.confirmation||"")!=="حذف البيانات التجريبية")return J({error:"تأكيد الحذف غير صحيح"},400);
+  if(String(b.confirmation||"")!=="تأكيد")return J({error:"كلمة التأكيد غير صحيحة"},400);
   const tables=["employee_passkeys","webauthn_challenges","attendance","audit","requests","employee_requests","notifications","violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights","push_subscriptions","escape_events","device_rebind_requests"];
-  const placeholders=tables.map(()=>"?").join(",");
-  const existing=await rows(env.DB,`SELECT name FROM sqlite_master WHERE type='table' AND name IN (${placeholders})`,...tables) as any[];
-  const existingNames=new Set(existing.map(x=>String(x.name)));
   const deletedCounts:Record<string,number>={};
-  const statements:any[]=[];
+  // D1-safe reset: avoid sqlite_master discovery and large batch statements. Missing optional tables are ignored individually.
   for(const table of tables){
-    if(!existingNames.has(table))continue;
-    const count=Number((await env.DB.prepare(`SELECT COUNT(*) AS c FROM "${table}"`).first<any>())?.c||0);
-    deletedCounts[table]=count;
-    statements.push(env.DB.prepare(`DELETE FROM "${table}"`));
+    try{
+      const count=Number((await env.DB.prepare(`SELECT COUNT(*) AS c FROM "${table}"`).first<any>())?.c||0);
+      await env.DB.prepare(`DELETE FROM "${table}"`).run();
+      deletedCounts[table]=count;
+    }catch(error){
+      const message=error instanceof Error?error.message:String(error);
+      if(!/no such table/i.test(message)) throw error;
+    }
   }
-  if(existingNames.has("auth_sessions")){
+  try{
     const count=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM auth_sessions WHERE user_type='employee'").first<any>())?.c||0);
+    await env.DB.prepare("DELETE FROM auth_sessions WHERE user_type='employee'").run();
     deletedCounts.auth_employee_sessions=count;
-    statements.push(env.DB.prepare("DELETE FROM auth_sessions WHERE user_type='employee'"));
+  }catch(error){
+    const message=error instanceof Error?error.message:String(error);
+    if(!/no such table/i.test(message)) throw error;
   }
-  const employeeCount=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM employees").first<any>())?.c||0);
+  let employeeCount=0;
+  try{employeeCount=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM employees").first<any>())?.c||0);await env.DB.prepare("DELETE FROM employees").run();}catch(error){throw error;}
   deletedCounts.employees=employeeCount;
-  statements.push(env.DB.prepare("DELETE FROM employees"));
-  if(statements.length)await env.DB.batch(statements);
   let deletedImages=0;
   if(env.PROFILE_IMAGES){
     let cursor:string|undefined;
@@ -120,7 +93,7 @@ export async function handleWorkforce(req:Request,env:Env,actor:Actor|null,pathn
       cursor=page.truncated?page.cursor:undefined;
     }while(cursor);
   }
-  return J({ok:true,deleted:{...deletedCounts,profileImages:deletedImages},preserved:["admin_accounts","settings","locations"],message:"تم حذف البيانات التجريبية من D1 وصور R2 مع الحفاظ على حسابات الإدارة وإعدادات النظام ومواقع العمل."});
-}
+  return J({ok:true,deleted:{...deletedCounts,profileImages:deletedImages},preserved:["admin_accounts","settings","locations"],message:"تم تنفيذ Reset لبيانات النظام التجريبية من D1 وصور R2 مع الحفاظ على حسابات الإدارة وإعدادات النظام ومواقع العمل."});
+ }
  return J({error:"WORKFORCE_ROUTE_NOT_FOUND"},404);
 }
