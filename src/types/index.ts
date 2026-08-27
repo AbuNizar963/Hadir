@@ -15,6 +15,7 @@ export interface Employee {
   workStartTime?: string; workEndTime?: string;
   rotationStartTime?: string; rotationEndTime?: string;
   gracePeriodMinutes?: number;
+  earlyCheckoutGraceMinutes?: number;
   role?: UserRole; locationId?: string | null; rotationDaysOn?: number; rotationDaysOff?: number;
   workDays?: number[];
   specialties?: string[];
