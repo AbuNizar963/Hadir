@@ -28,7 +28,7 @@ export async function handleWorkforce(req:Request,env:Env,actor:Actor|null,pathn
  if(pathname==="/api/workforce/live"&&method==="GET"){
   if(!manage(actor))return J({error:"غير مصرح"},403);
   const [employees,notifications,violations,leaveRequests,tasks,performance,payroll,anomalies,insights,escapes]=await Promise.all([
-   rows(env.DB,"SELECT id,job_number AS jobNumber,name,status,role,work_start_time AS workStartTime,work_end_time AS workEndTime,schedule_type AS scheduleType,avatar FROM employees ORDER BY name"),
+   rows(env.DB,"SELECT id,job_number AS jobNumber,name,status,role,work_start_time AS workStartTime,work_end_time AS workEndTime,schedule_type AS scheduleType,avatar,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees ORDER BY name"),
    rows(env.DB,"SELECT id,title,body,severity,type,read_at AS readAt,created_at AS createdAt FROM notifications WHERE recipient_id=? ORDER BY created_at DESC LIMIT 50",actor.id),
    rows(env.DB,"SELECT v.*,e.name AS employeeName,e.job_number AS jobNumber FROM violations v LEFT JOIN employees e ON e.id=v.employee_id ORDER BY occurred_at DESC LIMIT 100"),
    rows(env.DB,"SELECT l.*,e.name AS employeeName,e.job_number AS jobNumber FROM leave_requests l LEFT JOIN employees e ON e.id=l.employee_id ORDER BY l.created_at DESC LIMIT 100"),
