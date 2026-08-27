@@ -19,6 +19,8 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div {
   position: relative;
   overflow: hidden;
   min-height: 92px;
+  direction: rtl;
+  text-align: right;
   border: 1px solid color-mix(in srgb, var(--stat-color) 24%, transparent) !important;
   background: linear-gradient(145deg, color-mix(in srgb, var(--stat-color) 9%, hsl(var(--card))), color-mix(in srgb, var(--stat-color) 3%, hsl(var(--background)))) !important;
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 8%, transparent), 0 6px 22px color-mix(in srgb, var(--stat-color) 7%, transparent);
@@ -29,7 +31,6 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:hover {
   border-color: color-mix(in srgb, var(--stat-color) 42%, transparent) !important;
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 10%, transparent), 0 10px 28px color-mix(in srgb, var(--stat-color) 11%, transparent);
 }
-/* Distinct but muted enterprise palette. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(1) { --stat-color: hsl(210 72% 54%); }
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(2) { --stat-color: hsl(152 55% 42%); }
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(3) { --stat-color: hsl(4 62% 54%); }
@@ -37,15 +38,19 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(4) { 
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(36 72% 46%); }
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(274 56% 54%); }
 
-/* Enterprise stat indicators: exactly ONE animated dot, always visually LEFT of the label. */
+/* Arabic enterprise layout: label is on the RIGHT, exactly ONE animated dot is on its LEFT. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child {
   display: flex !important;
+  flex-direction: row-reverse;
   align-items: center;
   justify-content: flex-start;
   gap: .5rem;
-  direction: ltr;
+  width: 100%;
+  direction: rtl;
+  text-align: right;
   color: color-mix(in srgb, var(--stat-color) 78%, hsl(var(--foreground)));
 }
+/* The single generated indicator is deliberately before the label in visual order. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child::before {
   content: "";
   flex: 0 0 .48rem;
@@ -53,16 +58,23 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-chi
   height: .48rem;
   border-radius: 9999px;
   background: var(--stat-color);
+  color: var(--stat-color);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent);
   animation: stat-card-pulse 2.4s cubic-bezier(.22,.61,.36,1) infinite;
 }
-/* Existing markup dots are hidden so they cannot create a second visible indicator. */
+/* Existing JSX dots are hidden to guarantee there is never a second visible dot. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child > .live-status-dot {
   display: none !important;
 }
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child > span:last-child {
-  order: 1;
   direction: rtl;
+  text-align: right;
+}
+/* All statistic numbers are intentionally white for maximum contrast. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > .live-value {
+  color: #fff !important;
+  text-align: right !important;
+  direction: ltr;
 }
 @keyframes stat-card-pulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent); opacity: 1; transform: scale(1); }
