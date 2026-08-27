@@ -12,6 +12,7 @@ const controls = [
   { id: "grace", title: "مهلة التأخر", description: "تحديد عدد الدقائق المسموح بها قبل احتساب التأخر لجميع الموظفين.", icon: <Icon><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></Icon> },
   { id: "earlyCheckout", title: "مهلة الانصراف المبكر", description: "السماح بالانصراف قبل نهاية الدوام ضمن عدد الدقائق المحدد.", icon: <Icon><path d="M7 7h10v14H7z"/><path d="M9 3h6v4H9z"/><path d="M10 12h4M12 10v4"/></Icon> },
   { id: "adminWorkHours", title: "أوقات دوام الموظفين الإداريين", description: "تطبيق وقت بداية ونهاية الدوام على الموظفين الإداريين فقط.", icon: <Icon><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/><path d="M5 4 3 6M19 4l2 2"/></Icon> },
+  { id: "rotationWorkHours", title: "أوقات دوام الموظفين التناوبيين", description: "تطبيق وقت بداية ونهاية الدوام على الموظفين التناوبيين فقط، دون التأثير على الموظفين الإداريين.", icon: <Icon><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/><path d="m7 5-2 2M17 5l2 2"/></Icon> },
   { id: "rotationDays", title: "أيام التناوب للموظفين التناوبيين", description: "تطبيق عدد أيام المناوبة وأيام الراحة على الموظفين من نوع الدوام التناوبي فقط.", icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m8 15 2 2 5-5"/></Icon> },
   { id: "unlinkDevices", title: "فك ربط جميع الأجهزة", description: "إزالة ربط الهاتف ومفاتيح الدخول لجميع الموظفين ليتمكنوا من ربط أجهزة جديدة.", icon: <Icon><path d="M9 7l6 6"/><path d="M15 7l-2-2a3 3 0 0 0-4 4l2 2"/><path d="M9 17l2 2a3 3 0 0 0 4-4l-2-2"/><path d="M4 4l16 16"/></Icon> },
   { id: "revokeSessions", title: "تسجيل خروج جميع الموظفين", description: "إلغاء جميع جلسات الموظفين الحالية وإجبارهم على تسجيل الدخول من جديد.", icon: <Icon><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 3v18"/></Icon> },
@@ -58,9 +59,8 @@ export default function OwnerBulkSettingsPanel() {
         const workEndTime = selected === "adminWorkHours" ? adminWorkEndTime : rotationWorkEndTime;
         if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workStartTime) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workEndTime)) throw new Error("أدخل وقت البداية والنهاية بصيغة HH:MM صحيحة.");
         if (workStartTime === workEndTime) throw new Error("وقت البداية والنهاية يجب أن يكونا مختلفين.");
-        const scheduleType = selected === "adminWorkHours" ? "ADMIN" : "ROTATION";
         const result = await bulkOwnerEmployeeSettings({ action: selected, workStartTime, workEndTime });
-        setMessage(`تم تحديث أوقات دوام ${scheduleType === "ADMIN" ? "الموظفين الإداريين" : "الموظفين التناوبيين"} لـ ${result.updated} موظفًا: ${workStartTime} → ${workEndTime}.`);
+        setMessage(`تم تحديث أوقات دوام ${selected === "adminWorkHours" ? "الموظفين الإداريين" : "الموظفين التناوبيين"} لـ ${result.updated} موظفًا: ${workStartTime} → ${workEndTime}.`);
       } else if (selected === "rotationDays") {
         const daysOn = Number(rotationDaysOn), daysOff = Number(rotationDaysOff);
         if (!Number.isInteger(daysOn) || daysOn < 1 || daysOn > 31 || !Number.isInteger(daysOff) || daysOff < 0 || daysOff > 31) throw new Error("أيام التناوب يجب أن تكون: المناوبة 1–31 يومًا، والراحة 0–31 يومًا.");
