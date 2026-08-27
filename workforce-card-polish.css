@@ -1,0 +1,34 @@
+/* Hadir · Workforce directory semantic status indicators
+ * The manager directory uses the dot as the employee-status signal:
+ * active = green, escaped/suspended = red. Device linkage must not turn an
+ * active employee yellow. This stylesheet is intentionally scoped to the
+ * LIVE DIRECTORY card grid so warning indicators elsewhere keep their meaning.
+ */
+
+section.hud-card.overflow-hidden.p-5.sm\:p-6 > div > div + div .live-status-dot[data-status="warning"] {
+  background: hsl(142 71% 45%) !important;
+  box-shadow: 0 0 0 3px hsl(142 71% 45% / .14), 0 0 12px hsl(142 71% 45% / .38) !important;
+  animation: hadir-status-pulse-green 1.8s ease-in-out infinite !important;
+}
+
+section.hud-card.overflow-hidden.p-5.sm\:p-6 article .live-status-dot[data-status="online"] {
+  background: hsl(142 71% 45%) !important;
+  box-shadow: 0 0 0 3px hsl(142 71% 45% / .14), 0 0 12px hsl(142 71% 45% / .38) !important;
+  animation: hadir-status-pulse-green 1.8s ease-in-out infinite !important;
+}
+
+section.hud-card.overflow-hidden.p-5.sm\:p-6 article .live-status-dot[data-status="danger"] {
+  background: hsl(0 72% 51%) !important;
+  box-shadow: 0 0 0 3px hsl(0 72% 51% / .14), 0 0 12px hsl(0 72% 51% / .38) !important;
+  animation: hadir-status-pulse-red 1.45s ease-in-out infinite !important;
+}
+
+@keyframes hadir-status-pulse-green {
+  0%, 100% { transform: scale(.9); opacity: .72; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+
+@keyframes hadir-status-pulse-red {
+  0%, 100% { transform: scale(.9); opacity: .72; }
+  50% { transform: scale(1.14); opacity: 1; }
+}
