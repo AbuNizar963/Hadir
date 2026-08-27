@@ -5,6 +5,8 @@
 .live-status-dot[data-status="warning"] { background: hsl(var(--warning)); box-shadow: 0 0 0 0 hsl(var(--warning) / .35); }
 .live-status-dot[data-status="danger"] { background: hsl(var(--destructive)); box-shadow: 0 0 0 0 hsl(var(--destructive) / .35); }
 .live-status-dot[data-status="info"] { background: hsl(var(--accent)); box-shadow: 0 0 0 0 hsl(var(--accent) / .35); }
+.live-status-dot[data-status="vip"] { background: hsl(38 92% 50%); box-shadow: 0 0 0 0 hsl(38 92% 50% / .35); }
+.live-status-dot[data-status="online"] { background: hsl(var(--primary)); box-shadow: 0 0 0 0 hsl(var(--primary) / .35); }
 
 @keyframes live-status-pulse { 0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; } 70% { box-shadow: 0 0 0 .45rem transparent; opacity: .82; } 100% { box-shadow: 0 0 0 0 transparent; opacity: 1; } }
 
@@ -12,10 +14,67 @@
 .live-value:where([data-changed="true"]) { animation: live-value-pop 260ms ease-out; }
 @keyframes live-value-pop { 0% { transform: scale(.96); opacity: .55; } 100% { transform: scale(1); opacity: 1; } }
 
+/* Employee directory statistics: one consistent professional card system. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div {
+  --stat-color: hsl(var(--primary));
+  position: relative;
+  overflow: hidden;
+  min-height: 92px;
+  border: 1px solid color-mix(in srgb, var(--stat-color) 28%, transparent) !important;
+  background: color-mix(in srgb, var(--stat-color) 7%, hsl(var(--background) / .3)) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--stat-color) 12%, transparent), 0 8px 24px color-mix(in srgb, var(--stat-color) 7%, transparent);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--stat-color) 48%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--stat-color) 18%, transparent), 0 12px 30px color-mix(in srgb, var(--stat-color) 12%, transparent);
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(1) { --stat-color: hsl(210 90% 58%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(2) { --stat-color: hsl(145 65% 45%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(3) { --stat-color: hsl(0 72% 58%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(4) { --stat-color: hsl(190 78% 48%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(38 92% 50%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(285 72% 58%); }
+
+/* Every statistic gets one indicator, aligned consistently beside its title. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child:not(.flex) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  color: color-mix(in srgb, var(--stat-color) 82%, hsl(var(--foreground)));
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child:not(.flex)::after {
+  content: "";
+  flex: 0 0 .55rem;
+  width: .55rem;
+  height: .55rem;
+  border-radius: 9999px;
+  background: var(--stat-color);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 35%, transparent);
+  animation: stat-card-pulse 2s ease-out infinite;
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child.flex {
+  color: color-mix(in srgb, var(--stat-color) 82%, hsl(var(--foreground)));
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child.flex > .live-status-dot {
+  order: 2;
+  flex: 0 0 .55rem;
+  background: var(--stat-color) !important;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 35%, transparent) !important;
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child.flex > span:last-child { order: 1; }
+@keyframes stat-card-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 35%, transparent); opacity: 1; }
+  70% { box-shadow: 0 0 0 .42rem transparent; opacity: .82; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+}
+
 .weather-strip-live { min-height: 1cm; max-height: 1.55cm; overflow: hidden; transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease; animation: weather-breathe 6s ease-in-out infinite; }
 .weather-strip-live:hover { transform: translateY(-1px); }
 @keyframes weather-breathe { 0%,100% { opacity: .94; } 50% { opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .live-status-dot, .live-value, .weather-strip-live { animation: none !important; transition: none !important; }
+  .live-status-dot, .live-value, .weather-strip-live, section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div, section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child:not(.flex)::after { animation: none !important; transition: none !important; }
 }
