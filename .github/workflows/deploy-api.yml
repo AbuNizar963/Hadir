@@ -70,6 +70,19 @@ jobs:
         working-directory: backend
         run: npx wrangler deploy --secrets-file .secrets.json
 
+      - name: Verify Cloudflare Worker secrets
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          secrets="$(npx wrangler secret list 2>/dev/null)"
+          printf '%s\n' "$secrets"
+          printf '%s\n' "$secrets" | grep -q 'GEMINI_API_KEY' || {
+            echo 'GEMINI_API_KEY is not configured on the deployed Cloudflare Worker.'
+            echo 'Add GEMINI_API_KEY in Cloudflare Workers & Pages > hadir-api > Settings > Variables and Secrets > Secrets, then redeploy.'
+            exit 1
+          }
+
       - name: Remove temporary secrets file
         if: always()
         working-directory: backend
@@ -97,5 +110,5 @@ jobs:
           cat /tmp/bootstrap.json
           case "$code" in
             200|401) exit 0 ;;
-            *) echo "Unexpected /api/bootstrap status: $code"; exit 1 ;;
+            *) echo "Unexpected /api/bootstrap status: $code"; exit 1;;
           esac
