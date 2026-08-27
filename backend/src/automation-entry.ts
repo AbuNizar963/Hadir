@@ -77,14 +77,15 @@ export default {
           await env.DB.prepare("INSERT INTO settings(key,value) VALUES('earlyCheckoutGraceMinutes',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(minutes)).run();
           return json({ok:true,updated:1,message:`تم ضبط مهلة الانصراف المبكر العامة إلى ${minutes} دقيقة.`,action},200,o);
         }
-        if(action==="workHours"){
+        if(action==="adminWorkHours"||action==="rotationWorkHours"){
           const workStartTime=String(b.workStartTime||"").trim();
           const workEndTime=String(b.workEndTime||"").trim();
+          const scheduleType=action==="adminWorkHours"?"ADMIN":"ROTATION";
           if(!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workStartTime)||!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workEndTime))return json({error:"وقت بداية ونهاية الدوام يجب أن يكونا بصيغة HH:MM صحيحة"},400,o);
           if(workStartTime===workEndTime)return json({error:"وقت بداية ونهاية الدوام يجب أن يكونا مختلفين"},400,o);
-          const result=await env.DB.prepare("UPDATE employees SET work_start_time=?,work_end_time=?").bind(workStartTime,workEndTime).run();
-          await env.DB.prepare("INSERT INTO settings(key,value) VALUES('bulkWorkHours',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify({workStartTime,workEndTime})).run();
-          return json({ok:true,updated:Number(result.meta.changes||0),message:`تم تحديث أوقات دوام جميع الموظفين إلى ${workStartTime} → ${workEndTime}.`,action},200,o);
+          const result=await env.DB.prepare("UPDATE employees SET work_start_time=?,work_end_time=? WHERE schedule_type=?").bind(workStartTime,workEndTime,scheduleType).run();
+          await env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(scheduleType==="ADMIN"?"bulkAdminWorkHours":"bulkRotationWorkHours",JSON.stringify({workStartTime,workEndTime})).run();
+          return json({ok:true,updated:Number(result.meta.changes||0),message:`تم تحديث أوقات دوام ${scheduleType==="ADMIN"?"الموظفين الإداريين":"الموظفين التناوبيين"} لـ ${Number(result.meta.changes||0)} موظفًا إلى ${workStartTime} → ${workEndTime}.`,action},200,o);
         }
         if(action==="rotationDays"){
           const rotationDaysOn=Number(b.rotationDaysOn);

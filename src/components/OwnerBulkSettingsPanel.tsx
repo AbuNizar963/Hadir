@@ -11,7 +11,7 @@ const controls = [
   { id: "avatar", title: "تغيير الصورة الشخصية للجميع", description: "رفع صورة موحدة وحفظها في R2 لكل موظف.", icon: <Icon><circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M19 5l2 2-2 2"/></Icon> },
   { id: "grace", title: "مهلة التأخر", description: "تحديد عدد الدقائق المسموح بها قبل احتساب التأخر لجميع الموظفين.", icon: <Icon><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></Icon> },
   { id: "earlyCheckout", title: "مهلة الانصراف المبكر", description: "السماح بالانصراف قبل نهاية الدوام ضمن عدد الدقائق المحدد.", icon: <Icon><path d="M7 7h10v14H7z"/><path d="M9 3h6v4H9z"/><path d="M10 12h4M12 10v4"/></Icon> },
-  { id: "workHours", title: "أوقات دوام جميع الموظفين", description: "تطبيق وقت بداية ونهاية موحدين على جميع الموظفين دون تغيير نوع دوامهم أو أيامهم.", icon: <Icon><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/><path d="M5 4 3 6M19 4l2 2"/></Icon> },
+  { id: "adminWorkHours", title: "أوقات دوام الموظفين الإداريين", description: "تطبيق وقت بداية ونهاية الدوام على الموظفين الإداريين فقط.", icon: <Icon><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/><path d="M5 4 3 6M19 4l2 2"/></Icon> },
   { id: "rotationDays", title: "أيام التناوب للموظفين التناوبيين", description: "تطبيق عدد أيام المناوبة وأيام الراحة على الموظفين من نوع الدوام التناوبي فقط.", icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m8 15 2 2 5-5"/></Icon> },
   { id: "unlinkDevices", title: "فك ربط جميع الأجهزة", description: "إزالة ربط الهاتف ومفاتيح الدخول لجميع الموظفين ليتمكنوا من ربط أجهزة جديدة.", icon: <Icon><path d="M9 7l6 6"/><path d="M15 7l-2-2a3 3 0 0 0-4 4l2 2"/><path d="M9 17l2 2a3 3 0 0 0 4-4l-2-2"/><path d="M4 4l16 16"/></Icon> },
   { id: "revokeSessions", title: "تسجيل خروج جميع الموظفين", description: "إلغاء جميع جلسات الموظفين الحالية وإجبارهم على تسجيل الدخول من جديد.", icon: <Icon><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 3v18"/></Icon> },
@@ -26,8 +26,10 @@ export default function OwnerBulkSettingsPanel() {
   const [password, setPassword] = useState("");
   const [grace, setGrace] = useState("10");
   const [earlyCheckout, setEarlyCheckout] = useState("0");
-  const [workStartTime, setWorkStartTime] = useState("08:00");
-  const [workEndTime, setWorkEndTime] = useState("16:00");
+  const [adminWorkStartTime, setAdminWorkStartTime] = useState("08:00");
+  const [adminWorkEndTime, setAdminWorkEndTime] = useState("16:00");
+  const [rotationWorkStartTime, setRotationWorkStartTime] = useState("08:00");
+  const [rotationWorkEndTime, setRotationWorkEndTime] = useState("16:00");
   const [rotationDaysOn, setRotationDaysOn] = useState("4");
   const [rotationDaysOff, setRotationDaysOff] = useState("4");
   const [image, setImage] = useState<File | null>(null);
@@ -51,11 +53,14 @@ export default function OwnerBulkSettingsPanel() {
         if (!Number.isInteger(minutes) || minutes < 0 || minutes > 180) throw new Error("القيمة يجب أن تكون بين 0 و180 دقيقة.");
         const result = await bulkOwnerEmployeeSettings({ action: selected, minutes });
         setMessage(selected === "grace" ? `تم ضبط مهلة التأخر لـ ${result.updated} موظفًا إلى ${minutes} دقيقة.` : `تم ضبط مهلة الانصراف المبكر إلى ${minutes} دقيقة.`);
-      } else if (selected === "workHours") {
+      } else if (selected === "adminWorkHours" || selected === "rotationWorkHours") {
+        const workStartTime = selected === "adminWorkHours" ? adminWorkStartTime : rotationWorkStartTime;
+        const workEndTime = selected === "adminWorkHours" ? adminWorkEndTime : rotationWorkEndTime;
         if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workStartTime) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workEndTime)) throw new Error("أدخل وقت البداية والنهاية بصيغة HH:MM صحيحة.");
         if (workStartTime === workEndTime) throw new Error("وقت البداية والنهاية يجب أن يكونا مختلفين.");
+        const scheduleType = selected === "adminWorkHours" ? "ADMIN" : "ROTATION";
         const result = await bulkOwnerEmployeeSettings({ action: selected, workStartTime, workEndTime });
-        setMessage(`تم تحديث أوقات الدوام لـ ${result.updated} موظفًا: ${workStartTime} → ${workEndTime}.`);
+        setMessage(`تم تحديث أوقات دوام ${scheduleType === "ADMIN" ? "الموظفين الإداريين" : "الموظفين التناوبيين"} لـ ${result.updated} موظفًا: ${workStartTime} → ${workEndTime}.`);
       } else if (selected === "rotationDays") {
         const daysOn = Number(rotationDaysOn), daysOff = Number(rotationDaysOff);
         if (!Number.isInteger(daysOn) || daysOn < 1 || daysOn > 31 || !Number.isInteger(daysOff) || daysOff < 0 || daysOff > 31) throw new Error("أيام التناوب يجب أن تكون: المناوبة 1–31 يومًا، والراحة 0–31 يومًا.");
@@ -97,7 +102,8 @@ export default function OwnerBulkSettingsPanel() {
           <optgroup label="الدوام والحضور">
             <option value="grace">مهلة التأخر</option>
             <option value="earlyCheckout">مهلة الانصراف المبكر</option>
-            <option value="workHours">أوقات دوام جميع الموظفين</option>
+            <option value="adminWorkHours">أوقات دوام الموظفين الإداريين</option>
+            <option value="rotationWorkHours">أوقات دوام الموظفين التناوبيين</option>
             <option value="rotationDays">أيام التناوب للموظفين التناوبيين</option>
           </optgroup>
           <optgroup label="الأجهزة والجلسات">
@@ -118,7 +124,7 @@ export default function OwnerBulkSettingsPanel() {
         {selected === "password" && <div className="flex flex-col sm:flex-row gap-2"><input type="password" className="input flex-1" value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة مرور جديدة" /><button type="button" className="btn-primary whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "تطبيق على الجميع"}</button></div>}
         {selected === "avatar" && <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center"><input type="file" accept="image/*" className="input text-xs flex-1" onChange={e => setImage(e.target.files?.[0] || null)} /><button type="button" className="btn-primary whitespace-nowrap" disabled={busy || !image} onClick={() => void run()}>{busy ? "جارٍ…" : "رفع وتطبيق"}</button></div>}
         {(selected === "grace" || selected === "earlyCheckout") && <div className="flex flex-col sm:flex-row gap-2 sm:items-center"><select className="input mono sm:max-w-[220px]" value={selected === "grace" ? grace : earlyCheckout} onChange={e => selected === "grace" ? setGrace(e.target.value) : setEarlyCheckout(e.target.value)}>{[0,5,10,15,20,30,45,60,90,120,180].map(value => <option key={value} value={value}>{value} دقيقة</option>)}</select><button type="button" className="btn-primary whitespace-nowrap sm:mr-auto" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
-        {selected === "workHours" && <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 sm:items-end"><label className="text-sm">بداية الدوام<input type="time" className="input mono mt-1 w-full" value={workStartTime} onChange={e => setWorkStartTime(e.target.value)} /></label><label className="text-sm">نهاية الدوام<input type="time" className="input mono mt-1 w-full" value={workEndTime} onChange={e => setWorkEndTime(e.target.value)} /></label><button type="button" className="btn-primary whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
+        {(selected === "adminWorkHours" || selected === "rotationWorkHours") && <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 sm:items-end"><label className="text-sm">بداية الدوام<input type="time" className="input mono mt-1 w-full" value={selected === "adminWorkHours" ? adminWorkStartTime : rotationWorkStartTime} onChange={e => selected === "adminWorkHours" ? setAdminWorkStartTime(e.target.value) : setRotationWorkStartTime(e.target.value)} /></label><label className="text-sm">نهاية الدوام<input type="time" className="input mono mt-1 w-full" value={selected === "adminWorkHours" ? adminWorkEndTime : rotationWorkEndTime} onChange={e => selected === "adminWorkHours" ? setAdminWorkEndTime(e.target.value) : setRotationWorkEndTime(e.target.value)} /></label><button type="button" className="btn-primary whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
         {selected === "rotationDays" && <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 sm:items-end"><label className="text-sm">أيام المناوبة<select className="input mono mt-1 w-full" value={rotationDaysOn} onChange={e => setRotationDaysOn(e.target.value)}>{Array.from({length:31},(_,i)=>i+1).map(value => <option key={value} value={value}>{value} يوم</option>)}</select></label><label className="text-sm">أيام الراحة<select className="input mono mt-1 w-full" value={rotationDaysOff} onChange={e => setRotationDaysOff(e.target.value)}>{Array.from({length:32},(_,i)=>i).map(value => <option key={value} value={value}>{value} يوم</option>)}</select></label><button type="button" className="btn-primary whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
         {(selected === "unlinkDevices" || selected === "revokeSessions") && <div className="flex flex-col sm:flex-row gap-3 sm:items-center"><span className="text-sm text-muted-foreground flex-1">{selected === "unlinkDevices" ? "سيتم إلغاء ربط الهاتف ومفتاح الدخول لكل موظف مع إبقاء الحسابات والبيانات الوظيفية محفوظة." : "سيتم إبطال الجلسات الحالية فقط؛ لن تتغير كلمات المرور أو البيانات."}</span><button type="button" className="btn-danger whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "تأكيد التنفيذ"}</button></div>}
       </div>
