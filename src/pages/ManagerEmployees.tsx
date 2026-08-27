@@ -27,6 +27,7 @@ type FormState = {
   workStartTime: string;
   workEndTime: string;
   grace: string;
+  earlyCheckoutGrace: string;
   workDays: number[];
   rotationDaysOn: number;
   rotationDaysOff: number;
@@ -44,6 +45,7 @@ const emptyForm: FormState = {
   workStartTime: "08:00",
   workEndTime: "16:00",
   grace: "",
+  earlyCheckoutGrace: "",
   workDays: [0, 1, 2, 3, 4],
   rotationDaysOn: 7,
   rotationDaysOff: 7,
@@ -69,6 +71,7 @@ function formFrom(e: Employee): FormState {
     workStartTime: e.workStartTime || "08:00",
     workEndTime: e.workEndTime || "16:00",
     grace: e.gracePeriodMinutes == null ? "" : String(e.gracePeriodMinutes),
+    earlyCheckoutGrace: e.earlyCheckoutGraceMinutes == null ? "" : String(e.earlyCheckoutGraceMinutes),
     workDays: e.workDays || [0, 1, 2, 3, 4],
     rotationDaysOn: e.rotationDaysOn ?? 7,
     rotationDaysOff: e.rotationDaysOff ?? 7,
@@ -121,7 +124,7 @@ function EmployeeCardBase({ e, location, canManage, escapeStatus, onEdit, onRemo
         <div className="rounded-xl border border-border/60 bg-background/30 p-2.5"><span className="text-muted-foreground">الوقت</span><div className="mono mt-0.5 font-bold">{rotation ? `${e.rotationDaysOn ?? 0} عمل / ${e.rotationDaysOff ?? 0} راحة` : `${e.workStartTime || "--:--"} → ${e.workEndTime || "--:--"}`}</div></div>
         <div className="rounded-xl border border-border/60 bg-background/30 p-2.5"><span className="text-muted-foreground">الحالة الميدانية</span><div className={`mt-0.5 font-bold ${escapeStatus === "escaped" ? "text-destructive" : "text-primary"}`}>{escapeStatus === "escaped" ? "هارب من العمل" : escapeStatus === "returned" ? "عاد للعمل" : "طبيعي"}</div></div>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground"><span>السماح: {e.gracePeriodMinutes ?? 0} دقيقة</span><span>{e.deviceId ? "الهاتف مرتبط" : "الهاتف غير مرتبط"}</span></div>
+      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground"><span>التأخير: {e.gracePeriodMinutes ?? 0} دقيقة</span><span>{e.earlyCheckoutGraceMinutes ? `الانصراف المبكر: ${e.earlyCheckoutGraceMinutes} دقيقة` : "الانصراف المبكر: بعد انتهاء الدوام"}</span></div>
       <div className="mt-3 grid gap-1.5 rounded-xl border border-border/60 bg-background/20 p-2.5 text-[11px]">
         <div className="flex items-center justify-between gap-2"><span className="font-bold">VIP</span><input type="checkbox" checked={!!e.isVip} disabled={!isOwner} onChange={(x) => onWorkforceUpdate(e, { isVip: x.target.checked })} /></div>
         <div className="flex items-center justify-between gap-2"><span>التحضير التلقائي</span><input type="checkbox" checked={!!e.autoCheckIn} disabled={!isOwner} onChange={(x) => onWorkforceUpdate(e, { autoCheckIn: x.target.checked })} /></div>
@@ -140,7 +143,7 @@ function EmployeeCardBase({ e, location, canManage, escapeStatus, onEdit, onRemo
 }
 
 const EmployeeCard = memo(EmployeeCardBase, (a, b) =>
-  a.canManage === b.canManage && a.escapeStatus === b.escapeStatus && a.location?.name === b.location?.name && a.e.id === b.e.id && a.e.name === b.e.name && a.e.jobNumber === b.e.jobNumber && a.e.status === b.e.status && a.e.scheduleType === b.e.scheduleType && a.e.workStartTime === b.e.workStartTime && a.e.workEndTime === b.e.workEndTime && a.e.rotationDaysOn === b.e.rotationDaysOn && a.e.rotationDaysOff === b.e.rotationDaysOff && a.e.deviceId === b.e.deviceId && a.e.isVip === b.e.isVip && a.e.autoCheckIn === b.e.autoCheckIn && a.e.autoCheckOut === b.e.autoCheckOut && a.e.gracePeriodMinutes === b.e.gracePeriodMinutes && JSON.stringify(a.e.specialties) === JSON.stringify(b.e.specialties) && a.e.avatar === b.e.avatar,
+  a.canManage === b.canManage && a.escapeStatus === b.escapeStatus && a.location?.name === b.location?.name && a.e.id === b.e.id && a.e.name === b.e.name && a.e.jobNumber === b.e.jobNumber && a.e.status === b.e.status && a.e.scheduleType === b.e.scheduleType && a.e.workStartTime === b.e.workStartTime && a.e.workEndTime === b.e.workEndTime && a.e.rotationDaysOn === b.e.rotationDaysOn && a.e.rotationDaysOff === b.e.rotationDaysOff && a.e.deviceId === b.e.deviceId && a.e.isVip === b.e.isVip && a.e.autoCheckIn === b.e.autoCheckIn && a.e.autoCheckOut === b.e.autoCheckOut && a.e.gracePeriodMinutes === b.e.gracePeriodMinutes && a.e.earlyCheckoutGraceMinutes === b.e.earlyCheckoutGraceMinutes && JSON.stringify(a.e.specialties) === JSON.stringify(b.e.specialties) && a.e.avatar === b.e.avatar,
 );
 
 export default function ManagerEmployees() {
@@ -173,6 +176,12 @@ export default function ManagerEmployees() {
           if (response.ok && Array.isArray(controls)) {
             const byId = new Map(controls.map((control: any) => [String(control.id), control]));
             next = next.map((employee) => { const control = byId.get(String(employee.id)); if (!control) return employee; return { ...employee, isVip: Boolean(control.isVip), autoCheckIn: Boolean(control.autoCheckIn), autoCheckOut: Boolean(control.autoCheckOut) }; });
+          }
+          const policyResponse = await fetch(`${api}/api/employee-checkout-policies`, { headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, credentials: "include", cache: "no-store" });
+          const policies = await policyResponse.json().catch(() => []);
+          if (policyResponse.ok && Array.isArray(policies)) {
+            const byId = new Map(policies.map((policy: any) => [String(policy.id), Number(policy.earlyCheckoutMinutes) || 0]));
+            next = next.map((employee) => ({ ...employee, earlyCheckoutGraceMinutes: byId.get(String(employee.id)) ?? employee.earlyCheckoutGraceMinutes ?? 0 }));
           }
         } catch {}
       }
@@ -212,6 +221,14 @@ export default function ManagerEmployees() {
     } catch (err) { setError(err instanceof Error ? err.message : `تعذر ${verb}.`); }
   };
 
+  const saveCheckoutPolicy = async (employeeId: string, minutes: number) => {
+    const token = localStorage.getItem("hadir.api.token.admin") || "";
+    const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+    const response = await fetch(`${api}/api/employees/${encodeURIComponent(employeeId)}/checkout-policy`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, credentials: "include", body: JSON.stringify({ earlyCheckoutMinutes: minutes }), cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ فترة السماح بالانصراف المبكر.");
+  };
+
   const submit = async () => {
     const name = form.name.trim(); const jobNumber = form.jobNumber.trim(); const pin = form.pin.trim();
     if (!name || !jobNumber) return setError("اسم الموظف والرقم الوظيفي مطلوبان.");
@@ -220,6 +237,7 @@ export default function ManagerEmployees() {
     setSaving(true); setError(null);
     try {
       const grace = form.grace.trim() === "" ? 0 : Math.max(0, Number(form.grace) || 0);
+      const earlyCheckoutGrace = form.earlyCheckoutGrace.trim() === "" ? 0 : Math.min(1440, Math.max(0, Number(form.earlyCheckoutGrace) || 0));
       const specialties = form.specialties.split(",").map((x) => x.trim()).filter(Boolean);
       const payload: Record<string, unknown> = {
         name, jobNumber, status: form.status, scheduleType: form.scheduleType,
@@ -230,19 +248,26 @@ export default function ManagerEmployees() {
         rotationStartDate: form.rotationStartDate || null, locationId: form.locationId || null, specialties,
       };
       if (pin) payload.pin = pin;
+      let savedEmployeeId = editingId;
       if (backendEnabled) {
-        if (editingId) await updateBackendEmployee(editingId, payload);
-        else await createBackendEmployee({ ...payload, pin, avatar: null });
+        if (editingId) {
+          const result = await updateBackendEmployee(editingId, payload);
+          savedEmployeeId = result.employee?.id || editingId;
+        } else {
+          const created = await createBackendEmployee({ ...payload, pin, avatar: null });
+          savedEmployeeId = created.employee?.id || null;
+        }
+        if (savedEmployeeId) await saveCheckoutPolicy(savedEmployeeId, earlyCheckoutGrace);
       } else if (editingId) {
         const current = employees.find((e) => e.id === editingId);
         if (!current) throw new Error("الموظف غير موجود.");
-        saveEmployees(employees.map((e) => e.id === editingId ? ({ ...current, ...payload, gracePeriodMinutes: grace, ...(pin ? { pinHash: hash(pin) } : {}) } as Employee) : e));
+        saveEmployees(employees.map((e) => e.id === editingId ? ({ ...current, ...payload, gracePeriodMinutes: grace, earlyCheckoutGraceMinutes: earlyCheckoutGrace, ...(pin ? { pinHash: hash(pin) } : {}) } as Employee) : e));
       } else {
         const employee: Employee = {
           id: generateId(), name, jobNumber, pinHash: hash(pin), status: form.status,
           deviceId: null, deviceLabel: null, createdAt: new Date().toISOString(), role: "staff",
           scheduleType: form.scheduleType, workStartTime: form.workStartTime, workEndTime: form.workEndTime,
-          gracePeriodMinutes: grace, workDays: form.workDays, rotationDaysOn: form.rotationDaysOn,
+          gracePeriodMinutes: grace, earlyCheckoutGraceMinutes: earlyCheckoutGrace, workDays: form.workDays, rotationDaysOn: form.rotationDaysOn,
           rotationDaysOff: form.rotationDaysOff, rotationStartDate: form.rotationStartDate || null,
           locationId: form.locationId || null, specialties, avatar: null,
         };
@@ -334,8 +359,12 @@ export default function ManagerEmployees() {
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <Field label="فترة السماح بالتأخير" hint="يبدأ الحقل فارغًا؛ اكتب 6 مباشرة وليس 06."><input className="input mono w-full" type="number" min="0" inputMode="numeric" placeholder="مثال: 6" value={form.grace} onChange={(e) => setField("grace", e.target.value)} /></Field>
+              <Field label="فترة السماح بالانصراف المبكر" hint="مثال: 60 = يسمح بالانصراف قبل نهاية الدوام بـ60 دقيقة دون طلب استئذان."><input className="input mono w-full" type="number" min="0" max="1440" inputMode="numeric" placeholder="مثال: 60" value={form.earlyCheckoutGrace} onChange={(e) => setField("earlyCheckoutGrace", e.target.value)} /></Field>
               <Field label="موقع العمل"><select className="input w-full" value={form.locationId} onChange={(e) => setField("locationId", e.target.value)}><option value="">المقر الرئيسي</option>{locations.filter((l) => String(l.name || "").trim() !== "المقر الرئيسي").map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Field>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               <Field label="التخصصات"><input className="input w-full" placeholder="استقبال، موارد بشرية" value={form.specialties} onChange={(e) => setField("specialties", e.target.value)} /></Field>
+              <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-3 text-[11px] leading-5 text-muted-foreground"><span className="font-bold text-foreground">قاعدة الانصراف:</span> إذا كانت القيمة 60 دقيقة ونهاية الدوام 16:00، يستطيع الموظف تسجيل الانصراف من 15:00. قبل ذلك يحتاج إلى موافقة الإدارة على طلب انصراف مبكر.</div>
             </div>
 
             {form.scheduleType === "ADMIN" && (
