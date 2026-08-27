@@ -20,18 +20,18 @@ jobs:
           fetch-depth: 0
 
       - name: Patch employee editor UX
-        shell: python
         run: |
+          python - <<'PY'
           from pathlib import Path
 
           path = Path("src/pages/ManagerEmployees.tsx")
           text = path.read_text(encoding="utf-8")
 
           old_scroll = '''    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-'''
+            top: 0,
+            behavior: "smooth",
+          });
+          '''
           if old_scroll not in text:
               raise SystemExit("Expected employee edit scroll block was not found")
           text = text.replace(old_scroll, "", 1)
@@ -61,6 +61,7 @@ jobs:
           text = text.replace(old_footer, new_footer, 1)
 
           path.write_text(text, encoding="utf-8")
+          PY
 
       - name: Commit patch
         run: |
