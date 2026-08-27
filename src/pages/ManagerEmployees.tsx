@@ -710,10 +710,6 @@ export default function ManagerEmployees() {
     setShowForm(true);
     setError(null);
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
   };
 
   const remove = async (e: Employee) => {
@@ -981,8 +977,14 @@ export default function ManagerEmployees() {
 
         {/* نموذج إضافة / تعديل الموظف - يظهر فوق الإحصائيات */}
         {showForm && (
-          <section className="hud-card p-5 sm:p-6">
-            <div className="mb-5 flex items-start justify-between gap-3">
+          <section
+  className={
+    editingId
+      ? "fixed inset-y-0 right-0 z-[70] w-full max-w-2xl overflow-y-auto rounded-none border-l border-border/80 bg-card p-5 shadow-2xl sm:p-6"
+      : "hud-card p-5 sm:p-6"
+  }
+>
+            <div className="sticky top-0 z-10 -mx-5 -mt-5 mb-5 flex items-start justify-between gap-3 border-b border-border/70 bg-card/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:-mt-6 sm:px-6">
               <div>
                 <div className="mono text-xs font-bold text-primary">
                   EMPLOYEE FORM
@@ -1304,7 +1306,7 @@ export default function ManagerEmployees() {
               </div>
             )}
 
-            <div className="mt-5 flex justify-end border-t border-border/60 pt-4">
+            <div className="sticky bottom-0 z-10 mt-5 -mx-5 flex justify-end border-t border-border/70 bg-card/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:px-6">
               <button
                 type="button"
                 className="btn-primary min-w-36"
