@@ -1,5 +1,5 @@
 import { addAttendance, findEmployeeByJobNumber, getAttendance, getEmployees, getSettings, saveEmployees } from "@/lib/storage";
-import { createBackendAttendance, getBackendEmployeeLocation, getBackendEmployeeProfile, getBackendSettings, backendEnabled } from "@/lib/backend";
+import { createBackendAttendance, getBackendAttendance, getBackendEmployeeLocation, getBackendEmployeeProfile, getBackendSettings, backendEnabled } from "@/lib/backend";
 import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
 import { haversineMeters, isValidGeoPosition, isLikelyMockedPosition, type GeoPosition } from "@/lib/geo";
 import type { AttendanceRecord, Employee } from "@/types";
@@ -41,12 +41,31 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
 
   const now=new Date();
   const currentPeriod=getEmployeeWorkPeriod(employee,now);
-  const allEmployeeRecords=getAttendance().filter((r)=>r.employeeId===employee!.id).sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());
+
+  // The cloud D1 database is authoritative when Cloudflare backend is enabled.
+  // The previous implementation checked only localStorage, so a valid check-in
+  // already stored in D1 could incorrectly look like "no check-in" on checkout.
+  let allEmployeeRecords: AttendanceRecord[];
+  if(backendEnabled){
+    try{
+      const remoteRecords=await getBackendAttendance(500);
+      allEmployeeRecords=(Array.isArray(remoteRecords)?remoteRecords:[])
+        .filter((r:any)=>String(r.employeeId||"")===String(employee!.id))
+        .sort((a:any,b:any)=>new Date(String(b.timestamp)).getTime()-new Date(String(a.timestamp)).getTime());
+    }catch(error){
+      console.warn("تعذر تحميل سجل الموظف من D1، سيتم استخدام السجل المحلي مؤقتًا:",error);
+      allEmployeeRecords=getAttendance().filter((r)=>r.employeeId===employee!.id).sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());
+    }
+  }else{
+    allEmployeeRecords=getAttendance().filter((r)=>r.employeeId===employee!.id).sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());
+  }
+
   const last=allEmployeeRecords[0];
   const openSession=last?.type==="check-in";
 
-  // Check-in belongs to a new scheduled work period. Check-out belongs to the open session,
-  // which may cross midnight and may therefore be outside today's calendar date.
+  // Check-in belongs to a new scheduled work period. Check-out is allowed
+  // whenever the employee has an open check-in, including before the scheduled
+  // end time. Early checkout is recorded and reported; it is NOT rejected.
   if(args.type==="check-in"){
     if(!currentPeriod.isWorkDay || !currentPeriod.start || !currentPeriod.end){return{ok:false,reason:`لا يوجد دوام للموظف الآن: ${currentPeriod.label}${currentPeriod.detail?` · ${currentPeriod.detail}`:""}`};}
     const periodRecords=recordsForPeriod(employee.id,currentPeriod.start,currentPeriod.end);
