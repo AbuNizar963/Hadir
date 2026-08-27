@@ -1,0 +1,89 @@
+name: Apply professional demo data reset fix
+
+on:
+  push:
+    branches: [fix/professional-demo-data-reset]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch backend and client
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          app = Path('backend/src/app.ts')
+          text = app.read_text()
+          marker = ' if(path==="/api/settings"&&req.method==="GET")'
+          if '/api/settings/demo-reset' not in text:
+              route = r''' if(path==="/api/settings/demo-reset"&&req.method==="POST"){
+                if(!actor||actor.role!=="owner")return json({error:"المالك فقط يستطيع تنفيذ تنظيف بيانات الاختبار"},403,origin);
+                const b=await req.json().catch(()=>({})) as any;
+                if(String(b.confirmation||"")!=="حذف البيانات التجريبية")return json({error:"عبارة التأكيد غير صحيحة"},400,origin);
+                const tables=[
+                  "employee_passkeys","webauthn_challenges","auth_sessions","notifications","attendance","requests","audit",
+                  "violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights",
+                  "push_subscriptions","escape_events","device_rebind_requests"
+                ];
+                const counts:any={};
+                for(const table of tables){
+                  try{
+                    const before=await env.DB.prepare(`SELECT COUNT(*) AS c FROM ${table}`).first<any>();
+                    await env.DB.prepare(`DELETE FROM ${table}`).run();
+                    counts[table]=Number(before?.c||0);
+                  }catch{ counts[table]=0; }
+                }
+                try{ await env.DB.prepare("DELETE FROM employees").run(); }catch{}
+                counts.employees=0;
+                if(env.PROFILE_IMAGES){
+                  let cursor:string|undefined=undefined;
+                  do{
+                    const page=await env.PROFILE_IMAGES.list({prefix:"employees/",cursor});
+                    const keys=(page.objects||[]).map((o:any)=>o.key).filter(Boolean);
+                    if(keys.length)await env.PROFILE_IMAGES.delete(keys);
+                    cursor=page.truncated?page.cursor:undefined;
+                  }while(cursor);
+                }
+                const total=Object.values(counts).reduce((sum:any,value:any)=>sum+Number(value||0),0);
+                return json({ok:true,operationId:uid(),message:"تم حذف بيانات الاختبار من الخادم بنجاح. تم الحفاظ على حسابات الإدارة وإعدادات النظام ومواقع العمل.",deleted:counts,totalRows:total,imagesPrefix:"employees/"},200,origin);
+              }
+'''
+              if marker not in text:
+                  raise SystemExit('settings marker not found in backend/src/app.ts')
+              text = text.replace(marker, route + marker, 1)
+              app.write_text(text)
+
+          backend = Path('src/lib/backend.ts')
+          text = backend.read_text()
+          if 'export async function resetBackendTestData' not in text:
+              addition = r'''\nexport async function resetBackendTestData(): Promise<{ ok: boolean; message: string; deleted: Record<string, number>; totalRows: number }> {\n  return requestWithRetry<{ ok: boolean; message: string; deleted: Record<string, number>; totalRows: number }>(\n    "/api/settings/demo-reset",\n    { method: "POST", body: JSON.stringify({ confirmation: "حذف البيانات التجريبية" }) },\n    3,\n    "admin",\n  );\n}\n'''
+              text = text.rstrip() + addition
+              backend.write_text(text)
+          print('patched backend/src/app.ts and src/lib/backend.ts')
+          PY
+      - name: Validate changed source
+        run: |
+          grep -q '/api/settings/demo-reset' backend/src/app.ts
+          grep -q 'resetBackendTestData' src/lib/backend.ts
+      - name: Commit source change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/src/app.ts src/lib/backend.ts
+          git diff --cached --check
+          git commit -m 'fix(settings): add owner-only professional demo data reset' || echo 'No source changes to commit'
+          git push
+      - name: Remove temporary workflow
+        run: |
+          git rm .github/workflows/apply-demo-reset-fix.yml
+          git commit -m 'chore: remove temporary demo reset patch workflow'
+          git push
