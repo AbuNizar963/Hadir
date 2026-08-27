@@ -128,7 +128,7 @@ function EmployeeCardBase({ e, location, canManage, escapeStatus, onEdit, onRemo
         <div className="flex items-center justify-between gap-2"><span>الانصراف التلقائي</span><input type="checkbox" checked={!!e.autoCheckOut} disabled={!isOwner} onChange={(x) => onWorkforceUpdate(e, { autoCheckOut: x.target.checked })} /></div>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {canManage && e.status === "active" && <button type="button" className="btn-primary text-[11px]" onClick={() => onDirect(e)}>تحضير مباشر</button>}
+        {isOwner && e.status === "active" && <button type="button" className="btn-primary text-[11px]" onClick={() => onDirect(e)}>تحضير مباشر</button>}
         {isOwner && e.status === "active" && <button type="button" className="btn-secondary text-[11px]" onClick={() => onCheckout(e)}>انصراف مباشر</button>}
         {canManage && e.status === "active" && escapeStatus !== "escaped" && <button type="button" className="rounded-lg border border-destructive/30 px-2.5 py-1.5 text-[11px] font-bold text-destructive hover:bg-destructive/10" onClick={() => onEscape(e)}>هروب</button>}
         {canManage && escapeStatus === "escaped" && <button type="button" className="rounded-lg border border-primary/30 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/10" onClick={() => onReturn(e)}>إلغاء الهروب / عاد</button>}
@@ -202,7 +202,7 @@ export default function ManagerEmployees() {
 
   const changeEscape = async (e: Employee, status: "escaped" | "returned") => {
     const verb = status === "escaped" ? "تسجيل هروب" : "تسجيل عودة";
-    const reason = window.prompt(`${verb} للموظف «${e.name}». اكتب السبب إن وجد:`) ?? "";
+    const reason = window.prompt(`${verb} للموظف «${e.name}». اكتب السبب إن وجد:`);
     if (reason === null) return;
     setError(null);
     try {
@@ -288,7 +288,7 @@ export default function ManagerEmployees() {
     } catch (err) { setError(err instanceof Error ? err.message : "تعذر حفظ إعدادات Workforce."); await load(false); }
   };
   const direct = async (e: Employee) => {
-    if (e.status !== "active") return;
+    if (e.status !== "active" || !isOwner) return;
     if (!confirm(`تسجيل حضور مباشر للموظف «${e.name}» كمأمورية/مهمة؟`)) return;
     try {
       const token = localStorage.getItem("hadir.api.token.admin") || "";
@@ -319,7 +319,7 @@ export default function ManagerEmployees() {
         {showImport && <section className="hud-card p-5"><div className="mb-4"><div className="mono text-xs font-bold text-primary">SMART IMPORT</div><h2 className="mt-1 font-bold">استيراد وتصدير الموظفين</h2></div><SmartEmployeeImport onImported={() => void load(false)} /></section>}
         {showForm && (
           <section className={editingId ? "fixed inset-y-0 right-0 z-[70] w-full max-w-2xl overflow-y-auto rounded-none border-l border-border/80 bg-card p-5 shadow-2xl sm:p-6" : "hud-card p-5 sm:p-6"}>
-            <div className="sticky top-0 z-10 -mx-5 -mt-5 mb-5 flex items-start justify-between gap-3 border-b border-border/70 bg-card/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:-mt-6 sm:px-6"><div><div className="mono text-xs font-bold text-primary">EMPLOYEE FORM</div><h2 className="mt-1 text-lg font-black">{editingId ? "تعديل بيانات الموظف" : "إضافة موظف جديد"}</h2><p className="mt-1 text-xs text-muted-foreground">الأدوار الإدارية تُدار من الإعدادات، وليس من هذه الصفحة.</p></div>{editingId && <button type="button" className="btn-secondary text-xs" onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(false); }}>إلغاء</button>}</div>
+            <div className="sticky top-0 z-10 -mx-5 -mt-5 mb-5 flex items-start justify-between gap-3 border-b border-border/70 bg-card/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:px-6"><div><div className="mono text-xs font-bold text-primary">EMPLOYEE FORM</div><h2 className="mt-1 text-lg font-black">{editingId ? "تعديل بيانات الموظف" : "إضافة موظف جديد"}</h2><p className="mt-1 text-xs text-muted-foreground">الأدوار الإدارية تُدار من الإعدادات، وليس من هذه الصفحة.</p></div>{editingId && <button type="button" className="btn-secondary text-xs" onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(false); }}>إلغاء</button>}</div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Field label="اسم الموظف"><input className="input w-full" placeholder="اكتب الاسم" value={form.name} onChange={(e) => setField("name", e.target.value)} /></Field>
               <Field label="الرقم الوظيفي"><input className="input mono w-full" inputMode="numeric" placeholder="مثال: 1000" value={form.jobNumber} disabled={!!editingId} onChange={(e) => setField("jobNumber", e.target.value)} /></Field>
