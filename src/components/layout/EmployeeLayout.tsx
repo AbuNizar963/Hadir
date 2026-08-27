@@ -5,6 +5,7 @@ import Brand from "@/components/Brand";
 import { cn } from "@/lib/utils";
 import { currentSession } from "@/lib/auth";
 import { backendLogout } from "@/lib/backend";
+import { getNotifications } from "@/lib/notifications";
 
 const NAV = [
   { to: "/employee", label: "لوحة الموظف", icon: LayoutDashboard, end: true },
@@ -18,15 +19,34 @@ const THEME_KEY = "hadir.theme";
 type Theme = "light" | "dark" | "system";
 function readTheme(): Theme { if (typeof window === "undefined") return "system"; const value = localStorage.getItem(THEME_KEY); return value === "light" || value === "dark" || value === "system" ? value : "system"; }
 function applyTheme(theme: Theme) { if (typeof document === "undefined") return; const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches); document.documentElement.classList.toggle("dark", dark); document.documentElement.style.colorScheme = dark ? "dark" : "light"; }
+const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+
+async function loadEmployeeUnreadCount(employeeId: string) {
+  if (!employeeId) return 0;
+  try {
+    const token = localStorage.getItem("hadir.api.token.employee") || "";
+    const headers: Record<string,string> = {};
+    if (token) headers.authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_URL}/api/notifications`, { headers, credentials: "include", cache: "no-store" });
+    if (response.ok) {
+      const rows = await response.json() as any[];
+      if (Array.isArray(rows)) return rows.filter(n => !n.readAt).length;
+    }
+  } catch {}
+  try { return getNotifications(employeeId).filter(n => !n.read).length; } catch { return 0; }
+}
 
 export default function EmployeeLayout({ title = "لوحة الموظف", subtitle, actions, children }: { title?: string; subtitle?: string; actions?: ReactNode; children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(readTheme());
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const session = currentSession();
   const navigate = useNavigate();
+  const employeeId = String(session?.employeeId || "");
   useEffect(() => { applyTheme(theme); try { localStorage.setItem(THEME_KEY, theme); } catch {} }, [theme]);
   useEffect(() => { if (theme !== "system") return; const media = window.matchMedia("(prefers-color-scheme: dark)"); const onChange = () => applyTheme("system"); media.addEventListener?.("change", onChange); return () => media.removeEventListener?.("change", onChange); }, [theme]);
+  useEffect(() => { let active = true; const load = async () => { const count = await loadEmployeeUnreadCount(employeeId); if (active) setUnreadNotifications(count); }; void load(); const timer = window.setInterval(() => void load(), 10000); const onChanged = () => void load(); window.addEventListener("hadir:notifications-changed", onChanged); window.addEventListener("storage", onChanged); return () => { active = false; window.clearInterval(timer); window.removeEventListener("hadir:notifications-changed", onChanged); window.removeEventListener("storage", onChanged); }; }, [employeeId]);
   const logout = async () => { try { await backendLogout(); } catch {} try { localStorage.removeItem("hadir.api.token.employee"); localStorage.removeItem("hadir.employee.session"); localStorage.removeItem("hadir.session"); localStorage.removeItem("employeeAuth"); } catch {} setMenuOpen(false); setThemeMenuOpen(false); navigate("/login", { replace: true }); };
   return <div className="min-h-screen bg-background text-foreground" dir="rtl">
     <div className="sticky top-0 z-[60] border-b border-border/70 bg-background/95 backdrop-blur-md">
@@ -34,7 +54,7 @@ export default function EmployeeLayout({ title = "لوحة الموظف", subtit
         <Link to="/employee" aria-label="حاضر" className="shrink-0"><Brand /></Link>
         <nav className="flex items-center gap-1.5 overflow-x-auto" aria-label="أدوات النظام">
           <button type="button" title="القائمة" aria-label="القائمة" aria-expanded={menuOpen} onClick={() => { setMenuOpen(v => !v); setThemeMenuOpen(false); }} className={cn(utilityClass, menuOpen && "border-primary/40 bg-primary/5 text-primary")}>{menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}<span className="mt-0.5 text-[11px] font-semibold leading-none">القائمة</span></button>
-          <Link to="/employee/notifications" title="الإشعارات" aria-label="الإشعارات" className={utilityClass}><Bell className="h-5 w-5" /><span className="mt-0.5 text-[11px] font-semibold leading-none">الإشعارات</span></Link>
+          <Link to="/employee/notifications" title="الإشعارات" aria-label="الإشعارات" className={`${utilityClass} relative`}><Bell className="h-5 w-5" />{unreadNotifications > 0 && <span className="absolute top-0 right-0 z-10 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold grid place-items-center mono">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}<span className="mt-0.5 text-[11px] font-semibold leading-none">الإشعارات</span></Link>
           <Link to="/weather" title="الطقس" aria-label="الطقس" className={utilityClass}><CloudSun className="h-5 w-5" /><span className="mt-0.5 text-[11px] font-semibold leading-none">الطقس</span></Link>
           <Link to="/prayer" title="القبلة" aria-label="القبلة" className={utilityClass}><Compass className="h-5 w-5" /><span className="mt-0.5 text-[11px] font-semibold leading-none">القبلة</span></Link>
           <Link to="/ai" title="المساعد" aria-label="المساعد" className={utilityClass}><Bot className="h-5 w-5" /><span className="mt-0.5 text-[11px] font-semibold leading-none">المساعد</span></Link>
