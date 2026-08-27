@@ -99,4 +99,4 @@ export default function EmployeePremium() {
 }
 function Metric({label,value}:{label:string,value:React.ReactNode}){return <div className="hud-card p-4"><div className="text-[10px] text-muted-foreground">{label}</div><div className="text-xl font-black mt-1">{value}</div></div>}
 function Info({label,value}:{label:string,value:React.ReactNode}){return <div className="rounded-xl border p-3"><div className="text-[10px] text-muted-foreground">{label}</div><div className="font-bold text-sm mt-1">{value}</div></div>}
-function Empty(){return <div className="text-sm text-muted-foreground py-6 text-center">لا توجد بيانات حتى الآن.</div>
+function Empty(){return <div className="text-sm text-muted-foreground py-6 text-center">لا توجد بيانات حتى الآن.</div>}
