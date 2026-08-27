@@ -26,14 +26,14 @@ jobs:
 
           old = 'import type { ReactNode } from "react";'
           new = '''import type { ReactNode } from "react";
-          import { Edit3, LogIn, LogOut, RotateCcw, ShieldAlert, SmartphoneOff, Trash2, Undo2 } from "lucide-react";'''
+import { Edit3, LogIn, LogOut, ShieldAlert, SmartphoneOff, Trash2, Undo2 } from "lucide-react";'''
           if old not in s:
               raise SystemExit('missing ReactNode import anchor')
           s = s.replace(old, new, 1)
 
           old = '''const rotation = e.scheduleType === "ROTATION";'''
           new = '''const rotation = e.scheduleType === "ROTATION";
-          const actionBase = "inline-flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition";'''
+  const actionBase = "inline-flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition";'''
           if old not in s:
               raise SystemExit('missing rotation anchor')
           s = s.replace(old, new, 1)
