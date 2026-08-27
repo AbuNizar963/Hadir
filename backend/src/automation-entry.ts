@@ -17,11 +17,15 @@ function readCookie(request: Request, name: string) { const cookies=request.head
 async function hashToken(token:string){const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token));let binary="";for(const byte of new Uint8Array(digest))binary+=String.fromCharCode(byte);return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");}
 async function actor(request:Request,env:Env){const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\s+/i,"")||"").trim();if(!token)return null;try{const h=await hashToken(token);const s=await env.DB.prepare("SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1").bind(h).first<any>();if(!s||s.userType!=="admin")return null;return await env.DB.prepare("SELECT id,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1").bind(s.userId).first<any>();}catch{return null;}}
 function origin(request:Request,env:Env){return String(env.APP_ORIGIN||request.headers.get("origin")||"*").split(",")[0].trim().replace(/\/$/,"")||"*";}
+function preflight(originValue:string){return new Response(null,{status:204,headers:{"access-control-allow-origin":originValue,"access-control-allow-credentials":"true","access-control-allow-methods":"GET,POST,PATCH,PUT,DELETE,OPTIONS","access-control-allow-headers":"authorization,content-type,x-requested-with","access-control-max-age":"86400","cache-control":"no-store"}});}
 
 export { base, HadirRealtime };
 export default {
   async fetch(request:Request,env:Env,ctx:ExecutionContext){
-    const a=await actor(request,env);const o=origin(request,env);const path=new URL(request.url).pathname;
+    const o=origin(request,env);
+    if(request.method==="OPTIONS")return preflight(o);
+    const a=await actor(request,env);
+    const path=new URL(request.url).pathname;
     if(path==="/api/workforce/live"&&request.method==="PATCH"){
       const b=await request.clone().json().catch(()=>({})) as any;const employeeId=String(b.employeeId||"").trim();
       if(!employeeId)return new Response(JSON.stringify({error:"الموظف مطلوب"}),{status:400,headers:{"content-type":"application/json","access-control-allow-origin":o,"access-control-allow-credentials":"true"}});
