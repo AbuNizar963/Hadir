@@ -38,41 +38,46 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(4) {
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(36 72% 46%); }
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(274 56% 54%); }
 
-/* Header: Arabic label stays on the RIGHT, with exactly one dot on its LEFT edge. */
+/* Arabic stat header: label RIGHT, exactly one animated dot physically anchored LEFT. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center;
-  justify-content: flex-start;
-  gap: .5rem;
+  position: relative !important;
+  display: block !important;
   width: 100%;
-  direction: rtl;
-  text-align: right;
+  min-height: 1.25rem;
+  padding-left: 1rem;
+  direction: rtl !important;
+  text-align: right !important;
+  white-space: nowrap;
 }
-/* Remove every existing JSX status indicator inside the stat header. */
+/* Remove every JSX indicator inside the stat header — this guarantees no duplicate dots. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child .live-status-dot,
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child [data-status] {
   display: none !important;
 }
-/* Generate one — and only one — premium indicator on the LEFT side of the label. */
+/* One dot only: always on the LEFT side of the Arabic label, independent of flex/RTL ordering. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child::before {
   content: "";
-  display: block;
-  order: 2;
-  flex: 0 0 .48rem;
+  position: absolute;
+  left: .05rem;
+  right: auto;
+  top: 50%;
   width: .48rem;
   height: .48rem;
+  margin: 0;
   border-radius: 9999px;
+  transform: translateY(-50%);
   background: var(--stat-color);
   color: var(--stat-color);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent);
   animation: stat-card-pulse 2.6s cubic-bezier(.22,.61,.36,1) infinite;
 }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child > span:last-child {
-  order: 1;
-  direction: rtl;
-  text-align: right;
-  margin-inline-start: auto;
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child > span {
+  display: block !important;
+  width: 100%;
+  direction: rtl !important;
+  text-align: right !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 /* Numbers: readable in both dark and light themes. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value {
@@ -86,9 +91,9 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value 
   color: #fff !important;
 }
 @keyframes stat-card-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent); opacity: 1; transform: scale(1); }
-  18% { box-shadow: 0 0 0 .16rem color-mix(in srgb, var(--stat-color) 12%, transparent); opacity: 1; transform: scale(1.03); }
-  48% { box-shadow: 0 0 0 .46rem transparent; opacity: .88; transform: scale(1); }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent); opacity: 1; transform: translateY(-50%) scale(1); }
+  18% { box-shadow: 0 0 0 .16rem color-mix(in srgb, var(--stat-color) 12%, transparent); opacity: 1; transform: translateY(-50%) scale(1.03); }
+  48% { box-shadow: 0 0 0 .46rem transparent; opacity: .88; transform: translateY(-50%) scale(1); }
 }
 
 .weather-strip-live { min-height: 1cm; max-height: 1.55cm; overflow: hidden; transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease; animation: weather-breathe 6s ease-in-out infinite; }
