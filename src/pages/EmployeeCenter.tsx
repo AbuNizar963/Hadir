@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, CalendarDays, ChartNoAxesCombined, CreditCard, IdCard, ListChecks, QrCode, ShieldCheck, UserRound } from "lucide-react";
+import { Activity, CalendarDays, ChartNoAxesCombined, Copy, CreditCard, IdCard, ListChecks, QrCode, ShieldCheck, UserRound } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { currentSession } from "@/lib/auth";
 import { getBackendAttendance, getBackendEmployeeProfile, getBackendRequests } from "@/lib/backend";
@@ -43,6 +43,7 @@ export default function EmployeeCenter() {
   const [month, setMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!session) return;
@@ -60,6 +61,18 @@ export default function EmployeeCenter() {
     })();
     return () => { alive = false; };
   }, [session?.employeeId]);
+
+  const copyJobNumber = async () => {
+    const value = String(employee?.jobNumber || "").trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setError("تعذر نسخ الرقم الوظيفي.");
+    }
+  };
 
   const pairs = useMemo(() => {
     const map = new Map<string, any>();
@@ -94,7 +107,7 @@ export default function EmployeeCenter() {
             <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl overflow-hidden border border-primary/30 bg-primary/10 grid place-items-center shrink-0">
               {avatarUrl ? <img src={avatarUrl} alt={employee.name} className="h-full w-full object-cover" /> : <span className="text-3xl font-black text-primary">{String(employee.name || "م").charAt(0)}</span>}
             </div>
-            <div className="min-w-0"><div className="text-xs text-muted-foreground">بطاقة الموظف الرقمية</div><h2 className="text-2xl sm:text-3xl font-black mt-1 truncate">{employee.name}</h2><div className="text-sm text-muted-foreground mt-1">{employee.jobNumber} · {employee.department || employee.role || "موظف"}</div></div>
+            <div className="min-w-0"><div className="text-xs text-muted-foreground">بطاقة الموظف الرقمية</div><h2 className="text-2xl sm:text-3xl font-black mt-1 truncate">{employee.name}</h2><div className="text-sm text-muted-foreground mt-1"><button type="button" onClick={() => void copyJobNumber()} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 -mx-2 font-bold hover:bg-secondary/70 transition" title="نسخ الرقم الوظيفي" aria-label="نسخ الرقم الوظيفي">{copied ? <span className="text-primary">تم النسخ ✓</span> : <><span className="mono">{employee.jobNumber}</span><Copy className="h-3.5 w-3.5"/></>}</button></div></div>
           </div>
           <div className="grid grid-cols-2 gap-2 min-w-[220px]"><Info label="الحالة" value={employee.status === "active" ? "نشط" : employee.status || "—"}/><Info label="الدوام" value={`${employee.workStartTime || "08:00"} → ${employee.workEndTime || "16:00"}`}/></div>
         </div>
