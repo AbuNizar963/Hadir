@@ -75,7 +75,10 @@ function detectMapping(rows: Row[]): Mapping {
     if (hit) return hit;
     throw new Error(`تعذر تحديد عمود ${label}.`);
   };
-  const optional = (words: readonly string[]) => keys.map(k => [scoreHeader(k, words), k] as const).sort((a, b) => b[0] - a[0])[0]?.[0] ? keys.map(k => [scoreHeader(k, words), k] as const).sort((a, b) => b[0] - a[0])[0][1] : undefined;
+  const optional = (words: readonly string[]) => {
+    const ranked = keys.map(k => [scoreHeader(k, words), k] as const).sort((a, b) => b[0] - a[0]);
+    return ranked[0]?.[0] ? ranked[0][1] : undefined;
+  };
   const name = required(aliases.name, "الاسم");
   const jobNumber = required(aliases.job, "الرقم الوظيفي");
   return {
