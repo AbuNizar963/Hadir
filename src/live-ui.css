@@ -37,41 +37,37 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(4) { 
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(36 72% 46%); }
 section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(274 56% 54%); }
 
-/* Exactly ONE pulse indicator per statistic, placed consistently on the LEFT of its label. */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child:not(.flex) {
-  display: flex;
+/* Enterprise stat indicators: exactly ONE animated dot, always visually LEFT of the label. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child {
+  display: flex !important;
   align-items: center;
   justify-content: flex-start;
   gap: .5rem;
+  direction: ltr;
   color: color-mix(in srgb, var(--stat-color) 78%, hsl(var(--foreground)));
 }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child:not(.flex)::before {
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child::before {
   content: "";
-  flex: 0 0 .5rem;
-  width: .5rem;
-  height: .5rem;
+  flex: 0 0 .48rem;
+  width: .48rem;
+  height: .48rem;
   border-radius: 9999px;
   background: var(--stat-color);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 35%, transparent);
-  animation: stat-card-pulse 2.2s ease-out infinite;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent);
+  animation: stat-card-pulse 2.4s cubic-bezier(.22,.61,.36,1) infinite;
 }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child.flex {
-  color: color-mix(in srgb, var(--stat-color) 78%, hsl(var(--foreground)));
+/* Existing markup dots are hidden so they cannot create a second visible indicator. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child > .live-status-dot {
+  display: none !important;
 }
-/* If markup already contains a live dot, use it as the sole indicator and never add another. */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child.flex > .live-status-dot {
-  order: 0;
-  flex: 0 0 .5rem;
-  width: .5rem;
-  height: .5rem;
-  background: var(--stat-color) !important;
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 35%, transparent) !important;
+section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child > span:last-child {
+  order: 1;
+  direction: rtl;
 }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child.flex > span:last-child { order: 1; }
 @keyframes stat-card-pulse {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 35%, transparent); opacity: 1; }
-  70% { box-shadow: 0 0 0 .4rem transparent; opacity: .84; }
-  100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent); opacity: 1; transform: scale(1); }
+  18% { box-shadow: 0 0 0 .18rem color-mix(in srgb, var(--stat-color) 10%, transparent); opacity: 1; transform: scale(1.04); }
+  48% { box-shadow: 0 0 0 .48rem transparent; opacity: .86; transform: scale(1); }
 }
 
 .weather-strip-live { min-height: 1cm; max-height: 1.55cm; overflow: hidden; transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease; animation: weather-breathe 6s ease-in-out infinite; }
@@ -79,5 +75,5 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-chi
 @keyframes weather-breathe { 0%,100% { opacity: .94; } 50% { opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .live-status-dot, .live-value, .weather-strip-live, section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div, section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child:not(.flex)::before { animation: none !important; transition: none !important; }
+  .live-status-dot, .live-value, .weather-strip-live, section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div, section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child::before { animation: none !important; transition: none !important; }
 }
