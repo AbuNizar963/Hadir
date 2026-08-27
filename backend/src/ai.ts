@@ -9,6 +9,26 @@ function trimText(value: unknown, max = 12000) {
   return String(value ?? "").slice(0, max);
 }
 
+function normalizeGreeting(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/[ًٌٍَُِّْـ]/g, "")
+    .replace(/[!؟?.,،]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function greetingResponse(question: string, role: "manager" | "employee") {
+  const q = normalizeGreeting(question);
+  const greetings = new Set([
+    "مرحبا", "اهلا", "اهلاً", "أهلا", "أهلًا", "السلام عليكم", "السلام عليكم ورحمة الله", "صباح الخير", "مساء الخير", "صباح النور", "مساء النور", "هاي", "هلا", "hello", "hi"
+  ]);
+  if (!greetings.has(q)) return null;
+  const name = role === "manager" ? "مدير النظام" : "بك";
+  return `وعليكم السلام ورحمة الله وبركاته، ${name}! 👋\nأنا مساعد Hadir الذكي. كيف يمكنني مساعدتك اليوم؟`;
+}
+
 function buildPrompt(role: "manager" | "employee", question: string, data: unknown) {
   const scope = role === "manager"
     ? "أنت مساعد مدير داخل نظام حضور. تستطيع تحليل بيانات الموظفين المرسلة لك ضمن صلاحية المدير. لا تكشف أسرارًا أو كلمات مرور أو رموز دخول أو معرفات أجهزة أو بيانات تقنية حساسة. لا تخترع أرقامًا أو سجلات غير موجودة في البيانات. إذا لم تكف البيانات قل ذلك بوضوح."
@@ -42,6 +62,11 @@ export async function handleAI(request: Request, env: Env) {
   const role = body?.role === "manager" ? "manager" : "employee";
   const question = trimText(body?.question, 1000).trim();
   if (!question) return Response.json({ ok: false, error: "السؤال فارغ" }, { status: 400 });
+
+  // Greetings are deterministic and do not need an AI provider or system data.
+  // This guarantees a fast, reliable response even when Workers AI/Gemini is unavailable.
+  const greeting = greetingResponse(question, role);
+  if (greeting) return Response.json({ ok: true, provider: "builtin", text: greeting }, { headers: { "cache-control": "no-store" } });
 
   const prompt = buildPrompt(role, question, body?.data ?? {});
   const errors: string[] = [];
