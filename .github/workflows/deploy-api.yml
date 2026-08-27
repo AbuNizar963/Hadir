@@ -19,6 +19,7 @@ jobs:
       VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
       VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
       VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v5
 
@@ -52,6 +53,7 @@ jobs:
           test -n "$VAPID_PUBLIC_KEY"
           test -n "$VAPID_PRIVATE_KEY"
           test -n "$VAPID_SUBJECT"
+          test -n "$GEMINI_API_KEY"
           umask 077
           python - <<'PY'
           import json, os
@@ -61,6 +63,7 @@ jobs:
               "VAPID_PUBLIC_KEY": os.environ["VAPID_PUBLIC_KEY"],
               "VAPID_PRIVATE_KEY": os.environ["VAPID_PRIVATE_KEY"],
               "VAPID_SUBJECT": os.environ["VAPID_SUBJECT"],
+              "GEMINI_API_KEY": os.environ["GEMINI_API_KEY"],
           }
           with open('.secrets.json', 'w', encoding='utf-8') as f:
               json.dump(values, f)
