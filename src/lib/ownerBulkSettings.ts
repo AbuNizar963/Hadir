@@ -1,0 +1,60 @@
+const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").trim().replace(/\/$/, "");
+const ADMIN_TOKEN_KEY = "hadir.api.token.admin";
+
+type BulkResult = { ok: boolean; updated: number; message?: string };
+
+function authHeaders() {
+  const headers = new Headers();
+  headers.set("authorization", `Bearer ${localStorage.getItem(ADMIN_TOKEN_KEY) || ""}`);
+  return headers;
+}
+
+async function apiJson(body: Record<string, unknown>): Promise<BulkResult> {
+  const response = await fetch(`${API_URL}/api/owner/bulk-settings`, {
+    method: "POST",
+    headers: new Headers({ ...Object.fromEntries(authHeaders().entries()), "content-type": "application/json" }),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({})) as BulkResult & { error?: string };
+  if (!response.ok) throw new Error(data.error || `فشل تنفيذ العملية (${response.status})`);
+  return data;
+}
+
+async function imageToWebp(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const max = 512;
+    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("تعذر تجهيز الصورة.");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    let quality = 0.82;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/webp", quality));
+      if (blob && blob.size <= 100 * 1024) return blob;
+      quality -= 0.08;
+    }
+    throw new Error("تعذر ضغط الصورة إلى أقل من 100 كيلوبايت.");
+  } finally {
+    bitmap.close();
+  }
+}
+
+export async function bulkOwnerEmployeeSettings(input: { action: "password"; password: string } | { action: "grace" | "earlyCheckout"; minutes: number } | { action: "avatar"; file: File }): Promise<BulkResult> {
+  if (input.action === "avatar") {
+    const blob = await imageToWebp(input.file);
+    const form = new FormData();
+    form.append("action", "avatar");
+    form.append("file", blob, "avatar.webp");
+    const response = await fetch(`${API_URL}/api/owner/bulk-settings`, { method: "POST", headers: authHeaders(), credentials: "include", cache: "no-store", body: form });
+    const data = await response.json().catch(() => ({})) as BulkResult & { error?: string };
+    if (!response.ok) throw new Error(data.error || `فشل رفع الصورة (${response.status})`);
+    return data;
+  }
+  return apiJson(input);
+}
