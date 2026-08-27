@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS employees (
   specialties_json TEXT NOT NULL DEFAULT '[]',
   work_days_json TEXT NOT NULL DEFAULT '[]',
   avatar TEXT,
-  avatar_key TEXT
+  avatar_key TEXT,
+  is_vip INTEGER NOT NULL DEFAULT 0,
+  auto_check_in INTEGER NOT NULL DEFAULT 0,
+  auto_check_out INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS locations (
