@@ -1,0 +1,68 @@
+name: Workforce UI polish runner
+
+on:
+  push:
+    branches: [feat/workforce-card-integration]
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/workforce-card-integration
+          fetch-depth: 0
+
+      - name: Polish employee card
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/pages/ManagerEmployees.tsx')
+          s = p.read_text(encoding='utf-8')
+          if 'from "lucide-react"' not in s:
+              s = s.replace('import type { ReactNode } from "react";', 'import type { ReactNode } from "react";\nimport { Edit3, LogIn, LogOut, ShieldAlert, SmartphoneOff, Trash2, Undo2 } from "lucide-react";', 1)
+          if 'const actionBase =' not in s:
+              s = s.replace('const rotation = e.scheduleType === "ROTATION";', 'const rotation = e.scheduleType === "ROTATION";\n  const actionBase = "inline-flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition";', 1)
+          old = '''      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">\n        <span>السماح: {e.gracePeriodMinutes ?? 0} دقيقة</span>\n        <span>{e.deviceId ? "الهاتف مرتبط" : "الهاتف غير مرتبط"}</span>\n      </div>'''
+          if old in s:
+              s = s.replace(old, '''      <div className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground">\n        <span>السماح: {e.gracePeriodMinutes ?? 0} دقيقة</span>\n      </div>''', 1)
+          classes = {
+              'className="btn-primary text-[11px]"': 'className={`${actionBase} border-primary/30 bg-primary text-primary-foreground hover:bg-primary/90`}',
+              'className="btn-secondary text-[11px]"': 'className={`${actionBase} border-border bg-secondary/50 hover:bg-secondary`}',
+              'className="rounded-lg border border-destructive/30 px-2.5 py-1.5 text-[11px] font-bold text-destructive hover:bg-destructive/10"': 'className={`${actionBase} border-destructive/30 text-destructive hover:bg-destructive/10`}',
+              'className="rounded-lg border border-primary/30 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/10"': 'className={`${actionBase} border-primary/30 text-primary hover:bg-primary/10`}',
+              'className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-destructive hover:bg-destructive/10"': 'className={`${actionBase} border-destructive/20 text-destructive hover:bg-destructive/10`}',
+              'className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted-foreground hover:bg-secondary"': 'className={`${actionBase} border-border/60 text-muted-foreground hover:bg-secondary`}',
+          }
+          for a, b in classes.items():
+              s = s.replace(a, b, 1)
+          labels = {
+              '>تحضير مباشر</button>': '><LogIn className="h-3.5 w-3.5" aria-hidden="true" />تحضير مباشر</button>',
+              '>انصراف مباشر</button>': '><LogOut className="h-3.5 w-3.5" aria-hidden="true" />انصراف مباشر</button>',
+              '>هروب</button>': '><ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" />هروب</button>',
+              '>إلغاء الهروب / عاد</button>': '><Undo2 className="h-3.5 w-3.5" aria-hidden="true" />إلغاء الهروب / عاد</button>',
+              '>تعديل</button>': '><Edit3 className="h-3.5 w-3.5" aria-hidden="true" />تعديل</button>',
+              '>حذف</button>': '><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />حذف</button>',
+              '>فك ربط الهاتف</button>': '><SmartphoneOff className="h-3.5 w-3.5" aria-hidden="true" />فك ربط الهاتف</button>',
+          }
+          for a, b in labels.items():
+              s = s.replace(a, b, 1)
+          p.write_text(s, encoding='utf-8')
+
+      - name: Verify
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerEmployees.tsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "style(workforce): polish employee card"
+          git push origin HEAD:feat/workforce-card-integration
