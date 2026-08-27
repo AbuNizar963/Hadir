@@ -1,5 +1,6 @@
 import base, { HadirRealtime } from "./ai-entry";
 import { directAttendance, workforceControls, runAutomaticAttendance } from "./automaticAttendance";
+import { resetTestData } from "./test-data-reset";
 
 type Env = {
   DB: D1Database;
@@ -26,6 +27,21 @@ export default {
     if(request.method==="OPTIONS")return preflight(o);
     const a=await actor(request,env);
     const path=new URL(request.url).pathname;
+
+    if(path==="/api/workforce/reset-test-data"&&request.method==="POST"){
+      if(!a||String(a.role).toLowerCase()!=="owner")return new Response(JSON.stringify({error:"المالك فقط يستطيع حذف بيانات الاختبار"}),{status:403,headers:{"content-type":"application/json","access-control-allow-origin":o,"access-control-allow-credentials":"true","cache-control":"no-store"}});
+      const body=await request.clone().json().catch(()=>({})) as any;
+      if(String(body.confirmation||"")!=="حذف البيانات التجريبية")return new Response(JSON.stringify({error:"عبارة التأكيد غير صحيحة"}),{status:400,headers:{"content-type":"application/json","access-control-allow-origin":o,"access-control-allow-credentials":"true","cache-control":"no-store"}});
+      try{
+        const result=await resetTestData(env);
+        const deletedTables=Object.entries(result.deleted).filter(([,count])=>count>0).map(([table,count])=>`${table}: ${count}`);
+        const totalRows=Object.values(result.deleted).reduce((sum,count)=>sum+count,0);
+        return new Response(JSON.stringify({ok:true,deleted:{...result.deleted,r2ProfileImages:result.r2Deleted,totalRows},preserved:result.preserved,message:`تم حذف ${totalRows} سجلًا من بيانات الاختبار وحذف ${result.r2Deleted} صورة من خادم الصور.${deletedTables.length?` الجداول المنظفة: ${deletedTables.join("، ")}.`:""} بقي حسابات الإدارة والإعدادات ومواقع العمل محفوظة.`}),{status:200,headers:{"content-type":"application/json","access-control-allow-origin":o,"access-control-allow-credentials":"true","cache-control":"no-store"}});
+      }catch(error){
+        return new Response(JSON.stringify({error:error instanceof Error?`فشل تنظيف بيانات الاختبار: ${error.message}`:"فشل تنظيف بيانات الاختبار من الخادم."}),{status:500,headers:{"content-type":"application/json","access-control-allow-origin":o,"access-control-allow-credentials":"true","cache-control":"no-store"}});
+      }
+    }
+
     if(path==="/api/workforce/live"&&request.method==="PATCH"){
       const b=await request.clone().json().catch(()=>({})) as any;const employeeId=String(b.employeeId||"").trim();
       if(!employeeId)return new Response(JSON.stringify({error:"الموظف مطلوب"}),{status:400,headers:{"content-type":"application/json","access-control-allow-origin":o,"access-control-allow-credentials":"true"}});
