@@ -1,0 +1,96 @@
+name: One-shot test data reset feature
+on:
+  push:
+    branches: [fix/reset-test-data-control]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch reset API and settings control
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          wf = Path('backend/src/workforce.ts')
+          s = wf.read_text()
+          if 'PROFILE_IMAGES?:R2Bucket' not in s:
+              s=s.replace('type Env={DB:D1Database};','type Env={DB:D1Database;PROFILE_IMAGES?:R2Bucket};',1)
+          marker=' if(pathname==="/api/workforce/reset-test-data"&&method==="POST")'
+          if marker not in s:
+              anchor=' return J({error:"WORKFORCE_ROUTE_NOT_FOUND"},404);'
+              if anchor not in s: raise SystemExit('workforce route anchor not found')
+              route=r''' if(pathname==="/api/workforce/reset-test-data"&&method==="POST"){
+              if(actor?.role!=="owner")return J({error:"غير مصرح"},403);
+              const b=await req.json().catch(()=>({})) as any;
+              if(String(b.confirmation||"")!=="حذف البيانات التجريبية")return J({error:"تأكيد الحذف غير صحيح"},400);
+              const tables=["attendance","audit","requests","employee_requests","notifications","violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights","push_subscriptions","escape_events","device_rebind_requests"];
+              const placeholders=tables.map(()=>"?").join(",");
+              const existing=await rows(env.DB,`SELECT name FROM sqlite_master WHERE type='table' AND name IN (${placeholders})`,...tables) as any[];
+              const existingNames=new Set(existing.map(x=>String(x.name)));
+              const deletedCounts:Record<string,number>={};
+              const statements=[] as D1PreparedStatement[];
+              for(const table of tables){
+                if(!existingNames.has(table))continue;
+                const count=Number((await env.DB.prepare(`SELECT COUNT(*) AS c FROM "${table}"`).first<any>())?.c||0);
+                deletedCounts[table]=count;
+                statements.push(env.DB.prepare(`DELETE FROM "${table}"`));
+              }
+              if(existingNames.has("auth_sessions")){
+                const count=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM auth_sessions WHERE user_type='employee'").first<any>())?.c||0);
+                deletedCounts.auth_employee_sessions=count;
+                statements.push(env.DB.prepare("DELETE FROM auth_sessions WHERE user_type='employee'"));
+              }
+              if(statements.length)await env.DB.batch(statements);
+              let deletedImages=0;
+              if(env.PROFILE_IMAGES){
+                let cursor:string|undefined;
+                do{
+                  const page=await env.PROFILE_IMAGES.list({limit:1000,...(cursor?{cursor}:{})});
+                  const keys=page.objects.map(object=>object.key);
+                  if(keys.length){await env.PROFILE_IMAGES.delete(keys);deletedImages+=keys.length;}
+                  cursor=page.truncated?page.cursor:undefined;
+                }while(cursor);
+              }
+              return J({ok:true,deleted:{...deletedCounts,employees:"all",profileImages:deletedImages},preserved:["admin_accounts","settings","locations"],message:"تم حذف البيانات التجريبية من D1 وصور R2 مع الحفاظ على حسابات الإدارة وإعدادات النظام ومواقع العمل."});
+            }
+'''
+              s=s.replace(anchor,route+anchor,1)
+          wf.write_text(s)
+
+          be=Path('src/lib/backend.ts')
+          s=be.read_text()
+          if 'export async function resetBackendTestData()' not in s:
+              s+='''\nexport async function resetBackendTestData() {\n  return requestWithRetry<{ ok: boolean; deleted: Record<string, number | string>; preserved: string[]; message: string }>("/api/workforce/reset-test-data", { method: "POST", body: JSON.stringify({ confirmation: "حذف البيانات التجريبية" }) }, 3, "admin");\n}\n'''
+          be.write_text(s)
+
+          ms=Path('src/pages/ManagerSettings.tsx')
+          s=ms.read_text()
+          old='saveBackendSettings, getBackendSettings, backendEnabled, createBootstrapOwner, saveBackendLocation, backendMe'
+          new='saveBackendSettings, getBackendSettings, backendEnabled, createBootstrapOwner, saveBackendLocation, backendMe, resetBackendTestData'
+          if old not in s: raise SystemExit('ManagerSettings backend import anchor not found')
+          s=s.replace(old,new,1)
+          state_anchor='  const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);\n'
+          if 'const [resettingCloud, setResettingCloud]' not in s:
+              if state_anchor not in s: raise SystemExit('ManagerSettings state anchor not found')
+              s=s.replace(state_anchor,state_anchor+'  const [resettingCloud, setResettingCloud] = useState(false);\n  const [resetCloudResult, setResetCloudResult] = useState<string | null>(null);\n',1)
+          reset_anchor='  const reset = () => { if (confirm("سيتم حذف بيانات النظام المحلية وإعادة التهيئة. هل أنت متأكد؟")) { resetAll(); setS(getSettings()); } };\n'
+          if 'const resetCloudTestData = async () =>' not in s:
+              if reset_anchor not in s: raise SystemExit('ManagerSettings reset anchor not found')
+              s=s.replace(reset_anchor,reset_anchor+'''\n  const resetCloudTestData = async () => {\n    if (!isOwner || resettingCloud) return;\n    const confirmation = window.prompt("هذه عملية حذف نهائي لبيانات الاختبار من الخادم. اكتب: حذف البيانات التجريبية");\n    if (confirmation !== "حذف البيانات التجريبية") {\n      if (confirmation !== null) setResetCloudResult("تم إلغاء العملية: عبارة التأكيد غير صحيحة.");\n      return;\n    }\n    setResettingCloud(true);\n    setResetCloudResult(null);\n    try {\n      const result = await resetBackendTestData();\n      resetAll();\n      setS(getSettings());\n      setResetCloudResult(result.message);\n    } catch (e) {\n      setResetCloudResult(e instanceof Error ? e.message : "تعذر حذف بيانات الاختبار من الخادم.");\n    } finally {\n      setResettingCloud(false);\n    }\n  };\n''',1)
+          section_anchor='    <AdminAccountsPanel />\n'
+          if 'DANGER ZONE · تنظيف بيئة الاختبار' not in s:
+              if section_anchor not in s: raise SystemExit('ManagerSettings render anchor not found')
+              s=s.replace(section_anchor,section_anchor+'''    {isOwner && <section className="hud-card p-5 sm:p-6 border-destructive/40">\n      <div className="text-xs mono text-destructive font-bold mb-2">DANGER ZONE · تنظيف بيئة الاختبار</div>\n      <h2 className="text-lg font-bold mb-2">حذف جميع بيانات الاختبار من الخادم</h2>\n      <p className="text-sm text-muted-foreground mb-4">يحذف الموظفين، سجلات الحضور والانصراف، الطلبات، الإشعارات، التقارير والبيانات التحليلية، جلسات الموظفين وصور الملفات من D1 وR2. تبقى حسابات الإدارة، إعدادات النظام ومواقع العمل محفوظة حتى لا تفقد القدرة على تسجيل الدخول.</p>\n      <div className="flex flex-col sm:flex-row gap-2">\n        <button type="button" className="btn-secondary border-destructive/50 text-destructive" disabled={resettingCloud} onClick={() => void resetCloudTestData()}>\n          {resettingCloud ? "⏳ جارٍ حذف بيانات الخادم…" : "🗑️ حذف بيانات الاختبار من الخادم"}\n        </button>\n      </div>\n      {resetCloudResult && <div className="mt-3 rounded-xl border p-3 text-sm">{resetCloudResult}</div>}\n    </section>}\n''',1)
+          ms.write_text(s)
+          PY
+      - name: Commit patch and remove temporary workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/src/workforce.ts src/lib/backend.ts src/pages/ManagerSettings.tsx
+          git rm .github/workflows/one-shot-test-data-reset.yml
+          git commit -m 'feat(settings): add owner test data reset'
+          git push
