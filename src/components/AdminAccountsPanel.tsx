@@ -3,7 +3,6 @@ import { getSettings, saveSettings } from "@/lib/storage";
 import { hash } from "@/lib/hash";
 import { backendEnabled, createBackendAdmin, deleteBackendAdmin, getBackendAdmins, updateBackendAdmin } from "@/lib/backend";
 import type { AdminAccount } from "@/types";
-import OwnerBulkSettingsPanel from "@/components/OwnerBulkSettingsPanel";
 
 function Chevron() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
@@ -84,6 +83,5 @@ export default function AdminAccountsPanel() {
         </div>
       </div>
     </details>
-    <OwnerBulkSettingsPanel />
   </div>;
 }
