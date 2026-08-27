@@ -1,6 +1,7 @@
 import base, { HadirRealtime } from "./ai-entry";
 import { directAttendance, workforceControls, runAutomaticAttendance } from "./automaticAttendance";
 import { resetTestData } from "./test-data-reset";
+import { handleProfileImageRequest } from "./r2";
 
 type Env = {
   DB: D1Database;
@@ -13,20 +14,30 @@ type Env = {
   AI?: { run(model: string, input: Record<string, unknown>): Promise<any> };
 };
 
+type ProfileActor = { id: string; username?: string; name: string; role: "owner" | "manager" | "supervisor" | "staff" };
+
 const SESSION_COOKIE = "hadir_session";
 function readCookie(request: Request, name: string) { const cookies=request.headers.get("cookie")||""; const item=cookies.split(";").map(v=>v.trim()).find(v=>v.startsWith(`${name}=`)); return item?decodeURIComponent(item.slice(name.length+1)):""; }
 async function hashToken(token:string){const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token));let binary="";for(const byte of new Uint8Array(digest))binary+=String.fromCharCode(byte);return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");}
 async function actor(request:Request,env:Env){const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\s+/i,"")||"").trim();if(!token)return null;try{const h=await hashToken(token);const s=await env.DB.prepare("SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1").bind(h).first<any>();if(!s||s.userType!=="admin")return null;return await env.DB.prepare("SELECT id,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1").bind(s.userId).first<any>();}catch{return null;}}
+async function profileImageActor(request:Request,env:Env):Promise<ProfileActor|null>{const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\s+/i,"")||"").trim();if(!token)return null;try{const h=await hashToken(token);const s=await env.DB.prepare("SELECT user_id AS userId,user_type AS userType,role FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1").bind(h).first<any>();if(!s)return null;if(s.userType==="admin"){const row=await env.DB.prepare("SELECT id,username,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1").bind(s.userId).first<any>();return row?{id:row.id,username:row.username,name:row.name,role:row.role}:null;}const row=await env.DB.prepare("SELECT id,job_number AS username,name,status FROM employees WHERE id=? LIMIT 1").bind(s.userId).first<any>();return row&&row.status==="active"?{id:row.id,username:row.username,name:row.name,role:"staff"}:null;}catch{return null;}}
 function origin(request:Request,env:Env){return String(env.APP_ORIGIN||request.headers.get("origin")||"*").split(",")[0].trim().replace(/\/$/,"")||"*";}
-function preflight(originValue:string){return new Response(null,{status:204,headers:{"access-control-allow-origin":originValue,"access-control-allow-credentials":"true","access-control-allow-methods":"GET,POST,PATCH,PUT,DELETE,OPTIONS","access-control-allow-headers":"authorization,content-type,x-requested-with","access-control-max-age":"86400","cache-control":"no-store"}});}
+function preflight(originValue:string){return new Response(null,{status:204,headers:{"access-control-allow-origin":originValue,"access-control-allow-credentials":"true","access-control-allow-methods":"GET,POST,PATCH,PUT,DELETE,OPTIONS","access-control-allow-headers":"authorization,content-type,x-requested-with,x-device-id","access-control-max-age":"86400","cache-control":"no-store"}});}
 
 export { base, HadirRealtime };
 export default {
   async fetch(request:Request,env:Env,ctx:ExecutionContext){
     const o=origin(request,env);
     if(request.method==="OPTIONS")return preflight(o);
-    const a=await actor(request,env);
+
     const path=new URL(request.url).pathname;
+    if(path.match(/^\/api\/employees\/[^/]+\/avatar$/)){
+      const imageActor=await profileImageActor(request,env);
+      const imageResponse=await handleProfileImageRequest(request,env,imageActor,o);
+      if(imageResponse)return imageResponse;
+    }
+
+    const a=await actor(request,env);
 
     if(path==="/api/workforce/reset-test-data"&&request.method==="POST"){
       if(!a||String(a.role).toLowerCase()!=="owner")return new Response(JSON.stringify({error:"المالك فقط يستطيع حذف بيانات الاختبار"}),{status:403,headers:{"content-type":"application/json","access-control-allow-origin":o,"access-control-allow-credentials":"true","cache-control":"no-store"}});
