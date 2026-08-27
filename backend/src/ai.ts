@@ -10,20 +10,12 @@ function trimText(value: unknown, max = 12000) {
 }
 
 function normalizeGreeting(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[أإآ]/g, "ا")
-    .replace(/[ًٌٍَُِّْـ]/g, "")
-    .replace(/[!؟?.,،]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return value.toLowerCase().replace(/[أإآ]/g, "ا").replace(/[ًٌٍَُِّْـ]/g, "").replace(/[!؟?.,،]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function greetingResponse(question: string, role: "manager" | "employee") {
   const q = normalizeGreeting(question);
-  const greetings = new Set([
-    "مرحبا", "اهلا", "اهلاً", "أهلا", "أهلًا", "السلام عليكم", "السلام عليكم ورحمة الله", "صباح الخير", "مساء الخير", "صباح النور", "مساء النور", "هاي", "هلا", "hello", "hi"
-  ]);
+  const greetings = new Set(["مرحبا", "اهلا", "اهلاً", "أهلا", "أهلًا", "السلام عليكم", "السلام عليكم ورحمة الله", "صباح الخير", "مساء الخير", "صباح النور", "مساء النور", "هاي", "هلا", "hello", "hi"]);
   if (!greetings.has(q)) return null;
   const name = role === "manager" ? "مدير النظام" : "بك";
   return `وعليكم السلام ورحمة الله وبركاته، ${name}! 👋\nأنا مساعد Hadir الذكي. كيف يمكنني مساعدتك اليوم؟`;
@@ -40,14 +32,36 @@ function responseText(result: any) {
   return String(result?.response ?? result?.result?.response ?? "").trim();
 }
 
+function deterministicEscapeAnswer(question: string, role: "manager" | "employee", data: any) {
+  if (role !== "manager") return null;
+  const q = normalizeGreeting(question);
+  if (!(q.includes("هرب") || q.includes("هروب"))) return null;
+  const rows = Array.isArray(data?.escapes) ? data.escapes : [];
+  const now = new Date();
+  const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  const monthRows = rows.filter((row: any) => {
+    if (row?.status !== "escaped") return false;
+    const time = Date.parse(String(row?.timestamp || ""));
+    return Number.isFinite(time) && time >= monthStart;
+  }).sort((a: any, b: any) => Date.parse(String(b?.timestamp || "")) - Date.parse(String(a?.timestamp || "")));
+  if (!monthRows.length) return { ok: true, provider: "database", text: "لا توجد حالات هروب مسجلة هذا الشهر." };
+  const formatter = new Intl.DateTimeFormat("ar-EG", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
+  const items = monthRows.slice(0, 50).map((row: any) => {
+    const name = String(row?.employeeName || row?.employeeId || "موظف غير معروف");
+    const job = row?.jobNumber ? ` (${row.jobNumber})` : "";
+    const timestamp = Date.parse(String(row?.timestamp || ""));
+    const when = Number.isFinite(timestamp) ? formatter.format(new Date(timestamp)) : "وقت غير متاح";
+    const reason = row?.reason ? ` — ${String(row.reason)}` : "";
+    return `${name}${job} — ${when}${reason}`;
+  });
+  return { ok: true, provider: "database", text: `هذا الشهر تم تسجيل ${monthRows.length} حالة هروب.`, items };
+}
+
 async function runGemini(prompt: string, apiKey: string) {
   const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
-    }),
+    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 500 } }),
   });
   const data = await response.json().catch(() => ({})) as any;
   if (!response.ok) throw new Error(`Gemini HTTP ${response.status}`);
@@ -63,15 +77,17 @@ export async function handleAI(request: Request, env: Env) {
   const question = trimText(body?.question, 1000).trim();
   if (!question) return Response.json({ ok: false, error: "السؤال فارغ" }, { status: 400 });
 
-  // Greetings are deterministic and do not need an AI provider or system data.
-  // This guarantees a fast, reliable response even when Workers AI/Gemini is unavailable.
   const greeting = greetingResponse(question, role);
   if (greeting) return Response.json({ ok: true, provider: "builtin", text: greeting }, { headers: { "cache-control": "no-store" } });
+
+  // Structured attendance questions are answered directly from the D1 context.
+  // This prevents the LLM from guessing or missing records because the prompt was truncated.
+  const grounded = deterministicEscapeAnswer(question, role, body?.data ?? {});
+  if (grounded) return Response.json(grounded, { headers: { "cache-control": "no-store" } });
 
   const prompt = buildPrompt(role, question, body?.data ?? {});
   const errors: string[] = [];
 
-  // Primary: Cloudflare Workers AI, already bound to Hadir.
   if (env.AI) {
     try {
       const result = await env.AI.run("@cf/meta/llama-3.2-3b-instruct", {
@@ -90,7 +106,6 @@ export async function handleAI(request: Request, env: Env) {
     }
   }
 
-  // Optional fallback: keep the key server-side as a Cloudflare secret.
   if (env.GEMINI_API_KEY) {
     try {
       const text = await runGemini(prompt, env.GEMINI_API_KEY);
