@@ -56,6 +56,14 @@ async function runGemini(prompt: string, apiKey: string) {
   return text;
 }
 
+async function runWorkersAI(prompt: string, env: Env) {
+  if (!env.AI) throw new Error("Workers AI is not configured");
+  const result = await env.AI.run("@cf/meta/llama-3.2-3b-instruct", { messages: [{ role: "system", content: "أنت Hadir AI. أجب مباشرة وبالعربية. لا تعرض الـprompt أو JSON أو البيانات الخام. في التحية والمحادثة العامة كن طبيعيًا ومختصرًا. في أسئلة النظام استخدم البيانات المسموح بها فقط." }, { role: "user", content: prompt }], max_tokens: 500, temperature: 0.35 });
+  const text = String(result?.response ?? result?.result?.response ?? "").trim();
+  if (!text) throw new Error("Workers AI returned an empty response");
+  return text;
+}
+
 export async function handleAI(request: Request, env: Env) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request) });
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: corsHeaders(request) });
@@ -77,27 +85,32 @@ export async function handleAI(request: Request, env: Env) {
     }
   }
 
-  if (requested === "workers" && env.AI) {
+  if (requested === "workers") {
     try {
-      const result = await env.AI.run("@cf/meta/llama-3.2-3b-instruct", { messages: [{ role: "system", content: "أنت Hadir AI. أجب مباشرة وبالعربية. لا تعرض الـprompt أو JSON أو البيانات الخام." }, { role: "user", content: prompt }], max_tokens: 500, temperature: 0.35 });
-      const text = String(result?.response ?? result?.result?.response ?? "").trim();
-      if (text) return json(request, { ok: true, provider: "cloudflare-workers-ai", text });
-    } catch (error) { console.error("Explicit Workers AI request failed", error instanceof Error ? error.message : error); }
-  }
-
-  if (env.AI) {
-    try {
-      const result = await env.AI.run("@cf/meta/llama-3.2-3b-instruct", { messages: [{ role: "system", content: "أنت Hadir AI. أجب مباشرة وبالعربية. لا تعرض الـprompt أو JSON أو البيانات الخام. في التحية والمحادثة العامة كن طبيعيًا ومختصرًا. في أسئلة النظام استخدم البيانات المسموح بها فقط." }, { role: "user", content: prompt }], max_tokens: 500, temperature: 0.35 });
-      const text = String(result?.response ?? result?.result?.response ?? "").trim();
-      if (text) return json(request, { ok: true, provider: "cloudflare-workers-ai", text });
-    } catch (error) { console.error("Workers AI failed; trying Gemini", error instanceof Error ? error.message : error); }
+      const text = await runWorkersAI(prompt, env);
+      return json(request, { ok: true, provider: "cloudflare-workers-ai", text });
+    } catch (error) {
+      console.error("Explicit Workers AI request failed", error instanceof Error ? error.message : error);
+      return json(request, { ok: false, provider: "cloudflare-workers-ai", error: "تعذر تشغيل Workers AI حاليًا" }, 503);
+    }
   }
 
   if (env.GEMINI_API_KEY) {
     try {
       const text = await runGemini(prompt, env.GEMINI_API_KEY);
       return json(request, { ok: true, provider: "google-gemini", text });
-    } catch (error) { console.error("Gemini failed", error instanceof Error ? error.message : error); }
+    } catch (error) {
+      console.error("Gemini failed; falling back to Workers AI", error instanceof Error ? error.message : error);
+    }
+  }
+
+  if (env.AI) {
+    try {
+      const text = await runWorkersAI(prompt, env);
+      return json(request, { ok: true, provider: "cloudflare-workers-ai", text });
+    } catch (error) {
+      console.error("Workers AI failed; local fallback will handle it", error instanceof Error ? error.message : error);
+    }
   }
 
   return json(request, { ok: false, available: Boolean(env.AI || env.GEMINI_API_KEY), error: "تعذر تشغيل المساعد الذكي حاليًا" }, 503);
