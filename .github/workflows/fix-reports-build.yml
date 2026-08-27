@@ -1,0 +1,53 @@
+name: Repair reports build syntax
+
+on:
+  push:
+    branches:
+      - fix/reports-daily-attendance-export
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v5
+        with:
+          ref: fix/reports-daily-attendance-export
+          fetch-depth: 0
+      - name: Repair malformed export declaration
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          p = Path("src/pages/ManagerReports.tsx")
+          s = p.read_text(encoding="utf-8")
+          fixed, n = re.subn(r'(\],)d:', r'\1d=', s, count=1)
+          if n != 1:
+              raise SystemExit(f"Expected one malformed declaration, replaced {n}")
+          p.write_text(fixed, encoding="utf-8")
+      - name: Verify source
+        run: |
+          grep -n 'const exportCsv' src/pages/ManagerReports.tsx
+          ! grep -n '],d:' src/pages/ManagerReports.tsx
+      - name: Commit source repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerReports.tsx
+          git commit -m "fix(reports): correct export CSV declaration"
+          git push origin HEAD:fix/reports-daily-attendance-export
+      - name: Remove temporary workflow
+        if: success()
+        run: |
+          git fetch origin fix/reports-daily-attendance-export
+          git checkout -B cleanup origin/fix/reports-daily-attendance-export
+          git rm -f .github/workflows/fix-reports-build.yml
+          git commit -m "chore: remove temporary reports syntax repair workflow"
+          git push origin cleanup:fix/reports-daily-attendance-export
