@@ -32,6 +32,31 @@ function responseText(result: any) {
   return String(result?.response ?? result?.result?.response ?? "").trim();
 }
 
+function localDateKey(value: unknown) {
+  const time = Date.parse(String(value || ""));
+  if (!Number.isFinite(time)) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(time));
+}
+
+function deterministicAttendanceAnswer(question: string, role: "manager" | "employee", data: any) {
+  if (role !== "manager") return null;
+  const q = normalizeGreeting(question);
+  if (!(q.includes("غاب") || q.includes("غائب") || q.includes("لم يسجل") || q.includes("لم يسجل حضور") || q.includes("ما حضر"))) return null;
+
+  const employees = Array.isArray(data?.employees) ? data.employees : [];
+  const attendance = Array.isArray(data?.attendance) ? data.attendance : [];
+  const active = employees.filter((employee: any) => String(employee?.status || "").toLowerCase() === "active");
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const checkedIds = new Set(attendance.filter((row: any) => row?.type === "check-in" && localDateKey(row?.timestamp) === today).map((row: any) => String(row?.employeeId || "")));
+  const absent = active.filter((employee: any) => !checkedIds.has(String(employee?.id || "")));
+  const names = absent.slice(0, 100).map((employee: any) => `${String(employee?.name || employee?.id || "موظف غير معروف")}${employee?.jobNumber ? ` (${employee.jobNumber})` : ""}`);
+  const suffix = absent.length > 100 ? `\n... و${absent.length - 100} موظف آخر.` : "";
+  const text = absent.length
+    ? `حتى الآن، يوجد ${absent.length} موظف نشط لم يظهر له تسجيل حضور اليوم:\n${names.map((name: string, index: number) => `${index + 1}. ${name}`).join("\n")}${suffix}\n\nملاحظة: عدم وجود تسجيل حضور لا يعني بالضرورة غيابًا مؤكدًا قبل مراجعة المناوبة أو الإجازة أو يوم الراحة.`
+    : `حتى الآن، لا يوجد موظفون نشطون بلا تسجيل حضور اليوم. إجمالي الموظفين النشطين: ${active.length}.`;
+  return { ok: true, provider: "database", text };
+}
+
 function deterministicEscapeAnswer(question: string, role: "manager" | "employee", data: any) {
   if (role !== "manager") return null;
   const q = normalizeGreeting(question);
@@ -82,6 +107,9 @@ export async function handleAI(request: Request, env: Env) {
 
   // Structured attendance questions are answered directly from the D1 context.
   // This prevents the LLM from guessing or missing records because the prompt was truncated.
+  const groundedAttendance = deterministicAttendanceAnswer(question, role, body?.data ?? {});
+  if (groundedAttendance) return Response.json(groundedAttendance, { headers: { "cache-control": "no-store" } });
+
   const grounded = deterministicEscapeAnswer(question, role, body?.data ?? {});
   if (grounded) return Response.json(grounded, { headers: { "cache-control": "no-store" } });
 
