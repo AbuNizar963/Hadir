@@ -68,3 +68,6 @@ export async function getBackendEscapeEvents(employeeId?: string, limit = 500) {
 export async function createBackendEscapeEvent(input: { employeeId: string; status: "escaped" | "returned"; reason?: string; lat?: number; lng?: number }) { return requestWithRetry<{ ok: boolean; event: EscapeEvent }>("/api/escape-events", { method: "POST", body: JSON.stringify(input) }, 3, "admin"); }
 export async function backendHealth() { return request<{ ok: boolean; database?: string; ownerInitialized?: boolean }>("/api/health"); }
 export type { AdminAccount };
+export async function resetBackendTestData() {
+  return requestWithRetry<{ ok: boolean; deleted: Record<string, number | string>; preserved: string[]; message: string }>("/api/workforce/reset-test-data", { method: "POST", body: JSON.stringify({ confirmation: "حذف البيانات التجريبية" }) }, 3, "admin");
+}

@@ -3,7 +3,7 @@ import ManagerLayout from "@/components/layout/ManagerLayout";
 import AdminAccountsPanel from "@/components/AdminAccountsPanel";
 import { getSettings, resetAll, saveSettings, setManagerSession } from "@/lib/storage";
 import { currentManager } from "@/lib/auth";
-import { saveBackendSettings, getBackendSettings, backendEnabled, createBootstrapOwner, saveBackendLocation, backendMe } from "@/lib/backend";
+import { saveBackendSettings, getBackendSettings, backendEnabled, createBootstrapOwner, saveBackendLocation, backendMe, resetBackendTestData } from "@/lib/backend";
 import { getDiagnostics, clearDiagnostics, type DiagnosticEntry } from "@/lib/systemDiagnostics";
 import type { Settings, Location } from "@/types";
 
@@ -27,6 +27,8 @@ export default function ManagerSettings() {
   const [loginUrl, setLoginUrl] = useState("");
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
+  const [resettingCloud, setResettingCloud] = useState(false);
+  const [resetCloudResult, setResetCloudResult] = useState<string | null>(null);
   const manager = currentManager();
   const isOwner = manager?.role === "owner" || manager?.accountId === "bootstrap";
 
@@ -141,8 +143,40 @@ export default function ManagerSettings() {
 
   const reset = () => { if (confirm("سيتم حذف بيانات النظام المحلية وإعادة التهيئة. هل أنت متأكد؟")) { resetAll(); setS(getSettings()); } };
 
+  const resetCloudTestData = async () => {
+    if (!isOwner || resettingCloud) return;
+    const confirmation = window.prompt("هذه عملية حذف نهائي لبيانات الاختبار من الخادم. اكتب: حذف البيانات التجريبية");
+    if (confirmation !== "حذف البيانات التجريبية") {
+      if (confirmation !== null) setResetCloudResult("تم إلغاء العملية: عبارة التأكيد غير صحيحة.");
+      return;
+    }
+    setResettingCloud(true);
+    setResetCloudResult(null);
+    try {
+      const result = await resetBackendTestData();
+      resetAll();
+      setS(getSettings());
+      setResetCloudResult(result.message);
+    } catch (e) {
+      setResetCloudResult(e instanceof Error ? e.message : "تعذر حذف بيانات الاختبار من الخادم.");
+    } finally {
+      setResettingCloud(false);
+    }
+  };
+
   return <ManagerLayout title="الإعدادات" subtitle="إعدادات النظام والصلاحيات — المالك والمدير"><div className="space-y-5">
     <AdminAccountsPanel />
+    {isOwner && <section className="hud-card p-5 sm:p-6 border-destructive/40">
+      <div className="text-xs mono text-destructive font-bold mb-2">DANGER ZONE · تنظيف بيئة الاختبار</div>
+      <h2 className="text-lg font-bold mb-2">حذف جميع بيانات الاختبار من الخادم</h2>
+      <p className="text-sm text-muted-foreground mb-4">يحذف الموظفين، سجلات الحضور والانصراف، الطلبات، الإشعارات، التقارير والبيانات التحليلية، جلسات الموظفين وصور الملفات من D1 وR2. تبقى حسابات الإدارة، إعدادات النظام ومواقع العمل محفوظة حتى لا تفقد القدرة على تسجيل الدخول.</p>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <button type="button" className="btn-secondary border-destructive/50 text-destructive" disabled={resettingCloud} onClick={() => void resetCloudTestData()}>
+          {resettingCloud ? "⏳ جارٍ حذف بيانات الخادم…" : "🗑️ حذف بيانات الاختبار من الخادم"}
+        </button>
+      </div>
+      {resetCloudResult && <div className="mt-3 rounded-xl border p-3 text-sm">{resetCloudResult}</div>}
+    </section>}
     <section className="hud-card p-5 sm:p-6"><div className="text-xs mono text-primary font-bold mb-4">PROFILE · حساب المالك</div><div className="grid md:grid-cols-3 gap-3"><Field label="اسم المالك"><input className="input mt-1" value={s.ownerName || ""} onChange={e => setS({ ...s, ownerName: e.target.value })} placeholder="اسم المالك" /></Field><Field label="اسم المستخدم"><input className="input mono mt-1" value={s.ownerUsername || ""} onChange={e => setS({ ...s, ownerUsername: e.target.value })} placeholder="اسم المستخدم" /></Field><Field label="كلمة مرور جديدة"><input type="password" className="input mt-1" value={password} onChange={e => setPassword(e.target.value)} placeholder="6 أحرف على الأقل" /></Field></div></section>
     {isOwner && <section className="hud-card p-5 sm:p-6 border-primary/30"><div className="text-xs mono text-primary font-bold mb-4">DIAGNOSTICS · تقرير أخطاء النظام · OWNER ONLY</div><p className="text-sm text-muted-foreground mb-3">سجل تقني محلي لأخطاء JavaScript والوعود غير المعالجة، مع رمز الخطأ والوقت وStack Trace والسياق. لا يظهر إلا للمالك.</p><div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary" onClick={() => { setDiagnostics(getDiagnostics()); setShowDiagnostics(true); }}>🛠️ فتح سجل الأخطاء ({getDiagnostics().filter(x => x.level === "error").length})</button><button type="button" className="btn-secondary" onClick={() => { clearDiagnostics(); setDiagnostics([]); }}>مسح السجل</button></div>{showDiagnostics && <div className="mt-4 space-y-2 max-h-[520px] overflow-auto">{diagnostics.length === 0 ? <div className="text-sm text-muted-foreground p-4 border rounded-xl">لا توجد أخطاء مسجلة.</div> : diagnostics.map(d => <details key={d.id} className="border rounded-xl p-3 bg-secondary/20"><summary className="cursor-pointer text-sm"><b>{d.code}</b> · {new Date(d.timestamp).toLocaleString("ar-SA")} · {d.message}</summary><pre className="mt-3 whitespace-pre-wrap break-words text-[11px] mono overflow-auto">{JSON.stringify({ level: d.level, code: d.code, timestamp: d.timestamp, message: d.message, stack: d.stack, context: d.context }, null, 2)}</pre></details>)}</div>}</section>}
     <section className="hud-card p-5 sm:p-6"><div className="text-xs mono text-muted-foreground mb-4">GPS · الموقع الرئيسي</div><div className="grid md:grid-cols-3 gap-3"><Field label="خط العرض"><input type="number" step="0.000001" className="input mono mt-1" value={s.workSiteLat} onChange={e => setS({ ...s, workSiteLat: +e.target.value })} /></Field><Field label="خط الطول"><input type="number" step="0.000001" className="input mono mt-1" value={s.workSiteLng} onChange={e => setS({ ...s, workSiteLng: +e.target.value })} /></Field><Field label="النطاق بالمتر"><input type="number" min="20" max="2000" className="input mono mt-1" value={s.radiusMeters} onChange={e => setS({ ...s, radiusMeters: +e.target.value })} /></Field></div><button type="button" className="btn-secondary mt-3" onClick={() => getLocation("main")}>📍 استخدام موقعي الحالي</button></section>
