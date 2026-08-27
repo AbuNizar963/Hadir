@@ -24,7 +24,12 @@ export function getEmployeeScheduleStatus(employee: Employee | null | undefined,
     return { isWorkDay: true, label: "في المناوبة", detail: `اليوم ${normalizeDigits(String(info.workDay + 1))} من ${normalizeDigits(String(info.daysOn))} في المناوبة`, cycleDay: info.cycleDay + 1, cycleTotal: info.daysOn + info.daysOff };
   }
   if (period.kind === "OFF") return { isWorkDay: false, label: "إجازة أسبوعية", detail: period.detail };
-  return { isWorkDay: true, label: "يوم عمل (إداري)", detail: period.detail };
+  // Administrative employees enter the rest state as soon as today's shift ends.
+  if (period.end && target.getTime() >= period.end.getTime()) {
+    const next = getNextAdminWorkStart(employee, target);
+    return { isWorkDay: false, label: "فترة راحة", detail: next ? `انتهى دوام اليوم · العمل القادم ${formatDateTime(next)}` : "انتهى دوام اليوم" };
+  }
+  return { isWorkDay: true, label: "في المناوبة", detail: "يوم عمل (إداري)" };
 }
 
 export function getEmployeeWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): WorkPeriod {
@@ -44,8 +49,6 @@ export function getEmployeeWorkPeriod(employee: Employee | null | undefined, tar
   if (info.phase === "NOT_STARTED") return { isWorkDay: false, kind: "NOT_STARTED", start: null, end: null, label: "لم تبدأ المناوبة بعد", detail: `تبدأ أول مناوبة في ${employee.rotationStartDate} الساعة ${formatTime(info.firstStart)}` };
   if (info.phase === "OFF") return { isWorkDay: false, kind: "OFF", start: null, end: null, label: "راحة تناوبية", detail: `اليوم ${normalizeDigits(String(info.cycleDay - info.daysOn + 1))} من ${normalizeDigits(String(info.daysOff))} في الراحة` };
 
-  // Rotation days are elapsed 24-hour periods, not inclusive calendar dates.
-  // 4/4 starting Sunday at 09:00 runs Sunday 09:00 -> Thursday 09:00.
   const periodStart = info.periodStart;
   const end = new Date(periodStart.getTime() + info.daysOn * DAY_MS);
   return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "مناوبة تناوبية", detail: `من ${formatDateTime(periodStart)} → ${formatDateTime(end)}` };
@@ -77,12 +80,30 @@ export function getScheduleCountdown(employee: Employee | null | undefined, targ
     const next = new Date(info.periodStart.getTime() + (info.daysOn + info.daysOff) * DAY_MS);
     return { kind: "NEXT_WORK_START", target: next, label: "تبدأ المناوبة القادمة خلال" };
   }
+  if ((employee.scheduleType ?? "ADMIN") === "ADMIN") {
+    const next = getNextAdminWorkStart(employee, target);
+    return next ? { kind: "NEXT_WORK_START", target: next, label: "تبدأ المناوبة القادمة خلال" } : { kind: "NONE", target: null, label: "" };
+  }
   return { kind: "NONE", target: null, label: "" };
 }
 
 export function isWithinWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): boolean {
   const period = getActiveWorkPeriod(employee, target);
   return Boolean(period.isWorkDay && period.start && period.end && target >= period.start && target < period.end);
+}
+
+function getNextAdminWorkStart(employee: Employee, target: Date): Date | null {
+  const days = normalizeWorkDays(employee.workDays);
+  if (!days.length) return null;
+  const startTime = parseTime(employee.workStartTime, "09:00");
+  for (let offset = 0; offset <= 7; offset++) {
+    const candidate = new Date(target.getTime());
+    candidate.setDate(candidate.getDate() + offset);
+    candidate.setHours(startTime.hours, startTime.minutes, 0, 0);
+    if (!days.includes(candidate.getDay())) continue;
+    if (candidate.getTime() > target.getTime()) return candidate;
+  }
+  return null;
 }
 
 function getRotationInfo(employee: Employee, target: Date): { firstStart: Date; periodStart: Date; daysOn: number; daysOff: number; cycleDay: number; workDay: number; phase: "WORK" | "OFF" | "NOT_STARTED" } | null {
