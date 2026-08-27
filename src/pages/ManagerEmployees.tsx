@@ -130,6 +130,9 @@ function EmployeeCardBase({
   onRemove,
   onReset,
   onDirect,
+  onCheckout,
+  onWorkforceUpdate,
+  isOwner,
   onEscape,
   onReturn,
 }: {
@@ -141,6 +144,9 @@ function EmployeeCardBase({
   onRemove: (e: Employee) => void;
   onReset: (e: Employee) => void;
   onDirect: (e: Employee) => void;
+  onCheckout: (e: Employee) => void;
+  onWorkforceUpdate: (e: Employee, patch: { isVip?: boolean; autoCheckIn?: boolean; autoCheckOut?: boolean }) => void;
+  isOwner: boolean;
   onEscape: (e: Employee) => void;
   onReturn: (e: Employee) => void;
 }) {
@@ -212,6 +218,12 @@ function EmployeeCardBase({
           >
             {e.status === "active" ? "فعال" : "موقوف"}
           </span>
+
+          {e.isVip && (
+            <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[10px] font-black text-amber-500">
+              ★ VIP
+            </span>
+          )}
         </div>
       </div>
 
@@ -259,12 +271,22 @@ function EmployeeCardBase({
 
       <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
         <span>السماح: {e.gracePeriodMinutes ?? 0} دقيقة</span>
+        <span>{e.deviceId ? "الهاتف مرتبط" : "الهاتف غير مرتبط"}</span>
+      </div>
 
-        {e.deviceId ? (
-          <span className="text-primary">● جهاز موثق</span>
-        ) : (
-          <span>غير مرتبط</span>
-        )}
+      <div className="mt-3 grid gap-1.5 rounded-xl border border-border/60 bg-background/20 p-2.5 text-[11px]">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-bold">VIP</span>
+          <input type="checkbox" checked={!!e.isVip} disabled={!isOwner} onChange={(x) => onWorkforceUpdate(e, { isVip: x.target.checked })} />
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span>التحضير التلقائي</span>
+          <input type="checkbox" checked={!!e.autoCheckIn} disabled={!isOwner} onChange={(x) => onWorkforceUpdate(e, { autoCheckIn: x.target.checked })} />
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span>الانصراف التلقائي</span>
+          <input type="checkbox" checked={!!e.autoCheckOut} disabled={!isOwner} onChange={(x) => onWorkforceUpdate(e, { autoCheckOut: x.target.checked })} />
+        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -275,6 +297,16 @@ function EmployeeCardBase({
             onClick={() => onDirect(e)}
           >
             تحضير مباشر
+          </button>
+        )}
+
+        {isOwner && e.status === "active" && (
+          <button
+            type="button"
+            className="btn-secondary text-[11px]"
+            onClick={() => onCheckout(e)}
+          >
+            انصراف مباشر
           </button>
         )}
 
@@ -350,6 +382,9 @@ const EmployeeCard = memo(
     a.e.rotationDaysOn === b.e.rotationDaysOn &&
     a.e.rotationDaysOff === b.e.rotationDaysOff &&
     a.e.deviceId === b.e.deviceId &&
+    a.e.isVip === b.e.isVip &&
+    a.e.autoCheckIn === b.e.autoCheckIn &&
+    a.e.autoCheckOut === b.e.autoCheckOut &&
     a.e.gracePeriodMinutes === b.e.gracePeriodMinutes &&
     JSON.stringify(a.e.specialties) === JSON.stringify(b.e.specialties) &&
     a.e.avatar === b.e.avatar,
@@ -456,6 +491,7 @@ export default function ManagerEmployees() {
     }));
 
   const canManage = role === "owner" || role === "manager";
+  const isOwner = role === "owner";
   const canAdd = canManage || role === "supervisor";
 
   const escapeStatusFor = (
@@ -692,6 +728,48 @@ export default function ManagerEmployees() {
           ? err.message
           : "تعذر إلغاء ربط الجهاز.",
       );
+    }
+  };
+
+  const directCheckout = async (e: Employee) => {
+    if (e.status !== "active" || !isOwner) return;
+
+    if (!confirm(`تسجيل انصراف مباشر للموظف «${e.name}»؟`)) return;
+
+    try {
+      const token = localStorage.getItem("hadir.api.token.admin") || "";
+      const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+      const res = await fetch(`${api}/api/manager/attendance/checkout`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ employeeId: e.id }),
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر تسجيل الانصراف المباشر.");
+      await load(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر تسجيل الانصراف المباشر.");
+    }
+  };
+
+  const updateWorkforce = async (e: Employee, patch: { isVip?: boolean; autoCheckIn?: boolean; autoCheckOut?: boolean }) => {
+    if (!isOwner) return;
+    try {
+      const token = localStorage.getItem("hadir.api.token.admin") || "";
+      const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+      const res = await fetch(`${api}/api/manager/workforce-controls/${encodeURIComponent(e.id)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify(patch),
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ إعدادات Workforce.");
+      setEmployees((prev) => prev.map((x) => x.id === e.id ? { ...x, ...patch } : x));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر حفظ إعدادات Workforce.");
+      await load(false);
     }
   };
 
@@ -1384,6 +1462,9 @@ export default function ManagerEmployees() {
                     )
                   }
                   canManage={canManage}
+                  isOwner={isOwner}
+                  onCheckout={directCheckout}
+                  onWorkforceUpdate={updateWorkforce}
                   escapeStatus={escapeStatusFor(e.id)}
                   onEdit={edit}
                   onRemove={remove}
