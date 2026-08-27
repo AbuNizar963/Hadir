@@ -31,12 +31,14 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:hover {
   border-color: color-mix(in srgb, var(--stat-color) 42%, transparent) !important;
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 10%, transparent), 0 10px 28px color-mix(in srgb, var(--stat-color) 11%, transparent);
 }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(1) { --stat-color: hsl(210 72% 54%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(2) { --stat-color: hsl(152 55% 42%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(3) { --stat-color: hsl(4 62% 54%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(4) { --stat-color: hsl(188 64% 44%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(36 72% 46%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(274 56% 54%); }
+
+/* Semantic palette: every statistic has one stable meaning and one matching pulse. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(1) { --stat-color: hsl(210 72% 54%); } /* الإجمالي — blue */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(2) { --stat-color: hsl(152 55% 42%); } /* فعال — green */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(3) { --stat-color: hsl(38 78% 48%); } /* موقوف — amber */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(4) { --stat-color: hsl(188 64% 44%); } /* أجهزة موثقة — cyan */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(4 72% 52%); } /* هارب الآن — red */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(38 92% 50%); } /* VIP — gold */
 
 /* Arabic stat header: label RIGHT, exactly one animated dot physically anchored LEFT. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child {
