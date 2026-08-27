@@ -28,7 +28,7 @@ self.addEventListener("push",e=>e.waitUntil((async()=>{
   const title=String(d.title||"إشعار جديد");
   const body=String(d.body||d.message||"لديك إشعار جديد في Hadir");
   const url=resolveNotificationUrl(d.url||d.path||"/");
-  const icon=new URL("./icons/icon-192.png",self.registration.scope).href;
+  const icon=new URL("./favicon.svg",self.registration.scope).href;
   await self.registration.showNotification(title,{
     body,
     icon,
@@ -44,7 +44,7 @@ self.addEventListener("push",e=>e.waitUntil((async()=>{
 self.addEventListener("notificationclick",e=>{
   e.notification.close();
   e.waitUntil((async()=>{
-    const target=resolveNotificationUrl(e.notification.data?.url||e.notification.data?.path||"/");
+    const target=resolveNotificationUrl(e.notification.data?.url||e.notification.data?.path||"");
     const windows=await self.clients.matchAll({type:"window",includeUncontrolled:true});
     for(const client of windows){
       if("navigate" in client){
