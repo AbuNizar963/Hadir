@@ -23,18 +23,19 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("src/pages/ManagerEmployees.tsx")
           text = path.read_text(encoding="utf-8")
 
-          old_scroll = '''    window.scrollTo({
-            top: 0,
-            behavior: "smooth",
-          });
-          '''
-          if old_scroll not in text:
+          text, scroll_count = re.subn(
+              r'\n[ \t]*window\.scrollTo\(\{\s*top:\s*0,\s*behavior:\s*"smooth",\s*\}\);\s*\n',
+              "\n",
+              text,
+              count=1,
+          )
+          if scroll_count != 1:
               raise SystemExit("Expected employee edit scroll block was not found")
-          text = text.replace(old_scroll, "", 1)
 
           old_form = '''          <section className="hud-card p-5 sm:p-6">'''
           new_form = '''          <section
