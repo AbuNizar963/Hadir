@@ -6,7 +6,8 @@
 .live-status-dot[data-status="danger"] { background: hsl(var(--destructive)); box-shadow: 0 0 0 0 hsl(var(--destructive) / .35); }
 .live-status-dot[data-status="info"] { background: hsl(var(--accent)); box-shadow: 0 0 0 0 hsl(var(--accent) / .35); }
 .live-status-dot[data-status="vip"] { background: hsl(38 92% 50%); box-shadow: 0 0 0 0 hsl(38 92% 50% / .35); }
-.live-status-dot[data-status="online"] { background: hsl(var(--primary)); box-shadow: 0 0 0 0 hsl(var(--primary) / .35); }
+/* Operational status: online/active is always enterprise green, independent of device/theme primary color. */
+.live-status-dot[data-status="online"] { background: hsl(152 55% 42%) !important; box-shadow: 0 0 0 0 hsl(152 55% 42% / .35); }
 
 @keyframes live-status-pulse { 0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; } 70% { box-shadow: 0 0 0 .45rem transparent; opacity: .82; } 100% { box-shadow: 0 0 0 0 transparent; opacity: 1; } }
 .live-value { transition: transform 180ms ease, opacity 180ms ease; font-variant-numeric: tabular-nums; }
@@ -109,7 +110,6 @@ section.hud-card > div:first-child > div:first-child > div:first-child > .mono.t
   box-shadow: 0 0 0 0 hsl(210 72% 54% / .34);
   animation: directory-heading-pulse 2.4s cubic-bezier(.22,.61,.36,1) infinite;
 }
-/* The LIVE DIRECTORY heading is the second directory-style heading when the import/form panels are closed. */
 section.hud-card:nth-of-type(2) > div:first-child > div:first-child > div:first-child > .mono.text-xs.font-bold.text-primary::before {
   background: hsl(152 55% 42%);
   box-shadow: 0 0 0 0 hsl(152 55% 42% / .34);
