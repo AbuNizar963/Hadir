@@ -6,6 +6,19 @@ function trimText(value: unknown, max = 12000) {
   return String(value ?? "").slice(0, max);
 }
 
+function corsHeaders(request: Request) {
+  const origin = request.headers.get("origin");
+  const headers = new Headers({ "cache-control": "no-store", "access-control-allow-credentials": "true", "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": "Content-Type, Authorization" });
+  if (origin) headers.set("access-control-allow-origin", origin);
+  return headers;
+}
+
+function json(request: Request, data: unknown, status = 200) {
+  const headers = corsHeaders(request);
+  headers.set("content-type", "application/json; charset=utf-8");
+  return new Response(JSON.stringify(data), { status, headers });
+}
+
 function buildPrompt(role: "manager" | "employee", question: string, data: unknown) {
   const scope = role === "manager"
     ? "أنت مساعد مدير داخل نظام حضور. تستطيع تحليل بيانات الموظفين المرسلة لك ضمن صلاحية المدير. لا تكشف أسرارًا أو كلمات مرور أو رموز دخول أو معرفات أجهزة أو بيانات تقنية حساسة. لا تخترع أرقامًا أو سجلات غير موجودة في البيانات. إذا لم تكف البيانات قل ذلك بوضوح."
@@ -27,11 +40,12 @@ async function runGemini(prompt: string, apiKey: string) {
 }
 
 export async function handleAI(request: Request, env: Env) {
-  if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(request) });
+  if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: corsHeaders(request) });
   const body = await request.json().catch(() => null) as any;
   const role = body?.role === "manager" ? "manager" : "employee";
   const question = trimText(body?.question, 1000).trim();
-  if (!question) return Response.json({ ok: false, error: "السؤال فارغ" }, { status: 400 });
+  if (!question) return json(request, { ok: false, error: "السؤال فارغ" }, 400);
   const prompt = buildPrompt(role, question, body?.data ?? {});
 
   if (env.AI) {
@@ -45,7 +59,7 @@ export async function handleAI(request: Request, env: Env) {
         temperature: 0.2
       });
       const text = String(result?.response ?? result?.result?.response ?? "").trim();
-      if (text) return Response.json({ ok: true, provider: "cloudflare-workers-ai", text }, { headers: { "cache-control": "no-store" } });
+      if (text) return json(request, { ok: true, provider: "cloudflare-workers-ai", text });
     } catch (error) {
       console.error("Workers AI failed; trying Gemini", error instanceof Error ? error.message : error);
     }
@@ -54,11 +68,11 @@ export async function handleAI(request: Request, env: Env) {
   if (env.GEMINI_API_KEY) {
     try {
       const text = await runGemini(prompt, env.GEMINI_API_KEY);
-      return Response.json({ ok: true, provider: "google-gemini", text }, { headers: { "cache-control": "no-store" } });
+      return json(request, { ok: true, provider: "google-gemini", text });
     } catch (error) {
       console.error("Gemini failed", error instanceof Error ? error.message : error);
     }
   }
 
-  return Response.json({ ok: false, available: Boolean(env.AI || env.GEMINI_API_KEY), error: "تعذر تشغيل المساعد الذكي حاليًا" }, { status: 503, headers: { "cache-control": "no-store" } });
+  return json(request, { ok: false, available: Boolean(env.AI || env.GEMINI_API_KEY), error: "تعذر تشغيل المساعد الذكي حاليًا" }, 503);
 }
