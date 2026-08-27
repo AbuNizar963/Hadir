@@ -123,6 +123,18 @@ export default {
     }
 
     if(path==="/api/workforce/live"&&request.method==="PATCH"){
+      const profile=await profileImageActor(request,env);
+      if(profile?.role==="staff"){
+        const b=await request.clone().json().catch(()=>({})) as any;
+        const password=String(b.password||"");
+        if(password.length<4)return json({error:"كلمة السر يجب أن تتكون من 4 أحرف/أرقام على الأقل."},400,o);
+        const keys=Object.keys(b).filter((key)=>key!=="password"&&key!=="employeeId");
+        if(keys.length>0)return json({error:"تغيير ملف الموظف من هذا المسار مسموح لكلمة السر فقط."},400,o);
+        const passwordHash=await hashPassword(password);
+        const result=await env.DB.prepare("UPDATE employees SET pin_hash=? WHERE id=? AND status='active'").bind(passwordHash,profile.id).run();
+        if(Number(result.meta.changes||0)!==1)return json({error:"الموظف غير موجود أو موقوف"},404,o);
+        return json({ok:true,employee:{id:profile.id,jobNumber:profile.username||"",name:profile.name},message:"تم تغيير كلمة السر وحفظها مشفّرة في D1."},200,o);
+      }
       const b=await request.clone().json().catch(()=>({})) as any;const employeeId=String(b.employeeId||"").trim();
       if(!employeeId)return json({error:"الموظف مطلوب"},400,o);
       const u=new URL(request.url);u.pathname=`/api/manager/workforce-controls/${encodeURIComponent(employeeId)}`;
