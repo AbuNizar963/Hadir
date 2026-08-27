@@ -14,11 +14,13 @@ import { seedIfEmpty } from "@/lib/storage";
 import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnostics";
 import { startRealtimeSync } from "@/lib/realtime";
 import { installApiCredentials } from "@/lib/apiCredentials";
+import { installDeviceDirectoryEnhancer } from "./deviceDirectoryEnhancer";
 
 installApiCredentials();
 seedIfEmpty();
 installGlobalDiagnostics();
 startRealtimeSync();
+installDeviceDirectoryEnhancer();
 
 if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
