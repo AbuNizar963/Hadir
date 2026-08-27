@@ -33,12 +33,12 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:hover {
 }
 
 /* Semantic palette: every statistic has one stable meaning and one matching pulse. */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(1) { --stat-color: hsl(210 72% 54%); } /* الإجمالي — blue */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(2) { --stat-color: hsl(152 55% 42%); } /* فعال — green */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(3) { --stat-color: hsl(38 78% 48%); } /* موقوف — amber */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(4) { --stat-color: hsl(188 64% 44%); } /* أجهزة موثقة — cyan */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(4 72% 52%); } /* هارب الآن — red */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(38 92% 50%); } /* VIP — gold */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(1) { --stat-color: hsl(210 72% 54%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(2) { --stat-color: hsl(152 55% 42%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(3) { --stat-color: hsl(38 78% 48%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(4) { --stat-color: hsl(188 64% 44%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(4 72% 52%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(38 92% 50%); }
 
 /* Arabic stat header: label RIGHT, exactly one animated dot physically anchored LEFT. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child {
@@ -51,12 +51,8 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-ch
   text-align: right !important;
   white-space: nowrap;
 }
-/* Remove every JSX indicator inside the stat header — this guarantees no duplicate dots. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child .live-status-dot,
-section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child [data-status] {
-  display: none !important;
-}
-/* One dot only: always on the LEFT side of the Arabic label, independent of flex/RTL ordering. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child [data-status] { display: none !important; }
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child::before {
   content: "";
   position: absolute;
@@ -81,7 +77,6 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-ch
   margin: 0 !important;
   padding: 0 !important;
 }
-/* Numbers: readable in both dark and light themes. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value {
   color: hsl(var(--foreground)) !important;
   text-align: right !important;
@@ -89,13 +84,39 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value 
   font-weight: 900;
 }
 .dark section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value,
-.dark-mode section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value {
-  color: #fff !important;
-}
+.dark-mode section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value { color: #fff !important; }
 @keyframes stat-card-pulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent); opacity: 1; transform: translateY(-50%) scale(1); }
   18% { box-shadow: 0 0 0 .16rem color-mix(in srgb, var(--stat-color) 12%, transparent); opacity: 1; transform: translateY(-50%) scale(1.03); }
   48% { box-shadow: 0 0 0 .46rem transparent; opacity: .88; transform: translateY(-50%) scale(1); }
+}
+
+/* Directory section indicators: the English section labels also use the same semantic status language. */
+section.hud-card > div:first-child > div:first-child > div:first-child > .mono.text-xs.font-bold.text-primary {
+  position: relative;
+  display: inline-flex !important;
+  align-items: center;
+  gap: .45rem;
+  direction: ltr;
+}
+section.hud-card > div:first-child > div:first-child > div:first-child > .mono.text-xs.font-bold.text-primary::before {
+  content: "";
+  width: .48rem;
+  height: .48rem;
+  flex: 0 0 .48rem;
+  border-radius: 9999px;
+  background: hsl(210 72% 54%);
+  box-shadow: 0 0 0 0 hsl(210 72% 54% / .34);
+  animation: directory-heading-pulse 2.4s cubic-bezier(.22,.61,.36,1) infinite;
+}
+/* The LIVE DIRECTORY heading is the second directory-style heading when the import/form panels are closed. */
+section.hud-card:nth-of-type(2) > div:first-child > div:first-child > div:first-child > .mono.text-xs.font-bold.text-primary::before {
+  background: hsl(152 55% 42%);
+  box-shadow: 0 0 0 0 hsl(152 55% 42% / .34);
+}
+@keyframes directory-heading-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  35% { transform: scale(1.06); box-shadow: 0 0 0 .28rem transparent; opacity: .86; }
 }
 
 .weather-strip-live { min-height: 1cm; max-height: 1.55cm; overflow: hidden; transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease; animation: weather-breathe 6s ease-in-out infinite; }
@@ -103,5 +124,5 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value 
 @keyframes weather-breathe { 0%,100% { opacity: .94; } 50% { opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .live-status-dot, .live-value, .weather-strip-live, section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div, section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child::before { animation: none !important; transition: none !important; }
+  .live-status-dot, .live-value, .weather-strip-live, section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div, section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child::before, section.hud-card > div:first-child > div:first-child > div:first-child > .mono.text-xs.font-bold.text-primary::before { animation: none !important; transition: none !important; }
 }
