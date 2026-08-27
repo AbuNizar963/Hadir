@@ -1,0 +1,124 @@
+name: Apply reports export syntax fix
+
+on:
+  push:
+    branches:
+      - fix/reports-daily-attendance-export
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/reports-daily-attendance-export
+          fetch-depth: 0
+
+      - name: Rewrite report export block safely
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path("src/pages/ManagerReports.tsx")
+          text = path.read_text(encoding="utf-8")
+
+          start = text.index(" const exportCsv=()=>")
+          end = text.index(" const title=", start)
+
+          replacement = r''' const buildDailyRows=()=>summaries.flatMap(s=>calculateDetails(s.employee,dates,index,settings).map(day=>[
+    s.employee.name,s.employee.jobNumber,day.date,day.day,labels[day.status],day.checkIn,day.checkOut,
+    formatDurationMinutes(day.worked),day.late,day.early,day.detail
+  ]));
+  const exportCsv=()=>{
+    const h=["الموظف","الرقم الوظيفي","التاريخ","اليوم","الحالة","وقت الحضور","وقت الانصراف","مدة العمل","دقائق التأخر","دقائق الانصراف المبكر","تفصيل اليوم"];
+    downloadCSV(`Hadir-${mode}-${period}-attendance`,h,buildDailyRows() as CsvCell[][]);
+  };
+  const exportExcel=()=>{
+    const summaryH:ExcelCell[]=["الموظف","الرقم الوظيفي","أيام العمل","حاضر","غياب","انصراف مبكر","تأخر","تسجيل ناقص","ساعات العمل"];
+    const summaryD:ExcelCell[][]=summaries.map(s=>[
+      s.employee.name,s.employee.jobNumber,s.workDays,s.present,s.absent,s.early,s.late,s.open,formatDurationMinutes(s.worked)
+    ]);
+    const detailH:ExcelCell[]=["الموظف","الرقم الوظيفي","التاريخ","اليوم","الحالة","وقت الحضور","وقت الانصراف","مدة العمل","دقائق التأخر","دقائق الانصراف المبكر","تفصيل اليوم"];
+    const detailD=buildDailyRows() as ExcelCell[][];
+    const absenceH:ExcelCell[]=["الموظف","الرقم الوظيفي","تاريخ الغياب","اليوم","الحالة","سبب/تفصيل"];
+    const absenceD:ExcelCell[][]=summaries.flatMap(s=>calculateDetails(s.employee,dates,index,settings)
+      .filter(day=>day.status==="absent")
+      .map(day=>[s.employee.name,s.employee.jobNumber,day.date,day.day,"غياب",day.detail]));
+
+    const summarySheet=XLSX.utils.aoa_to_sheet([[`تقرير الحضور الملخص - ${period}`],[],summaryH,...summaryD]);
+    summarySheet["!merges"]=[{s:{r:0,c:0},e:{r:0,c:summaryH.length-1}}];
+    autoFitColumns(summarySheet,[summaryH,...summaryD],10,38);
+    styleExcelTable(summarySheet,2,summaryD.length+2,0,summaryH.length-1,3,0);
+    styleReportWorkbook(summarySheet,7,3,summaryD.length+2);
+
+    const detailSheet=XLSX.utils.aoa_to_sheet([[`السجل اليومي للحضور - ${period}`],[],detailH,...detailD]);
+    detailSheet["!merges"]=[{s:{r:0,c:0},e:{r:0,c:detailH.length-1}}];
+    autoFitColumns(detailSheet,[detailH,...detailD],10,42);
+    styleExcelTable(detailSheet,2,detailD.length+2,0,detailH.length-1,3,0);
+    styleReportWorkbook(detailSheet,7,3,detailD.length+2);
+
+    const absenceSheet=XLSX.utils.aoa_to_sheet([[`سجل أيام الغياب - ${period}`],[],absenceH,...absenceD]);
+    absenceSheet["!merges"]=[{s:{r:0,c:0},e:{r:0,c:absenceH.length-1}}];
+    autoFitColumns(absenceSheet,[absenceH,...absenceD],12,42);
+    styleExcelTable(absenceSheet,2,absenceD.length+2,0,absenceH.length-1,3,0);
+    styleReportWorkbook(absenceSheet,7,3,absenceD.length+2);
+
+    const denominator=total.present+total.absent+total.early+total.late+total.open;
+    const chart=XLSX.utils.aoa_to_sheet([
+      [`التحليل البياني - ${period}`],[],
+      ["الحالة","العدد","النسبة","المؤشر"],
+      ...chartData.map(x=>[
+        x.label,x.value,denominator?x.value/denominator:0,
+        "█".repeat(Math.min(40,Math.round(x.value/max*40)))
+      ] as ExcelCell[])
+    ]);
+    chart["!merges"]=[{s:{r:0,c:0},e:{r:0,c:3}}];
+    autoFitColumns(chart,[["الحالة","العدد","النسبة","المؤشر"]],12,42);
+    styleExcelTable(chart,2,chartData.length+2,0,3,3,0);
+
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,summarySheet,"الملخص");
+    XLSX.utils.book_append_sheet(wb,detailSheet,"السجل اليومي");
+    XLSX.utils.book_append_sheet(wb,absenceSheet,"أيام الغياب");
+    XLSX.utils.book_append_sheet(wb,chart,"التحليل البياني");
+    setExcelRtl(wb,summarySheet);setExcelRtl(wb,detailSheet);setExcelRtl(wb,absenceSheet);setExcelRtl(wb,chart);
+    const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array",compression:true})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`Hadir-${mode}-${period}.xlsx`;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  };
+'''
+          text = text[:start] + replacement + text[end:]
+          path.write_text(text, encoding="utf-8")
+
+      - name: Verify source shape
+        run: |
+          grep -n "const buildDailyRows\|const exportCsv\|const exportExcel\|const title" src/pages/ManagerReports.tsx
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerReports.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(reports): rewrite export block for reliable build"
+          git push origin HEAD:fix/reports-daily-attendance-export
+
+      - name: Remove temporary workflow
+        if: always()
+        shell: bash
+        run: |
+          git fetch origin fix/reports-daily-attendance-export
+          git checkout -B cleanup origin/fix/reports-daily-attendance-export
+          git rm -f .github/workflows/fix-reports-export.yml || true
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: remove temporary reports export patch workflow"
+          git push origin cleanup:fix/reports-daily-attendance-export
