@@ -1,0 +1,35 @@
+name: One-shot Workforce Persistence Patch
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/workforce-controls-persistence]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch live employee payload
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('backend/src/workforce.ts')
+          s=p.read_text()
+          old='schedule_type AS scheduleType,avatar FROM employees ORDER BY name'
+          new='schedule_type AS scheduleType,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut,avatar FROM employees ORDER BY name'
+          if new in s:
+              print('patch already present; nothing to do')
+              raise SystemExit(0)
+          if old not in s:
+              raise SystemExit('expected workforce live SELECT anchor not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git diff --quiet -- backend/src/workforce.ts; then exit 0; fi
+          git add backend/src/workforce.ts
+          git commit -m 'fix(workforce): persist control flags in live payload'
+          git push
