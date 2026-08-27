@@ -1,0 +1,38 @@
+name: Repair workforce syntax
+on:
+  push:
+    branches: [fix/workforce-syntax-root]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repair literal newline escapes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('backend/src/workforce.ts')
+          text = p.read_text()
+          marker = r'\n /* WORKFORCE_OWNER_CONTROLS_PATCH_V1 */\n'
+          start = text.find(marker)
+          if start < 0:
+              raise SystemExit('workforce patch marker not found')
+          end_marker = ' if(pathname==="/api/notifications"'
+          end = text.find(end_marker, start)
+          if end < 0:
+              raise SystemExit('workforce patch end marker not found')
+          block = text[start:end].replace(r'\n', '\n')
+          text = text[:start] + '\n' + block.strip('\n') + '\n' + text[end:]
+          p.write_text(text)
+          PY
+      - name: Commit repair and remove temporary workflow
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          rm -f .github/workflows/repair-workforce-syntax.yml
+          git add backend/src/workforce.ts .github/workflows/repair-workforce-syntax.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(workforce): repair malformed owner controls block"
+          git push
