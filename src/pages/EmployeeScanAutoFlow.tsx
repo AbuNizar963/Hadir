@@ -39,6 +39,14 @@ export default function EmployeeScanAutoFlow() {
     return () => { cancelled = true; observer.disconnect(); };
   }, []);
 
+  useEffect(() => {
+    if (!success) return;
+    const timer = window.setTimeout(() => {
+      window.location.assign("/employee");
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [success]);
+
   return (
     <>
       <EmployeeScan />
@@ -49,6 +57,7 @@ export default function EmployeeScanAutoFlow() {
             <div className="mb-5 flex justify-center"><Brand /></div>
             <h2 className="text-2xl font-black text-primary">تمت العملية بنجاح</h2>
             <p className="mt-2 text-sm text-muted-foreground">تم تأكيد تسجيل الحضور أو الانصراف بنجاح.</p>
+            <p className="mt-4 text-xs text-muted-foreground">سيتم إعادتك إلى الواجهة الرئيسية خلال 3 ثوانٍ...</p>
           </div>
         </div>
       )}
