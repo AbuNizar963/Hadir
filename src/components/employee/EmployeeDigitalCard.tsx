@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { currentSession } from "@/lib/auth";
+import { employeeAvatarUrl } from "@/lib/avatarUrl";
 
 type Props = { name?: string; jobNumber?: string; avatar?: string | null; compact?: boolean };
 
@@ -9,6 +10,7 @@ export default function EmployeeDigitalCard({ name: nameProp, jobNumber: jobNumb
   const name = nameProp || session?.name || "الموظف";
   const jobNumber = jobNumberProp || session?.jobNumber || "—";
   const employeeId = session?.employeeId || jobNumber;
+  const avatarSrc = employeeAvatarUrl(avatar, employeeId);
   const verifyUrl = useMemo(() => `${window.location.origin}/employee/verify/${encodeURIComponent(employeeId)}`, [employeeId]);
 
   return (
@@ -20,7 +22,7 @@ export default function EmployeeDigitalCard({ name: nameProp, jobNumber: jobNumb
       <div className="rounded-3xl border border-primary/25 bg-primary/5 p-5">
         <div className="flex items-center gap-4">
           <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-2xl border border-primary/20 bg-background text-2xl font-black text-primary">
-            {avatar ? <img src={avatar} alt={name} className="h-full w-full object-cover" /> : name.charAt(0)}
+            {avatarSrc ? <img src={avatarSrc} alt={name} className="h-full w-full object-cover" /> : name.charAt(0)}
           </div>
           <div className="min-w-0">
             <div className="text-[10px] text-muted-foreground">Hadir</div>
