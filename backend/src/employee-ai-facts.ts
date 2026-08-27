@@ -33,7 +33,7 @@ function activeWorkPeriod(e:any,target:Date){
   const t=parseTime(e.rotationStartTime||e.workStartTime,"09:00"); const first=withTime(base,t);
   const on=Math.max(1,Math.floor(Number(e.rotationDaysOn??4))); const off=Math.max(0,Math.floor(Number(e.rotationDaysOff??4))); const cycle=(on+off)*86400000;
   const elapsed=target.getTime()-first.getTime(); if(elapsed<0)return {isWorkDay:false,start:null as Date|null,end:null as Date|null,label:"لم تبدأ المناوبة بعد"};
-  const idx=Math.floor(elapsed/cycle); const within=elapsed-idx*cycle; const cycleDay=Math.floor(within/86400000); const start=new Date(first.getTime()+idx*cycle); 
+  const idx=Math.floor(elapsed/cycle); const within=elapsed-idx*cycle; const cycleDay=Math.floor(within/86400000); const start=new Date(first.getTime()+idx*cycle);
   if(cycleDay>=on)return {isWorkDay:false,start:null as Date|null,end:null as Date|null,label:"فترة راحة",cycleDay:cycleDay+1,on,off};
   return {isWorkDay:true,start,end:new Date(start.getTime()+on*86400000),label:"مناوبة تناوبية",cycleDay:cycleDay+1,on,off};
 }
@@ -65,7 +65,11 @@ export function employeeFactAnswer(question:string,data:FactData):string|null{
  if(/(آخر|اخر).*حضور|متى.*حضور.*لي/.test(q))return last?`آخر حضور لك كان ${dateLabel(day(last.timestamp))} الساعة ${new Date(last.timestamp).toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لدي تسجيل حضور لك.`;
  if(/(مناوب|جدول|دوام).*(اليوم|اليوم؟)|اليوم.*(مناوب|جدول|دوام)/.test(q)){
    if(isRotation(e)){
-     if(period.isWorkDay)return `مناوبتك اليوم قائمة. أنت في ${period.cycleDay} من ${period.on} يوم عمل ضمن دورة ${period.on}/${period.off}. وقت بداية المناوبة: ${period.start?.toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit"})}، وتنتهي: ${period.end?.toLocaleDateString("ar-SY",{timeZone:"Asia/Damascus"})} ${period.end?.toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit")}`;
+     if(period.isWorkDay){
+       const startText=period.start?.toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit"});
+       const endText=period.end?.toLocaleString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit",year:"numeric"});
+       return `مناوبتك اليوم قائمة. أنت في اليوم ${period.cycleDay} من ${period.on} يوم عمل ضمن دورة ${period.on}/${period.off}. بداية المناوبة ${startText} وتنتهي ${endText}.`;
+     }
      return `اليوم ضمن فترة الراحة في جدولك التناوبي.`;
    }
    if(period.isWorkDay)return `دوامك اليوم من ${e.workStartTime||"غير محدد"} إلى ${e.workEndTime||"غير محدد"}.`;
