@@ -19,23 +19,41 @@ async function enhanceEmployeeDirectory() {
     );
     if (!job) return;
     const employee = rows.find((item: any) => String(item.jobNumber) === job.textContent?.trim());
-    if (!employee?.deviceLabel) return;
-    if (card.querySelector("[data-hadir-device-details]")) return;
+    if (!employee?.deviceLabel || card.querySelector("[data-hadir-device-details]")) return;
 
     const details = document.createElement("div");
     details.dataset.hadirDeviceDetails = "true";
-    details.className = "mt-1 max-w-[260px] truncate text-[10px] text-primary/90";
+    details.className = "mt-1 max-w-[280px] truncate text-[10px] text-primary/90";
     details.title = employee.deviceLabel;
     details.textContent = `${deviceType(employee.deviceLabel)} · ${employee.deviceLabel}`;
     job.parentElement?.appendChild(details);
   });
 }
 
+function enhanceEmployeeHome() {
+  if (!location.pathname.startsWith("/employee")) return;
+  document.querySelectorAll<HTMLElement>("div").forEach((row) => {
+    if (row.dataset.hadirDeviceDetails || row.textContent?.trim() !== "الجهاز") return;
+    const value = row.parentElement?.querySelector<HTMLElement>("div.font-semibold");
+    if (!value || value.dataset.hadirDeviceDetails) return;
+    const label = value.textContent?.trim();
+    if (!label || label === "غير مرتبط") return;
+    value.dataset.hadirDeviceDetails = "true";
+    value.textContent = `${deviceType(label)} · ${label}`;
+    value.title = label;
+  });
+}
+
+async function enhance() {
+  await enhanceEmployeeDirectory();
+  enhanceEmployeeHome();
+}
+
 export function installDeviceDirectoryEnhancer() {
   let timer: number | undefined;
   const run = () => {
     window.clearTimeout(timer);
-    timer = window.setTimeout(() => void enhanceEmployeeDirectory(), 250);
+    timer = window.setTimeout(() => void enhance(), 250);
   };
   const observer = new MutationObserver(run);
   observer.observe(document.body, { childList: true, subtree: true });
