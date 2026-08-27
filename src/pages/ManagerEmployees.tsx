@@ -739,10 +739,10 @@ export default function ManagerEmployees() {
     try {
       const token = localStorage.getItem("hadir.api.token.admin") || "";
       const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-      const res = await fetch(`${api}/api/manager/attendance/checkout`, {
+      const res = await fetch(`${api}/api/workforce/live`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify({ employeeId: e.id }),
+        body: JSON.stringify({ employeeId: e.id, type: "check-out" }),
         cache: "no-store",
       });
       const data = await res.json().catch(() => ({}));
@@ -758,10 +758,10 @@ export default function ManagerEmployees() {
     try {
       const token = localStorage.getItem("hadir.api.token.admin") || "";
       const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-      const res = await fetch(`${api}/api/manager/workforce-controls/${encodeURIComponent(e.id)}`, {
+      const res = await fetch(`${api}/api/workforce/live`, {
         method: "PATCH",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ employeeId: e.id, ...patch }),
         cache: "no-store",
       });
       const data = await res.json().catch(() => ({}));
