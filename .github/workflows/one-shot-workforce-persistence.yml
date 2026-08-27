@@ -10,94 +10,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch live employee payload and demo reset
+      - name: Harden demo reset endpoint
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
-          p=Path('backend/src/workforce.ts')
-          s=p.read_text()
-          old=''' if(pathname==="/api/workforce/reset-test-data"&&method==="POST"){
-  if(actor?.role!=="owner")return J({error:"غير مصرح"},403);
-  const b=await req.json().catch(()=>({})) as any;
-  if(String(b.confirmation||"")!=="حذف البيانات التجريبية")return J({error:"تأكيد الحذف غير صحيح"},400);
-  const tables=["attendance","audit","requests","employee_requests","notifications","violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights","push_subscriptions","escape_events","device_rebind_requests"];
-  const placeholders=tables.map(()=>"?").join(",");
-  const existing=await rows(env.DB,`SELECT name FROM sqlite_master WHERE type='table' AND name IN (${placeholders})`,...tables) as any[];
-  const existingNames=new Set(existing.map(x=>String(x.name)));
-  const deletedCounts:Record<string,number>={};
-  const statements:any[]=[];
-  for(const table of tables){
-    if(!existingNames.has(table))continue;
-    const count=Number((await env.DB.prepare(`SELECT COUNT(*) AS c FROM "${table}"`).first<any>())?.c||0);
-    deletedCounts[table]=count;
-    statements.push(env.DB.prepare(`DELETE FROM "${table}"`));
-  }
-  if(existingNames.has("auth_sessions")){
-    const count=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM auth_sessions WHERE user_type='employee'").first<any>())?.c||0);
-    deletedCounts.auth_employee_sessions=count;
-    statements.push(env.DB.prepare("DELETE FROM auth_sessions WHERE user_type='employee'"));
-  }
-  const employeeCount=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM employees").first<any>())?.c||0);
-  deletedCounts.employees=employeeCount;
-  statements.push(env.DB.prepare("DELETE FROM employees"));
-  if(statements.length)await env.DB.batch(statements);
-  let deletedImages=0;
-  if(env.PROFILE_IMAGES){
-    let cursor:string|undefined;
-    do{
-      const page=await env.PROFILE_IMAGES.list({limit:1000,...(cursor?{cursor}:{})});
-      const keys=page.objects.map(object=>object.key);
-      if(keys.length){await env.PROFILE_IMAGES.delete(keys);deletedImages+=keys.length;}
-      cursor=page.truncated?page.cursor:undefined;
-    }while(cursor);
-  }
-  return J({ok:true,deleted:{...deletedCounts,profileImages:deletedImages},preserved:["admin_accounts","settings","locations"],message:"تم حذف البيانات التجريبية من D1 وصور R2 مع الحفاظ على حسابات الإدارة وإعدادات النظام ومواقع العمل."});
-}'''
-          new=''' if(pathname==="/api/workforce/reset-test-data"&&method==="POST"){
-  if(actor?.role!=="owner")return J({error:"غير مصرح"},403);
-  const b=await req.json().catch(()=>({})) as any;
-  if(String(b.confirmation||"")!=="حذف البيانات التجريبية")return J({error:"تأكيد الحذف غير صحيح"},400);
-  const tables=["employee_passkeys","webauthn_challenges","attendance","audit","requests","employee_requests","notifications","violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights","push_subscriptions","escape_events","device_rebind_requests"];
-  const placeholders=tables.map(()=>"?").join(",");
-  const existing=await rows(env.DB,`SELECT name FROM sqlite_master WHERE type='table' AND name IN (${placeholders})`,...tables) as any[];
-  const existingNames=new Set(existing.map(x=>String(x.name)));
-  const deletedCounts:Record<string,number>={};
-  const statements:any[]=[];
-  for(const table of tables){
-    if(!existingNames.has(table))continue;
-    const count=Number((await env.DB.prepare(`SELECT COUNT(*) AS c FROM "${table}"`).first<any>())?.c||0);
-    deletedCounts[table]=count;
-    statements.push(env.DB.prepare(`DELETE FROM "${table}"`));
-  }
-  if(existingNames.has("auth_sessions")){
-    const count=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM auth_sessions WHERE user_type='employee'").first<any>())?.c||0);
-    deletedCounts.auth_employee_sessions=count;
-    statements.push(env.DB.prepare("DELETE FROM auth_sessions WHERE user_type='employee'"));
-  }
-  const employeeCount=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM employees").first<any>())?.c||0);
-  deletedCounts.employees=employeeCount;
-  statements.push(env.DB.prepare("DELETE FROM employees"));
-  if(statements.length)await env.DB.batch(statements);
-  let deletedImages=0;
-  if(env.PROFILE_IMAGES){
-    let cursor:string|undefined;
-    do{
-      const page=await env.PROFILE_IMAGES.list({prefix:"employees/",limit:1000,...(cursor?{cursor}:{})});
-      const keys=page.objects.map(object=>object.key);
-      if(keys.length){await env.PROFILE_IMAGES.delete(keys);deletedImages+=keys.length;}
-      cursor=page.truncated?page.cursor:undefined;
-    }while(cursor);
-  }
-  return J({ok:true,deleted:{...deletedCounts,profileImages:deletedImages},preserved:["admin_accounts","settings","locations"],message:"تم حذف بيانات الاختبار من D1 وصور موظفي الاختبار من R2 مع الحفاظ على حسابات الإدارة وإعدادات النظام ومواقع العمل."});
-}'''
+          p = Path('backend/src/workforce.ts')
+          s = p.read_text()
+          old = 'const tables=["attendance","audit","requests","employee_requests","notifications","violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights","push_subscriptions","escape_events","device_rebind_requests"];'
+          new = 'const tables=["employee_passkeys","webauthn_challenges","attendance","audit","requests","employee_requests","notifications","violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights","push_subscriptions","escape_events","device_rebind_requests"];'
           if old in s:
-              s=s.replace(old,new,1)
-          elif 'employee_passkeys' not in s or 'prefix:"employees/"' not in s:
-              raise SystemExit('expected demo reset endpoint anchor not found')
+              s = s.replace(old, new, 1)
+          old_list = 'env.PROFILE_IMAGES.list({limit:1000,...(cursor?{cursor}:{})})'
+          new_list = 'env.PROFILE_IMAGES.list({prefix:"employees/",limit:1000,...(cursor?{cursor}:{})})'
+          if old_list in s:
+              s = s.replace(old_list, new_list, 1)
           p.write_text(s)
           PY
-      - name: Validate source
+      - name: Validate
         run: |
           grep -q 'employee_passkeys' backend/src/workforce.ts
           grep -q 'webauthn_challenges' backend/src/workforce.ts
