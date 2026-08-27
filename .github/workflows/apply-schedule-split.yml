@@ -1,0 +1,61 @@
+name: Apply owner schedule split
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply schedule split
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          panel = Path('src/components/OwnerBulkSettingsPanel.tsx')
+          s = panel.read_text()
+          s = s.replace('{ id: "workHours", title: "أوقات دوام جميع الموظفين", description: "تطبيق وقت بداية ونهاية موحدين على جميع الموظفين دون تغيير نوع دوامهم أو أيامهم.", icon:', '{ id: "adminWorkHours", title: "أوقات دوام الموظفين الإداريين", description: "تطبيق وقت بداية ونهاية الدوام على الموظفين الإداريين فقط.", icon:')
+          s = s.replace('{ id: "rotationDays", title: "أيام التناوب للموظفين التناوبيين",', '{ id: "rotationDays", title: "أيام التناوب للموظفين التناوبيين",')
+          s = s.replace('type Action = typeof controls[number]["id"];', 'type Action = typeof controls[number]["id"];')
+          s = s.replace('  const [workStartTime, setWorkStartTime] = useState("08:00");\n  const [workEndTime, setWorkEndTime] = useState("16:00");', '  const [adminWorkStartTime, setAdminWorkStartTime] = useState("08:00");\n  const [adminWorkEndTime, setAdminWorkEndTime] = useState("16:00");\n  const [rotationWorkStartTime, setRotationWorkStartTime] = useState("08:00");\n  const [rotationWorkEndTime, setRotationWorkEndTime] = useState("16:00");')
+          old = '''      } else if (selected === "workHours") {\n        if (!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(workStartTime) || !/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(workEndTime)) throw new Error("أدخل وقت البداية والنهاية بصيغة HH:MM صحيحة.");\n        if (workStartTime === workEndTime) throw new Error("وقت البداية والنهاية يجب أن يكونا مختلفين.");\n        const result = await bulkOwnerEmployeeSettings({ action: selected, workStartTime, workEndTime });\n        setMessage(`تم تحديث أوقات الدوام لـ ${result.updated} موظفًا: ${workStartTime} → ${workEndTime}.`);\n      } else if (selected === "rotationDays") {'''
+          new = '''      } else if (selected === "adminWorkHours" || selected === "rotationWorkHours") {\n        const workStartTime = selected === "adminWorkHours" ? adminWorkStartTime : rotationWorkStartTime;\n        const workEndTime = selected === "adminWorkHours" ? adminWorkEndTime : rotationWorkEndTime;\n        if (!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(workStartTime) || !/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(workEndTime)) throw new Error("أدخل وقت البداية والنهاية بصيغة HH:MM صحيحة.");\n        if (workStartTime === workEndTime) throw new Error("وقت البداية والنهاية يجب أن يكونا مختلفين.");\n        const scheduleType = selected === "adminWorkHours" ? "ADMIN" : "ROTATION";\n        const result = await bulkOwnerEmployeeSettings({ action: selected, workStartTime, workEndTime });\n        setMessage(`تم تحديث أوقات دوام ${scheduleType === "ADMIN" ? "الموظفين الإداريين" : "الموظفين التناوبيين"} لـ ${result.updated} موظفًا: ${workStartTime} → ${workEndTime}.`);\n      } else if (selected === "rotationDays") {'''
+          if old not in s: raise SystemExit('panel run block marker not found')
+          s = s.replace(old, new)
+          s = s.replace('<option value="workHours">أوقات دوام جميع الموظفين</option>\n            <option value="rotationDays">أيام التناوب للموظفين التناوبيين</option>', '<option value="adminWorkHours">أوقات دوام الموظفين الإداريين</option>\n            <option value="rotationWorkHours">أوقات دوام الموظفين التناوبيين</option>\n            <option value="rotationDays">أيام التناوب للموظفين التناوبيين</option>')
+          s = s.replace('{selected === "workHours" && <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 sm:items-end"><label className="text-sm">بداية الدوام<input type="time" className="input mono mt-1 w-full" value={workStartTime} onChange={e => setWorkStartTime(e.target.value)} /></label><label className="text-sm">نهاية الدوام<input type="time" className="input mono mt-1 w-full" value={workEndTime} onChange={e => setWorkEndTime(e.target.value)} /></label><button type="button" className="btn-primary whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}', '{(selected === "adminWorkHours" || selected === "rotationWorkHours") && <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 sm:items-end"><label className="text-sm">بداية الدوام<input type="time" className="input mono mt-1 w-full" value={selected === "adminWorkHours" ? adminWorkStartTime : rotationWorkStartTime} onChange={e => selected === "adminWorkHours" ? setAdminWorkStartTime(e.target.value) : setRotationWorkStartTime(e.target.value)} /></label><label className="text-sm">نهاية الدوام<input type="time" className="input mono mt-1 w-full" value={selected === "adminWorkHours" ? adminWorkEndTime : rotationWorkEndTime} onChange={e => selected === "adminWorkHours" ? setAdminWorkEndTime(e.target.value) : setRotationWorkEndTime(e.target.value)} /></label><button type="button" className="btn-primary whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}')
+          panel.write_text(s)
+
+          lib = Path('src/lib/ownerBulkSettings.ts')
+          s = lib.read_text()
+          s = s.replace('"grace" | "earlyCheckout" | "workHours" | "rotationDays" | "unlinkDevices" | "revokeSessions"', '"grace" | "earlyCheckout" | "adminWorkHours" | "rotationWorkHours" | "rotationDays" | "unlinkDevices" | "revokeSessions"')
+          lib.write_text(s)
+
+          backend = Path('backend/src/automation-entry.ts')
+          s = backend.read_text()
+          marker = '        if(action==="workHours"){'
+          if marker not in s: raise SystemExit('backend workHours marker not found')
+          start = s.index(marker)
+          end = s.index('        if(action==="rotationDays"){', start)
+          replacement = '''        if(action==="adminWorkHours"||action==="rotationWorkHours"){\n          const workStartTime=String(b.workStartTime||"").trim();\n          const workEndTime=String(b.workEndTime||"").trim();\n          const scheduleType=action==="adminWorkHours"?"ADMIN":"ROTATION";\n          if(!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(workStartTime)||!/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(workEndTime))return json({error:"وقت بداية ونهاية الدوام يجب أن يكونا بصيغة HH:MM صحيحة"},400,o);\n          if(workStartTime===workEndTime)return json({error:"وقت بداية ونهاية الدوام يجب أن يكونا مختلفين"},400,o);\n          const result=await env.DB.prepare("UPDATE employees SET work_start_time=?,work_end_time=? WHERE schedule_type=?").bind(workStartTime,workEndTime,scheduleType).run();\n          await env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(scheduleType==="ADMIN"?"bulkAdminWorkHours":"bulkRotationWorkHours",JSON.stringify({workStartTime,workEndTime})).run();\n          return json({ok:true,updated:Number(result.meta.changes||0),message:`تم تحديث أوقات دوام ${scheduleType==="ADMIN"?"الموظفين الإداريين":"الموظفين التناوبيين"} لـ ${Number(result.meta.changes||0)} موظفًا إلى ${workStartTime} → ${workEndTime}.`,action},200,o);\n        }\n'''
+          s = s[:start] + replacement + s[end:]
+          backend.write_text(s)
+          Path('.github/workflows/apply-schedule-split.yml').unlink()
+          PY
+
+          if git diff --quiet; then
+            echo 'No changes required'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/OwnerBulkSettingsPanel.tsx src/lib/ownerBulkSettings.ts backend/src/automation-entry.ts .github/workflows/apply-schedule-split.yml
+          git commit -m 'feat: split bulk work hours by employee schedule type'
+          git push
