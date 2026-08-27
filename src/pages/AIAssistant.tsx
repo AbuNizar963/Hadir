@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { currentSession } from "@/lib/auth";
 import { getManagerSession } from "@/lib/storage";
@@ -25,7 +25,7 @@ async function remoteAI(question: string, manager: boolean) {
   return String(data.text);
 }
 
-function Icon({ children }: { children: React.ReactNode }) {
+function Icon({ children }: { children: ReactNode }) {
   return <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">{children}</span>;
 }
 
@@ -100,7 +100,6 @@ export default function AIAssistant() {
     setMessages(m => [...m, { role: "user", text }]);
     setBusy(true);
     try {
-      // التحيات الأساسية تعمل محليًا فورًا ولا تعتمد على توفر النموذج السحابي.
       const normalized = text.toLocaleLowerCase("ar").replace(/[؟?!.,،]/g, "").trim();
       const greetings = /^(مرحبا|مرحباً|مرحبًا|اهلا|أهلا|أهلًا|السلام عليكم|السلامعليكم|صباح الخير|مساء الخير|هاي|هلا|hello|hi)$/i;
       if (greetings.test(normalized)) {
