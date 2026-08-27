@@ -22,7 +22,10 @@ async function saveProfile(body: Record<string, unknown>) {
     if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : `تعذر حفظ الصورة الشخصية (${response.status})`);
     return data as { ok?: boolean; key?: string; employee?: { avatar?: string | null } };
   }
-  const response = await fetch(`${API_URL}/api/workforce/live`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, "x-device-id": deviceId() }, body: JSON.stringify(body), cache: "no-store", credentials: "omit" });
+  const profile = await getBackendEmployeeProfile();
+  const employeeId = String(profile.id || "").trim();
+  if (!employeeId) throw new Error("تعذر تحديد الموظف الحالي. يرجى تسجيل الدخول مرة أخرى.");
+  const response = await fetch(`${API_URL}/api/workforce/live`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, "x-device-id": deviceId() }, body: JSON.stringify({ ...body, employeeId }), cache: "no-store", credentials: "include" });
   const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ الملف الشخصي"); return data as { ok?: boolean; employee?: { avatar?: string | null } };
 }
 
