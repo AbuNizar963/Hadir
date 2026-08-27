@@ -77,6 +77,24 @@ export default {
           await env.DB.prepare("INSERT INTO settings(key,value) VALUES('earlyCheckoutGraceMinutes',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(minutes)).run();
           return json({ok:true,updated:1,message:`تم ضبط مهلة الانصراف المبكر العامة إلى ${minutes} دقيقة.`,action},200,o);
         }
+        if(action==="workHours"){
+          const workStartTime=String(b.workStartTime||"").trim();
+          const workEndTime=String(b.workEndTime||"").trim();
+          if(!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workStartTime)||!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workEndTime))return json({error:"وقت بداية ونهاية الدوام يجب أن يكونا بصيغة HH:MM صحيحة"},400,o);
+          if(workStartTime===workEndTime)return json({error:"وقت بداية ونهاية الدوام يجب أن يكونا مختلفين"},400,o);
+          const result=await env.DB.prepare("UPDATE employees SET work_start_time=?,work_end_time=?").bind(workStartTime,workEndTime).run();
+          await env.DB.prepare("INSERT INTO settings(key,value) VALUES('bulkWorkHours',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify({workStartTime,workEndTime})).run();
+          return json({ok:true,updated:Number(result.meta.changes||0),message:`تم تحديث أوقات دوام جميع الموظفين إلى ${workStartTime} → ${workEndTime}.`,action},200,o);
+        }
+        if(action==="rotationDays"){
+          const rotationDaysOn=Number(b.rotationDaysOn);
+          const rotationDaysOff=Number(b.rotationDaysOff);
+          if(!Number.isInteger(rotationDaysOn)||rotationDaysOn<1||rotationDaysOn>31||!Number.isInteger(rotationDaysOff)||rotationDaysOff<0||rotationDaysOff>31)return json({error:"أيام التناوب يجب أن تكون: المناوبة 1–31 يومًا، والراحة 0–31 يومًا"},400,o);
+          if(rotationDaysOn+rotationDaysOff<2)return json({error:"يجب أن تحتوي دورة التناوب على يومين على الأقل"},400,o);
+          const result=await env.DB.prepare("UPDATE employees SET rotation_days_on=?,rotation_days_off=? WHERE schedule_type='ROTATION'").bind(rotationDaysOn,rotationDaysOff).run();
+          await env.DB.prepare("INSERT INTO settings(key,value) VALUES('bulkRotationDays',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify({rotationDaysOn,rotationDaysOff})).run();
+          return json({ok:true,updated:Number(result.meta.changes||0),message:`تم تحديث دورة التناوب لـ ${Number(result.meta.changes||0)} موظفًا تناوبيًا إلى ${rotationDaysOn} أيام مناوبة + ${rotationDaysOff} أيام راحة.`,action},200,o);
+        }
         if(action==="unlinkDevices"){
           const employees=await env.DB.prepare("SELECT id FROM employees").all<any>();
           let updated=0;
