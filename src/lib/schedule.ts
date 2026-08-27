@@ -14,18 +14,16 @@ export function getEmployeeScheduleStatus(employee: Employee | null | undefined,
   if (!employee) return { isWorkDay: false, label: "غير محدد" };
   if (period.kind === "NOT_STARTED") return { isWorkDay: false, label: "لم تبدأ المناوبة بعد", detail: period.detail };
   if (period.kind === "INVALID") return { isWorkDay: false, label: "جدول غير صالح", detail: period.detail };
-  if (period.kind === "OFF") {
-    const cycleDay = rotationCycleDay(employee, target) + 1;
-    const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
-    const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
-    return { isWorkDay: false, label: "فترة راحة", detail: `اليوم ${normalizeDigits(String(Math.max(1, cycleDay - on)))} من ${normalizeDigits(String(off))} في الراحة`, cycleDay, cycleTotal: on + off };
-  }
   if (employee.scheduleType === "ROTATION") {
-    const cycleDay = rotationCycleDay(employee, target) + 1;
-    const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
-    const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
-    return { isWorkDay: true, label: "في المناوبة", detail: `اليوم ${normalizeDigits(String(cycleDay))} من ${normalizeDigits(String(on))} في المناوبة`, cycleDay, cycleTotal: on + off };
+    const info = getRotationInfo(employee, target);
+    if (!info) return { isWorkDay: false, label: "جدول غير صالح" };
+    if (info.phase === "OFF") {
+      const restDay = info.cycleDay - info.daysOn + 1;
+      return { isWorkDay: false, label: "فترة راحة", detail: `اليوم ${normalizeDigits(String(restDay))} من ${normalizeDigits(String(info.daysOff))} في الراحة`, cycleDay: info.cycleDay + 1, cycleTotal: info.daysOn + info.daysOff };
+    }
+    return { isWorkDay: true, label: "في المناوبة", detail: `اليوم ${normalizeDigits(String(info.workDay + 1))} من ${normalizeDigits(String(info.daysOn))} في المناوبة`, cycleDay: info.cycleDay + 1, cycleTotal: info.daysOn + info.daysOff };
   }
+  if (period.kind === "OFF") return { isWorkDay: false, label: "إجازة أسبوعية", detail: period.detail };
   return { isWorkDay: true, label: "يوم عمل (إداري)", detail: period.detail };
 }
 
@@ -41,26 +39,15 @@ export function getEmployeeWorkPeriod(employee: Employee | null | undefined, tar
     return { isWorkDay: true, kind: "ADMIN", start, end, label: "دوام إداري", detail: `${formatTime(start)} → ${formatTime(end)}` };
   }
 
-  const startDate = parseYYYYMMDD(employee.rotationStartDate);
-  if (!startDate) return { isWorkDay: false, kind: "INVALID", start: null, end: null, label: "تاريخ بداية المناوبة غير صالح", detail: "حدد تاريخ أول مناوبة." };
-  const daysOn = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
-  const daysOff = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
-  const cycleLength = daysOn + daysOff;
-  const firstStart = withTime(startDate, parseTime(employee.rotationStartTime || employee.workStartTime, "09:00"));
-  const diff = Math.floor((startOfDay(target).getTime() - startOfDay(firstStart).getTime()) / DAY_MS);
-  if (diff < 0) return { isWorkDay: false, kind: "NOT_STARTED", start: null, end: null, label: "لم تبدأ المناوبة بعد", detail: `تبدأ أول مناوبة في ${employee.rotationStartDate} الساعة ${formatTime(firstStart)}` };
-  const dayInCycle = diff % cycleLength;
-  if (dayInCycle >= daysOn) return { isWorkDay: false, kind: "OFF", start: null, end: null, label: "راحة تناوبية", detail: `اليوم ${normalizeDigits(String(dayInCycle - daysOn + 1))} من ${normalizeDigits(String(daysOff))} في الراحة` };
-  const periodStart = new Date(firstStart.getTime() + Math.floor(diff / cycleLength) * cycleLength * DAY_MS);
-  const endClock = parseTime(employee.rotationEndTime || employee.workEndTime, "16:00");
+  const info = getRotationInfo(employee, target);
+  if (!info) return { isWorkDay: false, kind: "INVALID", start: null, end: null, label: "تاريخ بداية المناوبة غير صالح", detail: "حدد تاريخ أول مناوبة." };
+  if (info.phase === "NOT_STARTED") return { isWorkDay: false, kind: "NOT_STARTED", start: null, end: null, label: "لم تبدأ المناوبة بعد", detail: `تبدأ أول مناوبة في ${employee.rotationStartDate} الساعة ${formatTime(info.firstStart)}` };
+  if (info.phase === "OFF") return { isWorkDay: false, kind: "OFF", start: null, end: null, label: "راحة تناوبية", detail: `اليوم ${normalizeDigits(String(info.cycleDay - info.daysOn + 1))} من ${normalizeDigits(String(info.daysOff))} في الراحة` };
 
-  // A rotation is a continuous time interval. The number of work days is
-  // treated as a duration from the start instant, so 3 days starting Sunday
-  // at 09:00 ends Wednesday at 09:00 (not Tuesday at 09:00).
-  let end = new Date(periodStart.getTime() + daysOn * DAY_MS);
-  end = withTime(end, endClock);
-  if (end.getTime() <= periodStart.getTime()) end = new Date(end.getTime() + DAY_MS);
-
+  // Rotation days are elapsed 24-hour periods, not inclusive calendar dates.
+  // 4/4 starting Sunday at 09:00 runs Sunday 09:00 -> Thursday 09:00.
+  const periodStart = info.periodStart;
+  const end = new Date(periodStart.getTime() + info.daysOn * DAY_MS);
   return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "مناوبة تناوبية", detail: `من ${formatDateTime(periodStart)} → ${formatDateTime(end)}` };
 }
 
@@ -70,7 +57,7 @@ export function getActiveWorkPeriod(employee: Employee | null | undefined, targe
   if (employee?.scheduleType === "ROTATION" && employee.rotationStartDate) {
     const previous = new Date(target.getTime() - DAY_MS);
     const previousPeriod = getEmployeeWorkPeriod(employee, previous);
-    if (previousPeriod.isWorkDay && previousPeriod.start && previousPeriod.end && target >= previousPeriod.start && target <= previousPeriod.end) return previousPeriod;
+    if (previousPeriod.isWorkDay && previousPeriod.start && previousPeriod.end && target >= previousPeriod.start && target < previousPeriod.end) return previousPeriod;
   }
   return current;
 }
@@ -79,26 +66,15 @@ export function getScheduleCountdown(employee: Employee | null | undefined, targ
   if (!employee) return { kind: "NONE", target: null, label: "" };
   const period = getEmployeeWorkPeriod(employee, target);
   if (period.kind === "NOT_STARTED") {
-    const start = parseYYYYMMDD(employee.rotationStartDate);
-    if (!start) return { kind: "NONE", target: null, label: "" };
-    const firstStart = withTime(start, parseTime(employee.rotationStartTime || employee.workStartTime, "09:00"));
-    if (firstStart.getTime() <= target.getTime()) return { kind: "NONE", target: null, label: "" };
-    return { kind: "NEXT_WORK_START", target: firstStart, label: "بداية أول مناوبة" };
+    const info = getRotationInfo(employee, target);
+    if (!info) return { kind: "NONE", target: null, label: "" };
+    return { kind: "NEXT_WORK_START", target: info.firstStart, label: "بداية أول مناوبة" };
   }
   if (period.isWorkDay && period.end && period.end.getTime() > target.getTime()) return { kind: "WORK_END", target: period.end, label: "تنتهي المناوبة خلال" };
   if (employee.scheduleType === "ROTATION" && period.kind === "OFF") {
-    const startDate = parseYYYYMMDD(employee.rotationStartDate);
-    if (!startDate) return { kind: "NONE", target: null, label: "" };
-    const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
-    const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
-    const cycleLength = on + off;
-    const firstStart = withTime(startDate, parseTime(employee.rotationStartTime || employee.workStartTime, "09:00"));
-    const diff = Math.max(0, Math.floor((startOfDay(target).getTime() - startOfDay(firstStart).getTime()) / DAY_MS));
-    const cycleDay = diff % cycleLength;
-    const daysUntilNext = cycleLength - cycleDay;
-    const next = new Date(startOfDay(target).getTime() + daysUntilNext * DAY_MS);
-    next.setHours(firstStart.getHours(), firstStart.getMinutes(), 0, 0);
-    if (next.getTime() <= target.getTime()) next.setTime(next.getTime() + DAY_MS);
+    const info = getRotationInfo(employee, target);
+    if (!info) return { kind: "NONE", target: null, label: "" };
+    const next = new Date(info.periodStart.getTime() + (info.daysOn + info.daysOff) * DAY_MS);
     return { kind: "NEXT_WORK_START", target: next, label: "تبدأ المناوبة القادمة خلال" };
   }
   return { kind: "NONE", target: null, label: "" };
@@ -106,33 +82,30 @@ export function getScheduleCountdown(employee: Employee | null | undefined, targ
 
 export function isWithinWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): boolean {
   const period = getActiveWorkPeriod(employee, target);
-  return Boolean(period.isWorkDay && period.start && period.end && target >= period.start && target <= period.end);
+  return Boolean(period.isWorkDay && period.start && period.end && target >= period.start && target < period.end);
 }
 
-function rotationCycleDay(employee: Employee, target: Date): number {
-  const start = parseYYYYMMDD(employee.rotationStartDate);
-  if (!start) return 0;
-  const diff = Math.floor((startOfDay(target).getTime() - startOfDay(start).getTime()) / DAY_MS);
-  const on = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
-  const off = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
-  return Math.max(0, diff) % (on + off);
+function getRotationInfo(employee: Employee, target: Date): { firstStart: Date; periodStart: Date; daysOn: number; daysOff: number; cycleDay: number; workDay: number; phase: "WORK" | "OFF" | "NOT_STARTED" } | null {
+  const startDate = parseYYYYMMDD(employee.rotationStartDate);
+  if (!startDate) return null;
+  const daysOn = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4));
+  const daysOff = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4));
+  const cycleLength = daysOn + daysOff;
+  const firstStart = withTime(startDate, parseTime(employee.rotationStartTime || employee.workStartTime, "09:00"));
+  const elapsed = target.getTime() - firstStart.getTime();
+  if (elapsed < 0) return { firstStart, periodStart: firstStart, daysOn, daysOff, cycleDay: 0, workDay: 0, phase: "NOT_STARTED" };
+  const cycleMs = cycleLength * DAY_MS;
+  const cycleIndex = Math.floor(elapsed / cycleMs);
+  const cycleElapsed = elapsed - cycleIndex * cycleMs;
+  const cycleDay = Math.floor(cycleElapsed / DAY_MS);
+  const periodStart = new Date(firstStart.getTime() + cycleIndex * cycleMs);
+  if (cycleDay >= daysOn) return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: 0, phase: "OFF" };
+  return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: cycleDay, phase: "WORK" };
 }
 
-function normalizeWorkDays(days: number[] | undefined): number[] {
-  if (!Array.isArray(days)) return [...DEFAULT_ADMIN_DAYS];
-  return [...new Set(days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b);
-}
-
-function parseTime(value: string | undefined, fallback: string): { hours: number; minutes: number } {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || fallback).trim());
-  if (!match) return parseTime(fallback, "00:00");
-  const hours = Math.min(23, Math.max(0, Number(match[1])));
-  const minutes = Math.min(59, Math.max(0, Number(match[2])));
-  return { hours, minutes };
-}
-
+function normalizeWorkDays(days: number[] | undefined): number[] { if (!Array.isArray(days)) return [...DEFAULT_ADMIN_DAYS]; return [...new Set(days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b); }
+function parseTime(value: string | undefined, fallback: string): { hours: number; minutes: number } { const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || fallback).trim()); if (!match) return parseTime(fallback, "00:00"); return { hours: Math.min(23, Math.max(0, Number(match[1]))), minutes: Math.min(59, Math.max(0, Number(match[2]))) }; }
 function withTime(date: Date, time: { hours: number; minutes: number }): Date { const result = new Date(date); result.setHours(time.hours, time.minutes, 0, 0); return result; }
-function startOfDay(date: Date): Date { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
 function parseYYYYMMDD(value: string | null | undefined): Date | null { const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || "").trim()); if (!match) return null; const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])); if (date.getFullYear() !== Number(match[1]) || date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[3])) return null; return date; }
 function formatTime(date: Date): string { return normalizeDigits(date.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", hour12: false })); }
 function formatDateTime(date: Date): string { return `${normalizeDigits(date.toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" }))} ${formatTime(date)}`; }
