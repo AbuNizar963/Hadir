@@ -1,3 +1,4 @@
+# trigger polish runner
 name: Apply Workforce UI polish
 
 on:
@@ -23,21 +24,18 @@ jobs:
           from pathlib import Path
           p = Path('src/pages/ManagerEmployees.tsx')
           s = p.read_text(encoding='utf-8')
-
           old = 'import type { ReactNode } from "react";'
           new = '''import type { ReactNode } from "react";
 import { Edit3, LogIn, LogOut, ShieldAlert, SmartphoneOff, Trash2, Undo2 } from "lucide-react";'''
           if old not in s:
               raise SystemExit('missing ReactNode import anchor')
           s = s.replace(old, new, 1)
-
           old = '''const rotation = e.scheduleType === "ROTATION";'''
           new = '''const rotation = e.scheduleType === "ROTATION";
   const actionBase = "inline-flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition";'''
           if old not in s:
               raise SystemExit('missing rotation anchor')
           s = s.replace(old, new, 1)
-
           old = '''      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
         <span>السماح: {e.gracePeriodMinutes ?? 0} دقيقة</span>
         <span>{e.deviceId ? "الهاتف مرتبط" : "الهاتف غير مرتبط"}</span>
@@ -48,7 +46,6 @@ import { Edit3, LogIn, LogOut, ShieldAlert, SmartphoneOff, Trash2, Undo2 } from 
           if old not in s:
               raise SystemExit('missing duplicate phone status anchor')
           s = s.replace(old, new, 1)
-
           replacements = [
             ('className="btn-primary text-[11px]"', 'className={`${actionBase} border-primary/30 bg-primary text-primary-foreground hover:bg-primary/90`}'),
             ('className="btn-secondary text-[11px]"', 'className={`${actionBase} border-border bg-secondary/50 hover:bg-secondary`}'),
@@ -61,7 +58,6 @@ import { Edit3, LogIn, LogOut, ShieldAlert, SmartphoneOff, Trash2, Undo2 } from 
               if old not in s:
                   raise SystemExit(f'missing button class anchor: {old}')
               s = s.replace(old, new, 1)
-
           pairs = [
             ('>تحضير مباشر</button>', '><LogIn className="h-3.5 w-3.5" aria-hidden="true" />تحضير مباشر</button>'),
             ('>انصراف مباشر</button>', '><LogOut className="h-3.5 w-3.5" aria-hidden="true" />انصراف مباشر</button>'),
@@ -75,7 +71,6 @@ import { Edit3, LogIn, LogOut, ShieldAlert, SmartphoneOff, Trash2, Undo2 } from 
               if old not in s:
                   raise SystemExit(f'missing button label anchor: {old}')
               s = s.replace(old, new, 1)
-
           p.write_text(s, encoding='utf-8')
 
       - name: Verify TypeScript
