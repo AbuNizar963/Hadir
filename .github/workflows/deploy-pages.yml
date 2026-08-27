@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -20,6 +20,97 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Apply VIP employee count
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("src/pages/ManagerEmployees.tsx")
+          text = path.read_text(encoding="utf-8")
+
+          old_stats = '''    devices: employees.filter((e) => !!e.deviceId).length,\n    escaped: employees.filter((e) => escapeStatusFor(e.id) === "escaped").length,'''
+          new_stats = '''    devices: employees.filter((e) => !!e.deviceId).length,\n    vip: employees.filter((e) => e.status === "active" && e.isVip).length,\n    escaped: employees.filter((e) => escapeStatusFor(e.id) === "escaped").length,'''
+          if old_stats in text:
+              text = text.replace(old_stats, new_stats, 1)
+
+          old_grid = '<div className="grid grid-cols-2 gap-3 sm:grid-cols-5">'
+          new_grid = '<div className="grid grid-cols-2 gap-3 sm:grid-cols-6">'
+          if old_grid in text:
+              text = text.replace(old_grid, new_grid, 1)
+
+          old_vip = '<div className="rounded-2xl border border-border/60 bg-background/30 p-4"><div className="text-xs text-muted-foreground">أجهزة موثقة</div><div className="mono live-value mt-1 text-2xl font-black">{stats.devices}</div></div><div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4"><div className="text-xs text-muted-foreground">هارب الآن</div>'
+          new_vip = '<div className="rounded-2xl border border-border/60 bg-background/30 p-4"><div className="text-xs text-muted-foreground">أجهزة موثقة</div><div className="mono live-value mt-1 text-2xl font-black">{stats.devices}</div></div><div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="live-status-dot bg-amber-400" data-status="vip" /> <span>VIP مفعل</span></div><div className="mono live-value mt-1 text-2xl font-black text-amber-500">{stats.vip}</div></div><div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="live-status-dot bg-destructive" data-status="danger" /> <span>هارب الآن</span></div>'
+          if old_vip in text:
+              text = text.replace(old_vip, new_vip, 1)
+
+          path.write_text(text, encoding="utf-8")
+      - name: Commit source change and restore workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cat > .github/workflows/deploy-pages.yml <<'EOF'
+          name: Deploy Hadir Frontend
+
+          on:
+            push:
+              branches: [main]
+            workflow_dispatch:
+
+          permissions:
+            contents: read
+            pages: write
+            id-token: write
+
+          concurrency:
+            group: pages
+            cancel-in-progress: true
+
+          jobs:
+            build:
+              runs-on: ubuntu-latest
+              steps:
+                - name: Checkout
+                  uses: actions/checkout@v5
+
+                - name: Setup Bun
+                  uses: oven-sh/setup-bun@v2
+                  with:
+                    bun-version: 1.2.15
+
+                - name: Install dependencies
+                  run: bun install
+
+                - name: Build frontend
+                  env:
+                    VITE_BASE_PATH: /Hadir/
+                  run: bun run build
+
+                - name: Configure SPA fallback
+                  run: cp dist/index.html dist/404.html
+
+                - name: Upload Pages artifact
+                  uses: actions/upload-pages-artifact@v4
+                  with:
+                    path: dist
+
+            deploy:
+              environment:
+                name: github-pages
+                url: ${{ steps.deployment.outputs.page_url }}
+              runs-on: ubuntu-latest
+              needs: build
+              steps:
+                - name: Deploy to GitHub Pages
+                  id: deployment
+                  uses: actions/deploy-pages@v4
+          EOF
+          git add src/pages/ManagerEmployees.tsx .github/workflows/deploy-pages.yml
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "feat: show active VIP employee count"
+          git push
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
