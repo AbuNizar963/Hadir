@@ -10,6 +10,7 @@ type Env = {
   REALTIME: DurableObjectNamespace;
   DB: D1Database;
   AI?: { run(model: string, input: Record<string, unknown>): Promise<any> };
+  GEMINI_API_KEY?: string;
   JWT_SECRET?: string;
   APP_ORIGIN?: string;
   OWNER_RECOVERY_CODE?: string;
