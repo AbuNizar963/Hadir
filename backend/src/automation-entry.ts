@@ -2,6 +2,7 @@ import base, { HadirRealtime } from "./ai-entry";
 import { directAttendance, workforceControls, runAutomaticAttendance } from "./automaticAttendance";
 import { resetTestData } from "./test-data-reset";
 import { handleProfileImageRequest } from "./r2";
+import { clearEmployeeDevice } from "./deviceSecurity";
 
 type Env = { DB: D1Database; REALTIME: DurableObjectNamespace; APP_ORIGIN?: string; APP_TIMEZONE?: string; JWT_SECRET?: string; OWNER_RECOVERY_CODE?: string; PROFILE_IMAGES?: R2Bucket; AI?: { run(model: string, input: Record<string, unknown>): Promise<any> } };
 type ProfileActor = { id: string; username?: string; name: string; role: "owner" | "manager" | "supervisor" | "staff" };
@@ -75,6 +76,16 @@ export default {
           if(!Number.isInteger(minutes)||minutes<0||minutes>180)return json({error:"مهلة الانصراف المبكر يجب أن تكون بين 0 و180 دقيقة"},400,o);
           await env.DB.prepare("INSERT INTO settings(key,value) VALUES('earlyCheckoutGraceMinutes',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(minutes)).run();
           return json({ok:true,updated:1,message:`تم ضبط مهلة الانصراف المبكر العامة إلى ${minutes} دقيقة.`,action},200,o);
+        }
+        if(action==="unlinkDevices"){
+          const employees=await env.DB.prepare("SELECT id FROM employees").all<any>();
+          let updated=0;
+          for(const employee of (employees.results||[]) as any[]){ await clearEmployeeDevice(env,String(employee.id)); updated++; }
+          return json({ok:true,updated,message:`تم فك ربط ${updated} جهازًا وحذف مفاتيح الدخول المرتبطة بها.`},200,o);
+        }
+        if(action==="revokeSessions"){
+          const result=await env.DB.prepare("UPDATE auth_sessions SET revoked_at=? WHERE user_type='employee' AND revoked_at IS NULL").bind(new Date().toISOString()).run();
+          return json({ok:true,updated:Number(result.meta.changes||0),message:"تم إلغاء جلسات الموظفين الحالية."},200,o);
         }
         return json({error:"إجراء غير مدعوم"},400,o);
       }catch(error){return json({error:error instanceof Error?error.message:"تعذر تنفيذ إعداد الموظفين الجماعي"},500,o);}
