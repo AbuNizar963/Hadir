@@ -89,7 +89,7 @@ export async function handleWorkforce(req:Request,env:Env,actor:Actor|null,pathn
   if(actor?.role!=="owner")return J({error:"غير مصرح"},403);
   const b=await req.json().catch(()=>({})) as any;
   if(String(b.confirmation||"")!=="حذف البيانات التجريبية")return J({error:"تأكيد الحذف غير صحيح"},400);
-  const tables=["attendance","audit","requests","employee_requests","notifications","violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights","push_subscriptions","escape_events","device_rebind_requests"];
+  const tables=["employee_passkeys","webauthn_challenges","attendance","audit","requests","employee_requests","notifications","violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights","push_subscriptions","escape_events","device_rebind_requests"];
   const placeholders=tables.map(()=>"?").join(",");
   const existing=await rows(env.DB,`SELECT name FROM sqlite_master WHERE type='table' AND name IN (${placeholders})`,...tables) as any[];
   const existingNames=new Set(existing.map(x=>String(x.name)));
@@ -114,7 +114,7 @@ export async function handleWorkforce(req:Request,env:Env,actor:Actor|null,pathn
   if(env.PROFILE_IMAGES){
     let cursor:string|undefined;
     do{
-      const page=await env.PROFILE_IMAGES.list({limit:1000,...(cursor?{cursor}:{})});
+      const page=await env.PROFILE_IMAGES.list({prefix:"employees/",limit:1000,...(cursor?{cursor}:{})});
       const keys=page.objects.map(object=>object.key);
       if(keys.length){await env.PROFILE_IMAGES.delete(keys);deletedImages+=keys.length;}
       cursor=page.truncated?page.cursor:undefined;
