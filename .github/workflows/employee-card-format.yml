@@ -60,3 +60,5 @@ jobs:
           git add src/pages/ManagerEmployees.tsx
           git commit -m "fix(ui): unify employee card action icons"
           git push
+
+# intentional retrigger after workflow creation
