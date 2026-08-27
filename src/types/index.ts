@@ -18,6 +18,9 @@ export interface Employee {
   role?: UserRole; locationId?: string | null; rotationDaysOn?: number; rotationDaysOff?: number;
   workDays?: number[];
   specialties?: string[];
+  isVip?: boolean;
+  autoCheckIn?: boolean;
+  autoCheckOut?: boolean;
 }
 
 export interface AttendanceRecord { id: string; employeeId: string; jobNumber: string; employeeName: string; type: "check-in" | "check-out"; timestamp: string; lat: number; lng: number; distanceMeters: number; deviceId: string; ip: string; qrCode: string; locationId?: string; }
