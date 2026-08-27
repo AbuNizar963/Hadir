@@ -38,7 +38,7 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(4) {
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(36 72% 46%); }
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(274 56% 54%); }
 
-/* Header: Arabic label stays on the RIGHT, exactly one dot on its RIGHT edge. */
+/* Header: Arabic label stays on the RIGHT, with exactly one dot on its LEFT edge. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child {
   display: flex !important;
   flex-direction: row !important;
@@ -54,11 +54,11 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-ch
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child [data-status] {
   display: none !important;
 }
-/* Generate one — and only one — premium indicator on the right side of the label. */
+/* Generate one — and only one — premium indicator on the LEFT side of the label. */
 section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child::before {
   content: "";
   display: block;
-  order: 0;
+  order: 2;
   flex: 0 0 .48rem;
   width: .48rem;
   height: .48rem;
