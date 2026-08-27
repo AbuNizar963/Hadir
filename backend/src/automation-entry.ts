@@ -1,4 +1,4 @@
-import base from "./ai-entry";
+import base, { HadirRealtime } from "./ai-entry";
 import { directAttendance, workforceControls, runAutomaticAttendance } from "./automaticAttendance";
 
 type Env = {
@@ -18,7 +18,7 @@ async function hashToken(token:string){const digest=await crypto.subtle.digest("
 async function actor(request:Request,env:Env){const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\s+/i,"")||"").trim();if(!token)return null;try{const h=await hashToken(token);const s=await env.DB.prepare("SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1").bind(h).first<any>();if(!s||s.userType!=="admin")return null;return await env.DB.prepare("SELECT id,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1").bind(s.userId).first<any>();}catch{return null;}}
 function origin(request:Request,env:Env){return String(env.APP_ORIGIN||request.headers.get("origin")||"*").split(",")[0].trim().replace(/\/$/,"")||"*";}
 
-export { base };
+export { base, HadirRealtime };
 export default {
   async fetch(request:Request,env:Env,ctx:ExecutionContext){
     const a=await actor(request,env);const o=origin(request,env);
