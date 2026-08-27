@@ -1,13 +1,13 @@
 /* Live status language used across dashboards. */
 [aria-label="فتح قائمة الموظف"] { color: hsl(var(--primary)) !important; }
 
-.live-status-dot { position: relative; display: inline-block; width: .55rem; height: .55rem; flex: 0 0 .55rem; border-radius: 9999px; background: hsl(var(--primary)); box-shadow: 0 0 0 0 hsl(var(--primary) / .35); animation: live-status-pulse 2s ease-out infinite; }
-.live-status-dot[data-status="warning"] { background: hsl(var(--warning)); box-shadow: 0 0 0 0 hsl(var(--warning) / .35); }
-.live-status-dot[data-status="danger"] { background: hsl(var(--destructive)); box-shadow: 0 0 0 0 hsl(var(--destructive) / .35); }
-.live-status-dot[data-status="info"] { background: hsl(var(--accent)); box-shadow: 0 0 0 0 hsl(var(--accent) / .35); }
-.live-status-dot[data-status="vip"] { background: hsl(38 92% 50%); box-shadow: 0 0 0 0 hsl(38 92% 50% / .35); }
-/* Operational status: online/active is always enterprise green, independent of device/theme primary color. */
-.live-status-dot[data-status="online"] { background: hsl(152 55% 42%) !important; box-shadow: 0 0 0 0 hsl(152 55% 42% / .35); }
+.live-status-dot { position: relative; display: inline-block; width: .55rem; height: .55rem; flex: 0 0 .55rem; border-radius: 9999px; background: hsl(var(--primary)); color: hsl(var(--primary)); box-shadow: 0 0 0 0 hsl(var(--primary) / .35); animation: live-status-pulse 2s ease-out infinite; }
+.live-status-dot[data-status="warning"] { background: hsl(var(--warning)) !important; color: hsl(var(--warning)); box-shadow: 0 0 0 0 hsl(var(--warning) / .35); }
+.live-status-dot[data-status="danger"] { background: hsl(var(--destructive)) !important; color: hsl(var(--destructive)); box-shadow: 0 0 0 0 hsl(var(--destructive) / .35); }
+.live-status-dot[data-status="info"] { background: hsl(var(--accent)) !important; color: hsl(var(--accent)); box-shadow: 0 0 0 0 hsl(var(--accent) / .35); }
+.live-status-dot[data-status="vip"] { background: hsl(38 92% 50%) !important; color: hsl(38 92% 50%); box-shadow: 0 0 0 0 hsl(38 92% 50% / .35); }
+/* Operational status: linked device = green; active but unlinked = warning yellow. */
+.live-status-dot[data-status="online"] { background: hsl(152 55% 42%) !important; color: hsl(152 55% 42%); box-shadow: 0 0 0 0 hsl(152 55% 42% / .35); }
 
 @keyframes live-status-pulse { 0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; } 70% { box-shadow: 0 0 0 .45rem transparent; opacity: .82; } 100% { box-shadow: 0 0 0 0 transparent; opacity: 1; } }
 .live-value { transition: transform 180ms ease, opacity 180ms ease; font-variant-numeric: tabular-nums; }
