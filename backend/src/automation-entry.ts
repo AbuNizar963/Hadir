@@ -21,7 +21,22 @@ function origin(request:Request,env:Env){return String(env.APP_ORIGIN||request.h
 export { base, HadirRealtime };
 export default {
   async fetch(request:Request,env:Env,ctx:ExecutionContext){
-    const a=await actor(request,env);const o=origin(request,env);
+    const a=await actor(request,env);const o=origin(request,env);const path=new URL(request.url).pathname;
+    if(path==="/api/workforce/live"&&request.method==="PATCH"){
+      const b=await request.clone().json().catch(()=>({})) as any;const employeeId=String(b.employeeId||"").trim();
+      if(!employeeId)return new Response(JSON.stringify({error:"الموظف مطلوب"}),{status:400,headers:{"content-type":"application/json","access-control-allow-origin":o,"access-control-allow-credentials":"true"}});
+      const u=new URL(request.url);u.pathname=`/api/manager/workforce-controls/${encodeURIComponent(employeeId)}`;
+      const controls=await workforceControls(new Request(u,request),env,a,o);if(controls)return controls;
+    }
+    if(path==="/api/workforce/live"&&request.method==="GET"){
+      const u=new URL(request.url);u.pathname="/api/manager/workforce-controls";
+      const controls=await workforceControls(new Request(u,request),env,a,o);if(controls)return controls;
+    }
+    if(path==="/api/workforce/live"&&request.method==="POST"){
+      const b=await request.clone().json().catch(()=>({})) as any;const type=String(b.type||"");const u=new URL(request.url);
+      u.pathname=type==="check-out"?"/api/manager/attendance/checkout":type==="check-in"?"/api/manager/attendance/check-in":"/api/manager/attendance";
+      const direct=await directAttendance(new Request(u,request),env,a,o);if(direct)return direct;
+    }
     const direct=await directAttendance(request,env,a,o);if(direct)return direct;
     const controls=await workforceControls(request,env,a,o);if(controls)return controls;
     return base.fetch(request,env,ctx);
