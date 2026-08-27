@@ -68,7 +68,7 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
 
     if(url.pathname==="/api/manager/attendance"&&request.method==="POST"){
       const admin=await actorForAdministrativeAction(request,env);
-      if(!admin||!["owner","manager"].includes(String(admin.role).toLowerCase())) return new Response(JSON.stringify({error:"المالك أو المدير فقط يستطيعان التحضير المباشر"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}});
+      if(!admin||String(admin.role).toLowerCase()!=="owner") return new Response(JSON.stringify({error:"المالك فقط يستطيع التحضير المباشر"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}});
       const b=await request.json().catch(()=>({})) as any;
       const employeeId=String(b.employeeId||"").trim(); const type=String(b.type||"check-in");
       if(!employeeId||type!=="check-in") return new Response(JSON.stringify({error:"بيانات التحضير المباشر غير صحيحة"}),{status:400,headers:{...cors(origin),"content-type":"application/json"}});
