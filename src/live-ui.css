@@ -1,7 +1,7 @@
 /* Live status language used across dashboards. */
 [aria-label="فتح قائمة الموظف"] { color: hsl(var(--primary)) !important; }
 
-.live-status-dot { position: relative; display: inline-block; width: .55rem; height: .55rem; border-radius: 9999px; background: hsl(var(--primary)); box-shadow: 0 0 0 0 hsl(var(--primary) / .35); animation: live-status-pulse 2s ease-out infinite; }
+.live-status-dot { position: relative; display: inline-block; width: .55rem; height: .55rem; flex: 0 0 .55rem; border-radius: 9999px; background: hsl(var(--primary)); box-shadow: 0 0 0 0 hsl(var(--primary) / .35); animation: live-status-pulse 2s ease-out infinite; }
 .live-status-dot[data-status="warning"] { background: hsl(var(--warning)); box-shadow: 0 0 0 0 hsl(var(--warning) / .35); }
 .live-status-dot[data-status="danger"] { background: hsl(var(--destructive)); box-shadow: 0 0 0 0 hsl(var(--destructive) / .35); }
 .live-status-dot[data-status="info"] { background: hsl(var(--accent)); box-shadow: 0 0 0 0 hsl(var(--accent) / .35); }
@@ -13,8 +13,8 @@
 .live-value:where([data-changed="true"]) { animation: live-value-pop 260ms ease-out; }
 @keyframes live-value-pop { 0% { transform: scale(.96); opacity: .55; } 100% { transform: scale(1); opacity: 1; } }
 
-/* Employee directory statistics: one consistent, restrained professional card system. */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div {
+/* Employee directory statistics — one restrained enterprise card system. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div {
   --stat-color: hsl(210 72% 54%);
   position: relative;
   overflow: hidden;
@@ -26,33 +26,39 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div {
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 8%, transparent), 0 6px 22px color-mix(in srgb, var(--stat-color) 7%, transparent);
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:hover {
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:hover {
   transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--stat-color) 42%, transparent) !important;
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 10%, transparent), 0 10px 28px color-mix(in srgb, var(--stat-color) 11%, transparent);
 }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(1) { --stat-color: hsl(210 72% 54%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(2) { --stat-color: hsl(152 55% 42%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(3) { --stat-color: hsl(4 62% 54%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(4) { --stat-color: hsl(188 64% 44%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(36 72% 46%); }
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(274 56% 54%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(1) { --stat-color: hsl(210 72% 54%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(2) { --stat-color: hsl(152 55% 42%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(3) { --stat-color: hsl(4 62% 54%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(4) { --stat-color: hsl(188 64% 44%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(36 72% 46%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(274 56% 54%); }
 
-/* Arabic enterprise layout: label is on the RIGHT, exactly ONE animated dot is on its LEFT. */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child {
+/* Header: Arabic label stays on the RIGHT, exactly one dot on its LEFT. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child {
   display: flex !important;
-  flex-direction: row-reverse;
+  flex-direction: row !important;
   align-items: center;
   justify-content: flex-start;
   gap: .5rem;
   width: 100%;
   direction: rtl;
   text-align: right;
-  color: color-mix(in srgb, var(--stat-color) 78%, hsl(var(--foreground)));
 }
-/* The single generated indicator is deliberately before the label in visual order. */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child::before {
+/* Remove every existing JSX status indicator inside the stat header. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child .live-status-dot,
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child [data-status] {
+  display: none !important;
+}
+/* Generate one — and only one — premium indicator. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child::before {
   content: "";
+  display: block;
+  order: 2;
   flex: 0 0 .48rem;
   width: .48rem;
   height: .48rem;
@@ -60,26 +66,29 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-chi
   background: var(--stat-color);
   color: var(--stat-color);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent);
-  animation: stat-card-pulse 2.4s cubic-bezier(.22,.61,.36,1) infinite;
+  animation: stat-card-pulse 2.6s cubic-bezier(.22,.61,.36,1) infinite;
 }
-/* Existing JSX dots are hidden to guarantee there is never a second visible dot. */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child > .live-status-dot {
-  display: none !important;
-}
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child > span:last-child {
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child > span:last-child {
+  order: 1;
   direction: rtl;
   text-align: right;
+  margin-inline-start: auto;
 }
-/* All statistic numbers are intentionally white for maximum contrast. */
-section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > .live-value {
-  color: #fff !important;
+/* Numbers: readable in both dark and light themes. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value {
+  color: hsl(var(--foreground)) !important;
   text-align: right !important;
   direction: ltr;
+  font-weight: 900;
+}
+.dark section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value,
+.dark-mode section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value {
+  color: #fff !important;
 }
 @keyframes stat-card-pulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent); opacity: 1; transform: scale(1); }
-  18% { box-shadow: 0 0 0 .18rem color-mix(in srgb, var(--stat-color) 10%, transparent); opacity: 1; transform: scale(1.04); }
-  48% { box-shadow: 0 0 0 .48rem transparent; opacity: .86; transform: scale(1); }
+  18% { box-shadow: 0 0 0 .16rem color-mix(in srgb, var(--stat-color) 12%, transparent); opacity: 1; transform: scale(1.03); }
+  48% { box-shadow: 0 0 0 .46rem transparent; opacity: .88; transform: scale(1); }
 }
 
 .weather-strip-live { min-height: 1cm; max-height: 1.55cm; overflow: hidden; transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease; animation: weather-breathe 6s ease-in-out infinite; }
@@ -87,5 +96,5 @@ section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > .live-value {
 @keyframes weather-breathe { 0%,100% { opacity: .94; } 50% { opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .live-status-dot, .live-value, .weather-strip-live, section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div, section.hud-card > .grid.grid-cols-2.gap-3.sm\:grid-cols-6 > div > div:first-child::before { animation: none !important; transition: none !important; }
+  .live-status-dot, .live-value, .weather-strip-live, section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div, section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child::before { animation: none !important; transition: none !important; }
 }
