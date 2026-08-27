@@ -22,6 +22,7 @@ type Action = typeof controls[number]["id"];
 export default function OwnerBulkSettingsPanel() {
   const manager = currentManager();
   const isOwner = manager?.role === "owner" || manager?.accountId === "bootstrap";
+  const [selected, setSelected] = useState<Action | "">("");
   const [password, setPassword] = useState("");
   const [grace, setGrace] = useState("10");
   const [earlyCheckout, setEarlyCheckout] = useState("0");
@@ -30,87 +31,98 @@ export default function OwnerBulkSettingsPanel() {
   const [rotationDaysOn, setRotationDaysOn] = useState("4");
   const [rotationDaysOff, setRotationDaysOff] = useState("4");
   const [image, setImage] = useState<File | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [open, setOpen] = useState<Action | null>(null);
 
   if (!isOwner) return null;
+  const control = controls.find(item => item.id === selected);
 
-  const run = async (action: Action) => {
+  const run = async () => {
+    if (!selected) return;
     setMessage("");
     try {
-      setBusy(action);
-      if (action === "password") {
+      setBusy(true);
+      if (selected === "password") {
         if (password.length < 6) throw new Error("كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل.");
-        const result = await bulkOwnerEmployeeSettings({ action, password });
-        setMessage(`تم تغيير كلمة مرور ${result.updated} موظفًا بنجاح.`);
-        setPassword("");
-      } else if (action === "grace" || action === "earlyCheckout") {
-        const minutes = Number(action === "grace" ? grace : earlyCheckout);
+        const result = await bulkOwnerEmployeeSettings({ action: selected, password });
+        setMessage(`تم تغيير كلمة مرور ${result.updated} موظفًا بنجاح.`); setPassword("");
+      } else if (selected === "grace" || selected === "earlyCheckout") {
+        const minutes = Number(selected === "grace" ? grace : earlyCheckout);
         if (!Number.isInteger(minutes) || minutes < 0 || minutes > 180) throw new Error("القيمة يجب أن تكون بين 0 و180 دقيقة.");
-        const result = await bulkOwnerEmployeeSettings({ action, minutes });
-        setMessage(action === "grace" ? `تم ضبط مهلة التأخر لـ ${result.updated} موظفًا إلى ${minutes} دقيقة.` : `تم ضبط مهلة الانصراف المبكر العامة إلى ${minutes} دقيقة.`);
-      } else if (action === "workHours") {
-        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(workStartTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(workEndTime)) throw new Error("أدخل وقت البداية والنهاية بصيغة HH:MM صحيحة.");
+        const result = await bulkOwnerEmployeeSettings({ action: selected, minutes });
+        setMessage(selected === "grace" ? `تم ضبط مهلة التأخر لـ ${result.updated} موظفًا إلى ${minutes} دقيقة.` : `تم ضبط مهلة الانصراف المبكر إلى ${minutes} دقيقة.`);
+      } else if (selected === "workHours") {
+        if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workStartTime) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(workEndTime)) throw new Error("أدخل وقت البداية والنهاية بصيغة HH:MM صحيحة.");
         if (workStartTime === workEndTime) throw new Error("وقت البداية والنهاية يجب أن يكونا مختلفين.");
-        const result = await bulkOwnerEmployeeSettings({ action, workStartTime, workEndTime });
+        const result = await bulkOwnerEmployeeSettings({ action: selected, workStartTime, workEndTime });
         setMessage(`تم تحديث أوقات الدوام لـ ${result.updated} موظفًا: ${workStartTime} → ${workEndTime}.`);
-      } else if (action === "rotationDays") {
-        const daysOn = Number(rotationDaysOn);
-        const daysOff = Number(rotationDaysOff);
+      } else if (selected === "rotationDays") {
+        const daysOn = Number(rotationDaysOn), daysOff = Number(rotationDaysOff);
         if (!Number.isInteger(daysOn) || daysOn < 1 || daysOn > 31 || !Number.isInteger(daysOff) || daysOff < 0 || daysOff > 31) throw new Error("أيام التناوب يجب أن تكون: المناوبة 1–31 يومًا، والراحة 0–31 يومًا.");
-        if (daysOn + daysOff < 2) throw new Error("يجب أن يحتوي نظام التناوب على يوم مناوبة ويوم آخر على الأقل في الدورة.");
-        const result = await bulkOwnerEmployeeSettings({ action, rotationDaysOn: daysOn, rotationDaysOff: daysOff });
+        if (daysOn + daysOff < 2) throw new Error("يجب أن تحتوي دورة التناوب على يومين على الأقل.");
+        const result = await bulkOwnerEmployeeSettings({ action: selected, rotationDaysOn: daysOn, rotationDaysOff: daysOff });
         setMessage(`تم تحديث دورة التناوب لـ ${result.updated} موظفًا تناوبيًا: ${daysOn} أيام مناوبة + ${daysOff} أيام راحة.`);
-      } else if (action === "avatar") {
+      } else if (selected === "avatar") {
         if (!image) throw new Error("اختر صورة أولًا.");
         if (!image.type.startsWith("image/")) throw new Error("الملف المختار ليس صورة.");
         if (image.size > 10 * 1024 * 1024) throw new Error("حجم الصورة الأصلية يجب ألا يتجاوز 10 ميغابايت.");
-        const result = await bulkOwnerEmployeeSettings({ action, file: image });
-        setMessage(`تم تحديث صورة ${result.updated} موظفًا بنجاح.`);
-        setImage(null);
+        const result = await bulkOwnerEmployeeSettings({ action: selected, file: image });
+        setMessage(`تم تحديث صورة ${result.updated} موظفًا بنجاح.`); setImage(null);
       } else {
-        const result = await bulkOwnerEmployeeSettings({ action });
-        setMessage(action === "unlinkDevices" ? `تم فك ربط ${result.updated} موظفًا بنجاح. يمكنهم الآن ربط أجهزتهم من جديد.` : `تم تسجيل خروج ${result.updated} موظفًا من الجلسات الحالية.`);
+        if (!window.confirm(selected === "unlinkDevices" ? "سيتم فك ربط جميع أجهزة الموظفين. هل تريد المتابعة؟" : "سيتم تسجيل خروج جميع الموظفين من الجلسات الحالية. هل تريد المتابعة؟")) return;
+        const result = await bulkOwnerEmployeeSettings({ action: selected });
+        setMessage(selected === "unlinkDevices" ? `تم فك ربط ${result.updated} موظفًا بنجاح.` : `تم تسجيل خروج ${result.updated} موظفًا.`);
       }
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "تعذر تنفيذ العملية.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const confirmAndRun = (action: Action) => {
-    if (action === "unlinkDevices" && !window.confirm("سيتم فك ربط جميع أجهزة الموظفين وحذف مفاتيح الدخول المرتبطة بها. هل تريد المتابعة؟")) return;
-    if (action === "revokeSessions" && !window.confirm("سيتم تسجيل خروج جميع الموظفين من أجهزتهم الحالية. هل تريد المتابعة؟")) return;
-    void run(action);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "تعذر تنفيذ العملية."); }
+    finally { setBusy(false); }
   };
 
   return <section dir="rtl" className="hud-card p-5 sm:p-6 border-primary/30 bg-primary/5">
     <div className="text-xs mono text-primary font-bold mb-1">OWNER CONTROL · BULK EMPLOYEE SETTINGS</div>
     <h2 className="text-lg font-bold mb-1">إدارة الموظفين دفعة واحدة</h2>
-    <p className="text-sm text-muted-foreground mb-5">مركز تحكم موحد لمالك النظام. كل عملية داخل قائمة مستقلة لتقليل الازدحام ومنع التغييرات غير المقصودة.</p>
-    <div className="space-y-3">
-      {controls.map((control) => {
-        const isOpen = open === control.id;
-        const destructive = control.id === "unlinkDevices" || control.id === "revokeSessions";
-        return <div key={control.id} className={`rounded-2xl border bg-background/60 overflow-hidden ${destructive ? "border-destructive/20" : ""}`}>
-          <button type="button" className="w-full flex items-center gap-3 p-4 text-right hover:bg-muted/40 transition-colors" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : control.id)}>
-            <span className={`rounded-xl p-2 ${destructive ? "text-destructive bg-destructive/10" : "text-primary bg-primary/10"}`}>{control.icon}</span>
-            <span className="min-w-0 flex-1"><span className="block font-bold">{control.title}</span><span className="block text-xs text-muted-foreground mt-1">{control.description}</span></span>
-            <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-5 w-5 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
-          </button>
-          {isOpen && <div className="border-t p-4 bg-muted/10">
-            {control.id === "password" && <div className="flex flex-col sm:flex-row gap-2"><input type="password" className="input flex-1" value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة مرور جديدة" /><button type="button" className="btn-primary whitespace-nowrap" disabled={!!busy} onClick={() => void run("password")}>{busy === "password" ? "جارٍ…" : "تطبيق على الجميع"}</button></div>}
-            {control.id === "avatar" && <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center"><input type="file" accept="image/*" className="input text-xs flex-1" onChange={e => setImage(e.target.files?.[0] || null)} /><button type="button" className="btn-primary whitespace-nowrap" disabled={!!busy || !image} onClick={() => void run("avatar")}>{busy === "avatar" ? "جارٍ…" : "رفع وتطبيق"}</button></div>}
-            {(control.id === "grace" || control.id === "earlyCheckout") && <div className="flex flex-col sm:flex-row gap-2 sm:items-center"><input type="number" min="0" max="180" className="input mono sm:max-w-[180px]" value={control.id === "grace" ? grace : earlyCheckout} onChange={e => control.id === "grace" ? setGrace(e.target.value) : setEarlyCheckout(e.target.value)} /><span className="text-xs text-muted-foreground">دقيقة</span><button type="button" className="btn-primary whitespace-nowrap sm:mr-auto" disabled={!!busy} onClick={() => void run(control.id)}>{busy === control.id ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
-            {control.id === "workHours" && <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 sm:items-end"><label className="text-sm">بداية الدوام<input type="time" className="input mono mt-1 w-full" value={workStartTime} onChange={e => setWorkStartTime(e.target.value)} /></label><label className="text-sm">نهاية الدوام<input type="time" className="input mono mt-1 w-full" value={workEndTime} onChange={e => setWorkEndTime(e.target.value)} /></label><button type="button" className="btn-primary whitespace-nowrap" disabled={!!busy} onClick={() => void run("workHours")}>{busy === "workHours" ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
-            {control.id === "rotationDays" && <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 sm:items-end"><label className="text-sm">أيام المناوبة<input type="number" min="1" max="31" className="input mono mt-1 w-full" value={rotationDaysOn} onChange={e => setRotationDaysOn(e.target.value)} /></label><label className="text-sm">أيام الراحة<input type="number" min="0" max="31" className="input mono mt-1 w-full" value={rotationDaysOff} onChange={e => setRotationDaysOff(e.target.value)} /></label><button type="button" className="btn-primary whitespace-nowrap" disabled={!!busy} onClick={() => void run("rotationDays")}>{busy === "rotationDays" ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
-            {(control.id === "unlinkDevices" || control.id === "revokeSessions") && <div className="flex flex-col sm:flex-row gap-3 sm:items-center"><span className="text-sm text-muted-foreground flex-1">{control.id === "unlinkDevices" ? "سيتم إلغاء ربط الهاتف ومفتاح الدخول لكل موظف مع إبقاء الحسابات والبيانات الوظيفية محفوظة." : "سيتم إبطال الجلسات الحالية فقط؛ لن تتغير كلمات المرور أو البيانات."}</span><button type="button" className={destructive ? "btn-danger whitespace-nowrap" : "btn-primary whitespace-nowrap"} disabled={!!busy} onClick={() => confirmAndRun(control.id)}>{busy === control.id ? "جارٍ…" : "تأكيد التنفيذ"}</button></div>}
-          </div>}
-        </div>;
-      })}
+    <p className="text-sm text-muted-foreground mb-5">مركز تحكم موحد للمالك، مع قوائم منسدلة لتجميع العمليات وتقليل الازدحام ومنع التغييرات غير المقصودة.</p>
+
+    <div className="rounded-2xl border bg-background/70 p-3 sm:p-4">
+      <div className="flex items-center gap-3 mb-3">
+        <span className="rounded-xl p-2 text-primary bg-primary/10">{control?.icon || <Icon><path d="M4 6h16M4 12h16M4 18h16"/><path d="m8 9 2 2 4-4"/></Icon>}</span>
+        <div className="min-w-0 flex-1"><div className="font-bold">اختيار إعداد</div><div className="text-xs text-muted-foreground">اختر العملية المطلوبة من القائمة</div></div>
+      </div>
+      <div className="relative">
+        <select className="input w-full appearance-none pr-4 pl-10 font-medium" value={selected} onChange={e => { setSelected(e.target.value as Action | ""); setMessage(""); }}>
+          <option value="">اختر إعدادًا من القائمة…</option>
+          <optgroup label="حسابات وملفات الموظفين">
+            <option value="password">تغيير كلمة مرور جميع الموظفين</option>
+            <option value="avatar">تغيير الصورة الشخصية للجميع</option>
+          </optgroup>
+          <optgroup label="الدوام والحضور">
+            <option value="grace">مهلة التأخر</option>
+            <option value="earlyCheckout">مهلة الانصراف المبكر</option>
+            <option value="workHours">أوقات دوام جميع الموظفين</option>
+            <option value="rotationDays">أيام التناوب للموظفين التناوبيين</option>
+          </optgroup>
+          <optgroup label="الأجهزة والجلسات">
+            <option value="unlinkDevices">فك ربط جميع الأجهزة</option>
+            <option value="revokeSessions">تسجيل خروج جميع الموظفين</option>
+          </optgroup>
+        </select>
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
     </div>
+
+    {control && <div className="mt-3 rounded-2xl border bg-background/60 overflow-hidden">
+      <div className="flex items-start gap-3 p-4 border-b">
+        <span className="rounded-xl p-2 text-primary bg-primary/10">{control.icon}</span>
+        <div><div className="font-bold">{control.title}</div><div className="text-xs text-muted-foreground mt-1">{control.description}</div></div>
+      </div>
+      <div className="p-4 bg-muted/10">
+        {selected === "password" && <div className="flex flex-col sm:flex-row gap-2"><input type="password" className="input flex-1" value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة مرور جديدة" /><button type="button" className="btn-primary whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "تطبيق على الجميع"}</button></div>}
+        {selected === "avatar" && <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center"><input type="file" accept="image/*" className="input text-xs flex-1" onChange={e => setImage(e.target.files?.[0] || null)} /><button type="button" className="btn-primary whitespace-nowrap" disabled={busy || !image} onClick={() => void run()}>{busy ? "جارٍ…" : "رفع وتطبيق"}</button></div>}
+        {(selected === "grace" || selected === "earlyCheckout") && <div className="flex flex-col sm:flex-row gap-2 sm:items-center"><select className="input mono sm:max-w-[220px]" value={selected === "grace" ? grace : earlyCheckout} onChange={e => selected === "grace" ? setGrace(e.target.value) : setEarlyCheckout(e.target.value)}>{[0,5,10,15,20,30,45,60,90,120,180].map(value => <option key={value} value={value}>{value} دقيقة</option>)}</select><button type="button" className="btn-primary whitespace-nowrap sm:mr-auto" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
+        {selected === "workHours" && <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 sm:items-end"><label className="text-sm">بداية الدوام<input type="time" className="input mono mt-1 w-full" value={workStartTime} onChange={e => setWorkStartTime(e.target.value)} /></label><label className="text-sm">نهاية الدوام<input type="time" className="input mono mt-1 w-full" value={workEndTime} onChange={e => setWorkEndTime(e.target.value)} /></label><button type="button" className="btn-primary whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
+        {selected === "rotationDays" && <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 sm:items-end"><label className="text-sm">أيام المناوبة<select className="input mono mt-1 w-full" value={rotationDaysOn} onChange={e => setRotationDaysOn(e.target.value)}>{Array.from({length:31},(_,i)=>i+1).map(value => <option key={value} value={value}>{value} يوم</option>)}</select></label><label className="text-sm">أيام الراحة<select className="input mono mt-1 w-full" value={rotationDaysOff} onChange={e => setRotationDaysOff(e.target.value)}>{Array.from({length:32},(_,i)=>i).map(value => <option key={value} value={value}>{value} يوم</option>)}</select></label><button type="button" className="btn-primary whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
+        {(selected === "unlinkDevices" || selected === "revokeSessions") && <div className="flex flex-col sm:flex-row gap-3 sm:items-center"><span className="text-sm text-muted-foreground flex-1">{selected === "unlinkDevices" ? "سيتم إلغاء ربط الهاتف ومفتاح الدخول لكل موظف مع إبقاء الحسابات والبيانات الوظيفية محفوظة." : "سيتم إبطال الجلسات الحالية فقط؛ لن تتغير كلمات المرور أو البيانات."}</span><button type="button" className="btn-danger whitespace-nowrap" disabled={busy} onClick={() => void run()}>{busy ? "جارٍ…" : "تأكيد التنفيذ"}</button></div>}
+      </div>
+    </div>}
     {message && <div role="status" className="mt-4 rounded-xl border p-3 text-sm bg-background/70">{message}</div>}
   </section>;
 }
