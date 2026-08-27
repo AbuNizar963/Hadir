@@ -96,7 +96,11 @@ function parseBool(value: unknown, fallback = false) {
   if (["0", "false", "no", "n", "off", "لا", "غيرمفعل", "موقوف"].includes(n)) return false;
   return fallback;
 }
-function parseNumber(value: unknown, fallback: number) { const n = Number(String(value ?? "").replace(/[٠-٩]/g, d => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))); return Number.isFinite(n) ? n : fallback; }
+function parseNumber(value: unknown, fallback: number) {
+  const normalized = String(value ?? "").replace(/[٠-٩]/g, d => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : fallback;
+}
 function parseSchedule(value: unknown): ScheduleType { const n = normalize(value); return n.includes("تناوب") || n === "rotation" ? "ROTATION" : "ADMIN"; }
 function parseStatus(value: unknown): "active" | "suspended" { const n = normalize(value); return ["موقوف", "suspended", "inactive", "غيرفعال"].includes(n) ? "suspended" : "active"; }
 function parseDays(value: unknown) {
