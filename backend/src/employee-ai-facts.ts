@@ -15,10 +15,10 @@ function dateLabel(s:string){if(!s)return "";const [y,m,d]=s.split("-");return `
 export function employeeFactAnswer(question:string,data:FactData):string|null{
  const q=n(question);const e=data?.employee||{};const a=Array.isArray(data?.attendance)?data.attendance:[];const leaves=(Array.isArray(data?.leaveRequests)?data.leaveRequests:[]).filter((r:any)=>approved(r.status));
  const today=zoneToday(),year=today.slice(0,4),month=today.slice(0,7);
- const ins=a.filter((x:any)=>inEvent(x.type)&&String(x.timestamp)).sort((x:any), (y:any)=>String(y.timestamp).localeCompare(String(x.timestamp)));
+ const ins=a.filter((x:any)=>inEvent(x.type)&&String(x.timestamp)).sort((x:any,y:any)=>String(y.timestamp).localeCompare(String(x.timestamp)));
  const yearIns=ins.filter((x:any)=>day(x.timestamp).startsWith(year));
  const monthIns=ins.filter((x:any)=>day(x.timestamp).startsWith(month));
- const late=yearIns.filter((x:any)=>{const ts=new Date(x.timestamp);const m=/^(\\d{1,2}):(\\d{2})/.exec(String(e.workStartTime||"08:00"));if(Number.isNaN(ts.getTime())||!m)return false;const scheduled=new Date(ts);scheduled.setHours(Number(m[1]),Number(m[2]),0,0);return ts.getTime()>scheduled.getTime()+Number(e.gracePeriodMinutes||0)*60000;});
+ const late=yearIns.filter((x:any)=>{const ts=new Date(x.timestamp);const m=/^(\d{1,2}):(\d{2})/.exec(String(e.workStartTime||"08:00"));if(Number.isNaN(ts.getTime())||!m)return false;const scheduled=new Date(ts);scheduled.setHours(Number(m[1]),Number(m[2]),0,0);return ts.getTime()>scheduled.getTime()+Number(e.gracePeriodMinutes||0)*60000;});
  const ranges=leaves.map((r:any)=>({s:day(r.startDate||r.start_date),e:day(r.endDate||r.end_date||r.startDate||r.start_date)})).filter((r:any)=>r.s);
  const isLeave=(d:string)=>ranges.some((r:any)=>d>=r.s&&d<=r.e);
  const wd=workDays(e);const workedDays=new Set(yearIns.map((x:any)=>day(x.timestamp)));const absence:string[]=[];
@@ -27,8 +27,8 @@ export function employeeFactAnswer(question:string,data:FactData):string|null{
  const last=ins[0];
  if(/(كم|عدد).*(موظف|موظفين)|كم موظف لدي|عدد الموظفين/.test(q))return "كمساعد موظف، لا أملك صلاحية الاطلاع على عدد الموظفين أو بيانات الموظفين الآخرين. يمكنني فقط مساعدتك في بيانات حضورك أنت.";
  if(/(كم مرة|عدد مرات).*(تأخر|متأخر)/.test(q)&&/(هذا العام|السنة|عام)/.test(q))return `تأخرت ${late.length} ${late.length===1?"مرة":"مرات"} هذا العام.`;
- if(/(كم مرة|عدد مرات).*(تأخر|متأخر)/.test(q)&&/(هذا الشهر|الشهر)/.test(q))return `تأخرت ${late.filter((x:any)=>day(x.timestamp).startsWith(month)).length} ${late.filter((x:any)=>day(x.timestamp).startsWith(month)).length===1?"مرة":"مرات"} هذا الشهر.`;
- if(/متى.*(غبت|غيبت|غياب)|أيام.*(غبت|غياب)|تاريخ.*(غياب)/.test(q)&&/(هذا العام|السنة|عام)/.test(q))return wd.length? (absence.length?`أيام غيابك هذا العام (${absence.length}): ${absence.map(dateLabel).join("، ")}.`:`لا توجد أيام غياب محسوبة لك هذا العام وفق جدول دوامك والإجازات المعتمدة.`):"لا أستطيع حساب أيام الغياب بدقة لأن جدول أيام العمل الخاص بك غير متوفر بشكل كافٍ.";
+ if(/(كم مرة|عدد مرات).*(تأخر|متأخر)/.test(q)&&/(هذا الشهر|الشهر)/.test(q)){const c=late.filter((x:any)=>day(x.timestamp).startsWith(month)).length;return `تأخرت ${c} ${c===1?"مرة":"مرات"} هذا الشهر.`;}
+ if(/متى.*(غبت|غيبت|غياب)|أيام.*(غبت|غياب)|تاريخ.*(غياب)/.test(q)&&/(هذا العام|السنة|عام)/.test(q))return wd.length?(absence.length?`أيام غيابك هذا العام (${absence.length}): ${absence.map(dateLabel).join("، ")}.`:`لا توجد أيام غياب محسوبة لك هذا العام وفق جدول دوامك والإجازات المعتمدة.`):"لا أستطيع حساب أيام الغياب بدقة لأن جدول أيام العمل الخاص بك غير متوفر بشكل كافٍ.";
  if(/كم يوم.*(حضرت|حضور)/.test(q)&&/(هذا الشهر|الشهر)/.test(q))return `حضرت ${new Set(monthIns.map((x:any)=>day(x.timestamp))).size} يومًا هذا الشهر.`;
  if(/(آخر|اخر).*حضور|متى.*حضور.*لي/.test(q))return last?`آخر حضور لك كان ${dateLabel(day(last.timestamp))} الساعة ${new Date(last.timestamp).toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لدي تسجيل حضور لك.`;
  if(/(مناوب|جدول|دوام).*(اليوم|اليوم؟)|اليوم.*(مناوب|جدول|دوام)/.test(q)){
