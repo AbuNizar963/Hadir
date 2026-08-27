@@ -1,4 +1,4 @@
-type Env={DB:D1Database}; type Actor={id:string;role:string;name?:string};
+type Env={DB:D1Database;PROFILE_IMAGES?:R2Bucket}; type Actor={id:string;role:string;name?:string};
 const J=(x:unknown,s=200)=>new Response(JSON.stringify(x),{status:s,headers:{"content-type":"application/json","cache-control":"no-store"}}); const id=()=>crypto.randomUUID(); const now=()=>new Date().toISOString(); const encoder=new TextEncoder(); const ITER=100000;
 const manage=(a:Actor|null)=>!!a&&["owner","manager","supervisor"].includes(a.role); const admin=(a:Actor|null)=>!!a&&["owner","manager"].includes(a.role);
 function b64(data:ArrayBuffer|Uint8Array){const bytes=data instanceof Uint8Array?data:new Uint8Array(data);let s="";for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");}
@@ -85,5 +85,42 @@ export async function handleWorkforce(req:Request,env:Env,actor:Actor|null,pathn
  if(pathname==="/api/ai/insights/generate"&&method==="POST"){if(!manage(actor))return J({error:"غير مصرح"},403);const total=Number((await env.DB.prepare("SELECT COUNT(*) c FROM employees WHERE status='active'").first<any>())?.c||0);const checked=Number((await env.DB.prepare("SELECT COUNT(DISTINCT employee_id) c FROM attendance WHERE type='check-in' AND timestamp>=datetime('now','-1 day')").first<any>())?.c||0);const rate=total?Math.round(checked/total*100):0;const r={id:id(),scope:"dashboard",scopeId:null,kind:"attendance-summary",title:"ملخص الحضور الذكي",summary:`نسبة الحضور خلال آخر 24 ساعة ${rate}% (${checked}/${total}).`,evidence:JSON.stringify({checked,total,rate}),confidence:.98,createdAt:now()};await env.DB.prepare("INSERT INTO ai_insights(id,scope,scope_id,kind,title,summary,evidence,confidence,created_at) VALUES(?,?,?,?,?,?,?,?,?)").bind(r.id,r.scope,r.scopeId,r.kind,r.title,r.summary,r.evidence,r.confidence,r.createdAt).run();return J({ok:true,insight:r},201);}
  if(pathname==="/api/anomalies/scan"&&method==="POST"){if(!manage(actor))return J({error:"غير مصرح"},403);const es=await rows(env.DB,"SELECT id FROM employees WHERE status='active'");const created:any[]=[];for(const e of es as any[]){const c=Number((await env.DB.prepare("SELECT COUNT(*) c FROM audit WHERE employee_id=? AND result='rejected' AND timestamp>=datetime('now','-7 day')").bind(e.id).first<any>())?.c||0);if(c>=3){const r={id:id(),employeeId:e.id,type:"repeated-rejected-actions",score:Math.min(100,50+c*10),evidence:`${c} محاولات مرفوضة خلال 7 أيام`,status:"new",detectedAt:now()};await env.DB.prepare("INSERT INTO anomaly_events(id,employee_id,type,score,evidence,status,detected_at) VALUES(?,?,?,?,?,?,?)").bind(r.id,r.employeeId,r.type,r.score,r.evidence,r.status,r.detectedAt).run();created.push(r);}}return J({ok:true,created});}
  if(pathname==="/api/escape-events"&&method==="POST"){if(!manage(actor))return J({error:"غير مصرح"},403);const b=await req.json().catch(()=>({})) as any;const eid=String(b.employeeId||""),s=String(b.status||"");if(!eid||!["escaped","returned"].includes(s))return J({error:"بيانات الهروب غير صحيحة"},400);const e=await env.DB.prepare("SELECT id,name,job_number AS jobNumber FROM employees WHERE id=?").bind(eid).first<any>();if(!e)return J({error:"EMPLOYEE_NOT_FOUND"},404);const last=await env.DB.prepare("SELECT status FROM escape_events WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1").bind(eid).first<any>();if((s==='escaped'&&last?.status==='escaped')||(s==='returned'&&last?.status!=='escaped'))return J({error:"تسلسل حالة الهروب غير صحيح"},409);const r={id:id(),employeeId:eid,jobNumber:e.jobNumber,employeeName:e.name,status:s,timestamp:now(),reason:b.reason?String(b.reason):null,actorId:actor.id,actorName:actor.name||null,lat:b.lat==null?null:Number(b.lat),lng:b.lng==null?null:Number(b.lng),createdAt:now()};await env.DB.prepare("INSERT INTO escape_events(id,employee_id,job_number,employee_name,status,timestamp,reason,actor_id,actor_name,lat,lng,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").bind(r.id,r.employeeId,r.jobNumber,r.employeeName,r.status,r.timestamp,r.reason,r.actorId,r.actorName,r.lat,r.lng,r.createdAt).run();await notify(env.DB,eid,s==='escaped'?"تم تسجيل الهروب":"تم تسجيل العودة",s==='escaped'?"تم تسجيل حالة هروب":"تم تسجيل عودتك للعمل",s==='escaped'?"danger":"success","escape");return J({ok:true,event:r},201);}
+ if(pathname==="/api/workforce/reset-test-data"&&method==="POST"){
+  if(actor?.role!=="owner")return J({error:"غير مصرح"},403);
+  const b=await req.json().catch(()=>({})) as any;
+  if(String(b.confirmation||"")!=="حذف البيانات التجريبية")return J({error:"تأكيد الحذف غير صحيح"},400);
+  const tables=["attendance","audit","requests","employee_requests","notifications","violations","leave_requests","tasks","performance_reviews","payroll_entries","anomaly_events","ai_insights","push_subscriptions","escape_events","device_rebind_requests"];
+  const placeholders=tables.map(()=>"?").join(",");
+  const existing=await rows(env.DB,`SELECT name FROM sqlite_master WHERE type='table' AND name IN (${placeholders})`,...tables) as any[];
+  const existingNames=new Set(existing.map(x=>String(x.name)));
+  const deletedCounts:Record<string,number>={};
+  const statements:any[]=[];
+  for(const table of tables){
+    if(!existingNames.has(table))continue;
+    const count=Number((await env.DB.prepare(`SELECT COUNT(*) AS c FROM "${table}"`).first<any>())?.c||0);
+    deletedCounts[table]=count;
+    statements.push(env.DB.prepare(`DELETE FROM "${table}"`));
+  }
+  if(existingNames.has("auth_sessions")){
+    const count=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM auth_sessions WHERE user_type='employee'").first<any>())?.c||0);
+    deletedCounts.auth_employee_sessions=count;
+    statements.push(env.DB.prepare("DELETE FROM auth_sessions WHERE user_type='employee'"));
+  }
+  const employeeCount=Number((await env.DB.prepare("SELECT COUNT(*) AS c FROM employees").first<any>())?.c||0);
+  deletedCounts.employees=employeeCount;
+  statements.push(env.DB.prepare("DELETE FROM employees"));
+  if(statements.length)await env.DB.batch(statements);
+  let deletedImages=0;
+  if(env.PROFILE_IMAGES){
+    let cursor:string|undefined;
+    do{
+      const page=await env.PROFILE_IMAGES.list({limit:1000,...(cursor?{cursor}:{})});
+      const keys=page.objects.map(object=>object.key);
+      if(keys.length){await env.PROFILE_IMAGES.delete(keys);deletedImages+=keys.length;}
+      cursor=page.truncated?page.cursor:undefined;
+    }while(cursor);
+  }
+  return J({ok:true,deleted:{...deletedCounts,profileImages:deletedImages},preserved:["admin_accounts","settings","locations"],message:"تم حذف البيانات التجريبية من D1 وصور R2 مع الحفاظ على حسابات الإدارة وإعدادات النظام ومواقع العمل."});
+}
  return J({error:"WORKFORCE_ROUTE_NOT_FOUND"},404);
 }
