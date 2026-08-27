@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { currentManager } from "@/lib/auth";
 import { bulkOwnerEmployeeSettings } from "@/lib/ownerBulkSettings";
 
-function Icon({ children }: { children: React.ReactNode }) {
+function Icon({ children }: { children: ReactNode }) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{children}</svg>;
 }
 
@@ -63,12 +63,8 @@ export default function OwnerBulkSettingsPanel() {
   };
 
   const confirmAndRun = (action: Action) => {
-    if (action === "unlinkDevices") {
-      if (!window.confirm("سيتم فك ربط جميع أجهزة الموظفين وحذف مفاتيح الدخول المرتبطة بها. هل تريد المتابعة؟")) return;
-    }
-    if (action === "revokeSessions") {
-      if (!window.confirm("سيتم تسجيل خروج جميع الموظفين من أجهزتهم الحالية. هل تريد المتابعة؟")) return;
-    }
+    if (action === "unlinkDevices" && !window.confirm("سيتم فك ربط جميع أجهزة الموظفين وحذف مفاتيح الدخول المرتبطة بها. هل تريد المتابعة؟")) return;
+    if (action === "revokeSessions" && !window.confirm("سيتم تسجيل خروج جميع الموظفين من أجهزتهم الحالية. هل تريد المتابعة؟")) return;
     void run(action);
   };
 
@@ -76,7 +72,6 @@ export default function OwnerBulkSettingsPanel() {
     <div className="text-xs mono text-primary font-bold mb-1">OWNER CONTROL · BULK EMPLOYEE SETTINGS</div>
     <h2 className="text-lg font-bold mb-1">إدارة الموظفين دفعة واحدة</h2>
     <p className="text-sm text-muted-foreground mb-5">مركز تحكم موحد لمالك النظام. كل عملية داخل قائمة مستقلة لتقليل الازدحام ومنع التغييرات غير المقصودة.</p>
-
     <div className="space-y-3">
       {controls.map((control) => {
         const isOpen = open === control.id;
@@ -84,36 +79,18 @@ export default function OwnerBulkSettingsPanel() {
         return <div key={control.id} className={`rounded-2xl border bg-background/60 overflow-hidden ${destructive ? "border-destructive/20" : ""}`}>
           <button type="button" className="w-full flex items-center gap-3 p-4 text-right hover:bg-muted/40 transition-colors" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : control.id)}>
             <span className={`rounded-xl p-2 ${destructive ? "text-destructive bg-destructive/10" : "text-primary bg-primary/10"}`}>{control.icon}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-bold">{control.title}</span>
-              <span className="block text-xs text-muted-foreground mt-1">{control.description}</span>
-            </span>
+            <span className="min-w-0 flex-1"><span className="block font-bold">{control.title}</span><span className="block text-xs text-muted-foreground mt-1">{control.description}</span></span>
             <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-5 w-5 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
           </button>
-
           {isOpen && <div className="border-t p-4 bg-muted/10">
-            {(control.id === "password") && <div className="flex flex-col sm:flex-row gap-2">
-              <input type="password" className="input flex-1" value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة مرور جديدة" />
-              <button type="button" className="btn-primary whitespace-nowrap" disabled={!!busy} onClick={() => void run("password")}>{busy === "password" ? "جارٍ…" : "تطبيق على الجميع"}</button>
-            </div>}
-            {(control.id === "avatar") && <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-              <input type="file" accept="image/*" className="input text-xs flex-1" onChange={e => setImage(e.target.files?.[0] || null)} />
-              <button type="button" className="btn-primary whitespace-nowrap" disabled={!!busy || !image} onClick={() => void run("avatar")}>{busy === "avatar" ? "جارٍ…" : "رفع وتطبيق"}</button>
-            </div>}
-            {(control.id === "grace" || control.id === "earlyCheckout") && <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              <input type="number" min="0" max="180" className="input mono sm:max-w-[180px]" value={control.id === "grace" ? grace : earlyCheckout} onChange={e => control.id === "grace" ? setGrace(e.target.value) : setEarlyCheckout(e.target.value)} />
-              <span className="text-xs text-muted-foreground">دقيقة</span>
-              <button type="button" className="btn-primary whitespace-nowrap sm:mr-auto" disabled={!!busy} onClick={() => void run(control.id)}>{busy === control.id ? "جارٍ…" : "حفظ وتطبيق"}</button>
-            </div>}
-            {(control.id === "unlinkDevices" || control.id === "revokeSessions") && <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-              <span className="text-sm text-muted-foreground flex-1">{control.id === "unlinkDevices" ? "سيتم إلغاء ربط الهاتف ومفتاح الدخول لكل موظف مع إبقاء الحسابات والبيانات الوظيفية محفوظة." : "سيتم إبطال الجلسات الحالية فقط؛ لن تتغير كلمات المرور أو البيانات."}</span>
-              <button type="button" className={destructive ? "btn-danger whitespace-nowrap" : "btn-primary whitespace-nowrap"} disabled={!!busy} onClick={() => confirmAndRun(control.id)}>{busy === control.id ? "جارٍ…" : "تأكيد التنفيذ"}</button>
-            </div>}
+            {control.id === "password" && <div className="flex flex-col sm:flex-row gap-2"><input type="password" className="input flex-1" value={password} onChange={e => setPassword(e.target.value)} placeholder="كلمة مرور جديدة" /><button type="button" className="btn-primary whitespace-nowrap" disabled={!!busy} onClick={() => void run("password")}>{busy === "password" ? "جارٍ…" : "تطبيق على الجميع"}</button></div>}
+            {control.id === "avatar" && <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center"><input type="file" accept="image/*" className="input text-xs flex-1" onChange={e => setImage(e.target.files?.[0] || null)} /><button type="button" className="btn-primary whitespace-nowrap" disabled={!!busy || !image} onClick={() => void run("avatar")}>{busy === "avatar" ? "جارٍ…" : "رفع وتطبيق"}</button></div>}
+            {(control.id === "grace" || control.id === "earlyCheckout") && <div className="flex flex-col sm:flex-row gap-2 sm:items-center"><input type="number" min="0" max="180" className="input mono sm:max-w-[180px]" value={control.id === "grace" ? grace : earlyCheckout} onChange={e => control.id === "grace" ? setGrace(e.target.value) : setEarlyCheckout(e.target.value)} /><span className="text-xs text-muted-foreground">دقيقة</span><button type="button" className="btn-primary whitespace-nowrap sm:mr-auto" disabled={!!busy} onClick={() => void run(control.id)}>{busy === control.id ? "جارٍ…" : "حفظ وتطبيق"}</button></div>}
+            {(control.id === "unlinkDevices" || control.id === "revokeSessions") && <div className="flex flex-col sm:flex-row gap-3 sm:items-center"><span className="text-sm text-muted-foreground flex-1">{control.id === "unlinkDevices" ? "سيتم إلغاء ربط الهاتف ومفتاح الدخول لكل موظف مع إبقاء الحسابات والبيانات الوظيفية محفوظة." : "سيتم إبطال الجلسات الحالية فقط؛ لن تتغير كلمات المرور أو البيانات."}</span><button type="button" className={destructive ? "btn-danger whitespace-nowrap" : "btn-primary whitespace-nowrap"} disabled={!!busy} onClick={() => confirmAndRun(control.id)}>{busy === control.id ? "جارٍ…" : "تأكيد التنفيذ"}</button></div>}
           </div>}
         </div>;
       })}
     </div>
-
     {message && <div role="status" className="mt-4 rounded-xl border p-3 text-sm bg-background/70">{message}</div>}
   </section>;
 }
