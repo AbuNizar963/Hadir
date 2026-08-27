@@ -418,7 +418,44 @@ export default function ManagerEmployees() {
         ? await getBackendEmployees()
         : getEmployees();
 
-      const next = Array.isArray(rows) ? rows : [];
+      let next = Array.isArray(rows) ? rows : [];
+
+      // Workforce controls have a dedicated canonical API. Merge those values
+      // after the normal employee refresh so the 15s polling cycle can never
+      // overwrite a persisted VIP/automatic-attendance flag with stale data.
+      if (backendEnabled) {
+        try {
+          const token = localStorage.getItem("hadir.api.token.admin") || "";
+          const api = String(
+            import.meta.env.VITE_API_URL ||
+              "https://hadir-api.abunizar963.workers.dev",
+          ).replace(/\/$/, "");
+          const response = await fetch(`${api}/api/manager/workforce-controls`, {
+            headers: {
+              authorization: `Bearer ${token}`,
+              "content-type": "application/json",
+            },
+            credentials: "include",
+            cache: "no-store",
+          });
+          const controls = await response.json().catch(() => []);
+          if (response.ok && Array.isArray(controls)) {
+            const byId = new Map(
+              controls.map((control: any) => [String(control.id), control]),
+            );
+            next = next.map((employee) => {
+              const control = byId.get(String(employee.id));
+              if (!control) return employee;
+              return {
+                ...employee,
+                isVip: Boolean(control.isVip),
+                autoCheckIn: Boolean(control.autoCheckIn),
+                autoCheckOut: Boolean(control.autoCheckOut),
+              };
+            });
+          }
+        } catch {}
+      }
 
       setEmployees((prev) =>
         JSON.stringify(prev) === JSON.stringify(next) ? prev : next,
@@ -766,7 +803,9 @@ export default function ManagerEmployees() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ إعدادات Workforce.");
-      setEmployees((prev) => prev.map((x) => x.id === e.id ? { ...x, ...patch } : x));
+      // Re-read the persisted value from the canonical workforce endpoint.
+      // This removes optimistic-only state and verifies that D1 is the source of truth.
+      await load(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "تعذر حفظ إعدادات Workforce.");
       await load(false);
