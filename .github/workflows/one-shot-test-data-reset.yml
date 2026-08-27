@@ -1,0 +1,21 @@
+name: One-shot test data reset feature
+on:
+  push:
+    branches: [fix/reset-test-data-control]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: python3 scripts/patch_reset_test_data.py
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f backend/.reset-test-data-trigger-2 backend/.reset-test-data-trigger-3 backend/.reset-test-data-trigger-4
+          git add backend/src/workforce.ts src/lib/backend.ts src/pages/ManagerSettings.tsx
+          git commit -m 'feat(settings): add owner test data reset'
+          git push
