@@ -22,7 +22,7 @@ async function saveProfile(body: Record<string, unknown>) {
     if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : `تعذر حفظ الصورة الشخصية (${response.status})`);
     return data as { ok?: boolean; key?: string; employee?: { avatar?: string | null } };
   }
-  const response = await fetch(`${API_URL}/api/workforce/live`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, "x-device-id": deviceId() }, body: JSON.stringify(body), cache: "no-store", credentials: "include" });
+  const response = await fetch(`${API_URL}/api/workforce/live`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${token}`, "x-device-id": deviceId() }, body: JSON.stringify(body), cache: "no-store", credentials: "omit" });
   const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ الملف الشخصي"); return data as { ok?: boolean; employee?: { avatar?: string | null } };
 }
 
