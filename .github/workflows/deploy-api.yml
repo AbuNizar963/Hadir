@@ -102,6 +102,19 @@ jobs:
           assert data.get('d1') is True, data
           PY
 
+      - name: Verify production Pages CORS
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(curl -sS --retry 5 --retry-delay 2 -D - -o /dev/null -X OPTIONS \
+            -H 'Origin: https://hadir-9rq.pages.dev' \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: authorization,content-type' \
+            https://hadir-api.abunizar963.workers.dev/api/auth/login)"
+          printf '%s\n' "$headers"
+          printf '%s\n' "$headers" | grep -qi '^access-control-allow-origin: https://hadir-9rq.pages.dev$'
+          printf '%s\n' "$headers" | grep -qi '^access-control-allow-credentials: true$'
+
       - name: Verify bootstrap compatibility
         shell: bash
         run: |
