@@ -18,7 +18,7 @@ function readStoredJson<T>(key: string): T | null { if (typeof window === "undef
 function hasEmployeeSession(): boolean { const session = readStoredJson<{ employeeId?: string }>(EMPLOYEE_SESSION_KEY); return Boolean(session?.employeeId); }
 function hasManagerSession(): boolean { const session = readStoredJson<{ accountId?: string; role?: string }>(MANAGER_SESSION_KEY); return Boolean(session?.accountId || session?.role); }
 function tokenForRole(role: RoleHint): string { if (typeof window === "undefined") return ""; return localStorage.getItem(role === "admin" ? ADMIN_TOKEN_KEY : EMPLOYEE_TOKEN_KEY) || ""; }
-function activeRole(): RoleHint | undefined { if (hasManagerSession()) return "admin"; if (hasEmployeeSession()) return "employee"; return undefined; }
+function activeRole(): RoleHint | undefined { if (hasManagerSession()) return "admin"; if (hasEmployeeSession()) return "employee"; if (tokenForRole("admin")) return "admin"; if (tokenForRole("employee")) return "employee"; return undefined; }
 function token(): string { const role = activeRole(); return role ? tokenForRole(role) : ""; }
 function clearRoleSession(role: RoleHint): void { if (typeof window === "undefined") return; localStorage.removeItem(role === "admin" ? ADMIN_TOKEN_KEY : EMPLOYEE_TOKEN_KEY); if (role === "admin") localStorage.removeItem(MANAGER_SESSION_KEY); else localStorage.removeItem(EMPLOYEE_SESSION_KEY); }
 function persistToken(role: RoleHint, value: string): void { if (typeof window === "undefined") return; const opposite: RoleHint = role === "admin" ? "employee" : "admin"; clearRoleSession(opposite); localStorage.setItem(role === "admin" ? ADMIN_TOKEN_KEY : EMPLOYEE_TOKEN_KEY, value); }
