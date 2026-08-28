@@ -23,7 +23,6 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
       const employeeToken = typeof window !== "undefined" ? localStorage.getItem(EMPLOYEE_TOKEN_KEY) : null;
       const adminToken = typeof window !== "undefined" ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;
 
-      // الموظف المسجل محلياً لا يجب أن يرى صفحة تسجيل دخول الإدارة عند فتح رابط إداري.
       if (employeeSession && !adminToken) {
         if (alive) setState("employee");
         return;
@@ -38,37 +37,10 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
       }
 
       const local = currentManager();
-      const token = adminToken;
 
-      // لا توجد جلسة إدارة: تحقّق أولاً من جلسة الموظف قبل إعادة التوجيه.
-      if (!local && !token) {
-        if (employeeSession || employeeToken) {
-          if (alive) setState("employee");
-          return;
-        }
-
-        try {
-          const bootstrap = await bootstrapBackend();
-          if (!alive) return;
-          if (bootstrap.bootstrap) {
-            setManagerSession({
-              loginAt: new Date().toISOString(),
-              name: "إعداد النظام",
-              role: "owner",
-              jobNumber: "",
-              accountId: "bootstrap",
-            });
-            setState("authorized");
-          } else {
-            setState("unauthorized");
-          }
-        } catch {
-          if (alive) setState("unauthorized");
-        }
-        return;
-      }
-
-      // تحقّق من هوية الحساب من الخادم. إذا كان Staff فهو موظف وليس مديراً.
+      // The server session cookie is the source of truth. Do not require
+      // localStorage to exist before asking /api/me; installed PWAs can lose
+      // client-side state while retaining the browser's persistent cookie.
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
           const me = await backendMe();
@@ -102,14 +74,36 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
         }
       }
 
-      if (alive) {
-        // فشل الشبكة لا يعني تسجيل الخروج. نحافظ على الجلسة المحلية الحالية.
-        if (local?.role && ADMIN_ROLES.includes(local.role as AdminRole)) {
-          setState("authorized");
-        } else if (employeeSession || employeeToken) {
-          setState("employee");
-        } else {
-          setState(token ? "authorized" : "unauthorized");
+      if (!alive) return;
+
+      // If the server could not be reached, never destroy a valid local admin
+      // session. If neither local state nor a token exists, require login.
+      if (local?.role && ADMIN_ROLES.includes(local.role as AdminRole)) {
+        setState("authorized");
+      } else if (employeeSession || employeeToken) {
+        setState("employee");
+      } else if (adminToken) {
+        setState("authorized");
+      } else {
+        // Bootstrap is only for the first-time owner setup. It must not be
+        // used as the normal session-restoration mechanism.
+        try {
+          const bootstrap = await bootstrapBackend();
+          if (!alive) return;
+          if (bootstrap.bootstrap) {
+            setManagerSession({
+              loginAt: new Date().toISOString(),
+              name: "إعداد النظام",
+              role: "owner",
+              jobNumber: "",
+              accountId: "bootstrap",
+            });
+            setState("authorized");
+          } else {
+            setState("unauthorized");
+          }
+        } catch {
+          if (alive) setState("unauthorized");
         }
       }
     };
@@ -139,39 +133,22 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
           <section className="w-full max-w-lg">
             <div className="rounded-3xl border border-primary/20 bg-card p-6 shadow-xl sm:p-8">
               <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl border border-primary/20 bg-primary/10 text-4xl">🔒</div>
-
               <div className="mt-6 text-center">
                 <div className="mono text-xs font-bold tracking-widest text-primary">HADIR · ACCESS CONTROL</div>
                 <h1 className="mt-2 text-2xl font-black">هذه الواجهة مخصصة للإدارة</h1>
-                <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-muted-foreground">
-                  أنت مسجل الدخول حالياً كموظف، ولا تملك صلاحية الوصول إلى واجهة الإدارة.
-                </p>
+                <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-muted-foreground">أنت مسجل الدخول حالياً كموظف، ولا تملك صلاحية الوصول إلى واجهة الإدارة.</p>
               </div>
-
               <div className="mt-6 rounded-2xl border border-border/60 bg-background/40 p-4">
                 <div className="flex items-start gap-3">
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-lg">👤</div>
-                  <div className="min-w-0">
-                    <div className="font-bold">انتقل إلى واجهة دخول الموظفين</div>
-                    <p className="mt-1 text-xs leading-6 text-muted-foreground">
-                      استخدم واجهة الموظفين للوصول إلى الحضور والطلبات والملف الشخصي وباقي خدمات الموظف.
-                    </p>
-                  </div>
+                  <div className="min-w-0"><div className="font-bold">انتقل إلى واجهة دخول الموظفين</div><p className="mt-1 text-xs leading-6 text-muted-foreground">استخدم واجهة الموظفين للوصول إلى الحضور والطلبات والملف الشخصي وباقي خدمات الموظف.</p></div>
                 </div>
               </div>
-
               <div className="mt-6 grid gap-2 sm:grid-cols-2">
-                <button type="button" className="btn-primary min-h-11" onClick={() => navigate("/employee", { replace: true })}>
-                  الانتقال إلى واجهة الموظفين
-                </button>
-                <button type="button" className="btn-secondary min-h-11" onClick={() => navigate("/login", { replace: true })}>
-                  تسجيل دخول الموظفين
-                </button>
+                <button type="button" className="btn-primary min-h-11" onClick={() => navigate("/employee", { replace: true })}>الانتقال إلى واجهة الموظفين</button>
+                <button type="button" className="btn-secondary min-h-11" onClick={() => navigate("/login", { replace: true })}>تسجيل دخول الموظفين</button>
               </div>
-
-              <p className="mt-5 text-center text-[11px] text-muted-foreground">
-                إذا كنت من الإدارة، قم بتسجيل الخروج من حساب الموظف ثم استخدم حساب الإدارة.
-              </p>
+              <p className="mt-5 text-center text-[11px] text-muted-foreground">إذا كنت من الإدارة، قم بتسجيل الخروج من حساب الموظف ثم استخدم حساب الإدارة.</p>
             </div>
           </section>
         </div>
@@ -179,9 +156,6 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
     );
   }
 
-  if (state === "unauthorized") {
-    return <Navigate to="/manager/login" replace />;
-  }
-
+  if (state === "unauthorized") return <Navigate to="/manager/login" replace />;
   return <>{children}</>;
 }
