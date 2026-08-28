@@ -10,71 +10,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Patch source
+      - name: Wire existing workforce reset route
+        shell: bash
         run: |
           set -euo pipefail
-          cat > backend/src/system-reset.ts <<'EOF'
-          type ResetEnv = { DB: D1Database; PROFILE_IMAGES?: R2Bucket };
-          type ResetActor = { id: string; role?: string; name?: string } | null;
-          const deleteR2Prefix = async (bucket: R2Bucket, prefix: string) => {
-            let cursor: string | undefined;
-            let deleted = 0;
-            do {
-              const page = await bucket.list({ prefix, cursor, limit: 1000 });
-              const keys = page.objects.map((object) => object.key);
-              if (keys.length) { await bucket.delete(keys); deleted += keys.length; }
-              cursor = page.truncated ? page.cursor : undefined;
-            } while (cursor);
-            return deleted;
-          };
-          export async function handleSystemReset(env: ResetEnv, actor: ResetActor, origin: string): Promise<Response> {
-            if (!actor || String(actor.role).toLowerCase() !== "owner") return new Response(JSON.stringify({ ok: false, error: "المالك فقط يستطيع تنفيذ Reset النظام" }), { status: 403, headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": origin } });
-            try {
-              const sql = [
-                "DELETE FROM notifications", "DELETE FROM requests", "DELETE FROM attendance", "DELETE FROM audit",
-                "DELETE FROM violations", "DELETE FROM leave_requests", "DELETE FROM tasks", "DELETE FROM performance_reviews",
-                "DELETE FROM payroll_entries", "DELETE FROM anomaly_events", "DELETE FROM ai_insights", "DELETE FROM push_subscriptions",
-                "DELETE FROM employee_checkout_policies", "DELETE FROM employee_passkeys", "DELETE FROM employee_webauthn_credentials",
-                "DELETE FROM employee_webauthn_challenges", "DELETE FROM webauthn_challenges", "DELETE FROM employee_device_events",
-                "DELETE FROM auth_sessions WHERE user_type='employee'", "DELETE FROM escape_events", "DELETE FROM employees"
-              ];
-              await env.DB.batch(sql.map((statement) => env.DB.prepare(statement)));
-              const deletedR2Objects = env.PROFILE_IMAGES ? await deleteR2Prefix(env.PROFILE_IMAGES, "employees/") : 0;
-              return new Response(JSON.stringify({ ok: true, message: "تمت إعادة تهيئة بيانات التشغيل والاختبار بنجاح. بقيت حسابات الإدارة والإعدادات الأساسية ومواقع العمل محفوظة.", deletedR2Objects, timestamp: new Date().toISOString() }), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": origin } });
-            } catch (error) {
-              return new Response(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : "تعذر تنفيذ Reset النظام" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": origin } });
-            }
-          }
-          EOF
-
           python3 - <<'PY'
           from pathlib import Path
           p = Path('backend/src/entry.ts')
           s = p.read_text()
-          if 'from "./system-reset"' not in s:
-              s = s.replace('import { handleWorkforce } from "./workforce";\n', 'import { handleWorkforce } from "./workforce";\nimport { handleSystemReset } from "./system-reset";\n', 1)
-          if '/api/system/reset' not in s:
-              marker = '    const actor=await actorFromSession(request,env);\n'
-              insert = marker + '    if(url.pathname==="/api/system/reset"&&request.method==="POST"){ const admin=await actorForAdministrativeAction(request,env); const response=await handleSystemReset(env,admin,origin); return addDeviceCookie(response,prepared.deviceId,prepared.setCookie,origin); }\n'
-              if marker not in s: raise SystemExit('entry marker missing')
-              s = s.replace(marker, insert, 1)
-          p.write_text(s)
-
-          p = Path('src/lib/backend.ts')
-          s = p.read_text()
-          if 'export async function resetBackendTestData' not in s:
-              marker = 'export async function backendHealth()'
-              fn = 'export async function resetBackendTestData() { return requestWithRetry<{ ok: boolean; message: string; deletedR2Objects?: number }>("/api/system/reset", { method: "POST", body: JSON.stringify({}) }, 3, "admin"); }\n'
-              if marker not in s: raise SystemExit('backend marker missing')
-              s = s.replace(marker, fn + marker, 1)
+          s = s.replace('import { handleSystemReset } from "./system-reset";\n', '', 1)
+          s = s.replace('    if(url.pathname==="/api/system/reset"&&request.method==="POST"){ const admin=await actorForAdministrativeAction(request,env); const response=await handleSystemReset(env,admin,origin); return addDeviceCookie(response,prepared.deviceId,prepared.setCookie,origin); }\n', '', 1)
+          s = s.replace('url.pathname === "/api/device-rebind-requests"', 'url.pathname === "/api/device-rebind-requests" || url.pathname === "/api/workforce/reset" || url.pathname === "/api/workforce/reset-test-data"')
+          if '/api/workforce/reset' not in s:
+              raise SystemExit('reset route wiring failed')
+          if 'handleSystemReset' in s or './system-reset' in s:
+              raise SystemExit('obsolete system reset wiring remains')
           p.write_text(s)
           PY
-
-          grep -q 'handleSystemReset' backend/src/entry.ts
-          grep -q '/api/system/reset' backend/src/entry.ts
-          grep -q 'resetBackendTestData' src/lib/backend.ts
+          rm -f backend/src/system-reset.ts .repair-system-reset-trigger
+          grep -q '/api/workforce/reset' backend/src/entry.ts
+          ! grep -q 'handleSystemReset' backend/src/entry.ts
+          ! test -e backend/src/system-reset.ts
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add backend/src/system-reset.ts backend/src/entry.ts src/lib/backend.ts
-          git commit -m 'fix: add production system reset endpoint [skip ci]'
+          git add backend/src/entry.ts backend/src/system-reset.ts .repair-system-reset-trigger
+          git commit -m 'fix: wire existing workforce system reset route [skip ci]'
           git push origin HEAD:main
