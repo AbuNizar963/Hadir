@@ -8,3 +8,60 @@ main.max-w-xl.mx-auto.px-4.sm\:px-5.pb-16.space-y-4 > section:first-child [class
   overflow-wrap: anywhere;
   word-break: normal;
 }
+
+/* Professional PWA install card. */
+.hadir-install-card {
+  position: fixed;
+  z-index: 80;
+  inset-inline: 1rem;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: .8rem;
+  max-width: 34rem;
+  margin-inline: auto;
+  padding: .75rem .85rem;
+  border: 1px solid hsl(var(--primary) / .30);
+  border-radius: 1.15rem;
+  background: hsl(var(--card) / .96);
+  color: hsl(var(--foreground));
+  box-shadow: 0 18px 50px hsl(222 40% 3% / .42), inset 0 1px 0 hsl(var(--foreground) / .06);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  animation: hadir-install-in .28s ease both;
+}
+.hadir-install-icon {
+  width: 3rem;
+  height: 3rem;
+  padding: .35rem;
+  border-radius: .9rem;
+  background: hsl(var(--secondary));
+  border: 1px solid hsl(var(--primary) / .25);
+  box-shadow: 0 0 22px hsl(var(--primary) / .12);
+}
+.hadir-install-copy { min-width: 0; display: grid; gap: .12rem; }
+.hadir-install-copy strong { font-size: .92rem; font-weight: 800; }
+.hadir-install-copy span { font-size: .7rem; line-height: 1.5; color: hsl(var(--muted-foreground)); }
+.hadir-install-button {
+  min-width: 4.7rem;
+  border: 0;
+  border-radius: .8rem;
+  padding: .65rem .85rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 20px hsl(var(--primary) / .18);
+  transition: transform .18s ease, filter .18s ease, opacity .18s ease;
+}
+.hadir-install-button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.hadir-install-button:active { transform: translateY(0); }
+.hadir-install-button:disabled { opacity: .65; cursor: wait; }
+@keyframes hadir-install-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width: 420px) {
+  .hadir-install-card { grid-template-columns: auto 1fr; }
+  .hadir-install-button { grid-column: 1 / -1; width: 100%; }
+}
