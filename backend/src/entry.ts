@@ -58,7 +58,7 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
 
     const actor=await actorFromSession(request,env);
     const workforceActor = (url.pathname === "/api/notifications" || url.pathname === "/api/notifications/read" || url.pathname === "/api/violations" || url.pathname.startsWith("/api/violations/") || url.pathname === "/api/workforce/live" || url.pathname === "/api/device-rebind-requests" || url.pathname === "/api/workforce/reset" || url.pathname === "/api/workforce/reset-test-data") ? await actorForAdministrativeAction(request,env) : actor;
-    if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"||url.pathname==="/api/device-rebind-requests"){
+    if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"||url.pathname==="/api/device-rebind-requests"||url.pathname==="/api/workforce/reset"||url.pathname==="/api/workforce/reset-test-data"){
       const workforceResponse=await handleWorkforce(prepared.request,env,workforceActor,url.pathname);
       if(workforceResponse.status!==404)return addDeviceCookie(workforceResponse,prepared.deviceId,prepared.setCookie,origin);
     }
