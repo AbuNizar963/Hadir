@@ -30,6 +30,7 @@ type Mapping = {
 };
 type PreviewRow = { name: string; jobNumber: string; valid: boolean; duplicate: boolean };
 
+const DEFAULT_EMPLOYEE_PIN = "1234";
 const text = (v: unknown) => String(v ?? "").trim();
 const normalize = (v: unknown) => text(v).toLowerCase().replace(/[\s_\-./\\()\[\]{}:]+/g, "");
 const isLikelyName = (v: unknown) => { const s = text(v); return s.length >= 3 && s.length <= 90 && !/^\d+$/.test(s) && /[A-Za-z\u0600-\u06FF]/.test(s); };
@@ -182,12 +183,12 @@ export default function SmartEmployeeImport({ onImported }: { onImported?: () =>
         const isVip = mapping.isVip ? parseBool(row[mapping.isVip]) : false;
         const autoCheckIn = mapping.autoCheckIn ? parseBool(row[mapping.autoCheckIn]) : false;
         const autoCheckOut = mapping.autoCheckOut ? parseBool(row[mapping.autoCheckOut]) : false;
-        const common = { name, jobNumber, pin: jobNumber, status, deviceId: null, deviceLabel: null, scheduleType, workStartTime, workEndTime, gracePeriodMinutes, rotationStartDate, workDays, rotationDaysOn, rotationDaysOff, avatar: null, role: "staff" as const, locationId, specialties, isVip, autoCheckIn, autoCheckOut };
+        const common = { name, jobNumber, pin: DEFAULT_EMPLOYEE_PIN, status, deviceId: null, deviceLabel: null, scheduleType, workStartTime, workEndTime, gracePeriodMinutes, rotationStartDate, workDays, rotationDaysOn, rotationDaysOff, avatar: null, role: "staff" as const, locationId, specialties, isVip, autoCheckIn, autoCheckOut };
         if (backendEnabled) await createBackendEmployee(common as Parameters<typeof createBackendEmployee>[0]);
-        else { const emp: Employee = { id: generateId(), pinHash: hash(jobNumber), createdAt: new Date().toISOString(), ...common }; saveEmployees([emp, ...getEmployees()], { [emp.id]: jobNumber }); }
+        else { const emp: Employee = { id: generateId(), pinHash: hash(DEFAULT_EMPLOYEE_PIN), createdAt: new Date().toISOString(), ...common }; saveEmployees([emp, ...getEmployees()], { [emp.id]: DEFAULT_EMPLOYEE_PIN }); }
         jobs.add(key); added++;
       }
-      setMessage(`تم الاستيراد: ${added} موظف، ${skipped} مكرر، ${invalid} صف غير صالح.`); setMapping(null); setRows([]); setPreview([]); onImported?.();
+      setMessage(`تم الاستيراد: ${added} موظف، ${skipped} مكرر، ${invalid} صف غير صالح. رمز PIN الافتراضي للموظفين المستوردين: ${DEFAULT_EMPLOYEE_PIN}`); setMapping(null); setRows([]); setPreview([]); onImported?.();
     } catch (e) { setError(e instanceof Error ? e.message : "تعذر استيراد الموظفين."); }
     finally { setBusy(false); }
   };
@@ -202,7 +203,7 @@ export default function SmartEmployeeImport({ onImported }: { onImported?: () =>
       <Button type="button" variant="outline" disabled={busy || exporting} onClick={() => void handleExport()}><Download className="ml-2 h-4 w-4"/>{exporting ? "جاري تجهيز Excel…" : "تصدير الموظفين الذكي"}</Button>
       {mapping && <Button type="button" disabled={busy || valid === 0} onClick={() => void confirmImport()}>{busy ? "جاري الاستيراد…" : "تأكيد الاستيراد"}</Button>}
     </div>
-    {mapping && <><div className="text-sm">تم التعرف تلقائيًا: <b>الاسم</b> = {mapping.name}، <b>الرقم الوظيفي</b> = {mapping.jobNumber}</div><div className="text-xs text-muted-foreground">لا يتم تصدير الرقم الذاتي أو كلمة المرور أو معرف الجهاز. عند الاستيراد يُنشأ رمز PIN افتراضي يساوي الرقم الوظيفي.</div><div className="grid grid-cols-3 gap-2 text-xs"><div className="rounded border p-2"><CheckCircle2 className="inline h-4 w-4"/> صالح: {valid}</div><div className="rounded border p-2"><AlertTriangle className="inline h-4 w-4"/> مكرر: {duplicate}</div><div className="rounded border p-2">غير صالح: {invalid}</div></div><div className="max-h-56 overflow-auto rounded border"><table className="w-full text-xs"><thead><tr><th className="p-2 text-right">الاسم</th><th className="p-2 text-right">الرقم الوظيفي</th><th className="p-2 text-right">الحالة</th></tr></thead><tbody>{preview.slice(0, 100).map((r, i) => <tr key={i} className="border-t"><td className="p-2">{r.name || "—"}</td><td className="p-2">{r.jobNumber || "—"}</td><td className="p-2">{!r.valid ? "❌ ناقص/غير صالح" : r.duplicate ? "⚠️ مكرر" : "✅ جاهز"}</td></tr>)}</tbody></table></div></>}
+    {mapping && <><div className="text-sm">تم التعرف تلقائيًا: <b>الاسم</b> = {mapping.name}، <b>الرقم الوظيفي</b> = {mapping.jobNumber}</div><div className="text-xs text-muted-foreground">لا يتم تصدير الرقم الذاتي أو كلمة المرور أو معرف الجهاز. عند الاستيراد يُنشأ رمز PIN افتراضي من 4 أرقام: <b>{DEFAULT_EMPLOYEE_PIN}</b>.</div><div className="grid grid-cols-3 gap-2 text-xs"><div className="rounded border p-2"><CheckCircle2 className="inline h-4 w-4"/> صالح: {valid}</div><div className="rounded border p-2"><AlertTriangle className="inline h-4 w-4"/> مكرر: {duplicate}</div><div className="rounded border p-2">غير صالح: {invalid}</div></div><div className="max-h-56 overflow-auto rounded border"><table className="w-full text-xs"><thead><tr><th className="p-2 text-right">الاسم</th><th className="p-2 text-right">الرقم الوظيفي</th><th className="p-2 text-right">الحالة</th></tr></thead><tbody>{preview.slice(0, 100).map((r, i) => <tr key={i} className="border-t"><td className="p-2">{r.name || "—"}</td><td className="p-2">{r.jobNumber || "—"}</td><td className="p-2">{!r.valid ? "❌ ناقص/غير صالح" : r.duplicate ? "⚠️ مكرر" : "✅ جاهز"}</td></tr>)}</tbody></table></div></>}
     {message && <div className="text-sm text-emerald-600">{message}</div>}{error && <div className="text-sm text-destructive">{error}</div>}
   </div>;
 }
