@@ -1,0 +1,147 @@
+name: One-shot repair system reset
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Apply repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          reset_module = r'''type ResetEnv = { DB: D1Database; PROFILE_IMAGES?: R2Bucket };
+
+type ResetActor = { id: string; role?: string; name?: string } | null;
+
+const uid = () => crypto.randomUUID();
+
+async function deleteR2Prefix(bucket: R2Bucket, prefix: string): Promise<number> {
+  let cursor: string | undefined;
+  let deleted = 0;
+  do {
+    const page = await bucket.list({ prefix, cursor, limit: 1000 });
+    const keys = page.objects.map((object) => object.key).filter(Boolean);
+    if (keys.length) {
+      await bucket.delete(keys);
+      deleted += keys.length;
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return deleted;
+}
+
+export async function handleSystemReset(env: ResetEnv, actor: ResetActor, origin: string): Promise<Response> {
+  if (!actor || String(actor.role).toLowerCase() !== "owner") {
+    return new Response(JSON.stringify({ ok: false, error: "المالك فقط يستطيع تنفيذ Reset النظام" }), {
+      status: 403,
+      headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": origin },
+    });
+  }
+
+  const statements = [
+    "DELETE FROM notifications",
+    "DELETE FROM requests",
+    "DELETE FROM attendance",
+    "DELETE FROM audit",
+    "DELETE FROM violations",
+    "DELETE FROM leave_requests",
+    "DELETE FROM tasks",
+    "DELETE FROM performance_reviews",
+    "DELETE FROM payroll_entries",
+    "DELETE FROM anomaly_events",
+    "DELETE FROM ai_insights",
+    "DELETE FROM push_subscriptions",
+    "DELETE FROM employee_checkout_policies",
+    "DELETE FROM employee_passkeys",
+    "DELETE FROM employee_webauthn_credentials",
+    "DELETE FROM employee_webauthn_challenges",
+    "DELETE FROM webauthn_challenges",
+    "DELETE FROM employee_device_events",
+    "DELETE FROM auth_sessions WHERE user_type='employee'",
+    "DELETE FROM escape_events",
+    "DELETE FROM employees",
+  ];
+
+  try {
+    await env.DB.batch(statements.map((sql) => env.DB.prepare(sql)));
+    let deletedR2Objects = 0;
+    if (env.PROFILE_IMAGES) deletedR2Objects = await deleteR2Prefix(env.PROFILE_IMAGES, "employees/");
+    return new Response(JSON.stringify({
+      ok: true,
+      message: "تمت إعادة تهيئة بيانات التشغيل والاختبار بنجاح. بقيت حسابات الإدارة والإعدادات الأساسية ومواقع العمل محفوظة.",
+      deletedR2Objects,
+      timestamp: new Date().toISOString(),
+    }), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": origin } });
+  } catch (error) {
+    return new Response(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : "تعذر تنفيذ Reset النظام" }), {
+      status: 500,
+      headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": origin },
+    });
+  }
+}
+'''
+
+          p = Path("backend/src/system-reset.ts")
+          p.write_text(reset_module, encoding="utf-8")
+
+          p = Path("backend/src/entry.ts")
+          s = p.read_text(encoding="utf-8")
+          if 'from "./system-reset"' not in s:
+              s = s.replace('import { handleWorkforce } from "./workforce";\n', 'import { handleWorkforce } from "./workforce";\nimport { handleSystemReset } from "./system-reset";\n', 1)
+          marker = '    const actor=await actorFromSession(request,env);\n'
+          insertion = marker + '    if(url.pathname==="/api/system/reset"&&request.method==="POST"){ const admin=await actorForAdministrativeAction(request,env); const response=await handleSystemReset(env,admin,origin); return addDeviceCookie(response,prepared.deviceId,prepared.setCookie,origin); }\n'
+          if 'url.pathname==="/api/system/reset"' not in s:
+              if marker not in s:
+                  raise SystemExit("entry.ts patch marker not found")
+              s = s.replace(marker, insertion, 1)
+          p.write_text(s, encoding="utf-8")
+
+          p = Path("src/lib/backend.ts")
+          s = p.read_text(encoding="utf-8")
+          if "export async function resetBackendTestData" not in s:
+              marker = 'export async function backendHealth()'
+              fn = 'export async function resetBackendTestData() { return requestWithRetry<{ ok: boolean; message: string; deletedR2Objects?: number }>("/api/system/reset", { method: "POST", body: JSON.stringify({}) }, 3, "admin"); }\n'
+              if marker not in s:
+                  raise SystemExit("backend.ts patch marker not found")
+              s = s.replace(marker, fn + marker, 1)
+          p.write_text(s, encoding="utf-8")
+          PY
+
+      - name: Verify repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'handleSystemReset' backend/src/entry.ts
+          grep -q '/api/system/reset' backend/src/entry.ts
+          grep -q 'resetBackendTestData' src/lib/backend.ts
+          test -s backend/src/system-reset.ts
+
+      - name: Commit repaired source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/repair-system-reset.yml
+          git add backend/src/system-reset.ts backend/src/entry.ts src/lib/backend.ts .github/workflows/repair-system-reset.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: add production system reset endpoint [skip ci]"
+          git push origin HEAD:main
