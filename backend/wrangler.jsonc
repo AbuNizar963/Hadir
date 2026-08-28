@@ -7,7 +7,7 @@
   "workers_dev": true,
   "preview_urls": false,
   "vars": {
-    "APP_ORIGIN": "https://hadir.pages.dev,https://abunizar963.github.io",
+    "APP_ORIGIN": "https://hadir-9rq.pages.dev",
     "APP_TIMEZONE": "Asia/Damascus"
   },
   "account_id": "7c2f371786ada855f514d223e48daa72",
