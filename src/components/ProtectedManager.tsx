@@ -4,10 +4,7 @@ import { currentManager, currentSession } from "@/lib/auth";
 import { backendMe, bootstrapBackend, backendEnabled } from "@/lib/backend";
 import { setManagerSession } from "@/lib/storage";
 
-const ADMIN_TOKEN_KEY = "hadir.api.token.admin";
-const EMPLOYEE_TOKEN_KEY = "hadir.api.token.employee";
 const ADMIN_ROLES = ["owner", "manager", "supervisor"] as const;
-
 type AdminRole = typeof ADMIN_ROLES[number];
 type AccessState = "checking" | "authorized" | "employee" | "unauthorized";
 
@@ -19,28 +16,14 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
     let alive = true;
 
     const restore = async () => {
+      const local = currentManager();
       const employeeSession = currentSession();
-      const employeeToken = typeof window !== "undefined" ? localStorage.getItem(EMPLOYEE_TOKEN_KEY) : null;
-      const adminToken = typeof window !== "undefined" ? localStorage.getItem(ADMIN_TOKEN_KEY) : null;
-
-      if (employeeSession && !adminToken) {
-        if (alive) setState("employee");
-        return;
-      }
 
       if (!backendEnabled) {
-        const local = currentManager();
-        if (alive) {
-          setState(local?.role && ADMIN_ROLES.includes(local.role as AdminRole) ? "authorized" : employeeSession ? "employee" : "unauthorized");
-        }
+        if (alive) setState(local?.role && ADMIN_ROLES.includes(local.role as AdminRole) ? "authorized" : employeeSession ? "employee" : "unauthorized");
         return;
       }
 
-      const local = currentManager();
-
-      // The server session cookie is the source of truth. Do not require
-      // localStorage to exist before asking /api/me; installed PWAs can lose
-      // client-side state while retaining the browser's persistent cookie.
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
           const me = await backendMe();
@@ -48,13 +31,7 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
 
           const role = me.user?.role;
           if (typeof role === "string" && ADMIN_ROLES.includes(role as AdminRole)) {
-            const user = me.user as {
-              id?: string;
-              username?: string;
-              name?: string;
-              role?: string;
-            };
-
+            const user = me.user as { id?: string; username?: string; name?: string; role?: string };
             setManagerSession({
               loginAt: local?.loginAt || new Date().toISOString(),
               name: user.name,
@@ -68,25 +45,20 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
           }
           return;
         } catch {
-          if (attempt < 3) {
-            await new Promise((resolve) => window.setTimeout(resolve, 500 * attempt));
-          }
+          if (attempt < 3) await new Promise((resolve) => window.setTimeout(resolve, 500 * attempt));
         }
       }
 
       if (!alive) return;
 
-      // If the server could not be reached, never destroy a valid local admin
-      // session. If neither local state nor a token exists, require login.
+      // Network failures must not log the user out. If a local session exists,
+      // keep the UI available until the server can be reached again.
       if (local?.role && ADMIN_ROLES.includes(local.role as AdminRole)) {
         setState("authorized");
-      } else if (employeeSession || employeeToken) {
+      } else if (employeeSession) {
         setState("employee");
-      } else if (adminToken) {
-        setState("authorized");
       } else {
-        // Bootstrap is only for the first-time owner setup. It must not be
-        // used as the normal session-restoration mechanism.
+        // Bootstrap is only for first-time owner setup, never normal session restoration.
         try {
           const bootstrap = await bootstrapBackend();
           if (!alive) return;
@@ -109,9 +81,7 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
     };
 
     void restore();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
   if (state === "checking") {
