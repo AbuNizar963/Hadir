@@ -15,8 +15,8 @@ async function restoreEmployeeSession(): Promise<RestoreResult> {
 
   // Prefer the local bearer token when available, but always fall back to the
   // persistent HttpOnly session cookie. This is important for an installed
-  // Chrome PWA, where localStorage and the browser tab can occasionally differ.
-  const token = localStorage.getItem(EMPLOYEE_TOKEN_KEY)?.trim() || "";
+  // Chrome PWA, where localStorage and browser-tab storage can occasionally differ.
+  let token = localStorage.getItem(EMPLOYEE_TOKEN_KEY)?.trim() || "";
   let networkFailure = false;
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -36,9 +36,9 @@ async function restoreEmployeeSession(): Promise<RestoreResult> {
         const data = (await response.json().catch(() => ({}))) as { user?: Employee; error?: string };
 
         if (response.status === 401 || response.status === 403) {
-          // A stale local token must not prevent a valid persistent cookie from
-          // restoring the session. Retry once without Authorization.
-          if (token && attempt < 3) {
+          if (token) {
+            // Do not let an expired/stale local token block the persistent cookie.
+            token = "";
             localStorage.removeItem(EMPLOYEE_TOKEN_KEY);
             continue;
           }
@@ -88,8 +88,6 @@ export default function ProtectedEmployee({ children }: Props) {
         setCurrentSession(currentSession());
         setOffline(false);
       } else if (result === "offline") {
-        // Never convert a temporary Cloudflare/network outage into a logout.
-        // The token remains stored and the next navigation retries restoration.
         setOffline(true);
       }
       setChecking(false);
@@ -103,7 +101,7 @@ export default function ProtectedEmployee({ children }: Props) {
   }
 
   if (!session) {
-    if (offline && (localStorage.getItem(EMPLOYEE_TOKEN_KEY) || document.cookie)) {
+    if (offline && localStorage.getItem(EMPLOYEE_TOKEN_KEY)) {
       return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">تعذر الاتصال بالخادم مؤقتًا. جلسة الموظف محفوظة، حاول فتح الصفحة مرة أخرى.</div>;
     }
     return <Navigate to="/login" replace />;
