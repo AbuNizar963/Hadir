@@ -20,8 +20,9 @@ export default function EmployeeLogin() {
 
   useEffect(() => {
     let cancelled = false;
-    const token = localStorage.getItem(EMPLOYEE_TOKEN_KEY)?.trim() || "";
-    if (!token) { setRestoring(false); return; }
+    // The Worker also issues a persistent HttpOnly session cookie (5 years).
+    // Always probe /api/me so an installed Chrome PWA can restore the session
+    // even if its localStorage token was cleared or separated from the browser.
     void backendMe().then((result) => {
       if (cancelled) return;
       const user = result.user as EmployeeLoginUser;
@@ -31,11 +32,15 @@ export default function EmployeeLogin() {
       const existing = getSession();
       setManagerSession(null);
       setSession({ employeeId:id, jobNumber:number, name:String(user.name || "").trim(), loginAt:existing?.loginAt || new Date().toISOString(), role:user.role || "staff" });
+      // Keep the legacy/local token in sync when it exists, while the HttpOnly
+      // cookie remains the authoritative persistent session for the PWA.
+      if (localStorage.getItem(EMPLOYEE_TOKEN_KEY)) {
+        localStorage.setItem(EMPLOYEE_TOKEN_KEY, localStorage.getItem(EMPLOYEE_TOKEN_KEY) || "");
+      }
       window.dispatchEvent(new Event("hadir:session-changed"));
       nav("/employee", { replace:true });
     }).catch(() => {
-      localStorage.removeItem(EMPLOYEE_TOKEN_KEY);
-      setRestoring(false);
+      if (!cancelled) setRestoring(false);
     });
     return () => { cancelled = true; };
   }, [nav]);
