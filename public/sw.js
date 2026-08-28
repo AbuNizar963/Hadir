@@ -1,4 +1,4 @@
-const CACHE="hadir-shell-v3";
+const CACHE="hadir-shell-v4";
 const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[new URL("./",self.registration.scope).href,new URL("./employee",self.registration.scope).href,new URL("./manifest.webmanifest",self.registration.scope).href];
 
@@ -29,16 +29,7 @@ self.addEventListener("push",e=>e.waitUntil((async()=>{
   const body=String(d.body||d.message||"لديك إشعار جديد في Hadir");
   const url=resolveNotificationUrl(d.url||d.path||"/");
   const icon=new URL("./favicon.svg",self.registration.scope).href;
-  await self.registration.showNotification(title,{
-    body,
-    icon,
-    badge:icon,
-    dir:"rtl",
-    lang:"ar",
-    tag:String(d.tag||`hadir-${d.type||"notification"}`),
-    renotify:true,
-    data:{url,type:String(d.type||"info"),notificationId:String(d.notificationId||d.id||"")}
-  });
+  await self.registration.showNotification(title,{body,icon,badge:icon,dir:"rtl",lang:"ar",tag:String(d.tag||`hadir-${d.type||"notification"}`),renotify:true,data:{url,type:String(d.type||"info"),notificationId:String(d.notificationId||d.id||"")}});
 })());
 
 self.addEventListener("notificationclick",e=>{
@@ -47,12 +38,8 @@ self.addEventListener("notificationclick",e=>{
     const target=resolveNotificationUrl(e.notification.data?.url||e.notification.data?.path||"");
     const windows=await self.clients.matchAll({type:"window",includeUncontrolled:true});
     for(const client of windows){
-      if("navigate" in client){
-        try{await client.navigate(target);await client.focus();return;}catch{}
-      }
-      if("focus" in client){
-        try{await client.focus();return;}catch{}
-      }
+      if("navigate" in client){try{await client.navigate(target);await client.focus();return;}catch{}}
+      if("focus" in client){try{await client.focus();return;}catch{}}
     }
     if(self.clients.openWindow)await self.clients.openWindow(target);
   })());
