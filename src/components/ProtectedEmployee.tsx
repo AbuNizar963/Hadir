@@ -5,7 +5,9 @@ import { setSession } from "@/lib/storage";
 import type { Employee } from "@/types";
 
 const EMPLOYEE_TOKEN_KEY = "hadir.api.token.employee";
-const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+const CANONICAL_API_URL = "https://hadir-api.abunizar963.workers.dev";
+const configuredApiUrl = String(import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
+const API_URL = import.meta.env.PROD ? "" : (configuredApiUrl || CANONICAL_API_URL);
 
 type Props = { children: React.ReactNode };
 type RestoreResult = "restored" | "unauthorized" | "offline" | "missing";
@@ -13,9 +15,6 @@ type RestoreResult = "restored" | "unauthorized" | "offline" | "missing";
 async function restoreEmployeeSession(): Promise<RestoreResult> {
   if (typeof window === "undefined") return "missing";
 
-  // Prefer the local bearer token when available, but always fall back to the
-  // persistent HttpOnly session cookie. This is important for an installed
-  // Chrome PWA, where localStorage and browser-tab storage can occasionally differ.
   let token = localStorage.getItem(EMPLOYEE_TOKEN_KEY)?.trim() || "";
   let networkFailure = false;
 
@@ -37,7 +36,6 @@ async function restoreEmployeeSession(): Promise<RestoreResult> {
 
         if (response.status === 401 || response.status === 403) {
           if (token) {
-            // Do not let an expired/stale local token block the persistent cookie.
             token = "";
             localStorage.removeItem(EMPLOYEE_TOKEN_KEY);
             continue;
