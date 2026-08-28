@@ -12,23 +12,39 @@ type RestoreResult = "restored" | "unauthorized" | "offline" | "missing";
 
 async function restoreEmployeeSession(): Promise<RestoreResult> {
   if (typeof window === "undefined") return "missing";
-  const token = localStorage.getItem(EMPLOYEE_TOKEN_KEY)?.trim() || "";
-  if (!token) return "missing";
 
+  // Prefer the local bearer token when available, but always fall back to the
+  // persistent HttpOnly session cookie. This is important for an installed
+  // Chrome PWA, where localStorage and the browser tab can occasionally differ.
+  const token = localStorage.getItem(EMPLOYEE_TOKEN_KEY)?.trim() || "";
   let networkFailure = false;
+
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), 10000);
       try {
+        const headers: HeadersInit = {};
+        if (token) headers.authorization = `Bearer ${token}`;
         const response = await fetch(`${API_URL}/api/me`, {
           method: "GET",
           credentials: "include",
-          headers: { authorization: `Bearer ${token}` },
+          headers,
           signal: controller.signal,
+          cache: "no-store",
         });
         const data = (await response.json().catch(() => ({}))) as { user?: Employee; error?: string };
-        if (response.status === 401 || response.status === 403) return "unauthorized";
+
+        if (response.status === 401 || response.status === 403) {
+          // A stale local token must not prevent a valid persistent cookie from
+          // restoring the session. Retry once without Authorization.
+          if (token && attempt < 3) {
+            localStorage.removeItem(EMPLOYEE_TOKEN_KEY);
+            continue;
+          }
+          return "unauthorized";
+        }
+
         if (!response.ok || !data.user || typeof data.user.id !== "string") {
           networkFailure = true;
         } else {
@@ -87,7 +103,7 @@ export default function ProtectedEmployee({ children }: Props) {
   }
 
   if (!session) {
-    if (offline && localStorage.getItem(EMPLOYEE_TOKEN_KEY)) {
+    if (offline && (localStorage.getItem(EMPLOYEE_TOKEN_KEY) || document.cookie)) {
       return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">تعذر الاتصال بالخادم مؤقتًا. جلسة الموظف محفوظة، حاول فتح الصفحة مرة أخرى.</div>;
     }
     return <Navigate to="/login" replace />;
