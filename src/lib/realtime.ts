@@ -3,7 +3,10 @@ let socket: WebSocket | null = null;
 let reconnectTimer: number | null = null;
 let stopped = false;
 
-function getToken(): string { return localStorage.getItem("hadir.api.token") || localStorage.getItem("hadir.auth.token") || ""; }
+function getToken(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token.employee") || localStorage.getItem("hadir.api.token") || localStorage.getItem("hadir.auth.token") || "";
+}
 
 function connect() {
   if (stopped || typeof window === "undefined" || socket) return;
@@ -34,6 +37,6 @@ export function stopRealtimeSync() { stopped = true; socket?.close(); socket = n
 
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
-    if (event.key === "hadir.api.token" || event.key === "hadir.auth.token") { socket?.close(); socket = null; if (event.newValue) connect(); }
+    if (["hadir.api.token.admin", "hadir.api.token.employee", "hadir.api.token", "hadir.auth.token"].includes(event.key || "")) { socket?.close(); socket = null; if (event.newValue) connect(); }
   });
 }
