@@ -1,0 +1,128 @@
+/* Live status language used across dashboards. */
+[aria-label="فتح قائمة الموظف"] { color: hsl(var(--primary)) !important; }
+
+.live-status-dot { position: relative; display: inline-block; width: .55rem; height: .55rem; flex: 0 0 .55rem; border-radius: 9999px; background: hsl(var(--primary)); color: hsl(var(--primary)); box-shadow: 0 0 0 0 hsl(var(--primary) / .35); animation: live-status-pulse 2s ease-out infinite; }
+.live-status-dot[data-status="warning"] { background: hsl(var(--warning)) !important; color: hsl(var(--warning)); box-shadow: 0 0 0 0 hsl(var(--warning) / .35); }
+.live-status-dot[data-status="danger"] { background: hsl(var(--destructive)) !important; color: hsl(var(--destructive)); box-shadow: 0 0 0 0 hsl(var(--destructive) / .35); }
+.live-status-dot[data-status="info"] { background: hsl(var(--accent)) !important; color: hsl(var(--accent)); box-shadow: 0 0 0 0 hsl(var(--accent) / .35); }
+.live-status-dot[data-status="vip"] { background: hsl(38 92% 50%) !important; color: hsl(38 92% 50%); box-shadow: 0 0 0 0 hsl(38 92% 50% / .35); }
+/* Operational status: linked device = green; active but unlinked = warning yellow. */
+.live-status-dot[data-status="online"] { background: hsl(152 55% 42%) !important; color: hsl(152 55% 42%); box-shadow: 0 0 0 0 hsl(152 55% 42% / .35); }
+
+@keyframes live-status-pulse { 0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; } 70% { box-shadow: 0 0 0 .45rem transparent; opacity: .82; } 100% { box-shadow: 0 0 0 0 transparent; opacity: 1; } }
+.live-value { transition: transform 180ms ease, opacity 180ms ease; font-variant-numeric: tabular-nums; }
+.live-value:where([data-changed="true"]) { animation: live-value-pop 260ms ease-out; }
+@keyframes live-value-pop { 0% { transform: scale(.96); opacity: .55; } 100% { transform: scale(1); opacity: 1; } }
+
+/* Employee directory statistics — one restrained enterprise card system. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div {
+  --stat-color: hsl(210 72% 54%);
+  position: relative;
+  overflow: hidden;
+  min-height: 92px;
+  direction: rtl;
+  text-align: right;
+  border: 1px solid color-mix(in srgb, var(--stat-color) 24%, transparent) !important;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--stat-color) 9%, hsl(var(--card))), color-mix(in srgb, var(--stat-color) 3%, hsl(var(--background)))) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 8%, transparent), 0 6px 22px color-mix(in srgb, var(--stat-color) 7%, transparent);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--stat-color) 42%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 10%, transparent), 0 10px 28px color-mix(in srgb, var(--stat-color) 11%, transparent);
+}
+
+/* Semantic palette: every statistic has one stable meaning and one matching pulse. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(1) { --stat-color: hsl(210 72% 54%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(2) { --stat-color: hsl(152 55% 42%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(3) { --stat-color: hsl(38 78% 48%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(4) { --stat-color: hsl(188 64% 44%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(5) { --stat-color: hsl(4 72% 52%); }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div:nth-child(6) { --stat-color: hsl(38 92% 50%); }
+
+/* Arabic stat header: label RIGHT, exactly one animated dot physically anchored LEFT. */
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child {
+  position: relative !important;
+  display: block !important;
+  width: 100%;
+  min-height: 1.25rem;
+  padding-left: 1rem;
+  direction: rtl !important;
+  text-align: right !important;
+  white-space: nowrap;
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child .live-status-dot,
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child [data-status] { display: none !important; }
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child::before {
+  content: "";
+  position: absolute;
+  left: .05rem;
+  right: auto;
+  top: 50%;
+  width: .48rem;
+  height: .48rem;
+  margin: 0;
+  border-radius: 9999px;
+  transform: translateY(-50%);
+  background: var(--stat-color);
+  color: var(--stat-color);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent);
+  animation: stat-card-pulse 2.6s cubic-bezier(.22,.61,.36,1) infinite;
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child > span {
+  display: block !important;
+  width: 100%;
+  direction: rtl !important;
+  text-align: right !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value {
+  color: hsl(var(--foreground)) !important;
+  text-align: right !important;
+  direction: ltr;
+  font-weight: 900;
+}
+.dark section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value,
+.dark-mode section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > .live-value { color: #fff !important; }
+@keyframes stat-card-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-color) 42%, transparent); opacity: 1; transform: translateY(-50%) scale(1); }
+  18% { box-shadow: 0 0 0 .16rem color-mix(in srgb, var(--stat-color) 12%, transparent); opacity: 1; transform: translateY(-50%) scale(1.03); }
+  48% { box-shadow: 0 0 0 .46rem transparent; opacity: .88; transform: translateY(-50%) scale(1); }
+}
+
+/* Directory section indicators: the English section labels also use the same semantic status language. */
+section.hud-card > div:first-child > div:first-child > div:first-child > .mono.text-xs.font-bold.text-primary {
+  position: relative;
+  display: inline-flex !important;
+  align-items: center;
+  gap: .45rem;
+  direction: ltr;
+}
+section.hud-card > div:first-child > div:first-child > div:first-child > .mono.text-xs.font-bold.text-primary::before {
+  content: "";
+  width: .48rem;
+  height: .48rem;
+  flex: 0 0 .48rem;
+  border-radius: 9999px;
+  background: hsl(210 72% 54%);
+  box-shadow: 0 0 0 0 hsl(210 72% 54% / .34);
+  animation: directory-heading-pulse 2.4s cubic-bezier(.22,.61,.36,1) infinite;
+}
+section.hud-card:nth-of-type(2) > div:first-child > div:first-child > div:first-child > .mono.text-xs.font-bold.text-primary::before {
+  background: hsl(152 55% 42%);
+  box-shadow: 0 0 0 0 hsl(152 55% 42% / .34);
+}
+@keyframes directory-heading-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  35% { transform: scale(1.06); box-shadow: 0 0 0 .28rem transparent; opacity: .86; }
+}
+
+.weather-strip-live { min-height: 1cm; max-height: 1.55cm; overflow: hidden; transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease; animation: weather-breathe 6s ease-in-out infinite; }
+.weather-strip-live:hover { transform: translateY(-1px); }
+@keyframes weather-breathe { 0%,100% { opacity: .94; } 50% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .live-status-dot, .live-value, .weather-strip-live, section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div, section.hud-card > .grid.grid-cols-2.gap-3.sm\\:grid-cols-6 > div > div:first-child::before, section.hud-card > div:first-child > div:first-child > div:first-child > .mono.text-xs.font-bold.text-primary::before { animation: none !important; transition: none !important; }
+}

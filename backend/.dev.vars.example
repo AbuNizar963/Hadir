@@ -1,0 +1,6 @@
+# Local-only Web Push configuration.
+# Copy to backend/.dev.vars and replace the placeholders.
+# Never commit backend/.dev.vars.
+VAPID_PUBLIC_KEY="replace-with-vapid-public-key"
+VAPID_PRIVATE_KEY="replace-with-vapid-private-key"
+VAPID_SUBJECT="mailto:admin@abunizar963.github.io"
