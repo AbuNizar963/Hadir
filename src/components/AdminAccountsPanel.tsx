@@ -5,7 +5,7 @@ import { backendEnabled, createBackendAdmin, deleteBackendAdmin, getBackendAdmin
 import type { AdminAccount } from "@/types";
 
 function Chevron() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180"><path d="M6 9l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 function AdminIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path d="M12 3l7 3v5c0 4.6-2.8 8.1-7 10-4.2-1.9-7-5.4-7-10V6l7-3Z" fill="none" stroke="currentColor" strokeWidth="1.7"/><path d="M9 11.5a3 3 0 1 1 6 0M8.5 17c.8-1.5 2-2.2 3.5-2.2s2.7.7 3.5 2.2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>;
@@ -40,7 +40,7 @@ export default function AdminAccountsPanel() {
     setMessage(backendEnabled ? "جاري إنشاء الحساب على الخادم..." : "");
     try {
       if (backendEnabled) {
-        await createBackendAdmin({ name: cleanName, username: cleanUsername, password });
+        await createBackendAdmin({ name: cleanName, username: cleanUsername, password, role });
         await loadRemote();
       } else {
         if ((settings.adminAccounts || []).some(a => a.username.toLowerCase() === cleanUsername.toLowerCase())) { setMessage("اسم المستخدم مستخدم مسبقًا."); return; }
