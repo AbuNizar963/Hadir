@@ -158,19 +158,47 @@ async function recovery(req: Request, env: Env, origin: string) {
   }
 }
 
+async function validatePasswordRules(req: Request, path: string, origin: string) {
+  if ((path === "/api/bootstrap/owner" || path === "/api/admins") && req.method === "POST") {
+    const b = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+    const password = String(b.password || "");
+    if (password.length < 12) return json({ error: "كلمة مرور الإدارة والمالك يجب أن تكون 12 محرفًا على الأقل" }, 400, origin);
+  }
+  if (path.startsWith("/api/admins/") && req.method === "PATCH") {
+    const b = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+    if (b.password !== undefined && String(b.password || "").length < 12) return json({ error: "كلمة مرور الإدارة يجب أن تكون 12 محرفًا على الأقل" }, 400, origin);
+  }
+  if (path === "/api/employees" && req.method === "POST") {
+    const b = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+    const pin = String(b.pin || b.password || "");
+    if (!/^\d{4}$/.test(pin)) return json({ error: "رمز PIN للموظف يجب أن يكون 4 أرقام بالضبط" }, 400, origin);
+  }
+  if (path.startsWith("/api/employees/") && req.method === "PATCH" && !path.endsWith("/device")) {
+    const b = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+    if (b.pin !== undefined || b.password !== undefined) {
+      const pin = String(b.pin ?? b.password ?? "");
+      if (!/^\d{4}$/.test(pin)) return json({ error: "رمز PIN للموظف يجب أن يكون 4 أرقام بالضبط" }, 400, origin);
+    }
+  }
+  return null;
+}
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(req.url);
     const origin = env.APP_ORIGIN || "*";
-    if (url.pathname.replace(/\/$/, "") === "/api/auth/recover-owner") return recovery(req, env, origin);
-    if (url.pathname.replace(/\/$/, "") === "/api/auth/generate-owner-recovery") return generateOwnerRecovery(req, env, origin);
+    const path = url.pathname.replace(/\/$/, "") || "/";
+    if (path === "/api/auth/recover-owner") return recovery(req, env, origin);
+    if (path === "/api/auth/generate-owner-recovery") return generateOwnerRecovery(req, env, origin);
+    const ruleError = await validatePasswordRules(req, path, origin);
+    if (ruleError) return ruleError;
 
-    if (url.pathname.replace(/\/$/, "").match(/^\/api\/employees\/[^/]+\/avatar$/)) {
+    if (path.match(/^\/api\/employees\/[^/]+\/avatar$/)) {
       const actor = await actorFromOriginal(req, env);
       return handleProfileImageRequest(req, env, actor, origin);
     }
 
-    if (url.pathname.replace(/\/$/, "") === "/api/settings" && req.method === "PUT") {
+    if (path === "/api/settings" && req.method === "PUT") {
       const copy = req.clone();
       const response = await original.fetch(req, env, ctx);
       if (response.ok) {
@@ -185,7 +213,7 @@ export default {
       return response;
     }
 
-    if (url.pathname.replace(/\/$/, "") === "/api/employee-location" && req.method === "GET") {
+    if (path === "/api/employee-location" && req.method === "GET") {
       const response = await original.fetch(req, env, ctx);
       if (response.status !== 404) return response;
       try {
