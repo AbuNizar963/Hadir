@@ -19,6 +19,11 @@ async function hashPassword(password: string) {
   return `pbkdf2$${PASSWORD_ITERATIONS}$${b64(salt)}$${b64(bits)}`;
 }
 
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
+  return b64(digest);
+}
+
 function json(data: unknown, status: number, origin: string) {
   return new Response(JSON.stringify(data), { status, headers: {
     "content-type": "application/json; charset=utf-8",
@@ -66,10 +71,32 @@ async function actorFromOriginal(req: Request, env: Env) {
   return (await probe.json().catch(() => ({})) as any).user || null;
 }
 
+async function generateOwnerRecovery(req: Request, env: Env, origin: string) {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS" } });
+  if (req.method !== "POST") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
+  const actor = await actorFromOriginal(req, env);
+  if (!actor || actor.role !== "owner") return json({ error: "هذه العملية متاحة للمالك فقط" }, 403, origin);
+  await ensureRecoveryTables(env.DB);
+  const owner = await env.DB.prepare("SELECT id FROM admin_accounts WHERE role='owner' AND active=1 LIMIT 1").first<{ id: string }>();
+  if (!owner) return json({ error: "لم يتم العثور على حساب مالك فعال" }, 404, origin);
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  const code = b64(bytes).replace(/[^A-Za-z0-9]/g, "").slice(0, 24);
+  const codeHash = await sha256(code);
+  const timestamp = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_code_hash',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(codeHash),
+    env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind("")
+  ]);
+  return json({ ok: true, code, createdAt: timestamp, message: "تم إنشاء رمز استعادة جديد. احفظه الآن؛ لن يظهر مرة أخرى." }, 200, origin);
+}
+
 async function recovery(req: Request, env: Env, origin: string) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS" } });
   if (req.method !== "POST") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
-  if (!env.OWNER_RECOVERY_CODE) return json({ error: "استعادة المالك غير مفعلة على الخادم" }, 503, origin);
+  if (!env.OWNER_RECOVERY_CODE) {
+    const configured = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_code_hash' LIMIT 1").first<{value:string}>().catch(() => null);
+    if (!configured?.value) return json({ error: "استعادة المالك غير مفعلة على الخادم" }, 503, origin);
+  }
 
   const input = await req.json().catch(() => ({})) as Record<string, unknown>;
   const code = String(input.recoveryCode || "");
@@ -77,17 +104,22 @@ async function recovery(req: Request, env: Env, origin: string) {
   const name = String(input.ownerName || "").trim();
   const username = String(input.ownerUsername || "").trim();
   if (!code || !password) return json({ error: "رمز الاستعادة وكلمة المرور الجديدة مطلوبان" }, 400, origin);
-  if (password.length < 12) return json({ error: "كلمة المرور الجديدة يجب أن تكون 12 حرفًا على الأقل" }, 400, origin);
-  if (code.length !== env.OWNER_RECOVERY_CODE.length) return json({ error: "رمز الاستعادة غير صحيح" }, 401, origin);
+  if (password.length < 12) return json({ error: "كلمة المرور الجديدة يجب أن تكون 12 محرفًا على الأقل" }, 400, origin);
 
-  let diff = 0;
-  for (let i = 0; i < code.length; i++) diff |= code.charCodeAt(i) ^ env.OWNER_RECOVERY_CODE.charCodeAt(i);
-  if (diff !== 0) return json({ error: "رمز الاستعادة غير صحيح" }, 401, origin);
+  let validCode = false;
+  const stored = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_code_hash' LIMIT 1").first<{value:string}>().catch(() => null);
+  if (stored?.value) validCode = (await sha256(code)) === stored.value;
+  if (!validCode && env.OWNER_RECOVERY_CODE && code.length === env.OWNER_RECOVERY_CODE.length) {
+    let diff = 0;
+    for (let i = 0; i < code.length; i++) diff |= code.charCodeAt(i) ^ env.OWNER_RECOVERY_CODE.charCodeAt(i);
+    validCode = diff === 0;
+  }
+  if (!validCode) return json({ error: "رمز الاستعادة غير صحيح" }, 401, origin);
 
   try {
     await ensureRecoveryTables(env.DB);
     const used = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_used'").first<{ value: string }>();
-    if (used) return json({ error: "تم استخدام رمز استعادة المالك مسبقًا. أنشئ رمزًا جديدًا ثم أعد المحاولة." }, 409, origin);
+    if (used?.value) return json({ error: "تم استخدام رمز استعادة المالك مسبقًا. أنشئ رمزًا جديدًا ثم أعد المحاولة." }, 409, origin);
 
     const owner = await env.DB.prepare("SELECT id,username,name FROM admin_accounts WHERE role='owner' LIMIT 1").first<{ id: string; username: string; name: string }>();
     const passwordHash = await hashPassword(password);
@@ -131,6 +163,7 @@ export default {
     const url = new URL(req.url);
     const origin = env.APP_ORIGIN || "*";
     if (url.pathname.replace(/\/$/, "") === "/api/auth/recover-owner") return recovery(req, env, origin);
+    if (url.pathname.replace(/\/$/, "") === "/api/auth/generate-owner-recovery") return generateOwnerRecovery(req, env, origin);
 
     if (url.pathname.replace(/\/$/, "").match(/^\/api\/employees\/[^/]+\/avatar$/)) {
       const actor = await actorFromOriginal(req, env);
