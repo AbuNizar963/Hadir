@@ -32,38 +32,84 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.2.15
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
       - name: Typecheck
         run: bun run typecheck
+
       - name: Build Cloudflare Pages production bundle
         env:
           VITE_BASE_PATH: /
         run: bun run build
+
       - name: Validate Cloudflare Pages credentials
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test "${#CLOUDFLARE_API_TOKEN}" -ge 20
-      - name: Deploy to Cloudflare Pages
-        run: npx wrangler@4 pages deploy dist --project-name hadir-9rq --commit-dirty=true
-      - name: Verify deployed PWA metadata
+
+      - name: Resolve existing Cloudflare Pages project
+        id: pages-project
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsS --retry 8 --retry-delay 3 https://hadir-9rq.pages.dev/manifest.webmanifest -o /tmp/manifest.json
-          curl -fsS --retry 8 --retry-delay 3 https://hadir-9rq.pages.dev/sw.js -o /tmp/sw.js
+          response="$(curl -fsS --retry 5 --retry-delay 2 \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects")"
+
+          python - "$response" <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import sys
+
+          data = json.loads(sys.argv[1])
+          if not data.get("success"):
+              raise SystemExit("Cloudflare API did not return a successful Pages project list")
+
+          projects = data.get("result") or []
+          names = [p.get("name") for p in projects if p.get("name")]
+          preferred = ["hadir", "hadir-9rq"]
+          project = next((name for name in preferred if name in names), None)
+
+          if not project:
+              print("Existing Pages projects:", ", ".join(names) or "<none>", file=sys.stderr)
+              raise SystemExit("No existing Hadir Pages project was found; refusing to create a new project")
+
+          print(f"project_name={project}")
+          print(f"project_subdomain={project}.pages.dev")
+          PY
+
+          echo "Using existing Cloudflare Pages project: $(grep '^project_name=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
+
+      - name: Deploy to existing Cloudflare Pages project
+        env:
+          PROJECT_NAME: ${{ steps.pages-project.outputs.project_name }}
+        run: |
+          set -euo pipefail
+          npx wrangler@4 pages deploy dist --project-name "$PROJECT_NAME" --commit-dirty=true
+
+      - name: Verify deployed PWA metadata
+        env:
+          PROJECT_SUBDOMAIN: ${{ steps.pages-project.outputs.project_subdomain }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 8 --retry-delay 3 "https://$PROJECT_SUBDOMAIN/manifest.webmanifest" -o /tmp/manifest.json
+          curl -fsS --retry 8 --retry-delay 3 "https://$PROJECT_SUBDOMAIN/sw.js" -o /tmp/sw.js
           python - <<'PY'
           import json
           from pathlib import Path
-          manifest=json.loads(Path('/tmp/manifest.json').read_text())
+          manifest = json.loads(Path('/tmp/manifest.json').read_text())
           assert manifest.get('start_url') == './', manifest
           assert manifest.get('scope') == './', manifest
-          sw=Path('/tmp/sw.js').read_text()
+          sw = Path('/tmp/sw.js').read_text()
           assert 'hadir-shell-v4' in sw, 'new service worker was not published'
           PY
