@@ -9,12 +9,16 @@ const DAY_MS = 86_400_000;
 const DEFAULT_ADMIN_DAYS = [0, 1, 2, 3, 4];
 const DAY_NAMES = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
+function normalizedScheduleType(employee: Employee | null | undefined): "ADMIN" | "ROTATION" {
+  return String(employee?.scheduleType ?? "ADMIN").trim().toUpperCase() === "ROTATION" ? "ROTATION" : "ADMIN";
+}
+
 export function getEmployeeScheduleStatus(employee: Employee | null | undefined, target: Date = new Date()): ScheduleStatus {
   const period = getEmployeeWorkPeriod(employee, target);
   if (!employee) return { isWorkDay: false, label: "غير محدد" };
   if (period.kind === "NOT_STARTED") return { isWorkDay: false, label: "لم تبدأ المناوبة بعد", detail: period.detail };
   if (period.kind === "INVALID") return { isWorkDay: false, label: "جدول غير صالح", detail: period.detail };
-  if (employee.scheduleType === "ROTATION") {
+  if (normalizedScheduleType(employee) === "ROTATION") {
     const info = getRotationInfo(employee, target);
     if (!info) return { isWorkDay: false, label: "جدول غير صالح" };
     if (info.phase === "OFF") {
@@ -24,7 +28,6 @@ export function getEmployeeScheduleStatus(employee: Employee | null | undefined,
     return { isWorkDay: true, label: "في المناوبة", detail: `اليوم ${normalizeDigits(String(info.workDay + 1))} من ${normalizeDigits(String(info.daysOn))} في المناوبة`, cycleDay: info.cycleDay + 1, cycleTotal: info.daysOn + info.daysOff };
   }
   if (period.kind === "OFF") return { isWorkDay: false, label: "إجازة أسبوعية", detail: period.detail };
-  // Administrative employees enter the rest state as soon as today's shift ends.
   if (period.end && target.getTime() >= period.end.getTime()) {
     const next = getNextAdminWorkStart(employee, target);
     return { isWorkDay: false, label: "فترة راحة", detail: next ? `انتهى دوام اليوم · العمل القادم ${formatDateTime(next)}` : "انتهى دوام اليوم" };
@@ -34,7 +37,7 @@ export function getEmployeeScheduleStatus(employee: Employee | null | undefined,
 
 export function getEmployeeWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): WorkPeriod {
   if (!employee) return { isWorkDay: false, kind: "INVALID", start: null, end: null, label: "غير محدد" };
-  if ((employee.scheduleType ?? "ADMIN") === "ADMIN") {
+  if (normalizedScheduleType(employee) === "ADMIN") {
     const workDays = normalizeWorkDays(employee.workDays);
     const day = target.getDay();
     if (!workDays.includes(day)) return { isWorkDay: false, kind: "OFF", start: null, end: null, label: "إجازة أسبوعية", detail: workDays.length ? `أيام الدوام: ${workDays.map((d) => DAY_NAMES[d]).join("، ")}` : "لم يتم تحديد أيام دوام إداري." };
@@ -57,7 +60,7 @@ export function getEmployeeWorkPeriod(employee: Employee | null | undefined, tar
 export function getActiveWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): WorkPeriod {
   const current = getEmployeeWorkPeriod(employee, target);
   if (current.isWorkDay) return current;
-  if (employee?.scheduleType === "ROTATION" && employee.rotationStartDate) {
+  if (normalizedScheduleType(employee) === "ROTATION" && employee?.rotationStartDate) {
     const previous = new Date(target.getTime() - DAY_MS);
     const previousPeriod = getEmployeeWorkPeriod(employee, previous);
     if (previousPeriod.isWorkDay && previousPeriod.start && previousPeriod.end && target >= previousPeriod.start && target < previousPeriod.end) return previousPeriod;
@@ -74,13 +77,13 @@ export function getScheduleCountdown(employee: Employee | null | undefined, targ
     return { kind: "NEXT_WORK_START", target: info.firstStart, label: "بداية أول مناوبة" };
   }
   if (period.isWorkDay && period.end && period.end.getTime() > target.getTime()) return { kind: "WORK_END", target: period.end, label: "تنتهي المناوبة خلال" };
-  if (employee.scheduleType === "ROTATION" && period.kind === "OFF") {
+  if (normalizedScheduleType(employee) === "ROTATION" && period.kind === "OFF") {
     const info = getRotationInfo(employee, target);
     if (!info) return { kind: "NONE", target: null, label: "" };
     const next = new Date(info.periodStart.getTime() + (info.daysOn + info.daysOff) * DAY_MS);
     return { kind: "NEXT_WORK_START", target: next, label: "تبدأ المناوبة القادمة خلال" };
   }
-  if ((employee.scheduleType ?? "ADMIN") === "ADMIN") {
+  if (normalizedScheduleType(employee) === "ADMIN") {
     const next = getNextAdminWorkStart(employee, target);
     return next ? { kind: "NEXT_WORK_START", target: next, label: "تبدأ المناوبة القادمة خلال" } : { kind: "NONE", target: null, label: "" };
   }
@@ -124,7 +127,10 @@ function getRotationInfo(employee: Employee, target: Date): { firstStart: Date; 
   return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: cycleDay, phase: "WORK" };
 }
 
-function normalizeWorkDays(days: number[] | undefined): number[] { if (!Array.isArray(days)) return [...DEFAULT_ADMIN_DAYS]; return [...new Set(days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b); }
+function normalizeWorkDays(days: number[] | undefined): number[] {
+  if (!Array.isArray(days)) return [...DEFAULT_ADMIN_DAYS];
+  return [...new Set(days.map((d) => Number(d)).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b);
+}
 function parseTime(value: string | undefined, fallback: string): { hours: number; minutes: number } { const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || fallback).trim()); if (!match) return parseTime(fallback, "00:00"); return { hours: Math.min(23, Math.max(0, Number(match[1]))), minutes: Math.min(59, Math.max(0, Number(match[2]))) }; }
 function withTime(date: Date, time: { hours: number; minutes: number }): Date { const result = new Date(date); result.setHours(time.hours, time.minutes, 0, 0); return result; }
 function parseYYYYMMDD(value: string | null | undefined): Date | null { const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || "").trim()); if (!match) return null; const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])); if (date.getFullYear() !== Number(match[1]) || date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[3])) return null; return date; }
