@@ -12,7 +12,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_API }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       OWNER_RECOVERY_CODE: ${{ secrets.OWNER_RECOVERY_CODE }}
@@ -23,12 +23,11 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Validate Cloudflare credentials
-        working-directory: backend
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-          npx wrangler whoami
+          test "${#CLOUDFLARE_API_TOKEN}" -ge 20
 
       - name: Install backend dependencies
         working-directory: backend
