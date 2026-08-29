@@ -8,7 +8,9 @@ export type Coordinates = Pick<GeoPosition, "lat" | "lng">;
 
 const EARTH_RADIUS_METERS = 6_371_000;
 const COORDINATE_DECIMALS = 7;
-const GPS_TIMEOUT_MS = 10_000;
+const HIGH_ACCURACY_TIMEOUT_MS = 18_000;
+const FALLBACK_TIMEOUT_MS = 25_000;
+const WATCH_GRACE_MS = 2_000;
 
 export function roundCoordinate(value: number): number {
   return Number.isFinite(value) ? Number(value.toFixed(COORDINATE_DECIMALS)) : value;
@@ -74,68 +76,134 @@ async function loadFreshEmployeeWorkplace(): Promise<Coordinates & { radiusMeter
   return { lat, lng, radiusMeters };
 }
 
-export function getCurrentPosition(options: PositionOptions = {}): Promise<GeoPosition> {
-  return new Promise((resolve, reject) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      reject(new Error("المتصفح لا يدعم تحديد الموقع الجغرافي."));
-      return;
-    }
+function permissionHint(): string {
+  return "اسمح للموقع من إعدادات المتصفح والنظام، فعّل خدمات الموقع/GPS، ثم أعد المحاولة.";
+}
 
+async function queryLocationPermission(): Promise<PermissionState | null> {
+  if (typeof navigator === "undefined" || !navigator.permissions?.query) return null;
+  try {
+    const status = await navigator.permissions.query({ name: "geolocation" });
+    return status.state;
+  } catch {
+    return null;
+  }
+}
+
+function browserLocationError(error: GeolocationPositionError): Error {
+  if (error.code === error.PERMISSION_DENIED) {
+    return new Error(`تم رفض إذن الموقع. ${permissionHint()}`);
+  }
+  if (error.code === error.POSITION_UNAVAILABLE) {
+    return new Error(`الجهاز لم يوفر موقعًا صالحًا الآن. تأكد من GPS/خدمات الموقع والاتصال، ثم حاول مرة أخرى. ${permissionHint()}`);
+  }
+  return new Error(`لم يصل الموقع خلال المهلة المحددة. اترك الشاشة مفتوحة عدة ثوانٍ وحاول مرة أخرى. ${permissionHint()}`);
+}
+
+function readPosition(position: GeolocationPosition): GeoPosition {
+  const result: GeoPosition = {
+    lat: roundCoordinate(position.coords.latitude),
+    lng: roundCoordinate(position.coords.longitude),
+    accuracy: Number.isFinite(position.coords.accuracy)
+      ? roundDistanceMeters(position.coords.accuracy)
+      : undefined,
+  };
+  if (!isValidGeoPosition(result)) throw new Error("تعذر الحصول على إحداثيات GPS صالحة.");
+  return result;
+}
+
+function requestPosition(options: PositionOptions): Promise<GeoPosition> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        try { resolve(readPosition(position)); }
+        catch (error) { reject(error); }
+      },
+      (error) => reject(browserLocationError(error)),
+      options,
+    );
+  });
+}
+
+function requestWatchedPosition(): Promise<GeoPosition> {
+  return new Promise((resolve, reject) => {
     let settled = false;
-    let workplace: (Coordinates & { radiusMeters: number }) | null = null;
-    const finish = (result: GeoPosition | Error) => {
+    let best: GeoPosition | null = null;
+    let watchId: number | null = null;
+    const finish = (value?: GeoPosition, error?: Error) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
-      result instanceof Error ? reject(result) : resolve(result);
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      value ? resolve(value) : reject(error ?? new Error("تعذر تحديد الموقع."));
     };
-    const timeoutMs = GPS_TIMEOUT_MS;
-    const timer = setTimeout(() => {
-      finish(new Error("انتهت مهلة تحديد الموقع. فعّل GPS وخدمات الموقع وحاول مرة أخرى."));
-    }, timeoutMs + 750);
+    const timer = window.setTimeout(() => finish(best ?? undefined, best ? undefined : new Error(`تعذر تحديد موقعك بدقة كافية. ${permissionHint()}`)), FALLBACK_TIMEOUT_MS + WATCH_GRACE_MS);
 
-    const getFreshWorkplace = async () => {
-      try {
-        workplace = await loadFreshEmployeeWorkplace();
-      } catch (error) {
-        finish(error instanceof Error ? error : new Error("تعذر تحميل موقع العمل الحالي من D1."));
-      }
-    };
-
-    void getFreshWorkplace().then(() => {
-      if (settled) return;
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const result: GeoPosition = {
-            lat: roundCoordinate(position.coords.latitude),
-            lng: roundCoordinate(position.coords.longitude),
-            accuracy: Number.isFinite(position.coords.accuracy) ? roundDistanceMeters(position.coords.accuracy) : undefined,
-          };
-          if (!isValidGeoPosition(result)) {
-            finish(new Error("تعذر الحصول على إحداثيات GPS صالحة."));
-            return;
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        try {
+          const candidate = readPosition(position);
+          if (!best || (candidate.accuracy ?? Number.POSITIVE_INFINITY) < (best.accuracy ?? Number.POSITIVE_INFINITY)) best = candidate;
+          if ((candidate.accuracy ?? Number.POSITIVE_INFINITY) <= 50) {
+            window.clearTimeout(timer);
+            finish(candidate);
           }
-          if (workplace) {
-            const distance = haversineMeters(result, workplace);
-            if (distance > workplace.radiusMeters) {
-              finish(new Error(`أنت خارج نطاق موقع العمل الحالي. المسافة ${distance} م، والحد ${workplace.radiusMeters} م.`));
-              return;
-            }
-          }
-          finish(result);
-        },
-        (error) => {
-          if (error.code === error.PERMISSION_DENIED) finish(new Error("تم رفض إذن الموقع. اسمح للمتصفح بالوصول إلى GPS ثم حاول مرة أخرى."));
-          else if (error.code === error.POSITION_UNAVAILABLE) finish(new Error("تعذر تحديد موقعك الحقيقي. تأكد من تشغيل GPS وخدمات الموقع."));
-          else finish(new Error("انتهت مهلة تحديد الموقع. فعّل GPS وحاول مرة أخرى."));
-        },
-        {
-          ...options,
-          enableHighAccuracy: true,
-          timeout: GPS_TIMEOUT_MS,
-          maximumAge: 0,
-        },
-      );
-    });
+        } catch {
+          // Ignore malformed samples and continue watching.
+        }
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        finish(best ?? undefined, browserLocationError(error));
+      },
+      { enableHighAccuracy: true, timeout: FALLBACK_TIMEOUT_MS, maximumAge: 5_000 },
+    );
   });
+}
+
+export async function getCurrentPosition(options: PositionOptions = {}): Promise<GeoPosition> {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    throw new Error("تحديد الموقع متاح من المتصفح فقط.");
+  }
+  if (!window.isSecureContext) {
+    throw new Error("تحديد الموقع يتطلب اتصال HTTPS آمنًا. افتح الموقع من الرابط الرسمي الآمن ثم حاول مرة أخرى.");
+  }
+  if (!navigator.geolocation) {
+    throw new Error("هذا المتصفح لا يدعم تحديد الموقع الجغرافي.");
+  }
+
+  const permission = await queryLocationPermission();
+  if (permission === "denied") {
+    throw new Error(`إذن الموقع محظور لهذا الموقع. ${permissionHint()}`);
+  }
+
+  // First ask for the best available GPS result. A longer timeout is
+  // intentional: cold GPS fixes commonly need more than 10 seconds.
+  try {
+    return await requestPosition({
+      ...options,
+      enableHighAccuracy: true,
+      timeout: HIGH_ACCURACY_TIMEOUT_MS,
+      maximumAge: 0,
+    });
+  } catch (firstError) {
+    if (firstError instanceof Error && firstError.message.includes("تم رفض إذن الموقع")) throw firstError;
+
+    // Some phones/browser shells expose a network-based position more reliably
+    // when high-accuracy GPS is unavailable. Try a fresh lower-power fix.
+    try {
+      return await requestPosition({
+        ...options,
+        enableHighAccuracy: false,
+        timeout: FALLBACK_TIMEOUT_MS,
+        maximumAge: 10_000,
+      });
+    } catch (secondError) {
+      if (secondError instanceof Error && secondError.message.includes("تم رفض إذن الموقع")) throw secondError;
+      try {
+        return await requestWatchedPosition();
+      } catch {
+        throw secondError instanceof Error ? secondError : firstError;
+      }
+    }
+  }
 }

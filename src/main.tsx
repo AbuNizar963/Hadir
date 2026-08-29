@@ -16,6 +16,7 @@ import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnost
 import { startRealtimeSync } from "@/lib/realtime";
 import { installApiCredentials } from "@/lib/apiCredentials";
 import { installDeviceDirectoryEnhancer } from "./deviceDirectoryEnhancer";
+import "@/lib/qrPolyfill";
 
 installApiCredentials();
 seedIfEmpty();
