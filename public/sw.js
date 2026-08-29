@@ -1,9 +1,21 @@
-const CACHE="hadir-shell-v8";
+const CACHE="hadir-shell-v9";
 const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[new URL("./",self.registration.scope).href,new URL("./manifest.webmanifest",self.registration.scope).href];
 
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(APP_SHELL)).then(()=>self.skipWaiting())));
-self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+
+self.addEventListener("activate",e=>e.waitUntil((async()=>{
+  const keys=await caches.keys();
+  await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));
+  await self.clients.claim();
+  const windows=await self.clients.matchAll({type:"window",includeUncontrolled:true});
+  for(const client of windows){client.postMessage({type:"HADIR_SW_UPDATED"});}
+})()));
+
+self.addEventListener("message",e=>{
+  if(e.data?.type==="HADIR_SKIP_WAITING") void self.skipWaiting();
+});
+
 self.addEventListener("fetch",e=>{
   const r=e.request;
   if(r.method!=="GET")return;
@@ -14,7 +26,7 @@ self.addEventListener("fetch",e=>{
     e.respondWith(fetch(r,{cache:"no-store"}).catch(()=>caches.match(new URL("./",self.registration.scope).href)));
     return;
   }
-  e.respondWith(fetch(r).catch(()=>caches.match(r).then(c=>c||caches.match(new URL("./",self.registration.scope).href))));
+  e.respondWith(fetch(r,{cache:"no-store"}).catch(()=>caches.match(r).then(c=>c||caches.match(new URL("./",self.registration.scope).href))));
 });
 
 function resolveNotificationUrl(value){
