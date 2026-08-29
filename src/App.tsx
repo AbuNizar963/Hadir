@@ -24,8 +24,9 @@ import NotFound from "@/pages/NotFound";
 import ProtectedEmployee from "@/components/ProtectedEmployee";
 import ProtectedManager from "@/components/ProtectedManager";
 import RequireManagerRole from "@/components/RequireManagerRole";
-import { getManagerSession } from "@/lib/storage";
+import { getManagerSession, setManagerSession, setSession } from "@/lib/storage";
 import { backendMe } from "@/lib/backend";
+import { restorePwaSession } from "@/lib/pwaSession";
 import { enableWebPush } from "@/lib/push";
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
@@ -52,24 +53,28 @@ function PwaEntry() {
   useEffect(() => {
     let cancelled = false;
     const restore = async () => {
+      let result: any = null;
       try {
-        const result = await backendMe();
-        if (cancelled) return;
-        const user = result?.user as { role?: string } | undefined;
-        const role = String(user?.role || "").toLowerCase();
-        if (["employee", "staff"].includes(role)) {
-          navigate("/employee", { replace: true });
-          return;
-        }
-        if (["owner", "manager", "supervisor", "admin"].includes(role)) {
-          navigate("/manager", { replace: true });
-          return;
-        }
+        result = await backendMe();
       } catch {
-        // No valid server session: show the normal landing page.
-      } finally {
-        if (!cancelled) setChecking(false);
+        try { result = await restorePwaSession(); } catch { result = null; }
       }
+      if (cancelled) return;
+      const user = result?.user as { id?: string; username?: string; jobNumber?: string; name?: string; role?: string; status?: string } | undefined;
+      const role = String(user?.role || "").toLowerCase();
+      if (["employee", "staff"].includes(role) && user?.id) {
+        setManagerSession(null);
+        setSession({ employeeId: String(user.id), jobNumber: String(user.jobNumber || user.username || ""), name: String(user.name || ""), loginAt: new Date().toISOString(), role: user.role || "staff" });
+        navigate("/employee", { replace: true });
+        return;
+      }
+      if (["owner", "manager", "supervisor", "admin"].includes(role)) {
+        setSession(null);
+        setManagerSession({ loginAt: new Date().toISOString(), name: user?.name, role: role as "owner" | "manager" | "supervisor", jobNumber: user?.username, accountId: user?.id });
+        navigate("/manager", { replace: true });
+        return;
+      }
+      setChecking(false);
     };
     void restore();
     return () => { cancelled = true; };
