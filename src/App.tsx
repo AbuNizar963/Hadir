@@ -27,8 +27,7 @@ import RequireManagerRole from "@/components/RequireManagerRole";
 import { currentManager, currentSession } from "@/lib/auth";
 import { setManagerSession, setSession } from "@/lib/storage";
 import { enableWebPush } from "@/lib/push";
-import type { Employee } from "@/types";
-import type { AdminAccount } from "@/types";
+import type { Employee, AdminAccount } from "@/types";
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
 const EmployeeShell = ({ children }: { children: React.ReactNode }) => <ProtectedEmployee><EmployeeLayout>{children}</EmployeeLayout></ProtectedEmployee>;
@@ -56,12 +55,7 @@ type LaunchState = "checking" | "landing" | "employee" | "manager";
 
 async function validateStoredToken(role: Role, token: string): Promise<User | null> {
   try {
-    const response = await fetch(`${API_URL}/api/me`, {
-      method: "GET",
-      headers: { authorization: `Bearer ${token}` },
-      credentials: "include",
-      cache: "no-store",
-    });
+    const response = await fetch(`${API_URL}/api/me`, { method: "GET", headers: { authorization: `Bearer ${token}` }, credentials: "include", cache: "no-store" });
     if (!response.ok) return null;
     const data = await response.json().catch(() => ({})) as { user?: User };
     const user = data.user;
@@ -74,12 +68,6 @@ async function validateStoredToken(role: Role, token: string): Promise<User | nu
   }
 }
 
-/**
- * PWA launch gateway.
- * The installed PWA can retain an older start_url. Resolve the durable local
- * session first, then validate the role-specific bearer token directly so a
- * missing UI-session record does not force a new login.
- */
 function LaunchGateway() {
   const [state, setState] = useState<LaunchState>(() => {
     if (currentManager()) return "manager";
@@ -90,60 +78,34 @@ function LaunchGateway() {
   useEffect(() => {
     if (state !== "checking") return;
     let alive = true;
-
     const restore = async () => {
       if (typeof window === "undefined") return;
       const adminToken = localStorage.getItem("hadir.api.token.admin")?.trim() || "";
       const employeeToken = localStorage.getItem("hadir.api.token.employee")?.trim() || "";
-
-      if (!adminToken && !employeeToken) {
-        if (alive) setState("landing");
-        return;
-      }
-
+      if (!adminToken && !employeeToken) { if (alive) setState("landing"); return; }
       const candidates: Array<[Role, string]> = adminToken ? [["admin", adminToken]] : [["employee", employeeToken]];
       for (const [role, token] of candidates) {
         const user = await validateStoredToken(role, token);
         if (!alive) return;
         if (!user) continue;
-
         if (role === "admin") {
           const admin = user as AdminAccount;
-          setManagerSession({
-            loginAt: currentManager()?.loginAt || new Date().toISOString(),
-            name: admin.name,
-            role: admin.role,
-            jobNumber: admin.username,
-            accountId: admin.id,
-          });
+          setManagerSession({ loginAt: currentManager()?.loginAt || new Date().toISOString(), name: admin.name, role: admin.role, jobNumber: admin.username, accountId: admin.id });
           setState("manager");
           return;
         }
-
         const employee = user as Employee;
-        setSession({
-          employeeId: employee.id,
-          jobNumber: employee.jobNumber,
-          name: employee.name,
-          loginAt: currentSession()?.loginAt || new Date().toISOString(),
-          role: employee.role,
-        });
+        setSession({ employeeId: employee.id, jobNumber: employee.jobNumber, name: employee.name, loginAt: currentSession()?.loginAt || new Date().toISOString(), role: employee.role });
         setState("employee");
         return;
       }
-
-      // Do not delete an apparently valid token because the API was temporarily
-      // unreachable. Protected routes will retry restoration when opened again.
       if (alive) setState("landing");
     };
-
     void restore();
     return () => { alive = false; };
   }, [state]);
 
-  if (state === "checking") {
-    return <div dir="rtl" className="min-h-screen grid place-items-center bg-background px-6"><div className="text-center"><div className="text-3xl">🔐</div><p className="mt-3 font-bold">جاري استعادة جلسة الدخول…</p></div></div>;
-  }
+  if (state === "checking") return <div dir="rtl" className="min-h-screen grid place-items-center bg-background px-6"><div className="text-center"><div className="text-3xl">🔐</div><p className="mt-3 font-bold">جاري استعادة جلسة الدخول…</p></div></div>;
   if (state === "employee") return <Navigate to="/employee" replace />;
   if (state === "manager") return <Navigate to="/manager" replace />;
   return <Landing />;
@@ -163,7 +125,7 @@ export default function App() {
       <Route path="/employee/premium" element={<Navigate to="/employee/center" replace />} />
       <Route path="/employee/profile" element={<EmployeeShell><EmployeeProfile /></EmployeeShell>} />
       <Route path="/employee/history" element={<EmployeeShell><EmployeeHistory /></EmployeeShell>} />
-      <Route path="/employee/notifications" element={<EmployeeShell><EmployeeNotifications /></EmployeeNotifications></EmployeeShell>} />
+      <Route path="/employee/notifications" element={<EmployeeShell><EmployeeNotifications /></EmployeeShell>} />
       <Route path="/employee/scan/:type" element={<EmployeeShell><EmployeeScanAutoFlow /></EmployeeShell>} />
       <Route path="/manager/login" element={<ManagerLogin />} />
       <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
