@@ -58,7 +58,7 @@ jobs:
           assert manifest.get("start_url") == "./", manifest
           assert manifest.get("scope") == "./", manifest
           sw = Path("dist/sw.js").read_text(encoding="utf-8")
-          assert "hadir-shell-v5" in sw, "expected current service-worker version is missing"
+          assert "hadir-shell-v6" in sw, "expected current service-worker version is missing"
           PY
 
       - name: Verification complete
