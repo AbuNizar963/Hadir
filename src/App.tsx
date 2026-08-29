@@ -98,7 +98,8 @@ export default function App() {
       <Route path="/manager/login" element={<SessionRedirect expected="manager"><ManagerLogin /></SessionRedirect>} />
       <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
       <Route path="/manager/employees" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerEmployees /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/workforce" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerRequests /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager/workforce" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerWorkforceControls /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager/requests" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerRequests /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/audit" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerAudit /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/reports" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerReports /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/settings" element={<ManagerOnly><RequireManagerRole roles={["owner"]}><ManagerSettings /></RequireManagerRole></ManagerOnly>} />
