@@ -34,6 +34,7 @@ export async function getBackendEmployees() { return requestWithRetry<Employee[]
 export async function createBackendEmployee(input: Partial<Employee> & { pin?: string }) { return requestWithRetry<Employee>("/api/employees", { method: "POST", body: JSON.stringify(input) }, "admin"); }
 export async function updateBackendEmployee(id: string, input: Partial<Employee> & { pin?: string }) { return requestWithRetry<Employee>(`/api/employees/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }, "admin"); }
 export async function deleteBackendEmployee(id: string) { return requestWithRetry<{ ok: boolean }>(`/api/employees/${encodeURIComponent(id)}`, { method: "DELETE" }, "admin"); }
+export async function resetBackendEmployeeDevice(id: string) { return requestWithRetry<{ ok: boolean }>(`/api/employees/${encodeURIComponent(id)}/device`, { method: "DELETE" }, "admin"); }
 export async function getBackendAttendance(limit = 500) { return requestWithRetry<AttendanceRecord[]>(`/api/attendance?limit=${encodeURIComponent(Math.min(Math.max(Math.floor(limit), 1), 500))}`, {}, "employee"); }
 export async function createBackendAttendance(input: Partial<AttendanceRecord>) { return requestWithRetry<{ ok: boolean; record?: AttendanceRecord }>("/api/attendance", { method: "POST", body: JSON.stringify(input) }, "employee"); }
 export async function getBackendRequests(_scope?: "employee" | "all") { return requestWithRetry<EmployeeRequest[]>("/api/requests", {}, activeRole()); }
@@ -44,9 +45,9 @@ export async function getBackendSettings() { return requestWithRetry<Settings>("
 export async function updateBackendSettings(input: Partial<Settings>) { return requestWithRetry<{ ok: boolean }>("/api/settings", { method: "PUT", body: JSON.stringify(input) }, "admin"); }
 export async function saveBackendSettings(input: Settings) { return updateBackendSettings(input); }
 export async function getBackendEmployeeProfile() { const data = await backendMe("employee"); return data.user as Employee; }
-export async function getBackendLocations() { return requestWithRetry<Location[]>("/api/locations", {}, activeRole()); }
-export async function getBackendEmployeeLocation() { const employee = await getBackendEmployeeProfile(); const locations = await getBackendLocations(); const selected = (employee.locationId ? locations.find((location) => String(location.id) === String(employee.locationId)) : null) || locations.find((location) => String(location.id) === "main") || locations[0]; if (!selected) throw new Error("لا يوجد موقع عمل محفوظ."); return { location: selected }; }
+export async function getBackendLocations(roleHint?: RoleHint) { return requestWithRetry<Location[]>("/api/locations", {}, roleHint || activeRole()); }
+export async function getBackendEmployeeLocation() { const employee = await getBackendEmployeeProfile(); const locations = await getBackendLocations("employee"); const selected = (employee.locationId ? locations.find((location) => String(location.id) === String(employee.locationId)) : null) || locations.find((location) => String(location.id) === "main") || locations[0]; if (!selected) throw new Error("لا يوجد موقع عمل محفوظ."); return { location: selected }; }
 export async function saveBackendLocation(input: Location) { return requestWithRetry<{ ok: boolean }>(`/api/locations/${encodeURIComponent(input.id)}`, { method: "PUT", body: JSON.stringify(input) }, "admin"); }
 export async function createBackendEscapeEvent(input: Partial<EscapeEvent>) { return requestWithRetry<{ ok: boolean }>("/api/audit", { method: "POST", body: JSON.stringify(input) }, "admin"); }
-export async function getBackendEscapeEvents(limit = 500) { return getBackendAudit(limit); }
+export async function getBackendEscapeEvents(_roleHint?: RoleHint, limit = 500) { return getBackendAudit(limit); }
 export async function resetBackendTestData() { return requestWithRetry<{ ok: boolean; message: string }>("/api/reset-test-data", { method: "POST", body: JSON.stringify({}) }, "admin"); }
