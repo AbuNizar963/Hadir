@@ -3,6 +3,7 @@ import { hash, verify } from "@/lib/hash";
 import { log } from "@/lib/audit";
 import { backendLogout } from "@/lib/backend";
 import { revokeServerSession } from "@/lib/serverSession";
+import { clearPwaSession } from "@/lib/pwaSession";
 
 export interface LoginResult { ok:boolean; success:boolean; reason?:string; }
 const DEFAULT_OWNER_USERNAME="AbuNizar";
@@ -16,11 +17,6 @@ function savedToken(role:"admin"|"employee"): string {
   return localStorage.getItem(role === "admin" ? ADMIN_TOKEN_KEY : EMPLOYEE_TOKEN_KEY) || "";
 }
 
-/**
- * Legacy local authentication is retained only for compatibility with the
- * offline/admin UI. Employee production authentication must use backendEmployeeLogin,
- * which validates the employee against Cloudflare D1.
- */
 export function loginEmployee(jobNumber:string,pin:string):LoginResult{
   const username=normalize(jobNumber),employees=getEmployees();
   const emp=employees.find(e=>e.jobNumber.trim()===username||e.id===username);
@@ -35,6 +31,7 @@ export function loginEmployee(jobNumber:string,pin:string):LoginResult{
 export function logoutEmployee(){
   const token=savedToken("employee");
   setSession(null);
+  clearPwaSession();
   backendLogout("employee");
   void revokeServerSession(token);
 }
@@ -56,11 +53,11 @@ export function loginManager(password:string,username:string):LoginResult{
 export function logoutManager(){
   const token=savedToken("admin");
   setManagerSession(null);
+  clearPwaSession();
   backendLogout("admin");
   void revokeServerSession(token);
 }
 
-/** Local UI session only. The employee record and credentials remain authoritative in D1. */
 let cachedSession: ReturnType<typeof getSession> | null | undefined;
 let cachedSessionKey = "";
 export function currentSession(){
