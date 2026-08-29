@@ -1,0 +1,76 @@
+name: Deploy Hadir Frontend
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig*.json"
+      - "vite.config.*"
+      - "scripts/build.mjs"
+      - ".github/workflows/deploy-frontend.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hadir-frontend-production
+  cancel-in-progress: true
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build Cloudflare Pages production bundle
+        env:
+          VITE_BASE_PATH: /
+        run: bun run build
+
+      - name: Validate Cloudflare credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler@4 whoami
+
+      - name: Deploy to Cloudflare Pages
+        run: npx wrangler@4 pages deploy dist --project-name hadir-9rq --commit-dirty=true
+
+      - name: Verify deployed PWA metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 8 --retry-delay 3 https://hadir-9rq.pages.dev/manifest.webmanifest -o /tmp/manifest.json
+          curl -fsS --retry 8 --retry-delay 3 https://hadir-9rq.pages.dev/sw.js -o /tmp/sw.js
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest=json.loads(Path('/tmp/manifest.json').read_text())
+          assert manifest.get('start_url') == './', manifest
+          assert manifest.get('scope') == './', manifest
+          sw=Path('/tmp/sw.js').read_text()
+          assert 'hadir-shell-v4' in sw, 'new service worker was not published'
+          PY
