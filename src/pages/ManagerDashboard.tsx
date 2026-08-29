@@ -29,16 +29,20 @@ export default function ManagerDashboard() {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const today = todayKey();
+  const [selectedDay, setSelectedDay] = useState(today);
+
+  useEffect(() => {
+    if (selectedDay > today) setSelectedDay(today);
+  }, [selectedDay, today]);
 
   useEffect(() => {
     let active = true;
     let inFlight = false;
-
     const load = async () => {
       if (inFlight) return;
       inFlight = true;
       try {
-        const result = await getDailyStatus(today);
+        const result = await getDailyStatus(selectedDay);
         if (!active) return;
         setRows(Array.isArray(result.employees) ? result.employees : []);
         setError(null);
@@ -51,7 +55,7 @@ export default function ManagerDashboard() {
         inFlight = false;
       }
     };
-
+    setLoading(true);
     void load();
     const timer = window.setInterval(() => void load(), 5000);
     const refresh = () => void load();
@@ -63,7 +67,7 @@ export default function ManagerDashboard() {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);
     };
-  }, [today]);
+  }, [selectedDay]);
 
   const presentIds = useMemo(() => new Set(rows.filter(isPresent).map((row) => row.employeeId)), [rows]);
   const lateIds = useMemo(() => new Set(rows.filter((row) => row.status === "LATE").map((row) => row.employeeId)), [rows]);
@@ -82,20 +86,33 @@ export default function ManagerDashboard() {
     return true;
   }), [rows, search, filter, presentIds, absentIds, lateIds, restIds, leaveIds]);
 
-  const targetDate = useMemo(() => new Date(`${today}T12:00:00+03:00`), [today]);
+  const targetDate = useMemo(() => new Date(`${selectedDay}T12:00:00+03:00`), [selectedDay]);
   const filters: Array<[Filter, string]> = [
     ["all", "الكل"], ["present", "الحاضرون"], ["absent", "الغائبون"],
     ["late", "المتأخرون"], ["rest", "المستريحون"], ["leave", "الإجازات"],
   ];
 
   return (
-    <ManagerLayout title="لوحة القيادة" subtitle={`نظرة مباشرة على حالة الدوام اليوم · ${targetDate.toLocaleDateString("ar-EG", { weekday: "long", day: "2-digit", month: "long", timeZone: "Asia/Damascus" })}`}>
+    <ManagerLayout title="لوحة القيادة" subtitle={`نظرة مباشرة على حالة الدوام · ${targetDate.toLocaleDateString("ar-EG", { weekday: "long", day: "2-digit", month: "long", timeZone: "Asia/Damascus" })}`}>
       {error ? <section className="hud-card border border-destructive/30 bg-destructive/5 p-4 mb-6"><div className="font-bold text-destructive">تعذر مزامنة حالة الدوام من D1</div><div className="mt-1 text-xs text-muted-foreground">{error}</div></section> : null}
+
+      <section className="hud-card p-4 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-extrabold">تاريخ الدوام</div>
+            <div className="text-xs text-muted-foreground mt-1">كل يوم مستقل؛ لا يتم خلط حضور الأيام السابقة مع اليوم الحالي.</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="date" value={selectedDay} max={today} onChange={(event) => { setFilter("all"); setSearch(""); setSelectedDay(event.target.value || today); }} className="rounded-lg border bg-secondary/50 px-3 py-2 text-sm font-bold" aria-label="اختيار تاريخ الدوام" />
+            {selectedDay !== today ? <button type="button" onClick={() => { setFilter("all"); setSearch(""); setSelectedDay(today); }} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">اليوم</button> : null}
+          </div>
+        </div>
+      </section>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-6">
         <Kpi label="إجمالي الموظفين" value={rows.length} />
-        <Kpi label="حضور اليوم" value={presentIds.size} accent="primary" />
-        <Kpi label="غياب اليوم" value={absentIds.size} accent="warning" />
+        <Kpi label="حضور اليوم المحدد" value={presentIds.size} accent="primary" />
+        <Kpi label="غياب اليوم المحدد" value={absentIds.size} accent="warning" />
         <Kpi label="متأخرون" value={lateIds.size} accent="destructive" />
       </section>
 
@@ -107,8 +124,8 @@ export default function ManagerDashboard() {
       <section className="hud-card p-5 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-lg font-extrabold">ملخص اليوم</h2>
-            <p className="text-xs text-muted-foreground mt-1">D1 هو مصدر الحقيقة: الموظف خارج جدوله أو في يوم OFF لا يُحتسب غائبًا.</p>
+            <h2 className="text-lg font-extrabold">ملخص الدوام</h2>
+            <p className="text-xs text-muted-foreground mt-1">D1 هو مصدر الحقيقة: الحضور حسب التاريخ المحدد، ويوم الراحة أو OFF لا يُحتسب غيابًا.</p>
           </div>
         </div>
         <div className="grid gap-3 md:grid-cols-5">
@@ -123,7 +140,7 @@ export default function ManagerDashboard() {
       <section className="hud-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <div className="text-sm font-bold">حالة الموظفين اليوم</div>
+            <div className="text-sm font-bold">حالة الموظفين في التاريخ المحدد</div>
             <div className="text-xs text-muted-foreground mt-1">المصدر: D1 · attendance + employees + leave_requests · Asia/Damascus</div>
           </div>
         </div>
