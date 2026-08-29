@@ -28,7 +28,15 @@
       (() => {
         const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true || new URLSearchParams(location.search).get('pwa') === '1';
         if (!isStandalone) return;
+
+        // A previously installed PWA can retain an older start URL such as /login.
+        // Always normalize standalone launches to the single auth bootstrap entry.
         const path = location.pathname;
+        if ((path === '/login' || path === '/manager/login') && new URLSearchParams(location.search).get('pwa') !== '1') {
+          location.replace('/?pwa=1');
+          return;
+        }
+
         const isLoginRoute = path === '/login' || path === '/manager/login' || path === '/';
         if (!isLoginRoute) return;
         const splash = document.createElement('div');
@@ -46,7 +54,7 @@
         };
         const storedToken = () => {
           try {
-            return localStorage.getItem('hadir.api.token.employee') || localStorage.getItem('hadir.api.token.admin') || localStorage.getItem('hadir.api.token') || '';
+            return localStorage.getItem('hadir_pwa_token') || localStorage.getItem('hadir.api.token.employee') || localStorage.getItem('hadir.api.token.admin') || localStorage.getItem('hadir.api.token') || '';
           } catch { return ''; }
         };
         (async () => {
@@ -67,7 +75,7 @@
     <script>
       (() => {
         const API = (window.__HADIR_API__ || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-        const token = () => localStorage.getItem("hadir.api.token.employee") || localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token") || "";
+        const token = () => localStorage.getItem("hadir.pwa_token") || localStorage.getItem("hadir_pwa_token") || localStorage.getItem("hadir.api.token.employee") || localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token") || "";
         const sessionExists = () => Boolean(localStorage.getItem("hadir.session") || localStorage.getItem("hadir.manager_session"));
         const seenKey = "hadir.browser.notifications.seen";
         const seen = () => { try { return new Set(JSON.parse(localStorage.getItem(seenKey) || "[]")); } catch { return new Set(); } };
