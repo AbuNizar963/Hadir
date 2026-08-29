@@ -67,22 +67,58 @@ function parseBrowser(ua: string): { browser: string; version: string } {
   return { browser: "Browser", version: "" };
 }
 
-export function getDeviceDetails(): DeviceDetails {
-  if (typeof window === "undefined") return { type: "unknown", manufacturer: "server", model: "server", os: "server", osVersion: "", browser: "server", browserVersion: "", label: "server", exactModelAvailable: false };
-  const ua = navigator.userAgent || "";
-  const isAndroid = /Android/i.test(ua), isIPhone = /iPhone/i.test(ua);
+function buildDeviceDetails(ua: string, hints?: { model?: string; platform?: string; platformVersion?: string; mobile?: boolean; formFactors?: string[] }): DeviceDetails {
+  const isAndroid = /Android/i.test(ua) || hints?.platform === "Android";
+  const isIPhone = /iPhone/i.test(ua);
   const isIPad = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
-  const isWindows = /Windows/i.test(ua), isMac = /Macintosh|Mac OS X/i.test(ua) && !isIPad;
-  const isLinux = /Linux/i.test(ua) && !isAndroid;
-  const android = isAndroid ? parseAndroidModel(ua) : null, browser = parseBrowser(ua);
-  let type: DeviceDetails["type"] = "desktop", manufacturer = isWindows ? "Microsoft" : "Unknown", model = isWindows ? "Windows PC" : "Computer", os = isWindows ? "Windows" : "Unknown", osVersion = versionFrom(ua, /Windows NT\s([\d.]+)/i), exactModelAvailable = false;
+  const isWindows = /Windows/i.test(ua) || hints?.platform === "Windows";
+  const isMac = /Macintosh|Mac OS X/i.test(ua) && !isIPad || hints?.platform === "macOS";
+  const isLinux = /Linux/i.test(ua) && !isAndroid || hints?.platform === "Linux";
+  const android = isAndroid ? parseAndroidModel(ua) : null;
+  const browser = parseBrowser(ua);
+  const hintModel = String(hints?.model || "").trim();
+  let type: DeviceDetails["type"] = "desktop";
+  let manufacturer = isWindows ? "Microsoft" : "Unknown";
+  let model = isWindows ? "Windows PC" : "Computer";
+  let os = isWindows ? "Windows" : "Unknown";
+  let osVersion = versionFrom(ua, /Windows NT\s([\d.]+)/i);
   if (isIPhone) { type = "phone"; manufacturer = "Apple"; model = "iPhone"; os = "iOS"; osVersion = versionFrom(ua, /OS\s([\d_]+)/i).replace(/_/g, "."); }
   else if (isIPad) { type = "tablet"; manufacturer = "Apple"; model = "iPad"; os = "iPadOS"; osVersion = versionFrom(ua, /OS\s([\d_]+)/i).replace(/_/g, "."); }
-  else if (isAndroid) { type = /Mobile/i.test(ua) ? "phone" : "tablet"; manufacturer = android?.manufacturer || "Android"; model = android?.model || "Android device"; os = "Android"; osVersion = versionFrom(ua, /Android\s([\d.]+)/i); exactModelAvailable = model !== "Android device"; }
-  else if (isMac) { manufacturer = "Apple"; model = "Mac"; os = "macOS"; osVersion = versionFrom(ua, /Mac OS X\s*([\d_\.]+)/i).replace(/_/g, "."); }
-  else if (isLinux) { manufacturer = "Linux"; model = "Linux PC"; os = "Linux"; }
+  else if (isAndroid) {
+    type = hints?.mobile || /Mobile/i.test(ua) ? "phone" : "tablet";
+    manufacturer = android?.manufacturer || "Android";
+    model = hintModel || android?.model || "Android device";
+    os = "Android";
+    osVersion = hints?.platformVersion || versionFrom(ua, /Android\s([\d.]+)/i);
+  } else if (isMac) { manufacturer = "Apple"; model = "Mac"; os = "macOS"; osVersion = hints?.platformVersion || versionFrom(ua, /Mac OS X\s*([\d_\.]+)/i).replace(/_/g, "."); }
+  else if (isLinux) { manufacturer = "Linux"; model = "Linux PC"; os = "Linux"; osVersion = hints?.platformVersion || ""; }
+  const exactModelAvailable = Boolean(hintModel) || (isAndroid && model !== "Android device") || isIPhone || isIPad;
   const label = [manufacturer, model, `${os}${osVersion ? ` ${osVersion}` : ""}`, `${browser.browser}${browser.version ? ` ${browser.version}` : ""}`.trim()].join(" · ");
   return { type, manufacturer, model, os, osVersion, browser: browser.browser, browserVersion: browser.version, label, exactModelAvailable };
+}
+
+export function getDeviceDetails(): DeviceDetails {
+  if (typeof window === "undefined") return { type: "unknown", manufacturer: "server", model: "server", os: "server", osVersion: "", browser: "server", browserVersion: "", label: "server", exactModelAvailable: false };
+  return buildDeviceDetails(navigator.userAgent || "");
+}
+
+/** Modern model lookup using User-Agent Client Hints. Browsers may decline high-entropy model data for privacy. */
+export async function getDeviceDetailsAsync(): Promise<DeviceDetails> {
+  if (typeof window === "undefined") return getDeviceDetails();
+  const base = getDeviceDetails();
+  const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean; platform?: string; getHighEntropyValues?: (hints: string[]) => Promise<{ model?: string; platform?: string; platformVersion?: string; mobile?: boolean; formFactors?: string[] }> } }).userAgentData;
+  if (!uaData?.getHighEntropyValues) return base;
+  try {
+    const hints = await uaData.getHighEntropyValues(["model", "platform", "platformVersion", "formFactors"]);
+    return buildDeviceDetails(navigator.userAgent || "", hints);
+  } catch { return base; }
+}
+
+export async function getDeviceLabelAsync(): Promise<string> {
+  const details = await getDeviceDetailsAsync();
+  const label = details.label;
+  try { localStorage.setItem(DEVICE_LABEL_KEY, label); } catch {}
+  return label;
 }
 
 export function getDeviceTypeLabel(type: DeviceDetails["type"]): string {
@@ -93,9 +129,13 @@ export function getDeviceTypeIcon(type: DeviceDetails["type"]): string {
   return type === "phone" ? "📱" : type === "tablet" ? "▣" : type === "desktop" ? "🖥️" : "◉";
 }
 
-/** Always refresh the label so an old generic "Android" label is upgraded on the next login. */
+/** Uses the latest asynchronously resolved label when available, otherwise falls back to synchronous detection. */
 export function getDeviceLabel(): string {
   if (typeof window === "undefined") return "server";
+  try {
+    const cached = localStorage.getItem(DEVICE_LABEL_KEY)?.trim();
+    if (cached && !/^(Android|Unknown|Computer)\s·/.test(cached)) return cached;
+  } catch {}
   const label = getDeviceDetails().label;
   try { localStorage.setItem(DEVICE_LABEL_KEY, label); } catch {}
   return label;
