@@ -1,0 +1,86 @@
+name: Deploy Hadir Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "functions/**"
+      - "scripts/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig*.json"
+      - "vite.config.*"
+      - "wrangler.toml"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: hadir-frontend-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VITE_BASE_PATH: /
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build production frontend for Cloudflare Pages
+        run: bun run build
+
+      - name: Verify production artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/index.html
+          test -s dist/manifest.webmanifest
+          test -s dist/sw.js
+          grep -Fq '"start_url": "/"' dist/manifest.webmanifest
+          grep -Fq '"scope": "/"' dist/manifest.webmanifest
+          grep -Fq 'hadir-shell-v10' dist/sw.js
+
+      - name: Validate Cloudflare credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler whoami
+
+      - name: Deploy Pages project
+        run: npx wrangler pages deploy dist --project-name hadir --branch main --commit-dirty=true
+
+      - name: Verify production Pages deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            if curl -fsSL --retry 2 --max-time 15 https://hadir-9rq.pages.dev/manifest.webmanifest -o /tmp/manifest.webmanifest; then break; fi
+            sleep 5
+          done
+          test -s /tmp/manifest.webmanifest
+          grep -Fq '"start_url": "/"' /tmp/manifest.webmanifest
+          grep -Fq '"scope": "/"' /tmp/manifest.webmanifest
+          curl -fsSL --retry 5 --retry-delay 2 https://hadir-9rq.pages.dev/sw.js -o /tmp/sw.js
+          grep -Fq 'hadir-shell-v10' /tmp/sw.js
+          curl -fsSL --retry 5 --retry-delay 2 https://hadir-9rq.pages.dev/ -o /tmp/index.html
+          grep -Fq '<div id="root"></div>' /tmp/index.html
