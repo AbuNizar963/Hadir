@@ -5,16 +5,26 @@ import { handleDailyStatus } from "./daily-status-api";
 type Env = {
   DB: D1Database;
   APP_ORIGIN?: string;
+  APP_ORIGINS?: string;
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
 };
 
 function origin(request: Request, env: Env) {
-  return String(env.APP_ORIGIN || request.headers.get("origin") || "*")
-    .split(",")[0]
-    .trim()
-    .replace(/\/$/, "") || "*";
+  const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
+  const configured = [String(env.APP_ORIGIN || ""), String(env.APP_ORIGINS || "")]
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
+  // Production Pages can use the configured canonical hostname, while previews/custom
+  // aliases may legitimately send a different Origin. Never emit '*' together with
+  // credentials; echo only origins that are explicitly trusted by policy.
+  if (requestOrigin && configured.includes(requestOrigin)) return requestOrigin;
+  if (requestOrigin && /^https:\/\/[^/]+\.pages\.dev$/i.test(requestOrigin)) return requestOrigin;
+  if (requestOrigin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin)) return requestOrigin;
+  return configured[0] || "*";
 }
 
 export { HadirRealtime };
