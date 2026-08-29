@@ -1,4 +1,4 @@
-const CACHE="hadir-shell-v4";
+const CACHE="hadir-shell-v5";
 const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[
   new URL("./",self.registration.scope).href,
@@ -24,8 +24,8 @@ self.addEventListener("fetch",event=>{
   const url=new URL(request.url);
   if(url.origin!==self.location.origin||!url.pathname.startsWith(BASE))return;
 
-  // Network-first keeps deployed HTML/JS/PWA metadata current. The shell cache is
-  // only the offline fallback and is never allowed to mask a successful deployment.
+  // Always prefer the network so a newly deployed Pages version is not hidden
+  // behind an old shell. The cache is only an offline fallback.
   event.respondWith(
     fetch(request)
       .then(response=>response)
