@@ -53,12 +53,21 @@ jobs:
           test -s dist/sw.js
           python - <<'PY'
           import json
+          import re
           from pathlib import Path
+
           manifest = json.loads(Path("dist/manifest.webmanifest").read_text(encoding="utf-8"))
           assert manifest.get("start_url") == "./", manifest
           assert manifest.get("scope") == "./", manifest
+
           sw = Path("dist/sw.js").read_text(encoding="utf-8")
-          assert "hadir-shell-v6" in sw, "expected current service-worker version is missing"
+          match = re.search(r'const CACHE="(hadir-shell-v\d+)";', sw)
+          assert match, "service-worker cache version declaration is missing"
+          assert match.group(1) == "hadir-shell-v7", (
+              f"unexpected service-worker cache version: {match.group(1)}"
+          )
+          assert "SKIP_WAITING" in sw, "service-worker update activation handler is missing"
+          assert "notificationclick" in sw, "service-worker notification click handler is missing"
           PY
 
       - name: Verification complete
