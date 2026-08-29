@@ -1,0 +1,10 @@
+/* Keep long employee names readable inside the employee home header. */
+main.max-w-xl.mx-auto.px-4.sm\:px-5.pb-16.space-y-4 > section:first-child [class~="truncate"] {
+  font-size: 1.05rem;
+  line-height: 1.55;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
