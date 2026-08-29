@@ -1,8 +1,10 @@
 const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
 const RECONNECT_MIN_MS = 1000;
 const RECONNECT_MAX_MS = 15000;
+const TOKEN_POLL_MS = 2000;
 let socket: WebSocket | null = null;
 let reconnectTimer: number | null = null;
+let tokenPollTimer: number | null = null;
 let reconnectDelay = RECONNECT_MIN_MS;
 let stopped = false;
 let lastToken = "";
@@ -59,6 +61,7 @@ function connect() {
     if (socket !== ws) return;
     reconnectDelay = RECONNECT_MIN_MS;
     emitSyncState("connected");
+    // Ask active views to refresh once the realtime channel is ready.
     window.dispatchEvent(new Event("hadir:d1-view-changed"));
   };
 
@@ -106,12 +109,21 @@ export function startRealtimeSync() {
   stopped = false;
   reconnectDelay = RECONNECT_MIN_MS;
   refreshConnection();
+  if (typeof window !== "undefined" && tokenPollTimer === null) {
+    // Same-tab login/logout does not fire the storage event. A tiny token poll
+    // closes that gap without adding API traffic or changing the UI.
+    tokenPollTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") refreshConnection();
+    }, TOKEN_POLL_MS);
+  }
 }
 
 export function stopRealtimeSync() {
   stopped = true;
   if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+  if (tokenPollTimer !== null) window.clearInterval(tokenPollTimer);
   reconnectTimer = null;
+  tokenPollTimer = null;
   closeSocket();
   emitSyncState("disconnected");
 }
@@ -124,6 +136,5 @@ if (typeof window !== "undefined") {
     if (["hadir.api.token.admin", "hadir.api.token.employee", "hadir.api.token", "hadir.auth.token"].includes(event.key || "")) refreshConnection();
   });
 
-  // Login/logout in the same tab does not fire the browser's storage event.
   window.addEventListener("hadir:auth-changed", refreshConnection);
 }
