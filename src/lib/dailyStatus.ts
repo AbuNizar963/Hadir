@@ -22,7 +22,10 @@ type DailyStatusResponse = {
   employees: DailyStatusRow[];
 };
 
-const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").trim().replace(/\/$/, "");
+// Do not allow a Pages environment variable to silently redirect this critical
+// production endpoint to an obsolete Worker. The D1 source of truth has one
+// canonical production API origin.
+const API_URL = "https://hadir-api.abunizar963.workers.dev";
 const ADMIN_TOKEN_KEY = "hadir.api.token.admin";
 
 export async function getDailyStatus(day: string): Promise<DailyStatusResponse> {
