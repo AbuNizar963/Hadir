@@ -13,8 +13,14 @@ type AttendanceAudit = { employeeId?: string; action?: string; result?: string; 
 
 function isScheduledRestDay(employee: Employee, target: Date): boolean {
   const period = getEmployeeWorkPeriod(employee, target);
-  // OFF, not-started rotations, and invalid/unconfigured schedules are not absences.
   return period.kind === "OFF" || period.kind === "NOT_STARTED" || period.kind === "INVALID";
+}
+
+function localDateKey(timestamp: string | undefined): string | null {
+  if (!timestamp) return null;
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 export default function ManagerDashboard() {
@@ -29,31 +35,39 @@ export default function ManagerDashboard() {
 
   useEffect(() => {
     let active = true;
+    let refreshInFlight = false;
     const load = async () => {
-      const [employeeResult, attendanceResult, leaveResult] = await Promise.allSettled([getBackendEmployees(), getBackendAudit(2000), workforce.leaveRequests()]);
-      if (!active) return;
-      setEmployees(employeeResult.status === "fulfilled" ? employeeResult.value : getEmployees());
-      setAttendance(attendanceResult.status === "fulfilled" ? attendanceResult.value : []);
-      setLeaveRequests(leaveResult.status === "fulfilled" ? leaveResult.value : []);
-      setLoading(false);
+      if (refreshInFlight) return;
+      refreshInFlight = true;
+      try {
+        const [employeeResult, attendanceResult, leaveResult] = await Promise.allSettled([getBackendEmployees(), getBackendAudit(2000), workforce.leaveRequests()]);
+        if (!active) return;
+        if (employeeResult.status === "fulfilled") setEmployees(employeeResult.value);
+        else setEmployees(prev => prev.length ? prev : getEmployees());
+        if (attendanceResult.status === "fulfilled") setAttendance(attendanceResult.value);
+        if (leaveResult.status === "fulfilled") setLeaveRequests(leaveResult.value);
+        setLoading(false);
+      } finally { refreshInFlight = false; }
     };
     void load();
-    const timer = window.setInterval(() => void load(), 10000);
-    return () => { active = false; window.clearInterval(timer); };
+    const timer = window.setInterval(() => void load(), 5000);
+    const refresh = () => void load();
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh); };
   }, []);
 
-  const todayRecords = useMemo(() => attendance.filter(r => r.timestamp?.startsWith(today) && r.action === "check-in" && r.result === "success"), [attendance, today]);
+  const todayRecords = useMemo(() => attendance.filter(r => localDateKey(r.timestamp) === today && r.action === "check-in" && r.result === "success"), [attendance, today]);
   const presentIds = useMemo(() => new Set(todayRecords.map(r => String(r.employeeId || "")).filter(Boolean)), [todayRecords]);
   const [hh, mm] = (settings?.workStart || "08:00").split(":").map(Number);
-  const scheduled = useMemo(() => { const d = new Date(); d.setHours(hh, mm, 0, 0); return d; }, [hh, mm]);
+  const scheduled = useMemo(() => { const d = new Date(`${today}T00:00:00`); d.setHours(hh, mm, 0, 0); return d; }, [today, hh, mm]);
   const activeEmployees = useMemo(() => employees.filter(e => e.status === "active"), [employees]);
   const targetDate = useMemo(() => new Date(`${today}T12:00:00`), [today]);
   const restIds = useMemo(() => new Set(activeEmployees.filter(employee => isScheduledRestDay(employee, targetDate)).map(employee => String(employee.id)).filter(Boolean)), [activeEmployees, targetDate]);
   const leaveIds = useMemo(() => new Set(leaveRequests.filter(request => request.status === "approved" && request.startDate <= today && request.endDate >= today).map(request => String(request.employeeId || "")).filter(Boolean)), [leaveRequests, today]);
   const absentIds = useMemo(() => new Set(activeEmployees.filter(employee => { const id = String(employee.id); return !presentIds.has(id) && !restIds.has(id) && !leaveIds.has(id); }).map(employee => String(employee.id)).filter(Boolean)), [activeEmployees, presentIds, restIds, leaveIds]);
-  const lateIds = useMemo(() => new Set(todayRecords.filter(r => { const timestamp = Date.parse(String(r.timestamp || "")); if (!Number.isFinite(timestamp)) return false; const late = Math.max(0, Math.round((timestamp - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)); return late > 0; }).map(r => String(r.employeeId || "")).filter(Boolean)), [todayRecords, scheduled, settings?.lateGraceMinutes]);
+  const lateIds = useMemo(() => new Set(todayRecords.filter(r => { const timestamp = Date.parse(String(r.timestamp || "")); if (!Number.isFinite(timestamp)) return false; return Math.max(0, Math.round((timestamp - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)) > 0; }).map(r => String(r.employeeId || "")).filter(Boolean)), [todayRecords, scheduled, settings?.lateGraceMinutes]);
   const absentCount = absentIds.size;
-
   const filteredEmployees = useMemo(() => activeEmployees.filter(e => { const id = String(e.id); if (search && !e.name.includes(search)) return false; if (filter === "present" && !presentIds.has(id)) return false; if (filter === "absent" && !absentIds.has(id)) return false; if (filter === "late" && !lateIds.has(id)) return false; if (filter === "rest" && !restIds.has(id)) return false; if (filter === "leave" && !leaveIds.has(id)) return false; return true; }), [activeEmployees, search, filter, presentIds, absentIds, lateIds, restIds, leaveIds]);
   const filters: Array<[Filter, string]> = [["all", "الكل"], ["present", "الحاضرون"], ["absent", "الغائبون"], ["late", "المتأخرون"], ["rest", "المستريحون"], ["leave", "الإجازات"]];
 
