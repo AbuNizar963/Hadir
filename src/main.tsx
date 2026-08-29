@@ -23,9 +23,31 @@ installDeviceDirectoryEnhancer();
 if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
     const base = import.meta.env.BASE_URL || "/";
-    const swUrl = new URL("sw.js?v=8", new URL(base, window.location.origin)).toString();
+    const swUrl = new URL("sw.js?v=9", new URL(base, window.location.origin)).toString();
     const scope = new URL(base, window.location.origin).pathname;
-    navigator.serviceWorker.register(swUrl, { scope, updateViaCache: "none" }).catch(() => undefined);
+    navigator.serviceWorker.register(swUrl, { scope, updateViaCache: "none" }).then((registration) => {
+      void registration.update();
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            worker.postMessage({ type: "HADIR_SKIP_WAITING" });
+          }
+        });
+      });
+    }).catch(() => undefined);
+
+    let reloadedForUpdate = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloadedForUpdate) return;
+      reloadedForUpdate = true;
+      window.location.reload();
+    });
+
+    window.setInterval(() => {
+      void navigator.serviceWorker.getRegistration(scope).then((registration) => registration?.update()).catch(() => undefined);
+    }, 15 * 60 * 1000);
   });
 }
 
