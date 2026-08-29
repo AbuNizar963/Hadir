@@ -25,13 +25,18 @@ import ProtectedEmployee from "@/components/ProtectedEmployee";
 import ProtectedManager from "@/components/ProtectedManager";
 import RequireManagerRole from "@/components/RequireManagerRole";
 import { currentManager, currentSession } from "@/lib/auth";
-import { backendMe } from "@/lib/backend";
 import { setManagerSession, setSession } from "@/lib/storage";
 import { enableWebPush } from "@/lib/push";
+import type { Employee } from "@/types";
+import type { AdminAccount } from "@/types";
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
 const EmployeeShell = ({ children }: { children: React.ReactNode }) => <ProtectedEmployee><EmployeeLayout>{children}</EmployeeLayout></ProtectedEmployee>;
 const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
+const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+
+type Role = "admin" | "employee";
+type User = AdminAccount | Employee;
 
 function PushSessionBridge() {
   const location = useLocation();
@@ -49,12 +54,31 @@ function PushSessionBridge() {
 
 type LaunchState = "checking" | "landing" | "employee" | "manager";
 
+async function validateStoredToken(role: Role, token: string): Promise<User | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/me`, {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const data = await response.json().catch(() => ({})) as { user?: User };
+    const user = data.user;
+    if (!user || typeof user !== "object") return null;
+    if (role === "admin" && !["owner", "manager", "supervisor"].includes(String((user as AdminAccount).role))) return null;
+    if (role === "employee" && String((user as Employee).role) !== "staff") return null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * PWA launch gateway.
- * The installed PWA may launch at `/`, `/employee/`, or a stale manifest start_url.
- * Resolve the persisted local session first, then validate a persisted API token when
- * the local UI session is missing. This prevents a fresh PWA launch from falling back
- * to the public landing page after the browser has already authenticated the user.
+ * The installed PWA can retain an older start_url. Resolve the durable local
+ * session first, then validate the role-specific bearer token directly so a
+ * missing UI-session record does not force a new login.
  */
 function LaunchGateway() {
   const [state, setState] = useState<LaunchState>(() => {
@@ -77,38 +101,39 @@ function LaunchGateway() {
         return;
       }
 
-      const candidates: Array<"admin" | "employee"> = adminToken ? ["admin"] : ["employee"];
-      for (const role of candidates) {
-        try {
-          const me = await backendMe(role);
-          if (!alive || !me.user) return;
-          const user = me.user as { id?: string; username?: string; name?: string; role?: string };
-          if (role === "admin" && user.id && ["owner", "manager", "supervisor"].includes(String(user.role))) {
-            setManagerSession({
-              loginAt: currentManager()?.loginAt || new Date().toISOString(),
-              name: user.name,
-              role: user.role,
-              jobNumber: user.username,
-              accountId: user.id,
-            });
-            setState("manager");
-            return;
-          }
-          if (role === "employee" && user.id && user.username && String(user.role) === "staff") {
-            setSession({
-              employeeId: user.id,
-              jobNumber: user.username,
-              name: user.name || user.username,
-              loginAt: currentSession()?.loginAt || new Date().toISOString(),
-              role: user.role,
-            });
-            setState("employee");
-            return;
-          }
-        } catch {
-          // Keep the token intact. A temporary network failure must not become a logout.
+      const candidates: Array<[Role, string]> = adminToken ? [["admin", adminToken]] : [["employee", employeeToken]];
+      for (const [role, token] of candidates) {
+        const user = await validateStoredToken(role, token);
+        if (!alive) return;
+        if (!user) continue;
+
+        if (role === "admin") {
+          const admin = user as AdminAccount;
+          setManagerSession({
+            loginAt: currentManager()?.loginAt || new Date().toISOString(),
+            name: admin.name,
+            role: admin.role,
+            jobNumber: admin.username,
+            accountId: admin.id,
+          });
+          setState("manager");
+          return;
         }
+
+        const employee = user as Employee;
+        setSession({
+          employeeId: employee.id,
+          jobNumber: employee.jobNumber,
+          name: employee.name,
+          loginAt: currentSession()?.loginAt || new Date().toISOString(),
+          role: employee.role,
+        });
+        setState("employee");
+        return;
       }
+
+      // Do not delete an apparently valid token because the API was temporarily
+      // unreachable. Protected routes will retry restoration when opened again.
       if (alive) setState("landing");
     };
 
@@ -138,7 +163,7 @@ export default function App() {
       <Route path="/employee/premium" element={<Navigate to="/employee/center" replace />} />
       <Route path="/employee/profile" element={<EmployeeShell><EmployeeProfile /></EmployeeShell>} />
       <Route path="/employee/history" element={<EmployeeShell><EmployeeHistory /></EmployeeShell>} />
-      <Route path="/employee/notifications" element={<EmployeeShell><EmployeeNotifications /></EmployeeShell>} />
+      <Route path="/employee/notifications" element={<EmployeeShell><EmployeeNotifications /></EmployeeNotifications></EmployeeShell>} />
       <Route path="/employee/scan/:type" element={<EmployeeShell><EmployeeScanAutoFlow /></EmployeeShell>} />
       <Route path="/manager/login" element={<ManagerLogin />} />
       <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
