@@ -1,11 +1,15 @@
 import type { AIInsight, AnomalyEvent, LeaveRequest, LiveNotification, PerformanceReview, TaskPriority, TaskStatus, Violation, WorkforceTask } from "@/types/workforce";
 
 const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-function token() { return localStorage.getItem("hadir.api.token") || localStorage.getItem("hadir.auth.token") || ""; }
+function token() {
+  return localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token") || localStorage.getItem("hadir.auth.token") || "";
+}
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers); headers.set("content-type", "application/json");
-  const t = token(); if (t) headers.set("authorization", `Bearer ${t}`);
-  const response = await fetch(`${API_URL}${path}`, { ...init, headers, credentials: "include" });
+  const headers = new Headers(init.headers);
+  headers.set("content-type", "application/json");
+  const t = token();
+  if (t) headers.set("authorization", `Bearer ${t}`);
+  const response = await fetch(`${API_URL}${path}`, { ...init, headers, credentials: "include", cache: "no-store" });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(String((data as any).error || "تعذر تنفيذ العملية"));
   return data as T;
