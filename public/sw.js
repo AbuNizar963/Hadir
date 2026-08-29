@@ -1,4 +1,4 @@
-const CACHE="hadir-shell-v7";
+const CACHE="hadir-shell-v8";
 const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[new URL("./",self.registration.scope).href,new URL("./manifest.webmanifest",self.registration.scope).href];
 
@@ -9,9 +9,7 @@ self.addEventListener("fetch",e=>{
   if(r.method!=="GET")return;
   const u=new URL(r.url);
   if(u.origin!==self.location.origin||!u.pathname.startsWith(BASE))return;
-  // Authentication and API state are never cached.
   if(u.pathname.startsWith(`${BASE}api/`))return;
-  // Navigation is network-first so auth bootstrap and new deployments are used.
   if(r.mode==="navigate"){
     e.respondWith(fetch(r,{cache:"no-store"}).catch(()=>caches.match(new URL("./",self.registration.scope).href)));
     return;
