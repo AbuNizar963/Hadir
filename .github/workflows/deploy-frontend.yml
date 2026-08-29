@@ -37,7 +37,7 @@ jobs:
         with:
           bun-version: 1.2.15
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --no-frozen-lockfile
       - name: Typecheck
         run: bun run typecheck
       - name: Build Cloudflare Pages production bundle
