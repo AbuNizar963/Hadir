@@ -15,7 +15,8 @@ async function restoreEmployeeSession(): Promise<RestoreResult> {
     try {
       const result = await backendMe();
       const employee = result.user as Employee;
-      if (!employee || typeof employee.id !== "string" || employee.role !== "employee") return "unauthorized";
+      const role = String(employee?.role || "").toLowerCase();
+      if (!employee || typeof employee.id !== "string" || !["employee", "staff"].includes(role)) return "unauthorized";
 
       setSession({
         employeeId: employee.id,
