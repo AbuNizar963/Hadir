@@ -2,7 +2,7 @@ import type { AdminAccount, Employee, AttendanceRecord, EmployeeRequest, Setting
 import { getDeviceFingerprint, getDeviceId, getDeviceLabel } from "@/lib/device";
 import { compressProfileImageDataUrl } from "@/lib/imageCompression";
 import { employeeAvatarUrl } from "@/lib/avatarUrl";
-import { persistPwaSession, clearPwaSession } from "@/lib/pwaSession";
+import { persistPwaSession, clearPwaSession, restorePwaSession } from "@/lib/pwaSession";
 
 const CANONICAL_API_URL = "https://hadir-api.abunizar963.workers.dev";
 const configuredApiUrl = String(import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
@@ -38,4 +38,34 @@ export async function getEmployeeDeviceStatus() { return request<{ bound: boolea
 export async function bootstrapBackend() { const data = await requestWithRetry<{ token: string; bootstrap: boolean }>("/api/bootstrap"); if (!data.bootstrap) throw new Error("تم إعداد حساب المالك مسبقًا"); persistToken("admin", data.token); return data; }
 export async function createBootstrapOwner(input: { name: string; username: string; password: string }) { const data = await requestWithRetry<{ token: string; user: AdminAccount; kind: "admin" }>("/api/bootstrap/owner", { method: "POST", body: JSON.stringify(input) }); persistToken("admin", data.token); return data.user; }
 export async function backendLogout(role?: RoleHint) { const resolved = role || activeRole(); if (!resolved) return; try { await requestWithRetry<{ ok: boolean }>("/api/auth/logout", { method: "POST", body: JSON.stringify({}) }, 2, resolved); } finally { clearRoleSession(resolved); clearPwaSession(); } }
-export async function backendMe() { const role = activeRole(); return requestWithRetry<{ user: AdminAccount | Employee }>("/api/me", {}, 5, role); }
+
+/**
+ * Authentication bootstrap for both normal Chrome and standalone PWA.
+ * If the normal role/token storage is missing (which can happen in a
+ * standalone launch context), recover the durable PWA credential from
+ * IndexedDB/localStorage and rehydrate the normal role token before any
+ * caller is allowed to decide that the user is logged out.
+ */
+export async function backendMe() {
+  let role = activeRole();
+  if (!role) {
+    try {
+      const recovered = await restorePwaSession();
+      return recovered as { user: AdminAccount | Employee };
+    } catch {
+      // No recoverable PWA session: let the caller show the login screen.
+    }
+  }
+  try {
+    return await requestWithRetry<{ user: AdminAccount | Employee }>("/api/me", {}, 5, role);
+  } catch (error) {
+    // A stale local role must not prevent recovery from the durable PWA
+    // session. Retry exactly once through the PWA recovery path.
+    try {
+      const recovered = await restorePwaSession();
+      return recovered as { user: AdminAccount | Employee };
+    } catch {
+      throw error;
+    }
+  }
+}
