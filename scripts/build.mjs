@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const vitePackage = new URL("../node_modules/vite/package.json", import.meta.url);
@@ -29,3 +29,17 @@ if (bun.status === 0 && !bun.error) {
 } else {
   run("npm", ["run", "build"]);
 }
+
+// Emit a deployment fingerprint from the actual commit used by the builder.
+// Cloudflare Pages exposes CF_PAGES_COMMIT_SHA for Git-integrated builds;
+// GitHub Actions exposes GITHUB_SHA for its own verification build.
+const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || "unknown";
+const branch = process.env.CF_PAGES_BRANCH || process.env.GITHUB_REF_NAME || "unknown";
+const deploymentUrl = process.env.CF_PAGES_URL || "";
+
+mkdirSync(new URL("../dist/", import.meta.url), { recursive: true });
+writeFileSync(
+  new URL("../dist/build-version.json", import.meta.url),
+  `${JSON.stringify({ commitSha, branch, deploymentUrl }, null, 2)}\n`,
+  "utf8",
+);
