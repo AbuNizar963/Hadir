@@ -33,7 +33,8 @@ if (bun.status === 0 && !bun.error) {
 // Emit a deployment fingerprint from the actual commit used by the builder.
 // Cloudflare Pages exposes CF_PAGES_COMMIT_SHA for Git-integrated builds;
 // GitHub Actions exposes GITHUB_SHA for its own verification build.
-const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || "unknown";
+const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || gitSha.stdout?.trim() || "unknown";
 const branch = process.env.CF_PAGES_BRANCH || process.env.GITHUB_REF_NAME || "unknown";
 const deploymentUrl = process.env.CF_PAGES_URL || "";
 
