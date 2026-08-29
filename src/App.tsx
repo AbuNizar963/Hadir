@@ -24,6 +24,7 @@ import NotFound from "@/pages/NotFound";
 import ProtectedEmployee from "@/components/ProtectedEmployee";
 import ProtectedManager from "@/components/ProtectedManager";
 import RequireManagerRole from "@/components/RequireManagerRole";
+import SessionRedirect from "@/components/SessionRedirect";
 import { getManagerSession, setManagerSession, setSession } from "@/lib/storage";
 import { backendMe } from "@/lib/backend";
 import { restorePwaSession } from "@/lib/pwaSession";
@@ -54,35 +55,27 @@ function PwaEntry() {
     let cancelled = false;
     const restore = async () => {
       let result: any = null;
-      try {
-        result = await backendMe();
-      } catch {
-        try { result = await restorePwaSession(); } catch { result = null; }
-      }
+      try { result = await backendMe(); }
+      catch { try { result = await restorePwaSession(); } catch { result = null; } }
       if (cancelled) return;
-      const user = result?.user as { id?: string; username?: string; jobNumber?: string; name?: string; role?: string; status?: string } | undefined;
+      const user = result?.user as { id?: string; username?: string; jobNumber?: string; name?: string; role?: string } | undefined;
       const role = String(user?.role || "").toLowerCase();
       if (["employee", "staff"].includes(role) && user?.id) {
         setManagerSession(null);
         setSession({ employeeId: String(user.id), jobNumber: String(user.jobNumber || user.username || ""), name: String(user.name || ""), loginAt: new Date().toISOString(), role: user.role || "staff" });
-        navigate("/employee", { replace: true });
-        return;
+        navigate("/employee", { replace: true }); return;
       }
-      if (["owner", "manager", "supervisor", "admin"].includes(role)) {
+      if (["owner", "manager", "supervisor", "admin"].includes(role) && user?.id) {
         setSession(null);
-        setManagerSession({ loginAt: new Date().toISOString(), name: user?.name, role: role as "owner" | "manager" | "supervisor", jobNumber: user?.username, accountId: user?.id });
-        navigate("/manager", { replace: true });
-        return;
+        setManagerSession({ loginAt: new Date().toISOString(), name: user.name, role: role as "owner" | "manager" | "supervisor", jobNumber: user.username, accountId: user.id });
+        navigate("/manager", { replace: true }); return;
       }
       setChecking(false);
     };
     void restore();
     return () => { cancelled = true; };
   }, [navigate]);
-
-  if (checking) {
-    return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">جاري استعادة جلسة الدخول…</div>;
-  }
+  if (checking) return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">جاري استعادة جلسة الدخول…</div>;
   return <Landing />;
 }
 
@@ -91,7 +84,7 @@ export default function App() {
     <PushSessionBridge />
     <Routes>
       <Route path="/" element={<PwaEntry />} />
-      <Route path="/login" element={<EmployeeLogin />} />
+      <Route path="/login" element={<SessionRedirect expected="employee"><EmployeeLogin /></SessionRedirect>} />
       <Route path="/weather" element={<WeatherPage />} />
       <Route path="/prayer" element={<PrayerPage />} />
       <Route path="/ai" element={<AIAssistant />} />
@@ -102,11 +95,10 @@ export default function App() {
       <Route path="/employee/history" element={<EmployeeShell><EmployeeHistory /></EmployeeShell>} />
       <Route path="/employee/notifications" element={<EmployeeShell><EmployeeNotifications /></EmployeeShell>} />
       <Route path="/employee/scan/:type" element={<EmployeeShell><EmployeeScanAutoFlow /></EmployeeShell>} />
-      <Route path="/manager/login" element={<ManagerLogin />} />
+      <Route path="/manager/login" element={<SessionRedirect expected="manager"><ManagerLogin /></SessionRedirect>} />
       <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
       <Route path="/manager/employees" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerEmployees /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/workforce" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerWorkforceControls /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/requests" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerRequests /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager/workforce" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerRequests /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/audit" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerAudit /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/reports" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerReports /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/settings" element={<ManagerOnly><RequireManagerRole roles={["owner"]}><ManagerSettings /></RequireManagerRole></ManagerOnly>} />
