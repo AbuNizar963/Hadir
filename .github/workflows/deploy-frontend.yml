@@ -1,4 +1,4 @@
-name: Verify Hadir Frontend
+name: Deploy Hadir Frontend
 
 on:
   workflow_dispatch:
@@ -19,14 +19,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: hadir-frontend-verification
+  group: hadir-frontend-production
   cancel-in-progress: true
 
 env:
+  # Frontend deployment is intentionally isolated from the API/D1 deployment.
+  # This token must have Cloudflare Pages permissions only for the Hadir account.
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   PAGES_PRODUCTION_URL: https://hadir-9rq.pages.dev
 
 jobs:
-  verify:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,44 +42,71 @@ jobs:
           bun-version: 1.2.15
 
       - name: Install dependencies
-        # Cloudflare Pages Git integration is the sole frontend deploy path.
-        # This workflow verifies the deployed result; it must not fail merely
-        # because Bun needs to reconcile a stale lockfile in the runner.
+        # The repository lockfile has previously required Bun reconciliation.
+        # Do not use --frozen-lockfile until package.json and bun.lock are aligned.
         run: bun install
 
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Build exactly as the frontend deployment
+      - name: Build Cloudflare Pages production bundle
         env:
           VITE_BASE_PATH: /
         run: bun run build
 
-      - name: Validate local PWA artifacts
+      - name: Validate frontend deployment credentials
         shell: bash
         run: |
           set -euo pipefail
-          test -s dist/index.html
-          test -s dist/manifest.webmanifest
-          test -s dist/sw.js
-          test -s dist/build-version.json
-          python - <<'PY'
-          import json, os, re
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test "${#CLOUDFLARE_API_TOKEN}" -ge 20
+
+      - name: Resolve existing Cloudflare Pages project
+        id: pages-project
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 5 --retry-delay 2 --retry-all-errors \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects" \
+            -o /tmp/pages-projects.json
+
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import sys
           from pathlib import Path
-          manifest=json.loads(Path("dist/manifest.webmanifest").read_text(encoding="utf-8"))
-          assert manifest.get("start_url")=="./", manifest
-          assert manifest.get("scope")=="./", manifest
-          version=json.loads(Path("dist/build-version.json").read_text(encoding="utf-8"))
-          assert version.get("commitSha")==os.environ["GITHUB_SHA"], version
-          sw=Path("dist/sw.js").read_text(encoding="utf-8")
-          match=re.search(r'const CACHE="(hadir-shell-v\d+)";', sw)
-          assert match, "service-worker shell cache version declaration is missing"
-          assert "SKIP_WAITING" in sw
-          assert "notificationclick" in sw
-          print(f"Local build verified: {version['commitSha']}; {match.group(1)}")
+
+          data = json.loads(Path("/tmp/pages-projects.json").read_text(encoding="utf-8"))
+          if not data.get("success"):
+              raise SystemExit(f"Cloudflare Pages project lookup failed: {data.get('errors') or []}")
+
+          projects = data.get("result") or []
+          names = [p.get("name") for p in projects if p.get("name")]
+          preferred = ["hadir-9rq", "hadir"]
+          project = next((name for name in preferred if name in names), None)
+
+          if not project:
+              print("Existing Pages projects:", ", ".join(names) or "<none>", file=sys.stderr)
+              raise SystemExit("No existing Hadir Cloudflare Pages project was found; refusing to create a new project")
+
+          print(f"project_name={project}")
+          print(f"Resolved existing Pages project: {project}")
           PY
 
-      - name: Verify Cloudflare Pages production
+      - name: Deploy to existing Cloudflare Pages production project
+        env:
+          PROJECT_NAME: ${{ steps.pages-project.outputs.project_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler@4 pages deploy dist \
+            --project-name "$PROJECT_NAME" \
+            --branch main \
+            --commit-dirty=true
+
+      - name: Verify exact production build
         shell: bash
         run: |
           set -euo pipefail
@@ -90,7 +121,7 @@ jobs:
           data=json.loads(Path("/tmp/build-version.json").read_text(encoding="utf-8"))
           expected=os.environ["GITHUB_SHA"]
           actual=data.get("commitSha")
-          if actual==expected:
+          if actual == expected:
               print(f"Cloudflare Pages production serves commit {expected}.")
               raise SystemExit(0)
           print(f"Pages currently serves {actual!r}; waiting for {expected!r}.")
@@ -99,14 +130,14 @@ jobs:
               then exit 0; fi
             fi
             if [ "$attempt" -eq 36 ]; then
-              echo "Cloudflare Pages Git deployment did not publish the current commit within 3 minutes."
+              echo "Cloudflare Pages production did not expose the deployed commit within 3 minutes."
               exit 1
             fi
-            echo "Waiting for Cloudflare Pages Git deployment (attempt $attempt/36)..."
+            echo "Waiting for Cloudflare Pages production propagation (attempt $attempt/36)..."
             sleep 5
           done
 
-      - name: Verify deployed PWA metadata
+      - name: Verify deployed PWA metadata and service worker
         shell: bash
         run: |
           set -euo pipefail
@@ -118,22 +149,27 @@ jobs:
             -H 'Cache-Control: no-cache, no-store' \
             "$PAGES_PRODUCTION_URL/sw.js?hadir_ci=$GITHUB_SHA" \
             -o /tmp/sw.js
+
           python - <<'PY'
-          import json, re
+          import json
+          import re
           from pathlib import Path
+
           manifest=json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
           assert manifest.get("start_url")=="./", manifest
           assert manifest.get("scope")=="./", manifest
+
           sw=Path("/tmp/sw.js").read_text(encoding="utf-8")
           match=re.search(r'const CACHE="(hadir-shell-v\d+)";', sw)
           assert match, "production service-worker shell cache version declaration is missing"
-          assert "SKIP_WAITING" in sw
-          assert "notificationclick" in sw
+          assert "SKIP_WAITING" in sw, "service-worker update activation handler is missing"
+          assert "notificationclick" in sw, "service-worker notification click handler is missing"
           print(f"Production PWA verified: {match.group(1)}")
           PY
 
-      - name: Verification complete
+      - name: Deployment complete
         run: |
-          echo "Hadir frontend is verified against Cloudflare Pages Git integration."
+          echo "Hadir frontend deployed successfully to Cloudflare Pages."
           echo "Production URL: $PAGES_PRODUCTION_URL"
-          echo "Commit: $GITHUB_SHA"
+          echo "Source commit: $GITHUB_SHA"
+          echo "Cloudflare Pages project: ${{ steps.pages-project.outputs.project_name }}"
