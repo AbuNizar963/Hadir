@@ -39,6 +39,11 @@ jobs:
           bun-version: 1.2.15
 
       - name: Install dependencies
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+
+      - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Typecheck
@@ -56,35 +61,53 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test "${#CLOUDFLARE_API_TOKEN}" -ge 20
 
+      - name: Validate PWA artifacts before deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/manifest.webmanifest
+          test -s dist/sw.js
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("dist/manifest.webmanifest").read_text(encoding="utf-8"))
+          assert manifest.get("start_url") == "./", manifest
+          assert manifest.get("scope") == "./", manifest
+          sw = Path("dist/sw.js").read_text(encoding="utf-8")
+          assert "hadir-shell-v5" in sw, "expected current service-worker version is missing"
+          PY
+
       - name: Resolve existing Cloudflare Pages project
         id: pages-project
         shell: bash
         run: |
           set -euo pipefail
-          response="$(curl -fsS --retry 5 --retry-delay 2 \
+          curl -fsS --retry 8 --retry-delay 2 \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects")"
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects" \
+            -o /tmp/pages-projects.json
 
-          python - "$response" <<'PY' >> "$GITHUB_OUTPUT"
+          python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
-          import sys
+          from pathlib import Path
 
-          data = json.loads(sys.argv[1])
+          data = json.loads(Path("/tmp/pages-projects.json").read_text(encoding="utf-8"))
           if not data.get("success"):
               raise SystemExit("Cloudflare API did not return a successful Pages project list")
 
           projects = data.get("result") or []
-          names = [p.get("name") for p in projects if p.get("name")]
-          preferred = ["hadir", "hadir-9rq"]
-          project = next((name for name in preferred if name in names), None)
-
+          preferred = {"hadir", "hadir-9rq"}
+          project = next((p for p in projects if p.get("name") in preferred), None)
           if not project:
-              print("Existing Pages projects:", ", ".join(names) or "<none>", file=sys.stderr)
+              names = [p.get("name") for p in projects if p.get("name")]
+              print("Existing Pages projects:", ", ".join(names) or "<none>")
               raise SystemExit("No existing Hadir Pages project was found; refusing to create a new project")
 
-          print(f"project_name={project}")
-          print(f"project_subdomain={project}.pages.dev")
+          name = str(project["name"])
+          subdomain = str(project.get("subdomain") or f"{name}.pages.dev")
+          print(f"project_name={name}")
+          print(f"project_subdomain={subdomain}")
           PY
 
           echo "Using existing Cloudflare Pages project: $(grep '^project_name=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
@@ -96,20 +119,55 @@ jobs:
           set -euo pipefail
           npx wrangler@4 pages deploy dist --project-name "$PROJECT_NAME" --commit-dirty=true
 
-      - name: Verify deployed PWA metadata
+      - name: Verify latest Cloudflare Pages deployment
+        id: latest-deployment
         env:
-          PROJECT_SUBDOMAIN: ${{ steps.pages-project.outputs.project_subdomain }}
+          PROJECT_NAME: ${{ steps.pages-project.outputs.project_name }}
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsS --retry 8 --retry-delay 3 "https://$PROJECT_SUBDOMAIN/manifest.webmanifest" -o /tmp/manifest.json
-          curl -fsS --retry 8 --retry-delay 3 "https://$PROJECT_SUBDOMAIN/sw.js" -o /tmp/sw.js
+          curl -fsS --retry 8 --retry-delay 2 \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT_NAME/deployments?per_page=1" \
+            -o /tmp/latest-deployment.json
+
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path("/tmp/latest-deployment.json").read_text(encoding="utf-8"))
+          if not data.get("success"):
+              raise SystemExit("Cloudflare API did not return the latest Pages deployment")
+          deployments = data.get("result") or []
+          if not deployments:
+              raise SystemExit("No Pages deployment was returned after deployment")
+          deployment = deployments[0]
+          url = str(deployment.get("url") or "").rstrip("/")
+          if not url.startswith("https://"):
+              raise SystemExit(f"Unexpected Pages deployment URL: {url!r}")
+          print(f"deployment_url={url}")
+          PY
+
+      - name: Verify deployed PWA metadata and service worker
+        env:
+          DEPLOYMENT_URL: ${{ steps.latest-deployment.outputs.deployment_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify_url="${DEPLOYMENT_URL}?hadir_verify=$(date +%s)"
+          curl -fsS --retry 12 --retry-delay 5 --retry-all-errors "$verify_url/manifest.webmanifest" -o /tmp/manifest.json
+          curl -fsS --retry 12 --retry-delay 5 --retry-all-errors "$verify_url/sw.js" -o /tmp/sw.js
           python - <<'PY'
           import json
           from pathlib import Path
-          manifest = json.loads(Path('/tmp/manifest.json').read_text())
-          assert manifest.get('start_url') == './', manifest
-          assert manifest.get('scope') == './', manifest
-          sw = Path('/tmp/sw.js').read_text()
-          assert 'hadir-shell-v4' in sw, 'new service worker was not published'
+
+          manifest_text = Path("/tmp/manifest.json").read_text(encoding="utf-8")
+          manifest = json.loads(manifest_text)
+          assert manifest.get("start_url") == "./", manifest
+          assert manifest.get("scope") == "./", manifest
+
+          sw = Path("/tmp/sw.js").read_text(encoding="utf-8")
+          assert "hadir-shell-v5" in sw, "current service worker was not published"
           PY
+          echo "PWA deployment verified successfully at $DEPLOYMENT_URL"
