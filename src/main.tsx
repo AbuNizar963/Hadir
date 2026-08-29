@@ -6,7 +6,6 @@ import "./index.css";
 import "./live-ui.css";
 import "./label-visibility.css";
 import "./settings-page.css";
-import "./mobile-layout-width.css";
 import "./rotation-form.css";
 import "./employee-name.css";
 import { seedIfEmpty } from "@/lib/storage";
@@ -14,8 +13,6 @@ import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnost
 import { startRealtimeSync } from "@/lib/realtime";
 import { installApiCredentials } from "@/lib/apiCredentials";
 import { installDeviceDirectoryEnhancer } from "./deviceDirectoryEnhancer";
-import { backendMe } from "@/lib/backend";
-import { restorePwaSession } from "@/lib/pwaSession";
 
 installApiCredentials();
 seedIfEmpty();
@@ -26,7 +23,7 @@ installDeviceDirectoryEnhancer();
 if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
     const base = import.meta.env.BASE_URL || "/";
-    const swUrl = new URL("sw.js?v=7", new URL(base, window.location.origin)).toString();
+    const swUrl = new URL("sw.js?v=8", new URL(base, window.location.origin)).toString();
     const scope = new URL(base, window.location.origin).pathname;
     navigator.serviceWorker.register(swUrl, { scope, updateViaCache: "none" }).catch(() => undefined);
   });
@@ -82,58 +79,11 @@ function PwaInstallPrompt() {
   </button>;
 }
 
-function StartupSessionGate({ children }: { children: React.ReactNode }) {
-  const [status, setStatus] = useState<"checking" | "ready">("checking");
-
-  useEffect(() => {
-    let cancelled = false;
-    const bootstrap = async () => {
-      let result: any = null;
-      try {
-        result = await backendMe();
-      } catch {
-        try {
-          result = await restorePwaSession();
-        } catch {
-          result = null;
-        }
-      }
-      if (cancelled) return;
-      const user = result?.user as { id?: string; username?: string; jobNumber?: string; name?: string; role?: string } | undefined;
-      const role = String(user?.role || "").toLowerCase();
-      if (user?.id && ["employee", "staff"].includes(role)) {
-        window.location.replace("/employee");
-        return;
-      }
-      if (user?.id && ["owner", "manager", "supervisor", "admin"].includes(role)) {
-        window.location.replace("/manager");
-        return;
-      }
-      setStatus("ready");
-    };
-    void bootstrap();
-    return () => { cancelled = true; };
-  }, []);
-
-  if (status === "checking") {
-    return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center bg-background">
-      <div className="text-sm font-semibold">جاري التحقق من جلسة الدخول…</div>
-    </div>;
-  }
-  return <>{children}</>;
-}
-
-function Root() {
-  return <StartupSessionGate>
-    <App />
-    <PwaInstallPrompt />
-  </StartupSessionGate>;
-}
-
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppErrorBoundary>
-      <Root />
+      <App />
+      <PwaInstallPrompt />
     </AppErrorBoundary>
   </StrictMode>,
 );
