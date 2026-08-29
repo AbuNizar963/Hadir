@@ -1,15 +1,16 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
-import { getBackendAttendance, getBackendEmployees } from "@/lib/backend";
-import { getAttendance, getEmployees, getSettings } from "@/lib/storage";
+import { getBackendAudit, getBackendEmployees } from "@/lib/backend";
+import { getEmployees, getSettings } from "@/lib/storage";
 import { todayKey } from "@/lib/utils";
-import type { AttendanceRecord, Employee } from "@/types";
+import type { Employee } from "@/types";
 
 type Filter = "all" | "present" | "absent" | "late";
+type AttendanceAudit = { employeeId?: string; action?: string; result?: string; timestamp?: string };
 
 export default function ManagerDashboard() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceAudit[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -21,11 +22,11 @@ export default function ManagerDashboard() {
     const load = async () => {
       const [employeeResult, attendanceResult] = await Promise.allSettled([
         getBackendEmployees(),
-        getBackendAttendance(2000),
+        getBackendAudit(2000),
       ]);
       if (!active) return;
       setEmployees(employeeResult.status === "fulfilled" ? employeeResult.value : getEmployees());
-      setAttendance(attendanceResult.status === "fulfilled" ? attendanceResult.value : getAttendance());
+      setAttendance(attendanceResult.status === "fulfilled" ? attendanceResult.value : []);
       setLoading(false);
     };
     void load();
@@ -33,18 +34,18 @@ export default function ManagerDashboard() {
     return () => { active = false; window.clearInterval(timer); };
   }, []);
 
-  const todayRecords = useMemo(() => attendance.filter(r => r.timestamp.startsWith(today)), [attendance, today]);
-  const presentIds = useMemo(() => new Set(todayRecords.filter(r => r.type === "check-in").map(r => r.employeeId)), [todayRecords]);
+  const todayRecords = useMemo(() => attendance.filter(r => r.timestamp?.startsWith(today) && r.action === "check-in" && r.result === "success"), [attendance, today]);
+  const presentIds = useMemo(() => new Set(todayRecords.map(r => String(r.employeeId || "")).filter(Boolean)), [todayRecords]);
   const [hh, mm] = (settings?.workStart || "08:00").split(":").map(Number);
   const scheduled = useMemo(() => { const d = new Date(); d.setHours(hh, mm, 0, 0); return d; }, [hh, mm]);
-  const lateIds = useMemo(() => new Set(todayRecords.filter(r => r.type === "check-in").map(r => ({ ...r, late: Math.max(0, Math.round((new Date(r.timestamp).getTime() - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)) })).filter(r => r.late > 0).map(r => r.employeeId)), [todayRecords, scheduled, settings?.lateGraceMinutes]);
+  const lateIds = useMemo(() => new Set(todayRecords.filter(r => { const timestamp = Date.parse(String(r.timestamp || "")); if (!Number.isFinite(timestamp)) return false; const late = Math.max(0, Math.round((timestamp - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)); return late > 0; }).map(r => String(r.employeeId || "")).filter(Boolean)), [todayRecords, scheduled, settings?.lateGraceMinutes]);
   const activeEmployees = useMemo(() => employees.filter(e => e.status === "active"), [employees]);
-  const absentCount = Math.max(0, activeEmployees.filter(e => !presentIds.has(e.id)).length);
+  const absentCount = Math.max(0, activeEmployees.filter(e => !presentIds.has(String(e.id))).length);
   const filteredEmployees = useMemo(() => activeEmployees.filter(e => {
     if (search && !e.name.includes(search)) return false;
-    if (filter === "present" && !presentIds.has(e.id)) return false;
-    if (filter === "absent" && presentIds.has(e.id)) return false;
-    if (filter === "late" && !lateIds.has(e.id)) return false;
+    if (filter === "present" && !presentIds.has(String(e.id))) return false;
+    if (filter === "absent" && presentIds.has(String(e.id))) return false;
+    if (filter === "late" && !lateIds.has(String(e.id))) return false;
     return true;
   }), [activeEmployees, search, filter, presentIds, lateIds]);
 
@@ -79,7 +80,7 @@ export default function ManagerDashboard() {
           {(["all", "present", "absent", "late"] as Filter[]).map(v => <button key={v} onClick={() => setFilter(v)} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${filter === v ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{v === "all" ? "الكل" : v === "present" ? "الحاضرون" : v === "absent" ? "الغائبون" : "المتأخرون"}</button>)}
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث باسم الموظف" className="min-w-[180px] flex-1 rounded-lg border bg-secondary/50 px-3 py-1.5 text-sm" />
         </div>
-        {loading ? <div className="py-8 text-center text-sm text-muted-foreground">جاري مزامنة بيانات الحضور…</div> : filteredEmployees.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">لا توجد نتائج مطابقة.</div> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{filteredEmployees.map(e => <EmployeeRow key={e.id} employee={e} present={presentIds.has(e.id)} late={lateIds.has(e.id)} />)}</div>}
+        {loading ? <div className="py-8 text-center text-sm text-muted-foreground">جاري مزامنة بيانات الحضور…</div> : filteredEmployees.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">لا توجد نتائج مطابقة.</div> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{filteredEmployees.map(e => <EmployeeRow key={e.id} employee={e} present={presentIds.has(String(e.id))} late={lateIds.has(String(e.id))} />)}</div>}
       </section>
     </ManagerLayout>
   );
