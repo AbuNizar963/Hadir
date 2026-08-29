@@ -29,7 +29,11 @@ function localDateKey(timestamp: string | undefined): string | null {
   if (!timestamp) return null;
   const date = new Date(timestamp);
   if (!Number.isFinite(date.getTime())) return null;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : null;
 }
 
 export default function ManagerDashboard() {
@@ -79,9 +83,6 @@ export default function ManagerDashboard() {
     };
   }, []);
 
-  // D1 attendance is the authoritative source for dashboard presence.
-  // Audit is intentionally not used here because audit entries can be absent
-  // or incomplete even when the actual attendance row was written successfully.
   const todayRecords = useMemo(
     () => attendance.filter((record) => localDateKey(record.timestamp) === today && String(record.type) === "check-in"),
     [attendance, today],
@@ -94,9 +95,9 @@ export default function ManagerDashboard() {
 
   const [hh, mm] = (settings?.workStart || "08:00").split(":").map(Number);
   const scheduled = useMemo(() => {
-    const d = new Date(`${today}T00:00:00`);
-    d.setHours(hh, mm, 0, 0);
-    return d;
+    const safeHh = Number.isFinite(hh) ? hh : 8;
+    const safeMm = Number.isFinite(mm) ? mm : 0;
+    return new Date(`${today}T${String(safeHh).padStart(2, "0")}:${String(safeMm).padStart(2, "0")}:00+03:00`);
   }, [today, hh, mm]);
 
   const lateIds = useMemo(
@@ -114,7 +115,7 @@ export default function ManagerDashboard() {
   );
 
   const activeEmployees = useMemo(() => employees.filter((employee) => employee.status === "active"), [employees]);
-  const targetDate = useMemo(() => new Date(`${today}T12:00:00`), [today]);
+  const targetDate = useMemo(() => new Date(`${today}T12:00:00+03:00`), [today]);
 
   const restIds = useMemo(
     () => new Set(activeEmployees.filter((employee) => isScheduledRestDay(employee, targetDate)).map((employee) => String(employee.id)).filter(Boolean)),
@@ -170,7 +171,7 @@ export default function ManagerDashboard() {
   ];
 
   return (
-    <ManagerLayout title="لوحة القيادة" subtitle={`نظرة مباشرة على حالة الدوام اليوم · ${targetDate.toLocaleDateString("ar-EG", { weekday: "long", day: "2-digit", month: "long" })}`}>
+    <ManagerLayout title="لوحة القيادة" subtitle={`نظرة مباشرة على حالة الدوام اليوم · ${targetDate.toLocaleDateString("ar-EG", { weekday: "long", day: "2-digit", month: "long", timeZone: "Asia/Damascus" })}`}>
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-6">
         <Kpi label="إجمالي الموظفين" value={activeEmployees.length} />
         <Kpi label="حضور اليوم" value={presentIds.size} accent="primary" />
