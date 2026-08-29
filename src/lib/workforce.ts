@@ -14,19 +14,37 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) throw new Error(String((data as any).error || "تعذر تنفيذ العملية"));
   return data as T;
 }
+
+// Cloudflare/API gateways can legitimately return an envelope such as
+// { data: [...] } instead of a bare array. Never let a transient/variant
+// response reach React code that calls .filter/.map/.length directly.
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["data", "items", "results", "rows", "notifications", "requests", "tasks", "violations", "reviews", "events", "insights"]) {
+      if (Array.isArray(record[key])) return record[key] as T[];
+    }
+  }
+  return [];
+}
+async function requestArray<T>(path: string, init: RequestInit = {}): Promise<T[]> {
+  return asArray<T>(await request<unknown>(path, init));
+}
+
 export const workforce = {
-  notifications: () => request<LiveNotification[]>("/api/workforce/notifications"),
+  notifications: () => requestArray<LiveNotification>("/api/workforce/notifications"),
   markNotificationRead: (id: string) => request<{ ok: true }>(`/api/workforce/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
-  violations: (employeeId?: string) => request<Violation[]>(`/api/workforce/violations${employeeId ? `?employeeId=${encodeURIComponent(employeeId)}` : ""}`),
-  leaveRequests: () => request<LeaveRequest[]>("/api/workforce/leave-requests"),
+  violations: (employeeId?: string) => requestArray<Violation>(`/api/workforce/violations${employeeId ? `?employeeId=${encodeURIComponent(employeeId)}` : ""}`),
+  leaveRequests: () => requestArray<LeaveRequest>("/api/workforce/leave-requests"),
   createLeaveRequest: (body: Pick<LeaveRequest, "type" | "startDate" | "endDate" | "reason">) => request<LeaveRequest>("/api/workforce/leave-requests", { method: "POST", body: JSON.stringify(body) }),
   reviewLeave: (id: string, status: "approved" | "rejected") => request<LeaveRequest>(`/api/workforce/leave-requests/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status }) }),
-  tasks: () => request<WorkforceTask[]>("/api/workforce/tasks"),
+  tasks: () => requestArray<WorkforceTask>("/api/workforce/tasks"),
   createTask: (body: { title: string; description?: string; assigneeId?: string; priority?: TaskPriority; dueAt?: string }) => request<WorkforceTask>("/api/workforce/tasks", { method: "POST", body: JSON.stringify(body) }),
   updateTask: (id: string, body: { status?: TaskStatus; priority?: TaskPriority }) => request<WorkforceTask>(`/api/workforce/tasks/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) }),
-  performance: (employeeId: string) => request<PerformanceReview[]>(`/api/workforce/performance/${encodeURIComponent(employeeId)}`),
-  anomalies: () => request<AnomalyEvent[]>("/api/workforce/anomalies"),
-  insights: (scope = "dashboard") => request<AIInsight[]>(`/api/workforce/insights?scope=${encodeURIComponent(scope)}`),
+  performance: (employeeId: string) => requestArray<PerformanceReview>(`/api/workforce/performance/${encodeURIComponent(employeeId)}`),
+  anomalies: () => requestArray<AnomalyEvent>("/api/workforce/anomalies"),
+  insights: (scope = "dashboard") => requestArray<AIInsight>(`/api/workforce/insights?scope=${encodeURIComponent(scope)}`),
 };
 
 export function subscribeWorkforceUpdates(handler: (event: Event) => void) {
