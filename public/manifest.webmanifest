@@ -13,23 +13,10 @@
   "background_color": "#0b0f14",
   "theme_color": "#0b0f14",
   "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
-    { "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
-  ],
-  "shortcuts": [
-    {
-      "name": "تسجيل الحضور والانصراف",
-      "short_name": "الحضور",
-      "description": "فتح شاشة تسجيل الحضور والانصراف",
-      "url": "./employee/",
-      "icons": [{ "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
-    },
-    {
-      "name": "دخول الموظف",
-      "short_name": "دخول الموظف",
-      "description": "فتح صفحة دخول الموظف",
-      "url": "./employee/",
-      "icons": [{ "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
-    }
+    { "src": "./pwa-icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./pwa-icon.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./pwa-icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
   ]
 }
