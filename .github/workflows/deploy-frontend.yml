@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_API }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
@@ -157,8 +157,7 @@ jobs:
           import json
           from pathlib import Path
 
-          manifest_text = Path("/tmp/manifest.json").read_text(encoding="utf-8")
-          manifest = json.loads(manifest_text)
+          manifest = json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
           assert manifest.get("start_url") == "./", manifest
           assert manifest.get("scope") == "./", manifest
 
