@@ -44,9 +44,17 @@
           if (['owner','manager','supervisor','admin'].includes(role)) { location.replace('/manager'); return true; }
           return false;
         };
-        (async () => {
+        const storedToken = () => {
           try {
-            const r = await fetch('/api/me', { credentials: 'include', cache: 'no-store', headers: { accept: 'application/json' } });
+            return localStorage.getItem('hadir.api.token.employee') || localStorage.getItem('hadir.api.token.admin') || localStorage.getItem('hadir.api.token') || '';
+          } catch { return ''; }
+        };
+        (async () => {
+          const token = storedToken();
+          const headers = { accept: 'application/json' };
+          if (token) headers.authorization = `Bearer ${token}`;
+          try {
+            const r = await fetch('/api/me', { credentials: 'include', cache: 'no-store', headers });
             if (r.ok) {
               const data = await r.json().catch(() => null);
               if (go(data?.user)) return;
@@ -79,17 +87,8 @@
             const rows = await r.json();
             if (!Array.isArray(rows)) return;
             const ids = seen();
-            if (!primed) {
-              rows.forEach(n => ids.add(n.id));
-              primed = true;
-              saveSeen(ids);
-              return;
-            }
-            for (const n of rows) {
-              if (ids.has(n.id)) continue;
-              ids.add(n.id);
-              show(n);
-            }
+            if (!primed) { rows.forEach(n => ids.add(n.id)); primed = true; saveSeen(ids); return; }
+            for (const n of rows) { if (ids.has(n.id)) continue; ids.add(n.id); show(n); }
             saveSeen(ids);
           } catch {}
         };
