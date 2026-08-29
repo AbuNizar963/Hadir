@@ -1,4 +1,4 @@
-const CACHE="hadir-shell-v6";
+const CACHE="hadir-shell-v7";
 const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[new URL("./",self.registration.scope).href,new URL("./manifest.webmanifest",self.registration.scope).href];
 
@@ -9,9 +9,9 @@ self.addEventListener("fetch",e=>{
   if(r.method!=="GET")return;
   const u=new URL(r.url);
   if(u.origin!==self.location.origin||!u.pathname.startsWith(BASE))return;
-  // Never cache API/auth responses: session state must always come from the server.
+  // Authentication and API state are never cached.
   if(u.pathname.startsWith(`${BASE}api/`))return;
-  // Navigation must reach the network first so a newly deployed auth bootstrap is used.
+  // Navigation is network-first so auth bootstrap and new deployments are used.
   if(r.mode==="navigate"){
     e.respondWith(fetch(r,{cache:"no-store"}).catch(()=>caches.match(new URL("./",self.registration.scope).href)));
     return;
@@ -31,7 +31,7 @@ function resolveNotificationUrl(value){
 
 self.addEventListener("push",e=>e.waitUntil((async()=>{
   let d={};
-  try{d=e.data?e.data.json():{}}catch{d={body:e.data?.text()||"لديك إشعار جديد في Hadir"};}
+  try{d=e.data?e.data.json():{body:e.data?.text()||"لديك إشعار جديد في Hadir"};}catch{d={body:e.data?.text()||"لديك إشعار جديد في Hadir"};}
   const title=String(d.title||"إشعار جديد");
   const body=String(d.body||d.message||"لديك إشعار جديد في Hadir");
   const url=resolveNotificationUrl(d.url||d.path||"/");
