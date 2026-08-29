@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useState } from "react";
+import { CalendarDays, Coffee } from "lucide-react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getBackendAudit, getBackendEmployees } from "@/lib/backend";
 import { getEmployees, getSettings } from "@/lib/storage";
@@ -80,8 +81,6 @@ export default function ManagerDashboard() {
       .filter(Boolean),
   ), [activeEmployees, targetDate]);
 
-  // Only an approved leave request whose date range contains today is a leave day.
-  // Leave is classified after present/rest so an actual check-in always remains authoritative.
   const leaveIds = useMemo(() => new Set(
     leaveRequests
       .filter(request => request.status === "approved" && request.startDate <= today && request.endDate >= today)
@@ -126,8 +125,11 @@ export default function ManagerDashboard() {
         <Kpi label="حضور اليوم" value={presentIds.size} accent="primary" />
         <Kpi label="غياب اليوم" value={absentCount} accent="warning" />
         <Kpi label="متأخرون" value={lateIds.size} accent="destructive" />
-        <Kpi label="الراحة" value={restIds.size} accent="rest" />
-        <Kpi label="الإجازات" value={leaveIds.size} accent="leave" />
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 mb-6" aria-label="الراحة والإجازات">
+        <StatusShortcut label="الراحة" value={restIds.size} icon={<Coffee className="h-5 w-5" aria-hidden="true" />} tone="rest" onClick={() => setFilter("rest")} active={filter === "rest"} />
+        <StatusShortcut label="الإجازات" value={leaveIds.size} icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />} tone="leave" onClick={() => setFilter("leave")} active={filter === "leave"} />
       </section>
 
       <section className="hud-card p-5 mb-6">
@@ -166,10 +168,19 @@ const EmployeeRow = memo(function EmployeeRow({ employee, present, absent, rest,
   return <div className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${cls}`}><span className="min-w-0 truncate font-semibold" title={employee.name}>{employee.name}</span><span className="shrink-0 rounded-full bg-background/70 px-2 py-1 text-[11px] font-bold">{status}</span></div>;
 });
 
-const Kpi = memo(function Kpi({ label, value, accent }: { label: string; value: number | string; accent?: "primary" | "warning" | "destructive" | "rest" | "leave" }) {
-  const color = accent === "primary" ? "text-primary" : accent === "warning" ? "text-[hsl(var(--warning))]" : accent === "destructive" ? "text-destructive" : accent === "rest" ? "text-sky-600 dark:text-sky-300" : accent === "leave" ? "text-violet-600 dark:text-violet-300" : "text-foreground";
+const Kpi = memo(function Kpi({ label, value, accent }: { label: string; value: number | string; accent?: "primary" | "warning" | "destructive" }) {
+  const color = accent === "primary" ? "text-primary" : accent === "warning" ? "text-[hsl(var(--warning))]" : accent === "destructive" ? "text-destructive" : "text-foreground";
   return <div className="hud-card p-4"><div className="text-xs text-muted-foreground">{label}</div><div className={`mt-1 text-3xl font-extrabold mono ${color}`}>{value}</div></div>;
 });
+
+function StatusShortcut({ label, value, icon, tone, onClick, active }: { label: string; value: number; icon: React.ReactNode; tone: "rest" | "leave"; onClick: () => void; active: boolean }) {
+  const style = tone === "rest" ? "border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300" : "border-violet-500/30 bg-violet-500/5 text-violet-700 dark:text-violet-300";
+  return <button type="button" onClick={onClick} aria-pressed={active} className={`hud-card flex items-center justify-between gap-3 p-4 text-right transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${style} ${active ? "ring-2 ring-primary/40" : ""}`}>
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background/70" aria-hidden="true">{icon}</span>
+    <span className="min-w-0 flex-1"><span className="block text-xs font-bold">{label}</span><span className="mt-1 block text-2xl font-black mono">{value}</span></span>
+    <span className="text-[10px] font-semibold opacity-70">عرض القائمة</span>
+  </button>;
+}
 
 function StatusCard({ label, value, tone }: { label: string; value: number; tone: "present" | "absent" | "late" | "rest" | "leave" }) {
   const style = tone === "present" ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300" : tone === "absent" ? "border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300" : tone === "rest" ? "border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300" : tone === "leave" ? "border-violet-500/30 bg-violet-500/5 text-violet-700 dark:text-violet-300" : "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300";
