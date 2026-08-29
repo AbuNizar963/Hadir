@@ -35,5 +35,5 @@ jobs:
         run: bun run typecheck
       - name: Production build
         env:
-          VITE_BASE_PATH: /Hadir/
+          VITE_BASE_PATH: /
         run: bun run build
