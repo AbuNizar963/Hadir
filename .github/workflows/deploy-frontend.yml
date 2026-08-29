@@ -22,6 +22,7 @@ env:
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   PAGES_PRODUCTION_URL: https://hadir-9rq.pages.dev
+  PAGES_PROJECT_NAME: hadir
 
 concurrency:
   group: hadir-frontend-production
@@ -58,50 +59,12 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test "${#CLOUDFLARE_API_TOKEN}" -ge 20
 
-      - name: Resolve existing Cloudflare Pages project
-        id: pages-project
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -fsS --retry 5 --retry-delay 2 --retry-all-errors \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects" \
-            -o /tmp/pages-projects.json
-
-          python - <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-
-          data = json.loads(Path("/tmp/pages-projects.json").read_text(encoding="utf-8"))
-          if not data.get("success"):
-              raise SystemExit(f"Cloudflare Pages project lookup failed: {data.get('errors') or []}")
-
-          projects = data.get("result") or []
-          names = [p.get("name") for p in projects if p.get("name")]
-          preferred = ["hadir-9rq", "hadir"]
-          project = next((name for name in preferred if name in names), None)
-
-          if not project:
-              print("Existing Pages projects:", ", ".join(names) or "<none>", file=sys.stderr)
-              raise SystemExit("No existing Hadir Cloudflare Pages project was found; refusing to create a new project")
-
-          Path("/tmp/pages-project-name").write_text(project, encoding="utf-8")
-          PY
-
-          project="$(cat /tmp/pages-project-name)"
-          printf 'project_name=%s\n' "$project" >> "$GITHUB_OUTPUT"
-          echo "Resolved existing Pages project: $project"
-
-      - name: Deploy to existing Cloudflare Pages production project
-        env:
-          PROJECT_NAME: ${{ steps.pages-project.outputs.project_name }}
+      - name: Deploy to Cloudflare Pages production
         shell: bash
         run: |
           set -euo pipefail
           npx wrangler@4 pages deploy dist \
-            --project-name "$PROJECT_NAME" \
+            --project-name "$PAGES_PROJECT_NAME" \
             --branch main \
             --commit-dirty=true
 
@@ -175,4 +138,4 @@ jobs:
           echo "Hadir frontend deployed successfully to Cloudflare Pages."
           echo "Production URL: $PAGES_PRODUCTION_URL"
           echo "Source commit: $GITHUB_SHA"
-          echo "Cloudflare Pages project: ${{ steps.pages-project.outputs.project_name }}"
+          echo "Cloudflare Pages project: $PAGES_PROJECT_NAME"
