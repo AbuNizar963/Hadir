@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
 import { backendEmployeeLogin, getEmployeeDeviceStatus, backendMe, registerEmployeePasskey } from "@/lib/backend";
+import { getDeviceLabelAsync } from "@/lib/device";
 import { setSession, setManagerSession, getSession } from "@/lib/storage";
 import { getSettings } from "@/lib/storage";
 
@@ -48,6 +49,9 @@ export default function EmployeeLogin() {
     try {
       if (!/^\d{6}$/.test(pin)) { setErr("رمز دخول الموظف يجب أن يتكون من 6 أرقام بالضبط."); setLoading(false); return; }
       setManagerSession(null);
+      // Resolve the most accurate device model before backendEmployeeLogin reads the label.
+      // Modern Chromium browsers may provide the real Android model through User-Agent Client Hints.
+      await getDeviceLabelAsync().catch(() => undefined);
       const timeout = new Promise<never>((_, reject) => { timer = window.setTimeout(() => reject(new Error("انتهت مهلة الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.")), LOGIN_TIMEOUT_MS); });
       const rawUser = await Promise.race([backendEmployeeLogin(jobNumber.trim(), pin), timeout]) as EmployeeLoginUser;
       const employeeId = String(rawUser?.id || "").trim();
