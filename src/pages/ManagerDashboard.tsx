@@ -9,6 +9,28 @@ import type { Employee } from "@/types";
 type Filter = "all" | "present" | "absent" | "late" | "rest";
 type AttendanceAudit = { employeeId?: string; action?: string; result?: string; timestamp?: string };
 
+function scheduleTypeOf(employee: Employee): "ADMIN" | "ROTATION" {
+  return String(employee.scheduleType || "ADMIN").trim().toUpperCase() === "ROTATION" ? "ROTATION" : "ADMIN";
+}
+
+function isScheduledRestDay(employee: Employee, target: Date): boolean {
+  const scheduleType = scheduleTypeOf(employee);
+
+  // Administrative schedules are driven by their explicit weekly work days.
+  // Never infer absence before checking this source of truth.
+  if (scheduleType === "ADMIN") {
+    const workDays = Array.isArray(employee.workDays)
+      ? [...new Set(employee.workDays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))]
+      : [0, 1, 2, 3, 4];
+    return !workDays.includes(target.getDay());
+  }
+
+  // Rotation schedules are driven by the employee's own cycle. Only an
+  // explicit OFF period is a rest day; malformed schedules stay unclassified
+  // rather than being silently converted into absence.
+  return getEmployeeWorkPeriod(employee, target).kind === "OFF";
+}
+
 export default function ManagerDashboard() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<AttendanceAudit[]>([]);
@@ -43,12 +65,11 @@ export default function ManagerDashboard() {
   const lateIds = useMemo(() => new Set(todayRecords.filter(r => { const timestamp = Date.parse(String(r.timestamp || "")); if (!Number.isFinite(timestamp)) return false; const late = Math.max(0, Math.round((timestamp - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)); return late > 0; }).map(r => String(r.employeeId || "")).filter(Boolean)), [todayRecords, scheduled, settings?.lateGraceMinutes]);
   const activeEmployees = useMemo(() => employees.filter(e => e.status === "active"), [employees]);
 
-  // The schedule period is the single source of truth for whether an employee
-  // is expected to work today. Only an explicit OFF period is classified as rest.
-  // This prevents scheduled rest days from ever entering the absence set.
+  // Attendance classification order is deliberate:
+  // 1) present, 2) scheduled rest, 3) absent. A rest day can never become absent.
   const restIds = useMemo(() => new Set(
     activeEmployees
-      .filter(employee => getEmployeeWorkPeriod(employee, now).kind === "OFF")
+      .filter(employee => isScheduledRestDay(employee, now))
       .map(employee => String(employee.id))
       .filter(Boolean),
   ), [activeEmployees, today]);
