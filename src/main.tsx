@@ -6,7 +6,6 @@ import "./index.css";
 import "./live-ui.css";
 import "./label-visibility.css";
 import "./settings-page.css";
-import "./layout-unified.css";
 import "./mobile-layout-width.css";
 import "./rotation-form.css";
 import "./employee-name.css";
@@ -27,7 +26,7 @@ installDeviceDirectoryEnhancer();
 if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
     const base = import.meta.env.BASE_URL || "/";
-    const swUrl = new URL("sw.js?v=6", new URL(base, window.location.origin)).toString();
+    const swUrl = new URL("sw.js?v=7", new URL(base, window.location.origin)).toString();
     const scope = new URL(base, window.location.origin).pathname;
     navigator.serviceWorker.register(swUrl, { scope, updateViaCache: "none" }).catch(() => undefined);
   });
