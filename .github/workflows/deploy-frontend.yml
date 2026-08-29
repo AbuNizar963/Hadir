@@ -54,6 +54,7 @@ jobs:
           set -euo pipefail
           test -s dist/manifest.webmanifest
           test -s dist/sw.js
+          test -s dist/build-version.json
           python - <<'PY'
           import json
           import re
@@ -63,64 +64,95 @@ jobs:
           assert manifest.get("start_url") == "./", manifest
           assert manifest.get("scope") == "./", manifest
 
+          version = json.loads(Path("dist/build-version.json").read_text(encoding="utf-8"))
+          assert version.get("commitSha") == "${GITHUB_SHA}", version
+
           sw = Path("dist/sw.js").read_text(encoding="utf-8")
           match = re.search(r'const CACHE="(hadir-shell-v\d+)";', sw)
           assert match, "service-worker cache version declaration is missing"
-          assert match.group(1) == "hadir-shell-v7", (
-              f"unexpected service-worker cache version: {match.group(1)}"
-          )
           assert "SKIP_WAITING" in sw, "service-worker update activation handler is missing"
           assert "notificationclick" in sw, "service-worker notification click handler is missing"
+          print(f"Local build fingerprint verified: {version['commitSha']}")
+          print(f"Service-worker shell cache: {match.group(1)}")
           PY
 
       - name: Wait for Cloudflare Pages production deployment
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 24); do
+          for attempt in $(seq 1 60); do
             headers="$(curl -sS -D - -o /tmp/index.html -H 'Cache-Control: no-cache' "$PAGES_PRODUCTION_URL/?hadir_ci=$GITHUB_SHA" || true)"
             if grep -qi '^HTTP/.* 200' <<< "$headers"; then
+              echo "Pages production is reachable."
               break
             fi
-            echo "Pages production is not ready yet (attempt $attempt/24); waiting 5s..."
+            if [ "$attempt" -eq 60 ]; then
+              echo "Cloudflare Pages production URL did not become reachable within 5 minutes: $PAGES_PRODUCTION_URL"
+              exit 1
+            fi
+            echo "Pages production is not ready yet (attempt $attempt/60); waiting 5s..."
             sleep 5
           done
           test -s /tmp/index.html
+
+      - name: Verify exact commit deployed to Cloudflare Pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl -fsS --retry 2 --retry-delay 2 --retry-all-errors \
+              -H 'Cache-Control: no-cache' \
+              "$PAGES_PRODUCTION_URL/build-version.json?hadir_ci=$GITHUB_SHA" \
+              -o /tmp/build-version.json; then
+              if python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("/tmp/build-version.json").read_text(encoding="utf-8"))
+          expected = "${GITHUB_SHA}"
+          if data.get("commitSha") == expected:
+              print(f"Cloudflare Pages is serving commit {expected}.")
+              raise SystemExit(0)
+          print(f"Pages is serving {data.get('commitSha')!r}; expected {expected!r}.")
+          raise SystemExit(1)
+          PY
+              then
+                exit 0
+              fi
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Cloudflare Pages did not expose the current Git commit after 5 minutes."
+              echo "This means the Git-integrated Pages deployment has not published this commit yet, or the configured production URL is not the project connected to this repository."
+              exit 1
+            fi
+            echo "Cloudflare Pages is still serving an older build (attempt $attempt/60); waiting 5s..."
+            sleep 5
+          done
 
       - name: Verify deployed PWA metadata and service worker
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 24); do
-            if curl -fsS --retry 2 --retry-delay 2 --retry-all-errors \
-              -H 'Cache-Control: no-cache' \
-              "$PAGES_PRODUCTION_URL/manifest.webmanifest?hadir_ci=$GITHUB_SHA" \
-              -o /tmp/manifest.json && \
-              curl -fsS --retry 2 --retry-delay 2 --retry-all-errors \
-              -H 'Cache-Control: no-cache' \
-              "$PAGES_PRODUCTION_URL/sw.js?hadir_ci=$GITHUB_SHA" \
-              -o /tmp/sw.js; then
-              if python - <<'PY'
+          curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
+            -H 'Cache-Control: no-cache' \
+            "$PAGES_PRODUCTION_URL/manifest.webmanifest?hadir_ci=$GITHUB_SHA" \
+            -o /tmp/manifest.json
+          curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
+            -H 'Cache-Control: no-cache' \
+            "$PAGES_PRODUCTION_URL/sw.js?hadir_ci=$GITHUB_SHA" \
+            -o /tmp/sw.js
+          python - <<'PY'
           import json
           from pathlib import Path
           manifest = json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
           sw = Path("/tmp/sw.js").read_text(encoding="utf-8")
           assert manifest.get("start_url") == "./", manifest
           assert manifest.get("scope") == "./", manifest
-          assert "hadir-shell-v7" in sw
+          assert "SKIP_WAITING" in sw
+          assert "notificationclick" in sw
+          print("Cloudflare Pages production PWA metadata and service worker verified.")
           PY
-              then
-                echo "Cloudflare Pages production PWA verified: $PAGES_PRODUCTION_URL"
-                exit 0
-              fi
-            fi
-            echo "Production PWA is not updated yet (attempt $attempt/24); waiting 5s..."
-            sleep 5
-          done
-          echo "Cloudflare Pages did not expose the expected PWA metadata after the deployment window."
-          exit 1
 
       - name: Verification complete
         run: |
-          echo "Frontend typecheck, production build, and PWA artifact validation passed."
+          echo "Frontend typecheck, production build, exact Pages commit, and PWA verification passed."
           echo "Cloudflare Pages Git integration is responsible for the production deployment."
