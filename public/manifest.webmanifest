@@ -5,7 +5,7 @@
   "description": "نظام حاضر لتسجيل الحضور والانصراف وإدارة الموظفين",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "/?pwa=1",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
