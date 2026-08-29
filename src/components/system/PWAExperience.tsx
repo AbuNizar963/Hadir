@@ -8,7 +8,7 @@ type BeforeInstallPromptEvent = Event & {
 
 const INSTALL_DISMISSED_KEY = "hadir.pwa.install.dismissed";
 const UPDATE_DISMISSED_KEY = "hadir.pwa.update.dismissed";
-const PWA_INSTALL_VERSION = "v3";
+const PWA_INSTALL_VERSION = "v4";
 
 function isStandalone() {
   if (typeof window === "undefined") return false;
@@ -45,8 +45,6 @@ export default function PWAExperience() {
   const [standalone, setStandalone] = useState(() => isStandalone());
   const [updating, setUpdating] = useState(false);
 
-  // The install invitation belongs to an authenticated experience. Keeping it
-  // off the landing/login screens prevents it from competing with sign-in.
   const installEligible = location.pathname.startsWith("/employee") || location.pathname.startsWith("/manager");
 
   useEffect(() => {
@@ -92,8 +90,6 @@ export default function PWAExperience() {
     };
   }, []);
 
-  // Android/Chromium: once the user reaches the employee or manager area,
-  // surface the native install prompt in our existing UI rather than on login.
   useEffect(() => {
     if (!installEligible || standalone || !installEvent || installDismissedThisVersion()) {
       setInstallVisible(false);
@@ -103,8 +99,6 @@ export default function PWAExperience() {
     return () => window.clearTimeout(timer);
   }, [installEligible, standalone, installEvent]);
 
-  // iOS/iPadOS has no beforeinstallprompt. Show the same visual invitation,
-  // but guide the user through Apple's Share -> Add to Home Screen flow.
   useEffect(() => {
     if (!installEligible || standalone || installEvent || !isIos() || !isMobile() || installDismissedThisVersion()) {
       setManualInstallVisible(false);
@@ -159,12 +153,19 @@ export default function PWAExperience() {
 
   const install = async () => {
     if (!installEvent) return;
-    await installEvent.prompt();
-    const choice = await installEvent.userChoice;
-    setInstallEvent(null);
-    setInstallVisible(false);
-    if (choice.outcome === "dismissed") {
-      try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {}
+    try {
+      await installEvent.prompt();
+      const choice = await installEvent.userChoice;
+      setInstallEvent(null);
+      setInstallVisible(false);
+      if (choice.outcome === "dismissed") {
+        try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {}
+      }
+    } catch {
+      // The native prompt can become unavailable if the browser consumes the
+      // one-shot event. Keep the user in the site rather than showing an error.
+      setInstallEvent(null);
+      setInstallVisible(false);
     }
   };
 
@@ -193,11 +194,11 @@ export default function PWAExperience() {
   }
 
   if (installVisible && installEvent && installEligible) {
-    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-primary/10"><img src="/pwa-icon.svg" alt="" className="size-9" /></div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">أضف حاضر إلى جهازك للوصول السريع وتشغيله كتطبيق مستقل. حسابك وبياناتك لا تتأثر بالتثبيت.</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => void install()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">تثبيت الآن</button><button type="button" onClick={dismissInstall} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">ليس الآن</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
+    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-primary/10"><img src="/pwa-icon-192.png" alt="" className="size-9" /></div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">أضف حاضر إلى جهازك للوصول السريع وتشغيله كتطبيق مستقل. حسابك وبياناتك لا تتأثر بالتثبيت.</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => void install()} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">تثبيت الآن</button><button type="button" onClick={dismissInstall} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">ليس الآن</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   }
 
   if (manualInstallVisible && isIos() && isMobile() && installEligible) {
-    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-primary/10"><img src="/pwa-icon.svg" alt="حاضر" className="size-9" /></div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر على iPhone</p><p className="mt-1 text-xs leading-6 text-muted-foreground">اضغط زر المشاركة <span aria-hidden="true">⬆️</span> في Safari، ثم اختر «إضافة إلى الشاشة الرئيسية» ليظهر حاضر كتطبيق مستقل على جهازك.</p><button type="button" onClick={dismissInstall} className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">فهمت</button></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
+    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-primary/10"><img src="/pwa-icon-192.png" alt="حاضر" className="size-9" /></div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر على iPhone</p><p className="mt-1 text-xs leading-6 text-muted-foreground">اضغط زر المشاركة <span aria-hidden="true">⬆️</span> في Safari، ثم اختر «إضافة إلى الشاشة الرئيسية» ليظهر حاضر كتطبيق مستقل على جهازك.</p><button type="button" onClick={dismissInstall} className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">فهمت</button></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   }
 
   return null;
