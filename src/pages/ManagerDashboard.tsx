@@ -3,7 +3,7 @@ import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getBackendAudit, getBackendEmployees } from "@/lib/backend";
 import { getEmployees, getSettings } from "@/lib/storage";
 import { todayKey } from "@/lib/utils";
-import { getEmployeeScheduleStatus } from "@/lib/schedule";
+import { getEmployeeWorkPeriod } from "@/lib/schedule";
 import type { Employee } from "@/types";
 
 type Filter = "all" | "present" | "absent" | "late" | "rest";
@@ -43,14 +43,12 @@ export default function ManagerDashboard() {
   const lateIds = useMemo(() => new Set(todayRecords.filter(r => { const timestamp = Date.parse(String(r.timestamp || "")); if (!Number.isFinite(timestamp)) return false; const late = Math.max(0, Math.round((timestamp - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)); return late > 0; }).map(r => String(r.employeeId || "")).filter(Boolean)), [todayRecords, scheduled, settings?.lateGraceMinutes]);
   const activeEmployees = useMemo(() => employees.filter(e => e.status === "active"), [employees]);
 
-  // Scheduled rest/off days are not absences. The employee schedule is authoritative
-  // for whether the employee is expected to work today.
+  // The schedule period is the single source of truth for whether an employee
+  // is expected to work today. Only an explicit OFF period is classified as rest.
+  // This prevents scheduled rest days from ever entering the absence set.
   const restIds = useMemo(() => new Set(
     activeEmployees
-      .filter(employee => {
-        const status = getEmployeeScheduleStatus(employee, now);
-        return status.label === "فترة راحة" || status.label === "راحة تناوبية" || status.label === "إجازة أسبوعية";
-      })
+      .filter(employee => getEmployeeWorkPeriod(employee, now).kind === "OFF")
       .map(employee => String(employee.id))
       .filter(Boolean),
   ), [activeEmployees, today]);
@@ -103,7 +101,7 @@ export default function ManagerDashboard() {
           <div><div className="text-sm font-bold">حالة الموظفين اليوم</div><div className="text-xs text-muted-foreground mt-1">للمتابعة السريعة؛ التفاصيل والسجل الكامل في «الموظفون» و«التقارير».</div></div>
         </div>
         <div className="flex flex-wrap gap-2 mb-4">
-          {(["all", "present", "absent", "rest", "late"] as Filter[]).map(v => <button key={v} onClick={() => setFilter(v)} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${filter === v ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{v === "all" ? "الكل" : v === "present" ? "الحاضرون" : v === "absent" ? "الغائبون" : v === "rest" ? "المستريحون" : "المتأخرون"}</button>)}
+          {["all", "present", "absent", "rest", "late"].map(v => <button key={v} onClick={() => setFilter(v as Filter)} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${filter === v ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{v === "all" ? "الكل" : v === "present" ? "الحاضرون" : v === "absent" ? "الغائبون" : v === "rest" ? "المستريحون" : "المتأخرون"}</button>)}
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث باسم الموظف" className="min-w-[180px] flex-1 rounded-lg border bg-secondary/50 px-3 py-1.5 text-sm" />
         </div>
         {loading ? <div className="py-8 text-center text-sm text-muted-foreground">جاري مزامنة بيانات الحضور…</div> : filteredEmployees.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">لا توجد نتائج مطابقة.</div> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{filteredEmployees.map(e => {
