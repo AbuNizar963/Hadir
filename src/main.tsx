@@ -28,7 +28,18 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
     const base = import.meta.env.BASE_URL || "/";
     const swUrl = new URL("sw.js", new URL(base, window.location.origin)).toString();
     const scope = new URL(base, window.location.origin).pathname;
-    navigator.serviceWorker.register(swUrl, { scope }).catch(() => undefined);
+    navigator.serviceWorker.register(swUrl, { scope }).then(registration => {
+      void registration.update();
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            void registration.update();
+          }
+        });
+      });
+    }).catch(() => undefined);
   });
 }
 
