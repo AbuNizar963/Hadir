@@ -17,9 +17,8 @@ export function installApiCredentials(): void {
 
     if (!url.startsWith(API_URL)) return nativeFetch(input, init);
 
-    // Preserve the caller's explicit credential policy. This is important for
-    // token-authenticated endpoints such as daily-status, which must use
-    // credentials: "omit" rather than sending cookies cross-origin.
+    // Preserve an explicitly supplied credential mode. Token-authenticated
+    // endpoints (including daily-status) intentionally use credentials: omit.
     if (init && Object.prototype.hasOwnProperty.call(init, "credentials")) {
       return nativeFetch(input, init);
     }
