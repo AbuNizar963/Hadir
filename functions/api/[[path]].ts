@@ -10,9 +10,6 @@ export async function onRequest(context: {
   targetUrl.search = incomingUrl.search;
 
   const headers = new Headers(context.request.headers);
-  // The Worker uses Origin for its CORS response policy. Keep it aligned with
-  // the first-party Pages origin even though the browser no longer needs CORS
-  // for the public-facing request.
   headers.set("origin", incomingUrl.origin);
   headers.delete("host");
 
@@ -29,14 +26,20 @@ export async function onRequest(context: {
   const response = await fetch(new Request(targetUrl.toString(), init));
   const responseHeaders = new Headers(response.headers);
 
-  // The Worker deliberately sets a host-only, long-lived HttpOnly session
-  // cookie. Passing Set-Cookie through this same-origin proxy makes that
-  // cookie belong to the Pages origin, avoiding third-party-cookie blocking
-  // in installed Chrome PWAs.
   responseHeaders.delete("access-control-allow-origin");
   responseHeaders.delete("access-control-allow-credentials");
   responseHeaders.delete("access-control-allow-headers");
   responseHeaders.delete("access-control-allow-methods");
+
+  // Do not collapse multiple Set-Cookie headers. The Worker can legitimately
+  // set both the authentication session and the device identity cookie on the
+  // same response. Chromium PWAs are especially sensitive to malformed or
+  // comma-joined Set-Cookie values. Preserve each cookie as its own header.
+  const cookies = typeof (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie === "function"
+    ? (response.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()
+    : [];
+  responseHeaders.delete("set-cookie");
+  for (const cookie of cookies) responseHeaders.append("set-cookie", cookie);
 
   return new Response(response.body, {
     status: response.status,
