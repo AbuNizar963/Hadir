@@ -1,4 +1,3 @@
-const PWA_SESSION_COOKIE = "hadir_pwa_session";
 const PWA_SESSION_STORAGE_KEY = "hadir_pwa_token";
 const PWA_SESSION_MAX_AGE = 60 * 60 * 24 * 365 * 5;
 const PWA_DB_NAME = "hadir-auth";
@@ -66,19 +65,22 @@ async function deleteIndexedSession(): Promise<void> {
   } catch { /* best effort */ }
 }
 
-export function persistPwaSession(token: string): void {
+/**
+ * Durable PWA recovery credential. The server HttpOnly cookie is the primary
+ * authentication mechanism; this browser-side credential exists only so a
+ * standalone Chromium PWA can recover the server session if its cookie jar is
+ * unavailable after an app restart. The write is awaited by login flows so an
+ * immediate app close cannot race the IndexedDB transaction.
+ */
+export async function persistPwaSession(token: string): Promise<void> {
   if (!isBrowser() || !token) return;
-  // Synchronous durable fallback: unlike sessionStorage, localStorage survives
-  // closing/reopening the browser and standalone PWA window.
   try { localStorage.setItem(PWA_SESSION_STORAGE_KEY, token); } catch { /* best effort */ }
-  document.cookie = `${PWA_SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${PWA_SESSION_MAX_AGE}; Path=/; Secure; SameSite=Lax`;
-  void writeIndexedSession(token);
+  await writeIndexedSession(token).catch(() => undefined);
 }
 
 export function clearPwaSession(): void {
   if (!isBrowser()) return;
   try { localStorage.removeItem(PWA_SESSION_STORAGE_KEY); } catch { /* best effort */ }
-  document.cookie = `${PWA_SESSION_COOKIE}=; Max-Age=0; Path=/; Secure; SameSite=Lax`;
   void deleteIndexedSession();
 }
 
@@ -88,15 +90,12 @@ export function getPwaSessionToken(): string {
     const stored = localStorage.getItem(PWA_SESSION_STORAGE_KEY);
     if (stored) return stored;
   } catch { /* best effort */ }
-  const prefix = `${PWA_SESSION_COOKIE}=`;
-  const item = document.cookie.split(";").map((value) => value.trim()).find((value) => value.startsWith(prefix));
-  return item ? decodeURIComponent(item.slice(prefix.length)) : "";
+  return "";
 }
 
 /**
- * Persistent PWA recovery. The server's HttpOnly `hadir_session` remains the
- * primary session. A durable browser-side copy is used only as a recovery
- * credential for standalone PWAs when the normal cookie context is unavailable.
+ * Recover the server session from durable PWA storage, validate it with the
+ * same-origin API, and rehydrate the normal role token used by the app.
  */
 export async function restorePwaSession(): Promise<any> {
   const token = getPwaSessionToken() || await readIndexedSession();
@@ -114,8 +113,6 @@ export async function restorePwaSession(): Promise<any> {
     throw new Error(typeof data?.error === "string" ? data.error : `PWA_SESSION_INVALID_${response.status}`);
   }
 
-  // Rehydrate the normal role token too, so every existing API call continues
-  // to use the same recovered credential after a standalone restart.
   try {
     const role = String(data?.user?.role || "").toLowerCase();
     if (["owner", "manager", "supervisor", "admin"].includes(role)) {
