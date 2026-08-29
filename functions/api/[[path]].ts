@@ -31,16 +31,20 @@ export async function onRequest(context: {
   responseHeaders.delete("access-control-allow-headers");
   responseHeaders.delete("access-control-allow-methods");
 
-  // Chromium expects each Set-Cookie value as a separate response header.
-  // The backend may set both the durable auth session and the device cookie.
-  // Preserve every Set-Cookie instead of allowing a proxy Headers operation to
-  // collapse them into a comma-separated value.
+  // The Pages proxy must forward authentication cookies exactly as separate
+  // Set-Cookie headers. Cloudflare runtimes may expose getSetCookie(), but older
+  // runtimes can expose only get(). The backend currently emits one durable
+  // hadir_session cookie, so the fallback is safe and prevents the cookie from
+  // being silently dropped in a standalone PWA context.
   const cookieHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
-  if (typeof cookieHeaders.getSetCookie === "function") {
-    const cookies = cookieHeaders.getSetCookie();
-    responseHeaders.delete("set-cookie");
-    for (const cookie of cookies) responseHeaders.append("set-cookie", cookie);
-  }
+  const cookies = typeof cookieHeaders.getSetCookie === "function"
+    ? cookieHeaders.getSetCookie()
+    : (() => {
+        const value = response.headers.get("set-cookie");
+        return value ? [value] : [];
+      })();
+  responseHeaders.delete("set-cookie");
+  for (const cookie of cookies) responseHeaders.append("set-cookie", cookie);
 
   return new Response(response.body, {
     status: response.status,
