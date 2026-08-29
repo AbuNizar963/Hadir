@@ -31,15 +31,16 @@ export async function onRequest(context: {
   responseHeaders.delete("access-control-allow-headers");
   responseHeaders.delete("access-control-allow-methods");
 
-  // Do not collapse multiple Set-Cookie headers. The Worker can legitimately
-  // set both the authentication session and the device identity cookie on the
-  // same response. Chromium PWAs are especially sensitive to malformed or
-  // comma-joined Set-Cookie values. Preserve each cookie as its own header.
-  const cookies = typeof (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie === "function"
-    ? (response.headers as Headers & { getSetCookie: () => string[] }).getSetCookie()
-    : [];
-  responseHeaders.delete("set-cookie");
-  for (const cookie of cookies) responseHeaders.append("set-cookie", cookie);
+  // Chromium expects each Set-Cookie value as a separate response header.
+  // The backend may set both the durable auth session and the device cookie.
+  // Preserve every Set-Cookie instead of allowing a proxy Headers operation to
+  // collapse them into a comma-separated value.
+  const cookieHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
+  if (typeof cookieHeaders.getSetCookie === "function") {
+    const cookies = cookieHeaders.getSetCookie();
+    responseHeaders.delete("set-cookie");
+    for (const cookie of cookies) responseHeaders.append("set-cookie", cookie);
+  }
 
   return new Response(response.body, {
     status: response.status,
