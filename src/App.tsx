@@ -36,6 +36,7 @@ const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abuniz
 
 type Role = "admin" | "employee";
 type User = AdminAccount | Employee;
+type TokenRestoreResult = { status: "restored"; user: User } | { status: "invalid" | "transient" };
 
 function PushSessionBridge() {
   const location = useLocation();
@@ -51,20 +52,26 @@ function PushSessionBridge() {
   return null;
 }
 
-type LaunchState = "checking" | "landing" | "employee" | "manager";
+type LaunchState = "checking" | "landing" | "employee" | "manager" | "offline";
 
-async function validateStoredToken(role: Role, token: string): Promise<User | null> {
+async function validateStoredToken(role: Role, token: string): Promise<TokenRestoreResult> {
   try {
-    const response = await fetch(`${API_URL}/api/me`, { method: "GET", headers: { authorization: `Bearer ${token}` }, credentials: "include", cache: "no-store" });
-    if (!response.ok) return null;
-    const data = await response.json().catch(() => ({})) as { user?: User };
-    const user = data.user;
-    if (!user || typeof user !== "object") return null;
-    if (role === "admin" && !["owner", "manager", "supervisor"].includes(String((user as AdminAccount).role))) return null;
-    if (role === "employee" && String((user as Employee).role) !== "staff") return null;
-    return user;
+    const response = await fetch(`${API_URL}/api/me`, {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (response.status === 401 || response.status === 403) return { status: "invalid" };
+    if (!response.ok) return { status: "transient" };
+    const data = await response.json().catch(() => null) as { user?: User } | null;
+    const user = data?.user;
+    if (!user || typeof user !== "object") return { status: "transient" };
+    if (role === "admin" && !["owner", "manager", "supervisor"].includes(String((user as AdminAccount).role))) return { status: "invalid" };
+    if (role === "employee" && String((user as Employee).role) !== "staff") return { status: "invalid" };
+    return { status: "restored", user };
   } catch {
-    return null;
+    return { status: "transient" };
   }
 }
 
@@ -76,36 +83,84 @@ function LaunchGateway() {
   });
 
   useEffect(() => {
-    if (state !== "checking") return;
+    if (state !== "checking" && state !== "offline") return;
     let alive = true;
+    let retryTimer: number | undefined;
+
     const restore = async () => {
       if (typeof window === "undefined") return;
       const adminToken = localStorage.getItem("hadir.api.token.admin")?.trim() || "";
       const employeeToken = localStorage.getItem("hadir.api.token.employee")?.trim() || "";
-      if (!adminToken && !employeeToken) { if (alive) setState("landing"); return; }
-      const candidates: Array<[Role, string]> = adminToken ? [["admin", adminToken]] : [["employee", employeeToken]];
+      if (!adminToken && !employeeToken) {
+        if (alive) setState("landing");
+        return;
+      }
+
+      // Check every persisted role token. Never let a stale token for the opposite
+      // role prevent a valid employee/manager token from being restored.
+      const candidates: Array<[Role, string]> = [];
+      if (adminToken) candidates.push(["admin", adminToken]);
+      if (employeeToken) candidates.push(["employee", employeeToken]);
+
+      let transientFailure = false;
       for (const [role, token] of candidates) {
-        const user = await validateStoredToken(role, token);
+        const result = await validateStoredToken(role, token);
         if (!alive) return;
-        if (!user) continue;
+        if (result.status === "transient") {
+          transientFailure = true;
+          continue;
+        }
+        if (result.status === "invalid") continue;
+
         if (role === "admin") {
-          const admin = user as AdminAccount;
-          setManagerSession({ loginAt: currentManager()?.loginAt || new Date().toISOString(), name: admin.name, role: admin.role, jobNumber: admin.username, accountId: admin.id });
+          const admin = result.user as AdminAccount;
+          setManagerSession({
+            loginAt: currentManager()?.loginAt || new Date().toISOString(),
+            name: admin.name,
+            role: admin.role,
+            jobNumber: admin.username,
+            accountId: admin.id,
+          });
           setState("manager");
           return;
         }
-        const employee = user as Employee;
-        setSession({ employeeId: employee.id, jobNumber: employee.jobNumber, name: employee.name, loginAt: currentSession()?.loginAt || new Date().toISOString(), role: employee.role });
+
+        const employee = result.user as Employee;
+        setSession({
+          employeeId: employee.id,
+          jobNumber: employee.jobNumber,
+          name: employee.name,
+          loginAt: currentSession()?.loginAt || new Date().toISOString(),
+          role: employee.role,
+        });
         setState("employee");
         return;
       }
-      if (alive) setState("landing");
+
+      if (!alive) return;
+      if (transientFailure) {
+        // A Cloudflare/D1/network outage is NOT a logout. Keep the stored token
+        // untouched and retry automatically instead of sending the user to login.
+        setState("offline");
+        retryTimer = window.setTimeout(() => {
+          if (alive) setState("checking");
+        }, 3000);
+        return;
+      }
+
+      // Only a definitive 401/403 is allowed to end token-based restoration.
+      setState("landing");
     };
+
     void restore();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
   }, [state]);
 
-  if (state === "checking") return <div dir="rtl" className="min-h-screen grid place-items-center bg-background px-6"><div className="text-center"><div className="text-3xl">🔐</div><p className="mt-3 font-bold">جاري استعادة جلسة الدخول…</p></div></div>;
+  if (state === "checking") return <div dir="rtl" className="min-h-screen grid place-items-center bg-background px-6"><div className="text-center"><div className="text-3xl">🔐</div><p className="mt-3 font-bold">جاري استعادة جلسة الدخول…</p><p className="mt-2 text-sm text-muted-foreground">لن يتم تسجيل خروجك بسبب انقطاع مؤقت في الاتصال.</p></div></div>;
+  if (state === "offline") return <div dir="rtl" className="min-h-screen grid place-items-center bg-background px-6"><div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 text-center shadow-lg"><div className="text-3xl">📡</div><p className="mt-3 font-bold">الجلسة محفوظة</p><p className="mt-2 text-sm leading-6 text-muted-foreground">الخادم غير متاح مؤقتًا. لم يتم حذف تسجيل الدخول، وستتم إعادة المحاولة تلقائيًا.</p></div></div>;
   if (state === "employee") return <Navigate to="/employee" replace />;
   if (state === "manager") return <Navigate to="/manager" replace />;
   return <Landing />;
