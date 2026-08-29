@@ -8,7 +8,6 @@ import "./label-visibility.css";
 import "./settings-page.css";
 import "./layout-unified.css";
 import "./mobile-layout-width.css";
-import "./pull-to-refresh.css";
 import "./rotation-form.css";
 import "./employee-name.css";
 import { seedIfEmpty } from "@/lib/storage";
@@ -26,7 +25,7 @@ installDeviceDirectoryEnhancer();
 if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
     const base = import.meta.env.BASE_URL || "/";
-    const swUrl = new URL("sw.js", new URL(base, window.location.origin)).toString();
+    const swUrl = new URL("sw.js?v=5", new URL(base, window.location.origin)).toString();
     const scope = new URL(base, window.location.origin).pathname;
     navigator.serviceWorker.register(swUrl, { scope }).catch(() => undefined);
   });
@@ -78,29 +77,25 @@ function PwaInstallPrompt() {
       await installEvent.userChoice;
     } finally {
       setBusy(false);
-      setInstallEvent(null);
     }
   };
 
-  return (
-    <aside className="hadir-install-card" dir="rtl" aria-label="تثبيت تطبيق حاضر">
-      <img className="hadir-install-icon" src="/favicon.svg" alt="شعار حاضر" />
-      <div className="hadir-install-copy">
-        <strong>ثبّت تطبيق حاضر</strong>
-        <span>وصول أسرع من شاشة هاتفك وتجربة مستقلة بدون شريط المتصفح.</span>
-      </div>
-      <button className="hadir-install-button" type="button" onClick={() => void install()} disabled={busy}>
-        {busy ? "جارٍ التثبيت…" : "تثبيت"}
-      </button>
-    </aside>
-  );
+  return <button type="button" onClick={install} disabled={busy} aria-label="تثبيت تطبيق حاضر" className="fixed bottom-4 left-4 z-50 rounded-2xl border bg-background/95 px-4 py-3 text-sm font-bold shadow-lg backdrop-blur">
+    {busy ? "جاري التثبيت…" : "تثبيت التطبيق"}
+  </button>;
+}
+
+function Root() {
+  return <>
+    <App />
+    <PwaInstallPrompt />
+  </>;
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppErrorBoundary>
-      <PwaInstallPrompt />
-      <App />
+      <Root />
     </AppErrorBoundary>
-  </StrictMode>
+  </StrictMode>,
 );
