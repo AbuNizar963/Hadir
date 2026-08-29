@@ -1,13 +1,13 @@
-const CACHE="hadir-shell-v7";
+const CACHE="hadir-shell-v8";
 const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[
   new URL("./",self.registration.scope).href,
   new URL("./manifest.webmanifest",self.registration.scope).href,
-  new URL("./pwa-icon.svg",self.registration.scope).href
+  new URL("./pwa-icon.svg",self.registration.scope).href,
+  new URL("./pwa-icon-192.png",self.registration.scope).href,
+  new URL("./pwa-icon-512.png",self.registration.scope).href
 ];
 
-// Keep a newly downloaded worker waiting until the user explicitly accepts
-// the update. This prevents surprise reloads while the user is working.
 self.addEventListener("install",event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL))
 ));
@@ -18,8 +18,6 @@ self.addEventListener("activate",event=>event.waitUntil(
     .then(()=>self.clients.claim())
 ));
 
-// Explicit update action from the PWA UI. This does not touch localStorage,
-// IndexedDB, cookies, authentication tokens, or Cloudflare D1.
 self.addEventListener("message",event=>{
   if(event.data?.type==="SKIP_WAITING") void self.skipWaiting();
 });
@@ -29,8 +27,6 @@ self.addEventListener("fetch",event=>{
   if(request.method!=="GET")return;
   const url=new URL(request.url);
   if(url.origin!==self.location.origin||!url.pathname.startsWith(BASE))return;
-
-  // Network-first keeps production fresh; cache is only an offline fallback.
   event.respondWith(
     fetch(request)
       .then(response=>response)
@@ -54,7 +50,7 @@ self.addEventListener("push",event=>event.waitUntil((async()=>{
   const title=String(data.title||"إشعار جديد");
   const body=String(data.body||data.message||"لديك إشعار جديد في Hadir");
   const url=resolveNotificationUrl(data.url||data.path||"/");
-  const icon=new URL("./pwa-icon.svg",self.registration.scope).href;
+  const icon=new URL("./pwa-icon-192.png",self.registration.scope).href;
   await self.registration.showNotification(title,{body,icon,badge:icon,dir:"rtl",lang:"ar",tag:String(data.tag||`hadir-${data.type||"notification"}`),renotify:true,data:{url,type:String(data.type||"info"),notificationId:String(data.notificationId||data.id||"")}});
 })());
 
