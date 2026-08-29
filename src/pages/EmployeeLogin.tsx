@@ -54,7 +54,7 @@ export default function EmployeeLogin() {
       if (rawUser.status && rawUser.status !== "active") throw new Error("حساب الموظف موقوف. يرجى مراجعة الإدارة.");
       setSession({ employeeId, jobNumber: employeeJobNumber, name: String(rawUser.name || "").trim(), loginAt: new Date().toISOString(), role: rawUser.role || "staff" });
       const token = localStorage.getItem(EMPLOYEE_TOKEN_KEY);
-      if (token) persistPwaSession(token);
+      if (token) await persistPwaSession(token);
       window.dispatchEvent(new Event("hadir:session-changed"));
       try {
         const device = await getEmployeeDeviceStatus();
