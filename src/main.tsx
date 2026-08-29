@@ -35,9 +35,7 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
         const worker = registration.installing;
         if (!worker) return;
         worker.addEventListener("statechange", () => {
-          if (worker.state === "installed" && navigator.serviceWorker.controller) {
-            void registration.update();
-          }
+          if (worker.state === "installed" && navigator.serviceWorker.controller) void registration.update();
         });
       });
     }).catch(() => undefined);
