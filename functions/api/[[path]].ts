@@ -33,30 +33,39 @@ export async function onRequest(context: {
   responseHeaders.delete("access-control-allow-headers");
   responseHeaders.delete("access-control-allow-methods");
 
-  // Preserve every upstream Set-Cookie as an independent header.
-  const cookieHeaders = response.headers as Headers & { getSetCookie?: () => string[] };
-  const cookies = typeof cookieHeaders.getSetCookie === "function"
-    ? cookieHeaders.getSetCookie()
-    : (() => {
-        const value = response.headers.get("set-cookie");
-        return value ? [value] : [];
-      })();
+  // The installed PWA authenticates against the Pages origin. Do not forward
+  // the Worker-origin session cookie: doing so creates competing cookies for
+  // the same logical session and makes standalone Chromium storage behavior
+  // unpredictable. The Pages proxy owns the browser session cookie.
   responseHeaders.delete("set-cookie");
-  for (const cookie of cookies) responseHeaders.append("set-cookie", cookie);
 
-  // The Pages origin is the actual origin of the installed PWA. Persist the
-  // authenticated session on that origin as a first-class HttpOnly cookie.
-  // This deliberately uses the token returned by the backend only for the
-  // login response; subsequent requests never expose the token to the page.
   if (incomingUrl.pathname === "/api/auth/login" && response.ok) {
     const data = await response.clone().json().catch(() => null) as { token?: unknown } | null;
     const token = typeof data?.token === "string" ? data.token.trim() : "";
     if (token) {
       responseHeaders.append(
         "set-cookie",
-        `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${SESSION_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`
+        `${SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${SESSION_MAX_AGE}; Path=/; HttpOnly; Secure; SameSite=Lax`
       );
     }
+  }
+
+  if (incomingUrl.pathname === "/api/bootstrap/owner" && response.ok) {
+    const data = await response.clone().json().catch(() => null) as { token?: unknown } | null;
+    const token = typeof data?.token === "string" ? data.token.trim() : "";
+    if (token) {
+      responseHeaders.append(
+        "set-cookie",
+        `${SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${SESSION_MAX_AGE}; Path=/; HttpOnly; Secure; SameSite=Lax`
+      );
+    }
+  }
+
+  if (incomingUrl.pathname === "/api/auth/logout") {
+    responseHeaders.append(
+      "set-cookie",
+      `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`
+    );
   }
 
   return new Response(response.body, {
