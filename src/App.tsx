@@ -48,6 +48,12 @@ function PushSessionBridge() {
   return null;
 }
 
+function isStandalonePwa(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(display-mode: standalone)").matches ||
+    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+}
+
 function PwaEntry() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
@@ -55,8 +61,26 @@ function PwaEntry() {
     let cancelled = false;
     const restore = async () => {
       let result: any = null;
-      try { result = await backendMe(); }
-      catch { try { result = await restorePwaSession(); } catch { result = null; } }
+
+      // A standalone Chromium PWA can have a separate browser context. Its
+      // durable PWA credential is therefore the first recovery source. This
+      // must run even when backendMe() merely returns a 401/null result rather
+      // than throwing; otherwise the app could fall through to Login without
+      // ever consulting the persisted PWA session.
+      if (isStandalonePwa()) {
+        try { result = await restorePwaSession(); } catch { result = null; }
+      }
+
+      if (!result?.user) {
+        try { result = await backendMe(); } catch { result = null; }
+      }
+
+      // If the normal session was absent/expired but the PWA credential exists
+      // (for example after a context reset), retry the durable recovery once.
+      if (!result?.user) {
+        try { result = await restorePwaSession(); } catch { result = null; }
+      }
+
       if (cancelled) return;
       const user = result?.user as { id?: string; username?: string; jobNumber?: string; name?: string; role?: string } | undefined;
       const role = String(user?.role || "").toLowerCase();
@@ -77,34 +101,4 @@ function PwaEntry() {
   }, [navigate]);
   if (checking) return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">جاري استعادة جلسة الدخول…</div>;
   return <Landing />;
-}
-
-export default function App() {
-  return <BrowserRouter basename={basename}>
-    <PushSessionBridge />
-    <Routes>
-      <Route path="/" element={<PwaEntry />} />
-      <Route path="/login" element={<SessionRedirect expected="employee"><EmployeeLogin /></SessionRedirect>} />
-      <Route path="/weather" element={<WeatherPage />} />
-      <Route path="/prayer" element={<PrayerPage />} />
-      <Route path="/ai" element={<AIAssistant />} />
-      <Route path="/employee" element={<EmployeeShell><EmployeeHome /></EmployeeShell>} />
-      <Route path="/employee/center" element={<EmployeeShell><EmployeeCenter /></EmployeeShell>} />
-      <Route path="/employee/premium" element={<Navigate to="/employee/center" replace />} />
-      <Route path="/employee/profile" element={<EmployeeShell><EmployeeProfile /></EmployeeShell>} />
-      <Route path="/employee/history" element={<EmployeeShell><EmployeeHistory /></EmployeeShell>} />
-      <Route path="/employee/notifications" element={<EmployeeShell><EmployeeNotifications /></EmployeeShell>} />
-      <Route path="/employee/scan/:type" element={<EmployeeShell><EmployeeScanAutoFlow /></EmployeeShell>} />
-      <Route path="/manager/login" element={<SessionRedirect expected="manager"><ManagerLogin /></SessionRedirect>} />
-      <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
-      <Route path="/manager/employees" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerEmployees /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/workforce" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerWorkforceControls /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/requests" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerRequests /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/audit" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerAudit /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/reports" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerReports /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/settings" element={<ManagerOnly><RequireManagerRole roles={["owner"]}><ManagerSettings /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager-home" element={<Navigate to="/manager" replace />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  </BrowserRouter>;
 }
