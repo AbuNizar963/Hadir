@@ -9,6 +9,7 @@ on:
       - "bun.lock"
       - "tsconfig*.json"
       - "vite.config.*"
+      - "scripts/**"
       - ".github/workflows/ci-frontend.yml"
   workflow_dispatch:
 
@@ -33,7 +34,14 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Typecheck
         run: bun run typecheck
-      - name: Production build
+      - name: Production build (Cloudflare Pages root)
         env:
-          VITE_BASE_PATH: /Hadir/
+          VITE_BASE_PATH: /
         run: bun run build
+      - name: Verify PWA artifacts
+        run: |
+          test -f dist/index.html
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+          grep -q 'start_url' dist/manifest.webmanifest
+          grep -q 'scope' dist/manifest.webmanifest
