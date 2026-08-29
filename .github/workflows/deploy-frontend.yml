@@ -22,6 +22,9 @@ concurrency:
   group: hadir-frontend-production
   cancel-in-progress: true
 
+env:
+  PAGES_PRODUCTION_URL: https://hadir-9rq.pages.dev
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -69,6 +72,53 @@ jobs:
           assert "SKIP_WAITING" in sw, "service-worker update activation handler is missing"
           assert "notificationclick" in sw, "service-worker notification click handler is missing"
           PY
+
+      - name: Wait for Cloudflare Pages production deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 24); do
+            headers="$(curl -sS -D - -o /tmp/index.html -H 'Cache-Control: no-cache' "$PAGES_PRODUCTION_URL/?hadir_ci=$GITHUB_SHA" || true)"
+            if grep -qi '^HTTP/.* 200' <<< "$headers"; then
+              break
+            fi
+            echo "Pages production is not ready yet (attempt $attempt/24); waiting 5s..."
+            sleep 5
+          done
+          test -s /tmp/index.html
+
+      - name: Verify deployed PWA metadata and service worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 24); do
+            if curl -fsS --retry 2 --retry-delay 2 --retry-all-errors \
+              -H 'Cache-Control: no-cache' \
+              "$PAGES_PRODUCTION_URL/manifest.webmanifest?hadir_ci=$GITHUB_SHA" \
+              -o /tmp/manifest.json && \
+              curl -fsS --retry 2 --retry-delay 2 --retry-all-errors \
+              -H 'Cache-Control: no-cache' \
+              "$PAGES_PRODUCTION_URL/sw.js?hadir_ci=$GITHUB_SHA" \
+              -o /tmp/sw.js; then
+              if python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
+          sw = Path("/tmp/sw.js").read_text(encoding="utf-8")
+          assert manifest.get("start_url") == "./", manifest
+          assert manifest.get("scope") == "./", manifest
+          assert "hadir-shell-v7" in sw
+          PY
+              then
+                echo "Cloudflare Pages production PWA verified: $PAGES_PRODUCTION_URL"
+                exit 0
+              fi
+            fi
+            echo "Production PWA is not updated yet (attempt $attempt/24); waiting 5s..."
+            sleep 5
+          done
+          echo "Cloudflare Pages did not expose the expected PWA metadata after the deployment window."
+          exit 1
 
       - name: Verification complete
         run: |
