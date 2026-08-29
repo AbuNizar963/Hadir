@@ -24,6 +24,7 @@ import NotFound from "@/pages/NotFound";
 import ProtectedEmployee from "@/components/ProtectedEmployee";
 import ProtectedManager from "@/components/ProtectedManager";
 import RequireManagerRole from "@/components/RequireManagerRole";
+import PWAExperience from "@/components/system/PWAExperience";
 import { currentManager, currentSession } from "@/lib/auth";
 import { setManagerSession, setSession } from "@/lib/storage";
 import { enableWebPush } from "@/lib/push";
@@ -96,8 +97,6 @@ function LaunchGateway() {
         return;
       }
 
-      // Check every persisted role token. Never let a stale token for the opposite
-      // role prevent a valid employee/manager token from being restored.
       const candidates: Array<[Role, string]> = [];
       if (adminToken) candidates.push(["admin", adminToken]);
       if (employeeToken) candidates.push(["employee", employeeToken]);
@@ -139,8 +138,6 @@ function LaunchGateway() {
 
       if (!alive) return;
       if (transientFailure) {
-        // A Cloudflare/D1/network outage is NOT a logout. Keep the stored token
-        // untouched and retry automatically instead of sending the user to login.
         setState("offline");
         retryTimer = window.setTimeout(() => {
           if (alive) setState("checking");
@@ -148,7 +145,6 @@ function LaunchGateway() {
         return;
       }
 
-      // Only a definitive 401/403 is allowed to end token-based restoration.
       setState("landing");
     };
 
@@ -169,6 +165,7 @@ function LaunchGateway() {
 export default function App() {
   return <BrowserRouter basename={basename}>
     <PushSessionBridge />
+    <PWAExperience />
     <Routes>
       <Route path="/" element={<LaunchGateway />} />
       <Route path="/login" element={<EmployeeLogin />} />
