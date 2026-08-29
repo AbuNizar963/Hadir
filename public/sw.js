@@ -1,4 +1,4 @@
-const CACHE="hadir-shell-v4";
+const CACHE="hadir-shell-v5";
 const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[new URL("./",self.registration.scope).href,new URL("./employee",self.registration.scope).href,new URL("./manifest.webmanifest",self.registration.scope).href];
 
@@ -9,6 +9,8 @@ self.addEventListener("fetch",e=>{
   if(r.method!=="GET")return;
   const u=new URL(r.url);
   if(u.origin!==self.location.origin||!u.pathname.startsWith(BASE))return;
+  // Authentication/session endpoints must always reach the network.
+  if(u.pathname.startsWith(`${BASE}api/`))return;
   e.respondWith(fetch(r).catch(()=>caches.match(r).then(c=>c||caches.match(new URL("./",self.registration.scope).href))));
 });
 
