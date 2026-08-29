@@ -23,17 +23,23 @@ function origin(request: Request, env: Env) {
   return configured[0] || "*";
 }
 
-const dailyCors = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-headers": "authorization, content-type",
-  "access-control-allow-methods": "GET, OPTIONS",
-  "cache-control": "no-store",
-};
+function dailyCors(request: Request, env: Env) {
+  const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
+  const allowOrigin = requestOrigin ? origin(request, env) : origin(request, env);
+  return {
+    "access-control-allow-origin": allowOrigin,
+    "access-control-allow-credentials": "true",
+    "access-control-allow-headers": "authorization, content-type",
+    "access-control-allow-methods": "GET, OPTIONS",
+    "vary": "Origin",
+    "cache-control": "no-store",
+  };
+}
 
-function dailyError(message: string, status = 500) {
+function dailyError(message: string, request: Request, env: Env, status = 500) {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", ...dailyCors },
+    headers: { "content-type": "application/json; charset=utf-8", ...dailyCors(request, env) },
   });
 }
 
@@ -46,12 +52,10 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname.replace(/\/$/, "") === "/api/manager/daily-status") {
-      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: dailyCors });
+      const cors = dailyCors(request, env);
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
 
       try {
-        // This endpoint can execute before the workforce router. Keep its D1
-        // dependency self-contained instead of relying on another route to
-        // lazily create leave_requests.
         await env.DB.prepare(`CREATE TABLE IF NOT EXISTS leave_requests (
           id TEXT PRIMARY KEY,
           employee_id TEXT NOT NULL,
@@ -71,10 +75,13 @@ export default {
         actorProbe.search = "";
         const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
         const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
-        return handleDailyStatus(request, env, actor);
+        const result = await handleDailyStatus(request, env, actor);
+        const headers = new Headers(result.headers);
+        for (const [key, value] of Object.entries(cors)) headers.set(key, value);
+        return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
       } catch (error) {
         console.error("daily-status failed", error);
-        return dailyError("تعذر قراءة حالة الدوام من D1. تم تسجيل الخطأ في Worker Logs.");
+        return dailyError("تعذر قراءة حالة الدوام من D1. تم تسجيل الخطأ في Worker Logs.", request, env);
       }
     }
 
