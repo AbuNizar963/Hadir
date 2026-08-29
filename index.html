@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="apple-touch-icon" href="./pwa-icon.svg" />
+    <link rel="apple-touch-icon" href="./pwa-icon-192.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#0b0f14" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -32,7 +32,7 @@
     <script>
       (() => {
         const API = (window.__HADIR_API__ || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-        const iconUrl = new URL("./pwa-icon.svg", document.baseURI).href;
+        const iconUrl = new URL("./pwa-icon-192.png", document.baseURI).href;
         const token = () => localStorage.getItem("hadir.api.token.employee") || localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token") || "";
         const sessionExists = () => Boolean(localStorage.getItem("hadir.session") || localStorage.getItem("hadir.manager_session"));
         const seenKey = "hadir.browser.notifications.seen";
