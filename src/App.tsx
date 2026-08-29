@@ -25,9 +25,9 @@ import ProtectedEmployee from "@/components/ProtectedEmployee";
 import ProtectedManager from "@/components/ProtectedManager";
 import RequireManagerRole from "@/components/RequireManagerRole";
 import SessionRedirect from "@/components/SessionRedirect";
-import { getManagerSession, setManagerSession, setSession } from "@/lib/storage";
+import { getManagerSession, getSession, setManagerSession, setSession } from "@/lib/storage";
 import { backendMe } from "@/lib/backend";
-import { getLastPwaRole, restorePwaSession } from "@/lib/pwaSession";
+import { getLastPwaRole, getPwaSessionToken, restorePwaSession } from "@/lib/pwaSession";
 import { enableWebPush } from "@/lib/push";
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
@@ -51,89 +51,60 @@ function PushSessionBridge() {
 function PwaEntry() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
-
   useEffect(() => {
     let cancelled = false;
-
     const restore = async () => {
-      let result: any = null;
       const lastRole = getLastPwaRole();
-      const roles: Array<"employee" | "admin"> = lastRole
-        ? [lastRole, lastRole === "admin" ? "employee" : "admin"]
-        : ["employee", "admin"];
-
-      // The installed PWA can have its own durable storage context. Always
-      // consult the role-specific PWA credential before allowing the landing
-      // page or login screen to render.
+      const roles: Array<"employee" | "admin"> = lastRole ? [lastRole, lastRole === "admin" ? "employee" : "admin"] : ["employee", "admin"];
+      let result: any = null;
       for (const role of roles) {
         try {
           result = await restorePwaSession(role);
           if (result?.user) break;
-        } catch {
-          result = null;
-        }
+        } catch { result = null; }
       }
-
-      // Keep the normal bearer-token path as a second recovery source. This
-      // also covers an existing browser session that predates PWA persistence.
       if (!result?.user) {
-        try {
-          result = await backendMe(lastRole);
-        } catch {
-          result = null;
-        }
+        try { result = await backendMe(lastRole); } catch { result = null; }
       }
-
       if (cancelled) return;
 
-      const user = result?.user as {
-        id?: string;
-        username?: string;
-        jobNumber?: string;
-        name?: string;
-        role?: string;
-      } | undefined;
+      const user = result?.user as { id?: string; username?: string; jobNumber?: string; name?: string; role?: string } | undefined;
       const role = String(user?.role || "").toLowerCase();
-
       if (["employee", "staff"].includes(role) && user?.id) {
         setManagerSession(null);
-        setSession({
-          employeeId: String(user.id),
-          jobNumber: String(user.jobNumber || user.username || ""),
-          name: String(user.name || ""),
-          loginAt: new Date().toISOString(),
-          role: user.role || "staff",
-        });
+        setSession({ employeeId: String(user.id), jobNumber: String(user.jobNumber || user.username || ""), name: String(user.name || ""), loginAt: new Date().toISOString(), role: user.role || "staff" });
         navigate("/employee", { replace: true });
         return;
       }
-
       if (["owner", "manager", "supervisor", "admin"].includes(role) && user?.id) {
         setSession(null);
-        setManagerSession({
-          loginAt: new Date().toISOString(),
-          name: user.name,
-          role: role as "owner" | "manager" | "supervisor",
-          jobNumber: user.username,
-          accountId: user.id,
-        });
+        setManagerSession({ loginAt: new Date().toISOString(), name: user.name, role: role as "owner" | "manager" | "supervisor", jobNumber: user.username, accountId: user.id });
         navigate("/manager", { replace: true });
         return;
       }
 
+      // If the API is temporarily unavailable, do not send an already logged-in
+      // PWA user to the public landing screen. The protected route will verify
+      // the same server session when it mounts and supports the existing offline
+      // session behavior.
+      const employeeSession = getSession();
+      const managerSession = getManagerSession();
+      if (employeeSession?.employeeId && getPwaSessionToken("employee")) {
+        setManagerSession(null);
+        navigate("/employee", { replace: true });
+        return;
+      }
+      if (managerSession?.accountId && getPwaSessionToken("admin")) {
+        setSession(null);
+        navigate("/manager", { replace: true });
+        return;
+      }
       setChecking(false);
     };
-
     void restore();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [navigate]);
-
-  if (checking) {
-    return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">جاري استعادة جلسة الدخول…</div>;
-  }
-
+  if (checking) return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">جاري استعادة جلسة الدخول…</div>;
   return <Landing />;
 }
 
