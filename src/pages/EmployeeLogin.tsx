@@ -4,6 +4,7 @@ import Brand from "@/components/Brand";
 import { backendEmployeeLogin, getEmployeeDeviceStatus, backendMe, registerEmployeePasskey } from "@/lib/backend";
 import { setSession, setManagerSession, getSession } from "@/lib/storage";
 import { getSettings } from "@/lib/storage";
+import { persistPwaSession } from "@/lib/pwaSession";
 
 const LOGIN_TIMEOUT_MS = 20000;
 const EMPLOYEE_TOKEN_KEY = "hadir.api.token.employee";
@@ -20,9 +21,6 @@ export default function EmployeeLogin() {
 
   useEffect(() => {
     let cancelled = false;
-    // The Worker also issues a persistent HttpOnly session cookie (5 years).
-    // Always probe /api/me so an installed Chrome PWA can restore the session
-    // even if its localStorage token was cleared or separated from the browser.
     void backendMe().then((result) => {
       if (cancelled) return;
       const user = result.user as EmployeeLoginUser;
@@ -32,11 +30,6 @@ export default function EmployeeLogin() {
       const existing = getSession();
       setManagerSession(null);
       setSession({ employeeId:id, jobNumber:number, name:String(user.name || "").trim(), loginAt:existing?.loginAt || new Date().toISOString(), role:user.role || "staff" });
-      // Keep the legacy/local token in sync when it exists, while the HttpOnly
-      // cookie remains the authoritative persistent session for the PWA.
-      if (localStorage.getItem(EMPLOYEE_TOKEN_KEY)) {
-        localStorage.setItem(EMPLOYEE_TOKEN_KEY, localStorage.getItem(EMPLOYEE_TOKEN_KEY) || "");
-      }
       window.dispatchEvent(new Event("hadir:session-changed"));
       nav("/employee", { replace:true });
     }).catch(() => {
@@ -60,6 +53,8 @@ export default function EmployeeLogin() {
       if (!employeeId || !employeeJobNumber) throw new Error("تعذر العثور على ملف الموظف المرتبط بهذا الحساب.");
       if (rawUser.status && rawUser.status !== "active") throw new Error("حساب الموظف موقوف. يرجى مراجعة الإدارة.");
       setSession({ employeeId, jobNumber: employeeJobNumber, name: String(rawUser.name || "").trim(), loginAt: new Date().toISOString(), role: rawUser.role || "staff" });
+      const token = localStorage.getItem(EMPLOYEE_TOKEN_KEY);
+      if (token) persistPwaSession(token);
       window.dispatchEvent(new Event("hadir:session-changed"));
       try {
         const device = await getEmployeeDeviceStatus();
