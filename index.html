@@ -26,6 +26,38 @@
     <div id="root"></div>
     <script>
       (() => {
+        const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true || new URLSearchParams(location.search).get('pwa') === '1';
+        if (!isStandalone) return;
+        const path = location.pathname;
+        const isLoginRoute = path === '/login' || path === '/manager/login' || path === '/';
+        if (!isLoginRoute) return;
+        const splash = document.createElement('div');
+        splash.id = 'hadir-auth-bootstrap';
+        splash.dir = 'rtl';
+        splash.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;background:#0b0f14;color:#fff;font-family:Cairo,system-ui,sans-serif';
+        splash.innerHTML = '<div style="text-align:center;padding:24px"><div style="font-size:24px;font-weight:800">حاضِر</div><div style="margin-top:10px;opacity:.72;font-size:14px">جاري التحقق من جلسة الدخول…</div></div>';
+        document.body.appendChild(splash);
+        const go = (user) => {
+          const role = String(user?.role || '').toLowerCase();
+          if (!user?.id) return false;
+          if (['employee','staff'].includes(role)) { location.replace('/employee'); return true; }
+          if (['owner','manager','supervisor','admin'].includes(role)) { location.replace('/manager'); return true; }
+          return false;
+        };
+        (async () => {
+          try {
+            const r = await fetch('/api/me', { credentials: 'include', cache: 'no-store', headers: { accept: 'application/json' } });
+            if (r.ok) {
+              const data = await r.json().catch(() => null);
+              if (go(data?.user)) return;
+            }
+          } catch {}
+          splash.remove();
+        })();
+      })();
+    </script>
+    <script>
+      (() => {
         const API = (window.__HADIR_API__ || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
         const token = () => localStorage.getItem("hadir.api.token.employee") || localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token") || "";
         const sessionExists = () => Boolean(localStorage.getItem("hadir.session") || localStorage.getItem("hadir.manager_session"));
