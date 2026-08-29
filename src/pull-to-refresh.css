@@ -1,0 +1,11 @@
+/* Keep Chrome Android's native pull-to-refresh available. Do not use contain/none here. */
+html,
+body,
+#root {
+  overscroll-behavior-y: auto !important;
+}
+
+/* The weather page is a normal document scroll; horizontal forecast strips may still scroll sideways. */
+main.weather-page {
+  overscroll-behavior-y: auto;
+}

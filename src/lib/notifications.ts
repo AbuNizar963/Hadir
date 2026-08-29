@@ -1,0 +1,27 @@
+export type NotificationType = "info" | "success" | "warning" | "error";
+export interface AppNotification { id: string; userId: string; title: string; body: string; type: NotificationType; read: boolean; createdAt: string; }
+const K_NOTIFICATIONS = "hadir.notifications";
+const EVT_CHANGED = "hadir:notifications-changed";
+const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+const APP_BASE = String(import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+const NOTIFICATION_ICON = `${APP_BASE}/pwa-192x192.png`;
+function headers() { return new Headers({ "content-type": "application/json" }); }
+function isRecent(n: AppNotification): boolean { const time = Date.parse(n.createdAt); return Number.isFinite(time) && Date.now() - time <= RETENTION_MS; }
+function prune(list: AppNotification[]): AppNotification[] { return list.filter(isRecent).slice(0, 200); }
+function readAll(): AppNotification[] { try { const raw = localStorage.getItem(K_NOTIFICATIONS); return raw ? prune(JSON.parse(raw)) : []; } catch { return []; } }
+function writeAll(list: AppNotification[]) { try { localStorage.setItem(K_NOTIFICATIONS, JSON.stringify(prune(list))); } catch {} if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVT_CHANGED)); }
+export async function requestNotificationPermission(): Promise<NotificationPermission | "unsupported"> { if (typeof window === "undefined" || !("Notification" in window)) return "unsupported"; if (Notification.permission === "granted" || Notification.permission === "denied") return Notification.permission; try { return await Notification.requestPermission(); } catch { return Notification.permission; } }
+function showBrowserNotification(n: AppNotification) { if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") return; try { if ("serviceWorker" in navigator) { void navigator.serviceWorker.ready.then(reg => reg.showNotification(n.title, { body: n.body, tag: `hadir-${n.id}`, icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON })).catch(() => new Notification(n.title, { body: n.body })); } else new Notification(n.title, { body: n.body }); } catch {} }
+async function fetchDeletedIds(): Promise<Set<string>> { try { const r = await fetch(`${API_URL}/api/notifications/deleted`, { headers: headers(), credentials: "include", cache: "no-store" }); if (!r.ok) return new Set(); const rows = await r.json() as any[]; return new Set(rows.map(n => String(n.notificationId || "")).filter(Boolean)); } catch { return new Set(); } }
+async function syncFromD1() { try { const [r, deletedIds] = await Promise.all([fetch(`${API_URL}/api/notifications`, { headers: headers(), credentials: "include", cache: "no-store" }), fetchDeletedIds()]); if (!r.ok) return; const rows = await r.json() as any[]; const previous = new Map(readAll().map(n => [n.id, n])); const mapped = prune(rows.filter(n => !deletedIds.has(String(n.id))).map(n => ({ id:String(n.id), userId:String(n.recipientId ?? n.userId ?? ""), title:String(n.title ?? "إشعار"), body:String(n.message ?? n.body ?? ""), type:(n.severity === "danger" ? "error" : n.severity === "warning" ? "warning" : n.severity === "success" ? "success" : n.type ?? "info") as NotificationType, read:Boolean(n.readAt), createdAt:String(n.createdAt) })) as AppNotification[]); for (const n of mapped) if (!previous.has(n.id)) showBrowserNotification(n); writeAll(mapped); } catch {} }
+let polling = false;
+export function startNotificationPolling() { if (polling || typeof window === "undefined") return () => {}; polling = true; void syncFromD1(); const timer = window.setInterval(() => void syncFromD1(), 15000); return () => { window.clearInterval(timer); polling = false; }; }
+export function addNotification(n: Omit<AppNotification,"id"|"read"|"createdAt">): AppNotification { const notif = { ...n, id: crypto.randomUUID(), read:false, createdAt:new Date().toISOString() }; writeAll([notif, ...readAll()]); showBrowserNotification(notif); return notif; }
+export function getNotifications(userId?: string): AppNotification[] { void syncFromD1(); const list=readAll(); return userId ? list.filter(n=>n.userId===userId || !n.userId) : list; }
+export function getUnreadCount(userId?: string): number { return getNotifications(userId).filter(n=>!n.read).length; }
+export function markAsRead(id: string) { const list=readAll().map(n=>n.id===id?{...n,read:true}:n); writeAll(list); void fetch(`${API_URL}/api/notifications/read`,{method:"POST",headers:headers(),credentials:"include",body:JSON.stringify({id})}).catch(()=>{}); }
+export function markAllAsRead(userId?: string) { const list=readAll().map(n=>(!userId||n.userId===userId)?{...n,read:true}:n); writeAll(list); void fetch(`${API_URL}/api/notifications/read`,{method:"POST",headers:headers(),credentials:"include",body:"{}"}).catch(()=>{}); }
+export function removeNotification(id: string) { writeAll(readAll().filter(n=>n.id!==id)); void fetch(`${API_URL}/api/notifications`,{method:"DELETE",headers:headers(),credentials:"include",body:JSON.stringify({id})}).catch(()=>{}); }
+export function clearNotifications(userId?: string) { writeAll(userId?readAll().filter(n=>n.userId!==userId):[]); void fetch(`${API_URL}/api/notifications`,{method:"DELETE",headers:headers(),credentials:"include",body:"{}"}).catch(()=>{}); }
+export const NOTIFICATIONS_CHANGED_EVENT = EVT_CHANGED;
