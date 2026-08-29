@@ -27,7 +27,7 @@ import RequireManagerRole from "@/components/RequireManagerRole";
 import SessionRedirect from "@/components/SessionRedirect";
 import { getManagerSession, setManagerSession, setSession } from "@/lib/storage";
 import { backendMe } from "@/lib/backend";
-import { restorePwaSession } from "@/lib/pwaSession";
+import { getLastPwaRole, restorePwaSession } from "@/lib/pwaSession";
 import { enableWebPush } from "@/lib/push";
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
@@ -50,8 +50,7 @@ function PushSessionBridge() {
 
 function isStandalonePwa(): boolean {
   if (typeof window === "undefined") return false;
-  return window.matchMedia?.("(display-mode: standalone)").matches ||
-    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+  return window.matchMedia?.("(display-mode: standalone)").matches || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
 }
 
 function PwaEntry() {
@@ -61,24 +60,21 @@ function PwaEntry() {
     let cancelled = false;
     const restore = async () => {
       let result: any = null;
+      const lastRole = getLastPwaRole();
+      const roles = lastRole ? [lastRole, lastRole === "admin" ? "employee" : "admin"] : ["employee", "admin"];
 
-      // A standalone Chromium PWA can have a separate browser context. Its
-      // durable PWA credential is therefore the first recovery source. This
-      // must run even when backendMe() merely returns a 401/null result rather
-      // than throwing; otherwise the app could fall through to Login without
-      // ever consulting the persisted PWA session.
-      if (isStandalonePwa()) {
-        try { result = await restorePwaSession(); } catch { result = null; }
+      // Always restore the last role first. Do not show Landing until all durable
+      // PWA credentials have been checked, so reopening the installed app never
+      // unnecessarily sends an already-authenticated user back to Login.
+      for (const role of roles) {
+        try {
+          result = await restorePwaSession(role as "employee" | "admin");
+          if (result?.user) break;
+        } catch { result = null; }
       }
 
       if (!result?.user) {
-        try { result = await backendMe(); } catch { result = null; }
-      }
-
-      // If the normal session was absent/expired but the PWA credential exists
-      // (for example after a context reset), retry the durable recovery once.
-      if (!result?.user) {
-        try { result = await restorePwaSession(); } catch { result = null; }
+        try { result = await backendMe(lastRole); } catch { result = null; }
       }
 
       if (cancelled) return;
