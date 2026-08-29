@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -7,6 +7,7 @@ type BeforeInstallPromptEvent = Event & {
 
 const INSTALL_DISMISSED_KEY = "hadir.pwa.install.dismissed";
 const UPDATE_DISMISSED_KEY = "hadir.pwa.update.dismissed";
+const PWA_INSTALL_VERSION = "v2";
 
 function isStandalone() {
   if (typeof window === "undefined") return false;
@@ -14,35 +15,72 @@ function isStandalone() {
     ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
 }
 
+function isIos() {
+  if (typeof navigator === "undefined") return false;
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function isMobile() {
+  if (typeof navigator === "undefined") return false;
+  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+}
+
+function installDismissedThisVersion() {
+  try {
+    return sessionStorage.getItem(INSTALL_DISMISSED_KEY) === PWA_INSTALL_VERSION;
+  } catch {
+    return false;
+  }
+}
+
 export default function PWAExperience() {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [installVisible, setInstallVisible] = useState(false);
+  const [manualInstallVisible, setManualInstallVisible] = useState(false);
   const [updateVisible, setUpdateVisible] = useState(false);
   const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && !navigator.onLine);
+  const [standalone, setStandalone] = useState(() => isStandalone());
   const [updating, setUpdating] = useState(false);
 
-  const standalone = useMemo(() => isStandalone(), []);
+  useEffect(() => {
+    const media = window.matchMedia?.("(display-mode: standalone)");
+    const onDisplayModeChange = () => setStandalone(isStandalone());
+    media?.addEventListener?.("change", onDisplayModeChange);
+    window.addEventListener("pageshow", onDisplayModeChange);
+    return () => {
+      media?.removeEventListener?.("change", onDisplayModeChange);
+      window.removeEventListener("pageshow", onDisplayModeChange);
+    };
+  }, []);
 
   useEffect(() => {
     const onBeforeInstall = (event: Event) => {
       event.preventDefault();
       const install = event as BeforeInstallPromptEvent;
       setInstallEvent(install);
-      if (!standalone && localStorage.getItem(INSTALL_DISMISSED_KEY) !== "1") {
-        window.setTimeout(() => setInstallVisible(true), 900);
+      setManualInstallVisible(false);
+      if (!standalone && !installDismissedThisVersion()) {
+        window.setTimeout(() => setInstallVisible(true), 700);
       }
     };
+
     const onInstalled = () => {
       setInstallEvent(null);
       setInstallVisible(false);
-      localStorage.removeItem(INSTALL_DISMISSED_KEY);
+      setManualInstallVisible(false);
+      setStandalone(true);
+      try { sessionStorage.removeItem(INSTALL_DISMISSED_KEY); } catch {}
     };
+
     const onOnline = () => setOffline(false);
     const onOffline = () => setOffline(true);
+
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
+
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
@@ -50,6 +88,14 @@ export default function PWAExperience() {
       window.removeEventListener("offline", onOffline);
     };
   }, [standalone]);
+
+  useEffect(() => {
+    if (standalone || installEvent || installDismissedThisVersion()) return;
+    const timer = window.setTimeout(() => {
+      if (isIos() && !isStandalone()) setManualInstallVisible(true);
+    }, 1400);
+    return () => window.clearTimeout(timer);
+  }, [standalone, installEvent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,12 +109,13 @@ export default function PWAExperience() {
       }
       const worker = registration.installing;
       if (!worker) return;
-      worker.addEventListener("statechange", () => {
+      const onStateChange = () => {
         if (cancelled) return;
         if (worker.state === "installed" && navigator.serviceWorker.controller && sessionStorage.getItem(UPDATE_DISMISSED_KEY) !== "1") {
           setUpdateVisible(true);
         }
-      });
+      };
+      worker.addEventListener("statechange", onStateChange);
     };
     void checkForUpdate();
     const timer = window.setInterval(() => void checkForUpdate(), 60_000);
@@ -88,8 +135,9 @@ export default function PWAExperience() {
   }, []);
 
   const dismissInstall = () => {
-    localStorage.setItem(INSTALL_DISMISSED_KEY, "1");
+    try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {}
     setInstallVisible(false);
+    setManualInstallVisible(false);
   };
 
   const install = async () => {
@@ -98,7 +146,9 @@ export default function PWAExperience() {
     const choice = await installEvent.userChoice;
     setInstallEvent(null);
     setInstallVisible(false);
-    if (choice.outcome === "dismissed") localStorage.setItem(INSTALL_DISMISSED_KEY, "1");
+    if (choice.outcome === "dismissed") {
+      try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {}
+    }
   };
 
   const update = async () => {
@@ -126,7 +176,11 @@ export default function PWAExperience() {
   }
 
   if (installVisible && installEvent) {
-    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📱</div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر كتطبيق على جهازك</p><p className="mt-1 text-xs leading-5 text-muted-foreground">وصول أسرع، تجربة كاملة الشاشة، وعمل أفضل مع اتصال متقطع — مع بقاء حسابك مسجّلًا.</p><div className="mt-3 flex gap-2"><button type="button" onClick={install} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">تثبيت التطبيق</button><button type="button" onClick={dismissInstall} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">ليس الآن</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
+    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📱</div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">وصول أسرع، شاشة كاملة، وتشغيل موثوق كـ PWA. حسابك وبياناتك لا تتأثر بالتثبيت.</p><div className="mt-3 flex gap-2"><button type="button" onClick={install} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">تثبيت الآن</button><button type="button" onClick={dismissInstall} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">ليس الآن</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
+  }
+
+  if (manualInstallVisible && isIos() && isMobile()) {
+    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📲</div><div className="min-w-0 flex-1"><p className="font-bold">أضف حاضر إلى الشاشة الرئيسية</p><p className="mt-1 text-xs leading-5 text-muted-foreground">على iPhone أو iPad: افتح قائمة المشاركة في Safari ثم اختر «إضافة إلى الشاشة الرئيسية». هذه هي طريقة تثبيت PWA الرسمية على أجهزة Apple.</p><button type="button" onClick={dismissInstall} className="mt-3 rounded-xl border border-border px-4 py-2 text-sm font-medium">فهمت</button></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   }
 
   return null;
