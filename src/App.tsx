@@ -48,53 +48,121 @@ function PushSessionBridge() {
   return null;
 }
 
-function isStandalonePwa(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia?.("(display-mode: standalone)").matches || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
-}
-
 function PwaEntry() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
+
   useEffect(() => {
     let cancelled = false;
+
     const restore = async () => {
       let result: any = null;
       const lastRole = getLastPwaRole();
-      const roles = lastRole ? [lastRole, lastRole === "admin" ? "employee" : "admin"] : ["employee", "admin"];
+      const roles: Array<"employee" | "admin"> = lastRole
+        ? [lastRole, lastRole === "admin" ? "employee" : "admin"]
+        : ["employee", "admin"];
 
-      // Always restore the last role first. Do not show Landing until all durable
-      // PWA credentials have been checked, so reopening the installed app never
-      // unnecessarily sends an already-authenticated user back to Login.
+      // The installed PWA can have its own durable storage context. Always
+      // consult the role-specific PWA credential before allowing the landing
+      // page or login screen to render.
       for (const role of roles) {
         try {
-          result = await restorePwaSession(role as "employee" | "admin");
+          result = await restorePwaSession(role);
           if (result?.user) break;
-        } catch { result = null; }
+        } catch {
+          result = null;
+        }
       }
 
+      // Keep the normal bearer-token path as a second recovery source. This
+      // also covers an existing browser session that predates PWA persistence.
       if (!result?.user) {
-        try { result = await backendMe(lastRole); } catch { result = null; }
+        try {
+          result = await backendMe(lastRole);
+        } catch {
+          result = null;
+        }
       }
 
       if (cancelled) return;
-      const user = result?.user as { id?: string; username?: string; jobNumber?: string; name?: string; role?: string } | undefined;
+
+      const user = result?.user as {
+        id?: string;
+        username?: string;
+        jobNumber?: string;
+        name?: string;
+        role?: string;
+      } | undefined;
       const role = String(user?.role || "").toLowerCase();
+
       if (["employee", "staff"].includes(role) && user?.id) {
         setManagerSession(null);
-        setSession({ employeeId: String(user.id), jobNumber: String(user.jobNumber || user.username || ""), name: String(user.name || ""), loginAt: new Date().toISOString(), role: user.role || "staff" });
-        navigate("/employee", { replace: true }); return;
+        setSession({
+          employeeId: String(user.id),
+          jobNumber: String(user.jobNumber || user.username || ""),
+          name: String(user.name || ""),
+          loginAt: new Date().toISOString(),
+          role: user.role || "staff",
+        });
+        navigate("/employee", { replace: true });
+        return;
       }
+
       if (["owner", "manager", "supervisor", "admin"].includes(role) && user?.id) {
         setSession(null);
-        setManagerSession({ loginAt: new Date().toISOString(), name: user.name, role: role as "owner" | "manager" | "supervisor", jobNumber: user.username, accountId: user.id });
-        navigate("/manager", { replace: true }); return;
+        setManagerSession({
+          loginAt: new Date().toISOString(),
+          name: user.name,
+          role: role as "owner" | "manager" | "supervisor",
+          jobNumber: user.username,
+          accountId: user.id,
+        });
+        navigate("/manager", { replace: true });
+        return;
       }
+
       setChecking(false);
     };
+
     void restore();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
-  if (checking) return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">جاري استعادة جلسة الدخول…</div>;
+
+  if (checking) {
+    return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">جاري استعادة جلسة الدخول…</div>;
+  }
+
   return <Landing />;
+}
+
+export default function App() {
+  return <BrowserRouter basename={basename}>
+    <PushSessionBridge />
+    <Routes>
+      <Route path="/" element={<PwaEntry />} />
+      <Route path="/login" element={<SessionRedirect expected="employee"><EmployeeLogin /></SessionRedirect>} />
+      <Route path="/weather" element={<WeatherPage />} />
+      <Route path="/prayer" element={<PrayerPage />} />
+      <Route path="/ai" element={<AIAssistant />} />
+      <Route path="/employee" element={<EmployeeShell><EmployeeHome /></EmployeeShell>} />
+      <Route path="/employee/center" element={<EmployeeShell><EmployeeCenter /></EmployeeShell>} />
+      <Route path="/employee/premium" element={<Navigate to="/employee/center" replace />} />
+      <Route path="/employee/profile" element={<EmployeeShell><EmployeeProfile /></EmployeeShell>} />
+      <Route path="/employee/history" element={<EmployeeShell><EmployeeHistory /></EmployeeShell>} />
+      <Route path="/employee/notifications" element={<EmployeeShell><EmployeeNotifications /></EmployeeShell>} />
+      <Route path="/employee/scan/:type" element={<EmployeeShell><EmployeeScanAutoFlow /></EmployeeShell>} />
+      <Route path="/manager/login" element={<SessionRedirect expected="manager"><ManagerLogin /></SessionRedirect>} />
+      <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
+      <Route path="/manager/employees" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerEmployees /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager/workforce" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerWorkforceControls /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager/requests" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerRequests /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager/audit" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerAudit /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager/reports" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerReports /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager/settings" element={<ManagerOnly><RequireManagerRole roles={["owner"]}><ManagerSettings /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager-home" element={<Navigate to="/manager" replace />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  </BrowserRouter>;
 }
