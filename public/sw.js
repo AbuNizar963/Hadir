@@ -6,10 +6,10 @@ const APP_SHELL=[
   new URL("./manifest.webmanifest",self.registration.scope).href
 ];
 
+// Keep a newly downloaded worker waiting until the user explicitly accepts
+// the update. This prevents surprise reloads while the user is working.
 self.addEventListener("install",event=>event.waitUntil(
-  caches.open(CACHE)
-    .then(cache=>cache.addAll(APP_SHELL))
-    .then(()=>self.skipWaiting())
+  caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL))
 ));
 
 self.addEventListener("activate",event=>event.waitUntil(
@@ -18,8 +18,8 @@ self.addEventListener("activate",event=>event.waitUntil(
     .then(()=>self.clients.claim())
 ));
 
-// The page can request an immediate, controlled activation after the user
-// explicitly chooses "تحديث الآن". No storage, cookies or D1 data are touched.
+// Explicit update action from the PWA UI. This does not touch localStorage,
+// IndexedDB, cookies, authentication tokens, or Cloudflare D1.
 self.addEventListener("message",event=>{
   if(event.data?.type==="SKIP_WAITING") void self.skipWaiting();
 });
