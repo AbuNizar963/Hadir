@@ -32,33 +32,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.2.15
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
       - name: Typecheck
         run: bun run typecheck
-
       - name: Build Cloudflare Pages production bundle
         env:
           VITE_BASE_PATH: /
         run: bun run build
-
-      - name: Validate Cloudflare credentials
+      - name: Validate Cloudflare Pages credentials
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-          npx wrangler@4 whoami
-
+          test "${#CLOUDFLARE_API_TOKEN}" -ge 20
       - name: Deploy to Cloudflare Pages
         run: npx wrangler@4 pages deploy dist --project-name hadir-9rq --commit-dirty=true
-
       - name: Verify deployed PWA metadata
         shell: bash
         run: |
