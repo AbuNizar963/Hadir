@@ -17,18 +17,19 @@ export function formatDateTime(iso: string): string {
   return normalizeDigits(date.toLocaleString("ar-EG", {
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    timeZone: "Asia/Damascus",
   }));
 }
 
 export function formatTime(iso: string): string {
   return normalizeDigits(new Date(iso).toLocaleTimeString("ar-EG", {
-    hour: "2-digit", minute: "2-digit", hour12: false,
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Damascus",
   }));
 }
 
 export function formatDate(iso: string): string {
   return normalizeDigits(new Date(iso).toLocaleDateString("ar-EG", {
-    year: "numeric", month: "2-digit", day: "2-digit",
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Damascus",
   }));
 }
 
@@ -36,11 +37,17 @@ export function formatNumber(value: number): string {
   return normalizeDigits(new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value));
 }
 
-/** Return the user's local calendar date rather than the UTC date. */
+/** Return the application's official calendar date in Damascus time. */
 export function todayKey(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Damascus",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value || "0000";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
   return `${year}-${month}-${day}`;
 }
 
