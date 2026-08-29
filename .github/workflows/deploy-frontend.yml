@@ -57,6 +57,7 @@ jobs:
           test -s dist/build-version.json
           python - <<'PY'
           import json
+          import os
           import re
           from pathlib import Path
 
@@ -65,7 +66,7 @@ jobs:
           assert manifest.get("scope") == "./", manifest
 
           version = json.loads(Path("dist/build-version.json").read_text(encoding="utf-8"))
-          assert version.get("commitSha") == "${GITHUB_SHA}", version
+          assert version.get("commitSha") == os.environ["GITHUB_SHA"], version
 
           sw = Path("dist/sw.js").read_text(encoding="utf-8")
           match = re.search(r'const CACHE="(hadir-shell-v\d+)";', sw)
@@ -106,9 +107,10 @@ jobs:
               -o /tmp/build-version.json; then
               if python - <<'PY'
           import json
+          import os
           from pathlib import Path
           data = json.loads(Path("/tmp/build-version.json").read_text(encoding="utf-8"))
-          expected = "${GITHUB_SHA}"
+          expected = os.environ["GITHUB_SHA"]
           if data.get("commitSha") == expected:
               print(f"Cloudflare Pages is serving commit {expected}.")
               raise SystemExit(0)
