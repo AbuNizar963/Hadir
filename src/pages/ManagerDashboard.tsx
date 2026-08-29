@@ -12,7 +12,9 @@ type Filter = "all" | "present" | "absent" | "late" | "rest" | "leave";
 type AttendanceAudit = { employeeId?: string; action?: string; result?: string; timestamp?: string };
 
 function isScheduledRestDay(employee: Employee, target: Date): boolean {
-  return getEmployeeWorkPeriod(employee, target).kind === "OFF";
+  const period = getEmployeeWorkPeriod(employee, target);
+  // OFF, not-started rotations, and invalid/unconfigured schedules are not absences.
+  return period.kind === "OFF" || period.kind === "NOT_STARTED" || period.kind === "INVALID";
 }
 
 export default function ManagerDashboard() {
@@ -28,11 +30,7 @@ export default function ManagerDashboard() {
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const [employeeResult, attendanceResult, leaveResult] = await Promise.allSettled([
-        getBackendEmployees(),
-        getBackendAudit(2000),
-        workforce.leaveRequests(),
-      ]);
+      const [employeeResult, attendanceResult, leaveResult] = await Promise.allSettled([getBackendEmployees(), getBackendAudit(2000), workforce.leaveRequests()]);
       if (!active) return;
       setEmployees(employeeResult.status === "fulfilled" ? employeeResult.value : getEmployees());
       setAttendance(attendanceResult.status === "fulfilled" ? attendanceResult.value : []);
@@ -44,10 +42,7 @@ export default function ManagerDashboard() {
     return () => { active = false; window.clearInterval(timer); };
   }, []);
 
-  const todayRecords = useMemo(
-    () => attendance.filter(r => r.timestamp?.startsWith(today) && r.action === "check-in" && r.result === "success"),
-    [attendance, today],
-  );
+  const todayRecords = useMemo(() => attendance.filter(r => r.timestamp?.startsWith(today) && r.action === "check-in" && r.result === "success"), [attendance, today]);
   const presentIds = useMemo(() => new Set(todayRecords.map(r => String(r.employeeId || "")).filter(Boolean)), [todayRecords]);
   const [hh, mm] = (settings?.workStart || "08:00").split(":").map(Number);
   const scheduled = useMemo(() => { const d = new Date(); d.setHours(hh, mm, 0, 0); return d; }, [hh, mm]);
@@ -59,17 +54,7 @@ export default function ManagerDashboard() {
   const lateIds = useMemo(() => new Set(todayRecords.filter(r => { const timestamp = Date.parse(String(r.timestamp || "")); if (!Number.isFinite(timestamp)) return false; const late = Math.max(0, Math.round((timestamp - scheduled.getTime()) / 60000) - (settings?.lateGraceMinutes ?? 10)); return late > 0; }).map(r => String(r.employeeId || "")).filter(Boolean)), [todayRecords, scheduled, settings?.lateGraceMinutes]);
   const absentCount = absentIds.size;
 
-  const filteredEmployees = useMemo(() => activeEmployees.filter(e => {
-    const id = String(e.id);
-    if (search && !e.name.includes(search)) return false;
-    if (filter === "present" && !presentIds.has(id)) return false;
-    if (filter === "absent" && !absentIds.has(id)) return false;
-    if (filter === "late" && !lateIds.has(id)) return false;
-    if (filter === "rest" && !restIds.has(id)) return false;
-    if (filter === "leave" && !leaveIds.has(id)) return false;
-    return true;
-  }), [activeEmployees, search, filter, presentIds, absentIds, lateIds, restIds, leaveIds]);
-
+  const filteredEmployees = useMemo(() => activeEmployees.filter(e => { const id = String(e.id); if (search && !e.name.includes(search)) return false; if (filter === "present" && !presentIds.has(id)) return false; if (filter === "absent" && !absentIds.has(id)) return false; if (filter === "late" && !lateIds.has(id)) return false; if (filter === "rest" && !restIds.has(id)) return false; if (filter === "leave" && !leaveIds.has(id)) return false; return true; }), [activeEmployees, search, filter, presentIds, absentIds, lateIds, restIds, leaveIds]);
   const filters: Array<[Filter, string]> = [["all", "الكل"], ["present", "الحاضرون"], ["absent", "الغائبون"], ["late", "المتأخرون"], ["rest", "المستريحون"], ["leave", "الإجازات"]];
 
   return <ManagerLayout title="لوحة القيادة" subtitle={`نظرة مباشرة على حالة الدوام اليوم · ${targetDate.toLocaleDateString("ar-EG", { weekday: "long", day: "2-digit", month: "long" })}`}>
