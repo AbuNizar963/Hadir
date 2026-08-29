@@ -22,9 +22,6 @@ type DailyStatusResponse = {
   employees: DailyStatusRow[];
 };
 
-// Do not allow a Pages environment variable to silently redirect this critical
-// production endpoint to an obsolete Worker. The D1 source of truth has one
-// canonical production API origin.
 const API_URL = "https://hadir-api.abunizar963.workers.dev";
 const ADMIN_TOKEN_KEY = "hadir.api.token.admin";
 
@@ -37,7 +34,7 @@ export async function getDailyStatus(day: string): Promise<DailyStatusResponse> 
     response = await fetch(`${API_URL}/api/manager/daily-status?date=${encodeURIComponent(day)}`, {
       method: "GET",
       headers,
-      credentials: "omit",
+      credentials: "include",
       cache: "no-store",
       mode: "cors",
     });
