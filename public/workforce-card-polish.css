@@ -50,3 +50,9 @@ article:has(input[type="checkbox"]) > div:last-child > button:last-child::before
     min-width: 7rem;
   }
 }
+
+/* Employee attendance actions: preserve layout and SVGs, clarify semantic colors. */
+a[href="/employee/scan/check-in"] .text-red-600 { color: #16a34a !important; }
+a[href="/employee/scan/check-in"] .bg-red-500\/12 { background-color: rgb(34 197 94 / 0.12) !important; }
+a[href="/employee/scan/check-out"] .text-blue-600 { color: #2563eb !important; }
+a[href="/employee/scan/check-out"] .bg-blue-500\/12 { background-color: rgb(59 130 246 / 0.12) !important; }
