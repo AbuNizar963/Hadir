@@ -11,13 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply repository patch
-        run: python3 scripts/apply_company_specialties.py
+      - name: Apply repository patches
+        run: |
+          python3 scripts/apply_company_specialties.py
+          python3 scripts/apply_job_number_update.py
       - name: Commit patch
         run: |
           git config user.name "HADIR Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/types/index.ts src/components/settings/CompanySpecialtiesPanel.tsx src/pages/ManagerSettings.tsx src/pages/ManagerEmployees.tsx src/pages/ManagerReports.tsx
+          git add src/types/index.ts src/components/settings/CompanySpecialtiesPanel.tsx src/pages/ManagerSettings.tsx src/pages/ManagerEmployees.tsx src/pages/ManagerReports.tsx backend/src/recovery.ts
           if git diff --cached --quiet; then echo "No changes needed"; exit 0; fi
           git commit -m "feat: add owner-managed work specialties"
           git push
