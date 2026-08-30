@@ -11,6 +11,7 @@ import {
   getBackendEmployees,
   getBackendEscapeEvents,
   getBackendLocations,
+  getBackendSettings,
   resetBackendEmployeeDevice,
   updateBackendEmployee,
 } from "@/lib/backend";
@@ -83,8 +84,16 @@ function formFrom(e: Employee): FormState {
 }
 
 function CompanySpecialtySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const options = getSettings().specialties || [];
+  const [options, setOptions] = useState<string[]>(() => getSettings().specialties || []);
   const current = value.trim();
+  useEffect(() => {
+    let alive = true;
+    getBackendSettings().then(remote => {
+      const remoteItems = Array.isArray(remote?.specialties) ? remote.specialties.map(String).map(x => x.trim()).filter(Boolean) : [];
+      if (alive && remoteItems.length) setOptions(Array.from(new Set(remoteItems)));
+    }).catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
   const merged = current && !options.includes(current) ? [current, ...options] : options;
   return <select value={current} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"><option value="">اختر نوع العمل</option>{merged.map(item => <option key={item} value={item}>{item}</option>)}</select>;
 }
