@@ -13,77 +13,9 @@ if "specialties?: string[]; }" not in s:
 
 panel = ROOT / "src/components/settings/CompanySpecialtiesPanel.tsx"
 panel.parent.mkdir(parents=True, exist_ok=True)
-# Do not overwrite an existing panel: production UI changes must survive this
-# compatibility workflow. Only create the legacy specialties panel when the
-# file is genuinely missing.
+# Never replace an existing production panel. Only create it if it is genuinely absent.
 if not panel.exists():
-    panel.write_text('''import { useEffect, useState } from "react";
-import { BriefcaseBusiness, Plus, Trash2 } from "lucide-react";
-import type { Settings } from "@/types";
-import { getSettings, saveSettings } from "@/lib/storage";
-import { getBackendSettings, saveBackendSettings } from "@/lib/backend";
-
-const clean = (values: string[]) => Array.from(new Set(values.map(v => v.trim()).filter(Boolean)));
-
-export default function CompanySpecialtiesPanel() {
-  const [items, setItems] = useState<string[]>([]);
-  const [value, setValue] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const local = getSettings().specialties || [];
-      try {
-        const remote = await getBackendSettings();
-        const remoteItems = remote?.specialties || [];
-        if (alive) setItems(clean(remoteItems.length ? remoteItems : local));
-      } catch {
-        if (alive) setItems(clean(local));
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
-
-  async function persist(next: string[]) {
-    const normalized = clean(next);
-    setItems(normalized);
-    const nextSettings: Settings = { ...getSettings(), specialties: normalized };
-    saveSettings(nextSettings);
-    setSaving(true);
-    setMessage(null);
-    try {
-      await saveBackendSettings(nextSettings);
-      setMessage("تم حفظ التخصصات");
-    } catch {
-      setMessage("تم حفظها محليًا، وتعذر مزامنة الخادم");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <section className="rounded-2xl border border-border/70 bg-card/60 p-5 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-black">تخصصات العمل</h2>
-          <p className="mt-1 text-xs text-muted-foreground">قائمة غير محدودة لأنواع العمل التي يضيفها المالك وتظهر عند إضافة الموظفين وفي التقارير.</p>
-          <div className="mt-4 flex gap-2">
-            <input type="text" inputMode="text" autoCapitalize="none" autoCorrect="off" value={value} onChange={e => setValue(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); const v = value.trim(); if (v && !items.includes(v)) { void persist([...items, v]); setValue(""); } } }} placeholder="مثال: سائق" className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
-            <button type="button" disabled={saving || !value.trim() || items.includes(value.trim())} onClick={() => { const v = value.trim(); if (v && !items.includes(v)) { void persist([...items, v]); setValue(""); } }} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-50"><Plus className="h-4 w-4" />إضافة</button>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {items.length ? items.map(item => <span key={item} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-bold">{item}<button type="button" onClick={() => void persist(items.filter(x => x !== item))} className="rounded-full p-0.5 text-muted-foreground hover:text-destructive" aria-label={`حذف ${item}`}><Trash2 className="h-3.5 w-3.5" /></button></span>) : <span className="text-xs text-muted-foreground">لم تتم إضافة تخصصات بعد.</span>}
-          </div>
-          {message && <p className="mt-3 text-[11px] text-muted-foreground">{message}</p>}
-        </div>
-      </div>
-    </section>
-  );
-}
-''', encoding="utf-8")
+    raise SystemExit("CompanySpecialtiesPanel.tsx is missing; refusing to recreate production UI from a compatibility script")
 
 p = ROOT / "src/pages/ManagerSettings.tsx"
 s = p.read_text(encoding="utf-8")
@@ -98,39 +30,49 @@ if "CompanySpecialtiesPanel" not in s:
     s = s[:m.end()] + "\n      <CompanySpecialtiesPanel />" + s[m.end():]
     p.write_text(s, encoding="utf-8")
 
+# Employee editor: keep the existing form and employee data model, but make the
+# work-type select consume centrally stored company specialties. Existing employee
+# values are intentionally retained as a fallback option so deleting a specialty
+# from settings never erases an employee's historical value.
 p = ROOT / "src/pages/ManagerEmployees.tsx"
 s = p.read_text(encoding="utf-8")
-if "CompanySpecialtySelect" not in s:
-    imp = 'import { getEmployees, saveEmployees } from "@/lib/storage";'
-    if imp not in s:
-        raise SystemExit("storage import missing")
-    s = s.replace(imp, 'import { getEmployees, saveEmployees, getSettings } from "@/lib/storage";', 1)
-    marker = 'function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {'
+if "getBackendSettings" not in s:
+    marker = "  getBackendLocations,"
     if marker not in s:
-        raise SystemExit("Field marker missing")
-    select = '''function CompanySpecialtySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+        raise SystemExit("backend import marker missing")
+    s = s.replace(marker, "  getBackendLocations,\n  getBackendSettings,", 1)
+
+old_select = '''function CompanySpecialtySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const options = getSettings().specialties || [];
   const current = value.trim();
   const merged = current && !options.includes(current) ? [current, ...options] : options;
   return <select value={current} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"><option value="">اختر نوع العمل</option>{merged.map(item => <option key={item} value={item}>{item}</option>)}</select>;
-}
+}'''
+new_select = '''function CompanySpecialtySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [options, setOptions] = useState<string[]>(() => getSettings().specialties || []);
+  const current = value.trim();
+  useEffect(() => {
+    let alive = true;
+    getBackendSettings().then(remote => {
+      const remoteItems = Array.isArray(remote?.specialties) ? remote.specialties.map(String).map(x => x.trim()).filter(Boolean) : [];
+      if (alive && remoteItems.length) setOptions(Array.from(new Set(remoteItems)));
+    }).catch(() => undefined);
+    return () => { alive = false; };
+  }, []);
+  const merged = current && !options.includes(current) ? [current, ...options] : options;
+  return <select value={current} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"><option value="">اختر نوع العمل</option>{merged.map(item => <option key={item} value={item}>{item}</option>)}</select>;
+}'''
+if old_select in s:
+    s = s.replace(old_select, new_select, 1)
+elif "function CompanySpecialtySelect" not in s:
+    raise SystemExit("CompanySpecialtySelect is missing; refusing unsafe patch")
 
-'''
-    s = s.replace(marker, select + marker, 1)
-    replacement = '<Field label="نوع العمل" hint="تؤخذ من تخصصات الشركة التي يضيفها المالك"><CompanySpecialtySelect value={form.specialties} onChange={v => setForm(prev => ({ ...prev, specialties: v }))} /></Field>'
-    found = False
-    for pat in [r'<Field label="التخصصات"[^>]*>.*?</Field>', r'<Field label="الاختصاص"[^>]*>.*?</Field>', r'<Field label="Specialties"[^>]*>.*?</Field>']:
-        s2, n = re.subn(pat, replacement, s, count=1, flags=re.S)
-        if n:
-            s = s2
-            found = True
-            break
-    if not found:
-        raise SystemExit("Existing specialties Field not found; refusing unsafe patch")
-    p.write_text(s, encoding="utf-8")
+# The workflow must never overwrite a complete production employee page. It only
+# performs the exact compatibility transformation above when the old selector is present.
+p.write_text(s, encoding="utf-8")
 
-# Daily report: remove the hard-coded Excel/template organization name.
-# The report keeps the Excel layout as a visual reference, but all group names now come from owner-managed specialties.
+# Daily report branding: remove the known hard-coded template title only when its
+# exact current markup is present. Never replace a different production layout.
 p = ROOT / "src/pages/ManagerReports.tsx"
 s = p.read_text(encoding="utf-8")
 old = '<h1 className="text-xl md:text-2xl font-black">خدمة قسم شرطة الشهباء لتاريخ {formatDate(date)}</h1>'
@@ -141,5 +83,4 @@ elif "خدمة قسم شرطة الشهباء" in s:
     raise SystemExit("Hard-coded daily report title exists but expected markup differs; refusing unsafe patch")
 p.write_text(s, encoding="utf-8")
 
-print("company specialties and daily report branding patch complete")
-# Idempotent: this script only changes targeted markers and refuses unsafe markup mismatches.
+print("company specialties compatibility patch complete")
