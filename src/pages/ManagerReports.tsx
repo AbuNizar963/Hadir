@@ -144,7 +144,7 @@ export default function ManagerReports() {
 
     {mode === "daily" ? <section className="service-report bg-white text-black rounded-none border shadow-sm print:border-0 print:shadow-none" dir="rtl">
       <div className="p-5 md:p-7 border-b-2 border-black/70 text-center">
-        <h1 className="text-xl md:text-2xl font-black">خدمة قسم شرطة الشهباء لتاريخ {formatDate(date)}</h1>
+        <div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div>
         <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold"><div>رئيس القسم : {settings.ownerName || "—"}</div><div>معاون رئيس القسم : {settings.managerName || "—"}</div></div>
       </div>
       <div className="p-3 md:p-5 space-y-4">{groupColumns.length ? groupColumns.map((pair, pi) => <div key={pi} className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
