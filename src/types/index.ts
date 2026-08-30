@@ -4,7 +4,7 @@ export type UserRole = "owner" | "admin" | "manager" | "supervisor" | "staff";
 export type RequestType = "permission" | "leave" | "checkout";
 export type EscapeStatus = "escaped" | "returned";
 
-export interface EmployeeRequest { id: string; employeeId: string; employeeName: string; jobNumber: string; type: RequestType; reason?: string; status: "pending" | "approved" | "rejected"; createdAt: string; }
+export interface EmployeeRequest { id: string; employeeId: string; employeeName: string; jobNumber: string; type: RequestType; reason?: string; status: "pending" | "approved" | "rejected" | "confirmed"; createdAt: string; startDate?: string | null; endDate?: string | null; }
 export interface Location { id: string; name: string; lat: number; lng: number; radiusMeters: number; }
 export interface AdminAccount { id: string; username: string; passwordHash: string; name: string; role: "owner" | "manager" | "supervisor"; active: boolean; createdAt: string; }
 
