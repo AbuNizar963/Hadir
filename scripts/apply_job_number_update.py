@@ -2,9 +2,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Production-safe/idempotent: patch only when the exact current route marker exists.
-# Never replace a source file wholesale and never touch historical attendance rows.
-# V2 also targets the canonical current employee API in backend/src/index.ts.
+# Production-safe/idempotent: patch only when exact current markers exist.
+# Never replace source files wholesale and never touch historical attendance rows.
 
 def patch_index():
     target = ROOT / "backend/src/index.ts"
@@ -73,5 +72,37 @@ def patch_recovery():
     target.write_text(text.replace(marker, patch + marker, 1), encoding="utf-8")
     print("recovery job-number patch applied")
 
+
+def patch_keyboard_fields():
+    # Stage 4: only remove an inappropriate numeric keyboard hint from mixed
+    # alphanumeric identifiers. Exact-marker checks make this fail closed.
+    manager = ROOT / "src/pages/ManagerEmployees.tsx"
+    text = manager.read_text(encoding="utf-8")
+    old = 'inputMode="numeric" placeholder="مثال: 1000" value={form.jobNumber} disabled={!!editingId}'
+    new = 'inputMode="text" autoComplete="off" placeholder="مثال: D718075" value={form.jobNumber}'
+    if old in text:
+        text = text.replace(old, new, 1)
+        manager.write_text(text, encoding="utf-8")
+        print("manager employee job-number keyboard/inputMode patched")
+    elif 'inputMode="text" autoComplete="off" placeholder="مثال: D718075" value={form.jobNumber}' in text:
+        print("manager employee job-number keyboard patch already present")
+    else:
+        raise SystemExit("Refusing unsafe keyboard patch: ManagerEmployees job-number marker was not found")
+
+    login = ROOT / "src/pages/EmployeeLogin.tsx"
+    text = login.read_text(encoding="utf-8")
+    old = 'type="text" inputMode="numeric" autoComplete="username" className="input w-full p-3.5 rounded-2xl border border-border bg-secondary/45 text-base" value={jobNumber} onChange={e=>setJobNumber(e.target.value)} placeholder="مثال: 1001"'
+    new = 'type="text" inputMode="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" className="input w-full p-3.5 rounded-2xl border border-border bg-secondary/45 text-base" value={jobNumber} onChange={e=>setJobNumber(e.target.value)} placeholder="مثال: D718075"'
+    if old in text:
+        text = text.replace(old, new, 1)
+        login.write_text(text, encoding="utf-8")
+        print("employee login job-number keyboard/inputMode patched")
+    elif 'type="text" inputMode="text" autoComplete="username" autoCapitalize="none" autoCorrect="off"' in text:
+        print("employee login job-number keyboard patch already present")
+    else:
+        raise SystemExit("Refusing unsafe keyboard patch: EmployeeLogin job-number marker was not found")
+
+
 patch_index()
 patch_recovery()
+patch_keyboard_fields()
