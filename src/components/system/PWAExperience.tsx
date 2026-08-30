@@ -7,7 +7,7 @@ type BeforeInstallPromptEvent = Event & {
 
 const INSTALL_DISMISSED_KEY = "hadir.pwa.install.dismissed";
 const UPDATE_DISMISSED_KEY = "hadir.pwa.update.dismissed";
-const PWA_INSTALL_VERSION = "v2";
+const PWA_INSTALL_VERSION = "v3";
 
 function isStandalone() {
   if (typeof window === "undefined") return false;
@@ -19,6 +19,10 @@ function isIos() {
   if (typeof navigator === "undefined") return false;
   return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function isAndroid() {
+  return typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
 }
 
 function isMobile() {
@@ -61,7 +65,7 @@ export default function PWAExperience() {
       setInstallEvent(install);
       setManualInstallVisible(false);
       if (!standalone && !installDismissedThisVersion()) {
-        window.setTimeout(() => setInstallVisible(true), 700);
+        window.setTimeout(() => setInstallVisible(true), 300);
       }
     };
 
@@ -89,11 +93,14 @@ export default function PWAExperience() {
     };
   }, [standalone]);
 
+  // Some Android/Chromium builds do not expose beforeinstallprompt even when
+  // the browser can install the PWA. Give the user the native browser path
+  // instead of silently creating an ordinary home-screen shortcut.
   useEffect(() => {
-    if (standalone || installEvent || installDismissedThisVersion()) return;
+    if (standalone || installEvent || installDismissedThisVersion() || !isMobile()) return;
     const timer = window.setTimeout(() => {
-      if (isIos() && !isStandalone()) setManualInstallVisible(true);
-    }, 1400);
+      if (!isStandalone()) setManualInstallVisible(true);
+    }, 2200);
     return () => window.clearTimeout(timer);
   }, [standalone, installEvent]);
 
@@ -142,10 +149,11 @@ export default function PWAExperience() {
 
   const install = async () => {
     if (!installEvent) return;
-    await installEvent.prompt();
-    const choice = await installEvent.userChoice;
+    const currentEvent = installEvent;
     setInstallEvent(null);
     setInstallVisible(false);
+    await currentEvent.prompt();
+    const choice = await currentEvent.userChoice;
     if (choice.outcome === "dismissed") {
       try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {}
     }
@@ -176,7 +184,11 @@ export default function PWAExperience() {
   }
 
   if (installVisible && installEvent) {
-    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📱</div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">وصول أسرع، شاشة كاملة، وتشغيل موثوق كـ PWA. حسابك وبياناتك لا تتأثر بالتثبيت.</p><div className="mt-3 flex gap-2"><button type="button" onClick={install} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">تثبيت الآن</button><button type="button" onClick={dismissInstall} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">ليس الآن</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
+    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📱</div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">هذا هو تثبيت PWA الحقيقي، وليس اختصارًا عاديًا. سيعمل حاضر بواجهة مستقلة عن المتصفح ويحافظ على جلسة الحساب.</p><div className="mt-3 flex gap-2"><button type="button" onClick={install} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">تثبيت الآن</button><button type="button" onClick={dismissInstall} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">ليس الآن</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
+  }
+
+  if (manualInstallVisible && isAndroid() && !installEvent) {
+    return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📲</div><div className="min-w-0 flex-1"><p className="font-bold">تثبيت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">إذا لم يظهر زر التثبيت التلقائي، افتح قائمة Chrome ⋮ ثم اختر «تثبيت التطبيق» أو «Install app». لا تستخدم «إضافة إلى الشاشة الرئيسية» لأنها قد تنشئ اختصارًا فقط.</p><button type="button" onClick={dismissInstall} className="mt-3 rounded-xl border border-border px-4 py-2 text-sm font-medium">فهمت</button></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   }
 
   if (manualInstallVisible && isIos() && isMobile()) {
