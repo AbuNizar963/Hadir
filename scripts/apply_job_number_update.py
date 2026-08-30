@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Production-safe, idempotent patch: never rewrites recovery.ts unless the expected current route marker exists.
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "backend/src/recovery.ts"
 text = TARGET.read_text(encoding="utf-8")
