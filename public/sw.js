@@ -1,4 +1,4 @@
-const CACHE="hadir-shell-v7";
+const CACHE="hadir-shell-v8";
 const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[
   new URL("./",self.registration.scope).href,
@@ -6,20 +6,16 @@ const APP_SHELL=[
   new URL("./pwa-icon.svg",self.registration.scope).href
 ];
 
-// Keep a newly downloaded worker waiting until the user explicitly accepts
-// the update. This prevents surprise reloads while the user is working.
 self.addEventListener("install",event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL))
 ));
 
 self.addEventListener("activate",event=>event.waitUntil(
   caches.keys()
-    .then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))
+    .then(keys=>Promise.all(keys.filter(key=>key.startsWith("hadir-shell-")&&key!==CACHE).map(key=>caches.delete(key))))
     .then(()=>self.clients.claim())
 ));
 
-// Explicit update action from the PWA UI. This does not touch localStorage,
-// IndexedDB, cookies, authentication tokens, or Cloudflare D1.
 self.addEventListener("message",event=>{
   if(event.data?.type==="SKIP_WAITING") void self.skipWaiting();
 });
@@ -30,7 +26,6 @@ self.addEventListener("fetch",event=>{
   const url=new URL(request.url);
   if(url.origin!==self.location.origin||!url.pathname.startsWith(BASE))return;
 
-  // Network-first keeps production fresh; cache is only an offline fallback.
   event.respondWith(
     fetch(request)
       .then(response=>response)
