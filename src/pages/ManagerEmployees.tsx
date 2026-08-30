@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { CalendarPlus, FileClock, Star } from "lucide-react";
+import { CalendarPlus, FileClock, Star, LogIn, LogOut, Footprints, Pencil, Trash2, Smartphone, RotateCcw } from "lucide-react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import SmartEmployeeImport from "@/components/employees/SmartEmployeeImport";
 import {
@@ -128,15 +128,16 @@ function EmployeeCardBase({ e, location, canManage, escapeStatus, onEdit, onRemo
         </button>
         <span className="text-[10px] text-muted-foreground">{e.isVip ? "تحضير + انصراف تلقائي" : "تشغيل تلقائي عند التفعيل"}</span>
       </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {canManage && e.status === "active" && <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-sky-500/30 bg-sky-500/5 px-2.5 text-[11px] font-bold text-sky-700 hover:bg-sky-500/10 dark:text-sky-300" onClick={() => onRequest(e, "permission")} title="تسجيل استئذان"><FileClock className="h-3.5 w-3.5" aria-hidden="true" />إذن</button>}
-        {canManage && e.status === "active" && <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/5 px-2.5 text-[11px] font-bold text-violet-700 hover:bg-violet-500/10 dark:text-violet-300" onClick={() => onRequest(e, "leave")} title="تسجيل إجازة"><CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" />إجازة</button>}
-        {isOwner && e.status === "active" && <button type="button" className="btn-primary text-[11px]" onClick={() => onDirect(e)}>تحضير مباشر</button>}
-        {isOwner && e.status === "active" && <button type="button" className="btn-secondary text-[11px]" onClick={() => onCheckout(e)}>انصراف مباشر</button>}
-        {canManage && e.status === "active" && escapeStatus !== "escaped" && <button type="button" className="rounded-lg border border-destructive/30 px-2.5 py-1.5 text-[11px] font-bold text-destructive hover:bg-destructive/10" onClick={() => onEscape(e)}>هروب</button>}
-        {canManage && escapeStatus === "escaped" && <button type="button" className="rounded-lg border border-primary/30 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/10" onClick={() => onReturn(e)}>إلغاء الهروب / عاد</button>}
-        {canManage && <><button type="button" className="btn-secondary text-[11px]" onClick={() => onEdit(e)}>تعديل</button><button type="button" className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-destructive hover:bg-destructive/10" onClick={() => onRemove(e)}>حذف</button></>}
-        {e.deviceId && <button type="button" className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted-foreground hover:bg-secondary" onClick={() => onReset(e)}>فك ربط الهاتف</button>}
+      <div className="mt-3 grid grid-cols-4 gap-1.5 sm:grid-cols-8">
+        {canManage && e.status === "active" && <button type="button" className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[9px] font-bold transition active:scale-95 disabled:opacity-50 border-sky-500/30 bg-sky-500/5 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300" onClick={() => onRequest(e, "permission")} title="إذن" aria-label="إذن"><FileClock className="h-4 w-4" aria-hidden="true" /><span>إذن</span></button>}
+        {canManage && e.status === "active" && <button type="button" className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[9px] font-bold transition active:scale-95 disabled:opacity-50 border-violet-500/30 bg-violet-500/5 text-violet-700 hover:bg-violet-500/10 dark:text-violet-300" onClick={() => onRequest(e, "leave")} title="إجازة" aria-label="إجازة"><CalendarPlus className="h-4 w-4" aria-hidden="true" /><span>إجازة</span></button>}
+        {isOwner && e.status === "active" && <button type="button" className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[9px] font-bold transition active:scale-95 disabled:opacity-50 border-emerald-500/30 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300" onClick={() => onDirect(e)} title="تحضير مباشر" aria-label="تحضير مباشر"><LogIn className="h-4 w-4" aria-hidden="true" /><span>تحضير</span></button>}
+        {isOwner && e.status === "active" && <button type="button" className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[9px] font-bold transition active:scale-95 disabled:opacity-50 border-orange-500/30 bg-orange-500/5 text-orange-700 hover:bg-orange-500/10 dark:text-orange-300" onClick={() => onCheckout(e)} title="انصراف مباشر" aria-label="انصراف مباشر"><LogOut className="h-4 w-4" aria-hidden="true" /><span>انصراف</span></button>}
+        {canManage && e.status === "active" && escapeStatus !== "escaped" && <button type="button" className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[9px] font-bold transition active:scale-95 disabled:opacity-50 border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10" onClick={() => onEscape(e)} title="هروب" aria-label="هروب"><Footprints className="h-4 w-4" aria-hidden="true" /><span>هروب</span></button>}
+        {canManage && escapeStatus === "escaped" && <button type="button" className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[9px] font-bold transition active:scale-95 disabled:opacity-50 border-primary/30 bg-primary/5 text-primary hover:bg-primary/10" onClick={() => onReturn(e)} title="إلغاء الهروب / عاد" aria-label="إلغاء الهروب / عاد"><RotateCcw className="h-4 w-4" aria-hidden="true" /><span>عودة</span></button>}
+        {canManage && <button type="button" className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[9px] font-bold transition active:scale-95 disabled:opacity-50 border-border/70 bg-secondary/30 text-foreground hover:bg-secondary" onClick={() => onEdit(e)} title="تعديل" aria-label="تعديل"><Pencil className="h-4 w-4" aria-hidden="true" /><span>تعديل</span></button>}
+        {canManage && <button type="button" className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[9px] font-bold transition active:scale-95 disabled:opacity-50 border-destructive/20 bg-destructive/5 text-destructive hover:bg-destructive/10" onClick={() => onRemove(e)} title="حذف" aria-label="حذف"><Trash2 className="h-4 w-4" aria-hidden="true" /><span>حذف</span></button>}
+        {e.deviceId && <button type="button" className="inline-flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[9px] font-bold transition active:scale-95 disabled:opacity-50 border-border/70 bg-secondary/20 text-muted-foreground hover:bg-secondary" onClick={() => onReset(e)} title="فك ربط الهاتف" aria-label="فك ربط الهاتف"><Smartphone className="h-4 w-4" aria-hidden="true" /><span>الجهاز</span></button>}
       </div>
     </article>
   );
@@ -161,6 +162,11 @@ export default function ManagerEmployees() {
   const [role, setRole] = useState("manager");
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [requestDialog, setRequestDialog] = useState<{ employee: Employee; type: "permission" | "leave" } | null>(null);
+  const [requestStartDate, setRequestStartDate] = useState("");
+  const [requestEndDate, setRequestEndDate] = useState("");
+  const [requestReason, setRequestReason] = useState("");
+  const [requestSaving, setRequestSaving] = useState(false);
 
   const load = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
@@ -221,20 +227,34 @@ export default function ManagerEmployees() {
     } catch (err) { setError(err instanceof Error ? err.message : `تعذر ${verb}.`); }
   };
 
-  const createAdminEmployeeRequest = async (e: Employee, type: "permission" | "leave") => {
+  const openAdminEmployeeRequest = (e: Employee, type: "permission" | "leave") => {
     if (!canManage || e.status !== "active") return;
-    const label = type === "permission" ? "استئذان" : "إجازة";
-    const reason = window.prompt(`تسجيل ${label} للموظف «${e.name}». اكتب السبب أو الملاحظة:`);
-    if (reason === null) return;
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus" }).format(new Date());
+    setRequestDialog({ employee: e, type });
+    setRequestStartDate(today);
+    setRequestEndDate(today);
+    setRequestReason("");
+    setError(null);
+  };
+
+  const createAdminEmployeeRequest = async () => {
+    if (!requestDialog || !canManage || requestDialog.employee.status !== "active") return;
+    const label = requestDialog.type === "permission" ? "استئذان" : "إجازة";
+    if (!requestStartDate || !requestEndDate) return setError(`حدد تاريخ بداية ونهاية ${label}.`);
+    if (requestEndDate < requestStartDate) return setError("تاريخ النهاية يجب أن يكون مساويًا أو بعد تاريخ البداية.");
+    setRequestSaving(true);
     setError(null);
     try {
       const token = localStorage.getItem("hadir.api.token.admin") || "";
       const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-      const response = await fetch(`${api}/api/requests`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, credentials: "include", cache: "no-store", body: JSON.stringify({ employeeId: e.id, type, reason: reason.trim() }) });
+      const response = await fetch(`${api}/api/requests`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, credentials: "include", cache: "no-store", body: JSON.stringify({ employeeId: requestDialog.employee.id, type: requestDialog.type, reason: requestReason.trim(), startDate: requestStartDate, endDate: requestEndDate }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : `تعذر تسجيل ${label}.`);
+      setRequestDialog(null);
+      setRequestReason("");
       await load(false);
     } catch (err) { setError(err instanceof Error ? err.message : `تعذر تسجيل ${label}.`); }
+    finally { setRequestSaving(false); }
   };
 
   const saveCheckoutPolicy = async (employeeId: string, minutes: number) => {
@@ -322,7 +342,7 @@ export default function ManagerEmployees() {
     try {
       const token = localStorage.getItem("hadir.api.token.admin") || "";
       const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-      const res = await fetch(`${api}/api/manager/workforce-controls/${encodeURIComponent(e.id)}`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ employeeId: e.id, ...patch }), cache: "no-store" });
+      const res = await fetch(`${api}/api/workforce/live`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ employeeId: e.id, ...patch }), cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ إعدادات Workforce.");
       await load(false);
@@ -382,8 +402,27 @@ export default function ManagerEmployees() {
         </div></section>
         <section className="hud-card overflow-hidden p-5 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="mono text-xs font-bold text-primary">LIVE DIRECTORY</div><h2 className="mt-1 text-lg font-black">قائمة الموظفين <span className="font-normal text-muted-foreground">({filtered.length})</span></h2><p className="mt-1 text-xs text-muted-foreground">{role === "supervisor" ? "المشرف: مشاهدة، إضافة، وفك ربط الهاتف فقط." : "المالك والمدير: إدارة الموظفين والتحضير المباشر للمهمات والمأموريات وتسجيل الهروب والعودة والأذونات والإجازات."}</p></div><div className="grid w-full gap-2 sm:grid-cols-[1fr_auto_auto] lg:w-auto"><input className="input lg:w-72" placeholder="بحث بالاسم أو الرقم أو الجهاز" value={query} onChange={(e) => setQuery(e.target.value)} /><select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}><option value="all">كل الحالات</option><option value="active">فعال</option><option value="suspended">موقوف</option></select><select className="input" value={scheduleFilter} onChange={(e) => setScheduleFilter(e.target.value as typeof scheduleFilter)}><option value="all">كل أنواع الدوام</option><option value="ADMIN">إداري</option><option value="ROTATION">تناوبي</option></select></div></div>
-          {loading ? <div className="py-16 text-center text-sm text-muted-foreground">جاري مزامنة الموظفين من قاعدة بيانات النظام…</div> : error && !showForm ? <div className="mt-5 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">{error}<button type="button" className="mr-3 underline" onClick={() => void load(true)}>إعادة المحاولة</button></div> : filtered.length === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-border/70 py-16 text-center"><div className="text-3xl">⌕</div><p className="mt-2 text-sm font-bold">لا توجد نتائج</p><p className="mt-1 text-xs text-muted-foreground">جرّب تغيير البحث أو الفلاتر.</p></div> : <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{filtered.map((e) => <EmployeeCard key={e.id} e={e} location={locations.find((l) => String(l.id) === String(e.locationId)) || locations.find((l) => l.id === "main")} canManage={canManage} isOwner={isOwner} onCheckout={directCheckout} onWorkforceUpdate={updateWorkforce} escapeStatus={escapeStatusFor(e.id)} onEdit={edit} onRemove={remove} onReset={resetDevice} onDirect={direct} onEscape={(x) => void changeEscape(x, "escaped")} onReturn={(x) => void changeEscape(x, "returned")} onRequest={createAdminEmployeeRequest} />)}</div>}
+          {loading ? <div className="py-16 text-center text-sm text-muted-foreground">جاري مزامنة الموظفين من قاعدة بيانات النظام…</div> : error && !showForm ? <div className="mt-5 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">{error}<button type="button" className="mr-3 underline" onClick={() => void load(true)}>إعادة المحاولة</button></div> : filtered.length === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-border/70 py-16 text-center"><div className="text-3xl">⌕</div><p className="mt-2 text-sm font-bold">لا توجد نتائج</p><p className="mt-1 text-xs text-muted-foreground">جرّب تغيير البحث أو الفلاتر.</p></div> : <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{filtered.map((e) => <EmployeeCard key={e.id} e={e} location={locations.find((l) => String(l.id) === String(e.locationId)) || locations.find((l) => l.id === "main")} canManage={canManage} isOwner={isOwner} onCheckout={directCheckout} onWorkforceUpdate={updateWorkforce} escapeStatus={escapeStatusFor(e.id)} onEdit={edit} onRemove={remove} onReset={resetDevice} onDirect={direct} onEscape={(x) => void changeEscape(x, "escaped")} onReturn={(x) => void changeEscape(x, "returned")} onRequest={openAdminEmployeeRequest} />)}</div>}
         </section>
+
+        {requestDialog && (
+          <div className="fixed inset-0 z-[90] grid place-items-center bg-black/45 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="request-dialog-title">
+            <div className="w-full max-w-md rounded-2xl border border-border/80 bg-card p-5 shadow-2xl">
+              <div className="flex items-start justify-between gap-3">
+                <div><div className="mono text-xs font-bold text-primary">REQUEST · D1</div><h2 id="request-dialog-title" className="mt-1 text-lg font-black">{requestDialog.type === "permission" ? "تسجيل إذن" : "تسجيل إجازة"}</h2><p className="mt-1 text-xs text-muted-foreground">{requestDialog.employee.name} · {requestDialog.employee.jobNumber}</p></div>
+                <button type="button" className="btn-secondary text-xs" onClick={() => setRequestDialog(null)} disabled={requestSaving}>إلغاء</button>
+              </div>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <Field label="أول يوم"><input className="input w-full" type="date" value={requestStartDate} onChange={(ev) => setRequestStartDate(ev.target.value)} /></Field>
+                <Field label="آخر يوم"><input className="input w-full" type="date" min={requestStartDate || undefined} value={requestEndDate} onChange={(ev) => setRequestEndDate(ev.target.value)} /></Field>
+              </div>
+              <div className="mt-4"><Field label="السبب / الملاحظة"><textarea className="input min-h-24 w-full resize-y" value={requestReason} onChange={(ev) => setRequestReason(ev.target.value)} placeholder={requestDialog.type === "permission" ? "سبب الإذن" : "سبب الإجازة"} /></Field></div>
+              <div className="mt-4 rounded-xl border border-primary/15 bg-primary/[0.04] p-3 text-[11px] leading-5 text-muted-foreground">سيتم حفظ الفترة كاملة في D1. بعد انتهاء آخر يوم يعود تقييم الموظف تلقائيًا إلى جدول دوامه الفعلي.</div>
+              {error && <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">{error}</div>}
+              <button type="button" className="btn-primary mt-4 w-full" disabled={requestSaving} onClick={() => void createAdminEmployeeRequest()}>{requestSaving ? "جاري الحفظ في D1…" : "حفظ الفترة"}</button>
+            </div>
+          </div>
+        )}
       </div>
     </ManagerLayout>
   );
