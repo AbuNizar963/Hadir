@@ -1,10 +1,12 @@
 import { memo, useEffect, useMemo, useState } from "react";
-import { CalendarDays, Coffee } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, Coffee, UserX } from "lucide-react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getDailyStatus, type DailyStatusRow } from "@/lib/dailyStatus";
 import { todayKey } from "@/lib/utils";
 
 type Filter = "all" | "present" | "absent" | "late" | "rest" | "leave";
+
+type ShortcutTone = "present" | "absent" | "late" | "rest" | "leave";
 
 function statusLabel(row: DailyStatusRow) {
   switch (row.status) {
@@ -100,14 +102,10 @@ export default function ManagerDashboard() {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 mb-6">
-        <Kpi label="إجمالي الموظفين" value={rows.length} />
-        <Kpi label="الحضور" value={presentIds.size} accent="primary" />
-        <Kpi label="الغياب" value={absentIds.size} accent="warning" />
-        <Kpi label="المتأخرون" value={lateIds.size} accent="destructive" />
-      </section>
-
-      <section className="grid grid-cols-2 gap-3 mb-6" aria-label="الراحة والإجازات">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 mb-6" aria-label="حالات الدوام">
+        <StatusShortcut label="الحضور" value={presentIds.size} icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} tone="present" onClick={() => setFilter("present")} active={filter === "present"} />
+        <StatusShortcut label="الغياب" value={absentIds.size} icon={<UserX className="h-5 w-5" aria-hidden="true" />} tone="absent" onClick={() => setFilter("absent")} active={filter === "absent"} />
+        <StatusShortcut label="المتأخرون" value={lateIds.size} icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} tone="late" onClick={() => setFilter("late")} active={filter === "late"} />
         <StatusShortcut label="الراحة" value={restIds.size} icon={<Coffee className="h-5 w-5" aria-hidden="true" />} tone="rest" onClick={() => setFilter("rest")} active={filter === "rest"} />
         <StatusShortcut label="الإجازات" value={leaveIds.size} icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />} tone="leave" onClick={() => setFilter("leave")} active={filter === "leave"} />
       </section>
@@ -140,12 +138,31 @@ const EmployeeRow = memo(function EmployeeRow({ row }: { row: DailyStatusRow }) 
   return <div className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${cls}`}><div className="min-w-0"><span className="block truncate font-semibold" title={row.employeeName}>{row.employeeName}</span><span className="mt-0.5 block text-[10px] opacity-70">{row.scheduleType === "ROTATION" ? "تناوبي" : "ثابت"}{row.jobNumber ? ` · ${row.jobNumber}` : ""}</span></div><span className="shrink-0 rounded-full bg-background/70 px-2 py-1 text-[11px] font-bold">{status}</span></div>;
 });
 
-const Kpi = memo(function Kpi({ label, value, accent }: { label: string; value: number | string; accent?: "primary" | "warning" | "destructive" }) {
-  const color = accent === "primary" ? "text-primary" : accent === "warning" ? "text-[hsl(var(--warning))]" : accent === "destructive" ? "text-destructive" : "text-foreground";
-  return <div className="hud-card p-4"><div className="text-xs text-muted-foreground">{label}</div><div className={`mt-1 text-3xl font-extrabold mono ${color}`}>{value}</div></div>;
-});
+function StatusShortcut({ label, value, icon, tone, onClick, active }: { label: string; value: number; icon: React.ReactNode; tone: ShortcutTone; onClick: () => void; active: boolean }) {
+  const style = tone === "present"
+    ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
+    : tone === "absent"
+      ? "border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300"
+      : tone === "late"
+        ? "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300"
+        : tone === "rest"
+          ? "border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300"
+          : "border-violet-500/30 bg-violet-500/5 text-violet-700 dark:text-violet-300";
 
-function StatusShortcut({ label, value, icon, tone, onClick, active }: { label: string; value: number; icon: React.ReactNode; tone: "rest" | "leave"; onClick: () => void; active: boolean }) {
-  const style = tone === "rest" ? "border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300" : "border-violet-500/30 bg-violet-500/5 text-violet-700 dark:text-violet-300";
-  return <button type="button" onClick={onClick} aria-pressed={active} className={`hud-card flex items-center justify-between gap-3 p-4 text-right transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${style} ${active ? "ring-2 ring-primary/40" : ""}`}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background/70" aria-hidden="true">{icon}</span><span className="min-w-0 flex-1"><span className="block text-xs font-bold">{label}</span><span className="mt-1 block text-2xl font-black mono">{value}</span></span><span className="text-[10px] font-semibold opacity-70">عرض القائمة</span></button>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={`عرض قائمة ${label}`}
+      className={`hud-card flex items-center justify-between gap-3 p-4 text-right transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${style} ${active ? "ring-2 ring-primary/40" : ""}`}
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background/70" aria-hidden="true">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-bold">{label}</span>
+        <span className="mt-1 block text-2xl font-black mono">{value}</span>
+      </span>
+      <span className="text-[10px] font-semibold opacity-70">عرض القائمة</span>
+    </button>
+  );
 }
