@@ -7,15 +7,14 @@ function upstreamUrl(request: Request, path?: string): URL {
   return url;
 }
 
-export async function onRequest(context: EventContext<unknown, string, Record<string, unknown>>) {
+export async function onRequest(context: any): Promise<Response> {
   const { request, params } = context;
-  const path = Array.isArray(params.path) ? params.path.join("/") : String(params.path || "");
+  const path = Array.isArray(params?.path) ? params.path.join("/") : String(params?.path || "");
   const target = upstreamUrl(request, path);
   const headers = new Headers(request.headers);
 
-  // The browser is talking to Pages itself, so the backend does not need
-  // cross-origin browser permissions. Preserve authentication and device
-  // headers, but make the upstream request identify the public Pages origin.
+  // The browser talks to Pages itself. Preserve authentication/device headers
+  // while making the upstream request identify the public Pages origin.
   headers.delete("host");
   headers.delete("content-length");
   headers.set("origin", new URL(request.url).origin);
