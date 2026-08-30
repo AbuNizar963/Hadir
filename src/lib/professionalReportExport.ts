@@ -1,4 +1,5 @@
 import { XLSX, autoFitColumns, styleExcelTable, styleReportWorkbook, setExcelRtl, type ExcelCell } from "@/lib/excelExport";
+import { getSettings } from "@/lib/storage";
 
 export type ProfessionalReportMode = "daily" | "monthly" | "annual";
 export type ProfessionalReportSummary = {
@@ -98,6 +99,7 @@ export function downloadProfessionalAttendanceReport(args: {
   absenceRows: ProfessionalReportDay[];
 }) {
   const { mode, period, generatedAt, summaries, dailyRows, chartData, absenceRows } = args;
+  const brandName = String(getSettings().brandName || "HADIR").trim() || "HADIR";
   const total = summaries.reduce((a, s) => ({
     workDays: a.workDays + s.workDays,
     present: a.present + s.present,
@@ -113,7 +115,7 @@ export function downloadProfessionalAttendanceReport(args: {
   const workbook = XLSX.utils.book_new();
 
   const dashboard = XLSX.utils.aoa_to_sheet([
-    ["HADIR · تقرير الحضور والانصراف المؤسسي"],
+    [brandName],
     ["الفترة", period, "نوع التقرير", mode === "daily" ? "يومي" : mode === "monthly" ? "شهري" : "سنوي"],
     ["تاريخ إنشاء التقرير", generatedAt, "عدد الموظفين", summaries.length],
     [],
@@ -144,7 +146,7 @@ export function downloadProfessionalAttendanceReport(args: {
 
   const summaryHeader: ExcelCell[] = ["الموظف", "الرقم الوظيفي", "أيام العمل", "حاضر", "غياب", "انصراف مبكر", "تأخر", "تسجيل ناقص", "راحة/عطلة", "ساعات العمل", "نسبة الحضور"];
   const summaryData: ExcelCell[][] = summaries.map((s) => [s.employee.name, s.employee.jobNumber ?? "", s.workDays, s.present, s.absent, s.early, s.late, s.open, s.off, `${Math.floor(s.worked / 60)}س ${s.worked % 60}د`, s.workDays ? s.present / s.workDays : 0]);
-  const summary = XLSX.utils.aoa_to_sheet([[`ملخص حضور الموظفين · ${period}`], [], summaryHeader, ...summaryData]);
+  const summary = XLSX.utils.aoa_to_sheet([[`${brandName} · ملخص حضور الموظفين · ${period}`], [], summaryHeader, ...summaryData]);
   summary["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: summaryHeader.length - 1 } }];
   autoFitColumns(summary, [summaryHeader, ...summaryData], 12, 30);
   styleExcelTable(summary, 2, Math.max(2, summaryData.length + 2), 0, summaryHeader.length - 1, 2, 0);
@@ -156,7 +158,7 @@ export function downloadProfessionalAttendanceReport(args: {
   finishSheet(summary, "A3");
 
   const detailHeader: ExcelCell[] = ["الموظف", "الرقم الوظيفي", "التاريخ", "اليوم", "الحالة", "وقت الحضور", "وقت الانصراف", "مدة العمل", "دقائق التأخر", "دقائق الانصراف المبكر", "تفصيل اليوم"];
-  const detail = XLSX.utils.aoa_to_sheet([[`السجل اليومي للحضور والانصراف · ${period}`], [], detailHeader, ...dailyRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, r.status, r.checkIn, r.checkOut, r.worked, r.late, r.early, r.detail] as ExcelCell[])]);
+  const detail = XLSX.utils.aoa_to_sheet([[`${brandName} · السجل اليومي للحضور والانصراف · ${period}`], [], detailHeader, ...dailyRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, r.status, r.checkIn, r.checkOut, r.worked, r.late, r.early, r.detail] as ExcelCell[])]);
   detail["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: detailHeader.length - 1 } }];
   autoFitColumns(detail, [detailHeader, ...dailyRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, r.status, r.checkIn, r.checkOut, r.worked, r.late, r.early, r.detail])], 11, 38);
   styleExcelTable(detail, 2, Math.max(2, dailyRows.length + 2), 0, detailHeader.length - 1, 2, 0);
@@ -168,7 +170,7 @@ export function downloadProfessionalAttendanceReport(args: {
   finishSheet(detail, "A3");
 
   const absenceHeader: ExcelCell[] = ["الموظف", "الرقم الوظيفي", "تاريخ الغياب", "اليوم", "الحالة", "سبب/تفصيل"];
-  const absence = XLSX.utils.aoa_to_sheet([[`سجل أيام الغياب · ${period}`], [], absenceHeader, ...absenceRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, "غياب", r.detail] as ExcelCell[])]);
+  const absence = XLSX.utils.aoa_to_sheet([[`${brandName} · سجل أيام الغياب · ${period}`], [], absenceHeader, ...absenceRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, "غياب", r.detail] as ExcelCell[])]);
   absence["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: absenceHeader.length - 1 } }];
   autoFitColumns(absence, [absenceHeader, ...absenceRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, "غياب", r.detail])], 12, 42);
   styleExcelTable(absence, 2, Math.max(2, absenceRows.length + 2), 0, absenceHeader.length - 1, 2, 0);
@@ -177,7 +179,7 @@ export function downloadProfessionalAttendanceReport(args: {
 
   const totalStatus = chartData.reduce((sum, x) => sum + x.value, 0);
   const analysisRows = chartData.map((x) => [x.label, x.value, totalStatus ? x.value / totalStatus : 0, "█".repeat(Math.min(45, Math.round((x.value / Math.max(1, ...chartData.map((v) => v.value))) * 45)))] as ExcelCell[]);
-  const analysis = XLSX.utils.aoa_to_sheet([[`التحليل التنفيذي للحضور · ${period}`], [], ["الحالة", "العدد", "النسبة", "المؤشر"], ...analysisRows]);
+  const analysis = XLSX.utils.aoa_to_sheet([[`${brandName} · التحليل التنفيذي للحضور · ${period}`], [], ["الحالة", "العدد", "النسبة", "المؤشر"], ...analysisRows]);
   analysis["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
   autoFitColumns(analysis, [["الحالة", "العدد", "النسبة", "المؤشر"], ...analysisRows], 14, 45);
   styleExcelTable(analysis, 2, analysisRows.length + 2, 0, 3, 2, 0);
