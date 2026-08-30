@@ -1,7 +1,7 @@
 import base, { HadirRealtime } from "./automation-entry";
 import { handleDeviceRebind } from "./device-rebind-api";
 import { handleDailyStatus } from "./daily-status-api";
-import { runAutomaticAttendance } from "./automaticAttendance";
+import { runAutomaticVip } from "./automatic-vip";
 
 type Env = {
   DB: D1Database;
@@ -92,11 +92,11 @@ export default {
 
   async scheduled(controller: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     try {
-      const run = runAutomaticAttendance(env);
+      const run = runAutomaticVip(env);
       ctx.waitUntil(run);
       await run;
     } catch (error) {
-      console.error("automatic-attendance cron failed", error);
+      console.error("automatic-vip cron failed", error);
     }
   },
 };
