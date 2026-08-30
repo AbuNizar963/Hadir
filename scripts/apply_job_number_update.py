@@ -1,42 +1,31 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Production-safe/idempotent: patch only when exact current markers exist.
+# Production-safe/idempotent: normalize only the exact job-number patch route.
 # Never replace source files wholesale and never touch historical attendance rows.
 
 def patch_index():
     target = ROOT / "backend/src/index.ts"
     text = target.read_text(encoding="utf-8")
-    if "JOB_NUMBER_UPDATE_PATCH_V2" in text:
-        print("index job-number patch already present")
-        return
-    marker = 'if(path==="/api/employees"&&req.method==="GET")'
-    if marker not in text:
-        raise SystemExit("Refusing unsafe patch: current employees GET route marker was not found in index.ts")
-    patch = r'''/* JOB_NUMBER_UPDATE_PATCH_V2 */
-if(path.startsWith("/api/employees/")&&req.method==="PATCH"&&!path.endsWith("/device")&&!path.endsWith("/avatar")){
-  if(!canWrite(actor.role))return json({error:"لا تملك صلاحية الكتابة"},403,origin);
-  const id=decodeURIComponent(path.split("/").pop()||"");
-  const b=await body(req);
-  if(b.jobNumber===undefined)return json({error:"لم يتم إرسال الرقم الوظيفي"},400,origin);
-  const nextJobNumber=String(b.jobNumber||"").trim();
-  if(!nextJobNumber)return json({error:"الرقم الوظيفي لا يمكن أن يكون فارغًا"},400,origin);
-  if(nextJobNumber.length>64||!/^[A-Za-z0-9_-]+$/.test(nextJobNumber))return json({error:"الرقم الوظيفي يجب أن يحتوي على أحرف وأرقام و _ أو - فقط وبحد أقصى 64 محرفًا"},400,origin);
-  const current=await env.DB.prepare("SELECT id,job_number AS jobNumber FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();
-  if(!current)return json({error:"الموظف غير موجود"},404,origin);
-  if(String(current.jobNumber)===nextJobNumber){const same=await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();return json({ok:true,employee:employeeOut(same),previousJobNumber:current.jobNumber},200,origin);}
-  const duplicate=await env.DB.prepare("SELECT id FROM employees WHERE job_number=? AND id<>? LIMIT 1").bind(nextJobNumber,id).first<any>();
-  if(duplicate)return json({error:"الرقم الوظيفي مستخدم من موظف آخر"},409,origin);
-  try{await env.DB.prepare("UPDATE employees SET job_number=? WHERE id=?").bind(nextJobNumber,id).run();}
-  catch(error){return json({error:"تعذر تحديث الرقم الوظيفي",detail:error instanceof Error?error.message:String(error)},409,origin);}
-  const updated=await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();
-  await audit(env,req,actor.name,"employee-job-number-update","success",id,nextJobNumber,`تغيير الرقم الوظيفي من ${current.jobNumber} إلى ${nextJobNumber}`);
-  return json({ok:true,employee:employeeOut(updated),previousJobNumber:current.jobNumber},200,origin);
-}
-'''
-    target.write_text(text.replace(marker, patch + marker, 1), encoding="utf-8")
-    print("index job-number patch applied")
+
+    # The original employee PATCH route already contains the complete, identity-safe
+    # jobNumber update logic. V2 was inserted immediately after it, making V2
+    # unreachable and leaving duplicate PATCH handlers in the source. Remove only
+    # that exact marked block; fail closed if the marker shape is unexpected.
+    marker = "/* JOB_NUMBER_UPDATE_PATCH_V2 */"
+    if marker in text:
+        start = text.index(marker)
+        end_marker = 'if(path==="/api/employees"&&req.method==="GET")'
+        end = text.find(end_marker, start)
+        if end == -1:
+            raise SystemExit("Refusing unsafe cleanup: V2 route end marker was not found")
+        text = text[:start] + text[end:]
+        target.write_text(text, encoding="utf-8")
+        print("duplicate V2 job-number route removed")
+    else:
+        print("duplicate V2 job-number route already absent")
 
 
 def patch_recovery():
