@@ -69,7 +69,9 @@ CREATE TABLE IF NOT EXISTS requests (
   type TEXT NOT NULL CHECK (type IN ('permission','leave','checkout')),
   reason TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected','confirmed','cancelled')),
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  start_date TEXT,
+  end_date TEXT
 );
 
 CREATE TABLE IF NOT EXISTS audit (
@@ -94,3 +96,4 @@ CREATE INDEX IF NOT EXISTS idx_attendance_employee_time ON attendance(employee_i
 CREATE INDEX IF NOT EXISTS idx_attendance_time ON attendance(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_time ON audit(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status);
+CREATE INDEX IF NOT EXISTS idx_requests_employee_dates ON requests(employee_id, start_date, end_date, status);
