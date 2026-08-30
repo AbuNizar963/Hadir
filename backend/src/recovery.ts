@@ -28,8 +28,10 @@ function json(data: unknown, status: number, origin: string) {
   return new Response(JSON.stringify(data), { status, headers: {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": origin,
+    "access-control-allow-credentials": "true",
     "access-control-allow-headers": "content-type, authorization, x-device-id",
     "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
+    "cache-control": "no-store",
   }});
 }
 
@@ -90,8 +92,97 @@ async function generateOwnerRecovery(req: Request, env: Env, origin: string) {
   return json({ ok: true, code, createdAt: timestamp, message: "تم إنشاء رمز استعادة جديد. احفظه الآن؛ لن يظهر مرة أخرى." }, 200, origin);
 }
 
+const DEFAULT_SETTINGS: Record<string, unknown> = {
+  qrCode: "HADIR-SITE-01-STATIC",
+  workSiteLat: 24.7136,
+  workSiteLng: 46.6753,
+  radiusMeters: 100,
+  workStart: "08:00",
+  workEnd: "16:00",
+  lateGraceMinutes: 10,
+  earlyCheckoutGraceMinutes: 0,
+  ownerUsername: "",
+  ownerName: "المالك",
+  managerUsername: "",
+  managerName: "",
+  supervisorUsername: "",
+  supervisorName: "",
+  brandName: "حاضِر",
+  brandLogo: null,
+  workTypes: [],
+  specialties: [],
+};
+
+const SETTINGS_KEYS = new Set(Object.keys(DEFAULT_SETTINGS));
+
+function parseSetting(value: string): unknown {
+  try { return JSON.parse(value); } catch { return value; }
+}
+
+async function readCompanySettings(env: Env) {
+  await ensureRecoveryTables(env.DB);
+  const rows = await env.DB.prepare("SELECT key,value FROM settings").all<{ key: string; value: string }>();
+  const settings: Record<string, unknown> = { ...DEFAULT_SETTINGS };
+  for (const row of rows.results || []) {
+    if (SETTINGS_KEYS.has(row.key)) settings[row.key] = parseSetting(row.value);
+  }
+  const admins = await env.DB.prepare("SELECT id,username,name,role,active,created_at AS createdAt FROM admin_accounts ORDER BY name").all<any>();
+  const locations = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name").all<any>();
+  return { ...settings, adminAccounts: admins.results || [], locations: locations.results || [] };
+}
+
+async function saveCompanySettings(req: Request, env: Env, origin: string) {
+  const actor = await actorFromOriginal(req, env);
+  if (!actor || !["owner", "manager"].includes(String(actor.role))) return json({ error: "غير مصرح" }, 403, origin);
+  if (req.method === "GET") return json(await readCompanySettings(env), 200, origin);
+  if (req.method !== "PUT") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
+
+  const input = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const entries: Array<[string, string]> = [];
+  for (const key of SETTINGS_KEYS) {
+    if (input[key] === undefined) continue;
+    if (key === "brandName") {
+      const name = String(input[key] || "").trim();
+      if (name.length > 120) return json({ error: "اسم الشركة يجب ألا يتجاوز 120 محرفًا" }, 400, origin);
+      entries.push([key, JSON.stringify(name)]);
+      continue;
+    }
+    if (key === "brandLogo") {
+      const logo = input[key] == null || input[key] === "" ? null : String(input[key]);
+      if (logo && (!logo.startsWith("data:image/webp;base64,") || logo.length > 140000)) return json({ error: "شعار الشركة غير صالح أو حجمه كبير جدًا" }, 400, origin);
+      entries.push([key, JSON.stringify(logo)]);
+      continue;
+    }
+    if (key === "specialties" || key === "workTypes") {
+      if (!Array.isArray(input[key])) return json({ error: `قيمة ${key} يجب أن تكون قائمة` }, 400, origin);
+      const values = Array.from(new Set((input[key] as unknown[]).map(v => String(v).trim()).filter(Boolean)));
+      if (values.some(v => v.length > 120)) return json({ error: `قيم ${key} لا يمكن أن تتجاوز 120 محرفًا` }, 400, origin);
+      entries.push([key, JSON.stringify(values)]);
+      continue;
+    }
+    entries.push([key, JSON.stringify(input[key])]);
+  }
+
+  if (input.ownerName !== undefined || input.ownerUsername !== undefined) {
+    const ownerId = actor.role === "owner" ? actor.id : null;
+    if (ownerId) {
+      const name = input.ownerName === undefined ? undefined : String(input.ownerName || "").trim();
+      const username = input.ownerUsername === undefined ? undefined : String(input.ownerUsername || "").trim();
+      if (name !== undefined && !name) return json({ error: "اسم المالك لا يمكن أن يكون فارغًا" }, 400, origin);
+      if (username !== undefined && !username) return json({ error: "اسم المستخدم لا يمكن أن يكون فارغًا" }, 400, origin);
+      await env.DB.prepare("UPDATE admin_accounts SET name=COALESCE(?,name), username=COALESCE(?,username) WHERE id=? AND role='owner'").bind(name ?? null, username ?? null, ownerId).run();
+    }
+  }
+
+  if (entries.length) {
+    await env.DB.batch(entries.map(([key, value]) => env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key, value)));
+  }
+  await syncMainLocation(env.DB, input);
+  return json({ ok: true }, 200, origin);
+}
+
 async function recovery(req: Request, env: Env, origin: string) {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS" } });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS" } });
   if (req.method !== "POST") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
   if (!env.OWNER_RECOVERY_CODE) {
     const configured = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_code_hash' LIMIT 1").first<{value:string}>().catch(() => null);
@@ -190,27 +281,13 @@ export default {
     const path = url.pathname.replace(/\/$/, "") || "/";
     if (path === "/api/auth/recover-owner") return recovery(req, env, origin);
     if (path === "/api/auth/generate-owner-recovery") return generateOwnerRecovery(req, env, origin);
+    if (path === "/api/settings" && (req.method === "GET" || req.method === "PUT")) return saveCompanySettings(req, env, origin);
     const ruleError = await validatePasswordRules(req, path, origin);
     if (ruleError) return ruleError;
 
     if (path.match(/^\/api\/employees\/[^/]+\/avatar$/)) {
       const actor = await actorFromOriginal(req, env);
       return handleProfileImageRequest(req, env, actor, origin);
-    }
-
-    if (path === "/api/settings" && req.method === "PUT") {
-      const copy = req.clone();
-      const response = await original.fetch(req, env, ctx);
-      if (response.ok) {
-        try {
-          const settings = await copy.json() as Record<string, unknown>;
-          await ensureRecoveryTables(env.DB);
-          await syncMainLocation(env.DB, settings);
-        } catch (error) {
-          console.error("تعذر مزامنة موقع المقر الرئيسي مع D1:", error);
-        }
-      }
-      return response;
     }
 
     if (path === "/api/employee-location" && req.method === "GET") {
