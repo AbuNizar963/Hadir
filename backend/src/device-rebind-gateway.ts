@@ -1,11 +1,13 @@
 import base, { HadirRealtime } from "./automation-entry";
 import { handleDeviceRebind } from "./device-rebind-api";
 import { handleDailyStatus } from "./daily-status-api";
+import { runAutomaticAttendance } from "./automaticAttendance";
 
 type Env = {
   DB: D1Database;
   APP_ORIGIN?: string;
   APP_ORIGINS?: string;
+  APP_TIMEZONE?: string;
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
@@ -86,5 +88,15 @@ export default {
     }
 
     return base.fetch(request, env, ctx);
+  },
+
+  async scheduled(controller: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    try {
+      const run = runAutomaticAttendance(env);
+      ctx.waitUntil(run);
+      await run;
+    } catch (error) {
+      console.error("automatic-attendance cron failed", error);
+    }
   },
 };
