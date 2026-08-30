@@ -1,6 +1,7 @@
 import base, { HadirRealtime } from "./automation-entry";
 import { handleDeviceRebind } from "./device-rebind-api";
 import { handleDailyStatus } from "./daily-status-api";
+import { handleCompanyLogoRequest } from "./company-logo";
 import { runAutomaticVip } from "./automatic-vip";
 
 type Env = {
@@ -11,6 +12,7 @@ type Env = {
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
+  PROFILE_IMAGES?: R2Bucket;
 };
 
 function origin(request: Request, env: Env) {
@@ -51,6 +53,17 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const response = await handleDeviceRebind(request, env, origin(request, env));
     if (response) return response;
+
+    const logoResponse = await handleCompanyLogoRequest(request, env, null, origin(request, env));
+    if (logoResponse) {
+      if (request.method === "GET" || request.method === "OPTIONS") return logoResponse;
+      const actorProbe = new URL(request.url);
+      actorProbe.pathname = "/api/me";
+      actorProbe.search = "";
+      const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
+      const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
+      return handleCompanyLogoRequest(request, env, actor, origin(request, env));
+    }
 
     const url = new URL(request.url);
     if (url.pathname.replace(/\/$/, "") === "/api/manager/daily-status") {
