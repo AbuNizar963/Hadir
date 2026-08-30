@@ -52,4 +52,16 @@ if "CompanySpecialtySelect" not in s:
         raise SystemExit("Existing specialties Field not found; refusing unsafe patch")
     p.write_text(s, encoding="utf-8")
 
-print("company specialties patch complete")
+# Daily report: remove the hard-coded Excel/template organization name.
+# The report keeps the Excel layout as a visual reference, but all group names now come from owner-managed specialties.
+p = ROOT / "src/pages/ManagerReports.tsx"
+s = p.read_text(encoding="utf-8")
+old = '<h1 className="text-xl md:text-2xl font-black">خدمة قسم شرطة الشهباء لتاريخ {formatDate(date)}</h1>'
+new = '<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div>'
+if old in s:
+    s = s.replace(old, new, 1)
+elif "خدمة قسم شرطة الشهباء" in s:
+    raise SystemExit("Hard-coded daily report title exists but expected markup differs; refusing unsafe patch")
+p.write_text(s, encoding="utf-8")
+
+print("company specialties and daily report branding patch complete")
