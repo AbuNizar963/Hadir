@@ -12,6 +12,8 @@ type RequestRow = {
   reason: string;
   status: "pending" | "approved" | "rejected" | "confirmed" | "cancelled";
   createdAt: string;
+  startDate?: string | null;
+  endDate?: string | null;
 };
 
 const uid = () => crypto.randomUUID();
@@ -31,8 +33,20 @@ const requestType = (value: unknown): RequestRow["type"] | null => {
   return type === "permission" || type === "leave" || type === "checkout" ? type : null;
 };
 
+const dateValue = (value: unknown) => {
+  const v = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+};
+
 const typeLabel = (type: RequestRow["type"]) =>
   type === "permission" ? "استئذان" : type === "leave" ? "إجازة" : "انصراف";
+
+async function ensureRequestSchema(db: D1Database) {
+  await db.batch([
+    db.prepare("ALTER TABLE requests ADD COLUMN start_date TEXT"),
+    db.prepare("ALTER TABLE requests ADD COLUMN end_date TEXT"),
+  ]).catch(() => undefined);
+}
 
 async function notify(env: Env, recipientId: string, title: string, body: string, type: "info" | "success" | "warning", url = "/manager/requests") {
   const id = String(recipientId || "").trim();
@@ -56,12 +70,13 @@ async function notify(env: Env, recipientId: string, title: string, body: string
         await env.DB.prepare("DELETE FROM push_subscriptions WHERE id=?").bind(subscription.id).run().catch(() => undefined);
       }
     } catch {
-      // D1 notification is authoritative; a temporary Push provider failure must not remove the request.
+      // D1 notification is authoritative.
     }
   }
 }
 
 export async function handleRequests(req: Request, env: Env, actor: Actor | null, origin: string) {
+  await ensureRequestSchema(env.DB);
   const url = new URL(req.url);
   const path = url.pathname.replace(/\/$/, "") || "/";
   const method = req.method;
@@ -71,43 +86,60 @@ export async function handleRequests(req: Request, env: Env, actor: Actor | null
   if (path === "/api/requests" && method === "GET") {
     if (!actor || !["owner", "manager", "supervisor", "staff"].includes(actor.role)) return json({ error: "غير مصرح" }, 403, origin);
     const rows = actor.role === "staff"
-      ? await env.DB.prepare("SELECT id,employee_id AS employeeId,employee_name AS employeeName,job_number AS jobNumber,type,reason,status,created_at AS createdAt FROM requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 200").bind(actor.id).all<RequestRow>()
-      : await env.DB.prepare("SELECT id,employee_id AS employeeId,employee_name AS employeeName,job_number AS jobNumber,type,reason,status,created_at AS createdAt FROM requests ORDER BY created_at DESC LIMIT 500").all<RequestRow>();
+      ? await env.DB.prepare("SELECT id,employee_id AS employeeId,employee_name AS employeeName,job_number AS jobNumber,type,reason,status,created_at AS createdAt,start_date AS startDate,end_date AS endDate FROM requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 200").bind(actor.id).all<RequestRow>()
+      : await env.DB.prepare("SELECT id,employee_id AS employeeId,employee_name AS employeeName,job_number AS jobNumber,type,reason,status,created_at AS createdAt,start_date AS startDate,end_date AS endDate FROM requests ORDER BY created_at DESC LIMIT 500").all<RequestRow>();
     return json(rows.results || [], 200, origin);
   }
 
   if (path === "/api/requests" && method === "POST") {
-    if (!actor || actor.role !== "staff") return json({ error: "الموظف فقط يستطيع إنشاء الطلب" }, 403, origin);
+    if (!actor || !["owner", "manager"].includes(actor.role) && actor.role !== "staff") return json({ error: "غير مصرح" }, 403, origin);
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const type = requestType(body.type ?? body.requestType);
     if (!type) return json({ error: "نوع الطلب غير صحيح" }, 400, origin);
-    const employee = await env.DB.prepare("SELECT id,job_number AS jobNumber,name FROM employees WHERE id=? AND status='active' LIMIT 1").bind(actor.id).first<{ id: string; jobNumber: string; name: string }>();
+    const startDate = dateValue(body.startDate);
+    const endDate = dateValue(body.endDate);
+    if (!startDate || !endDate) return json({ error: "يجب تحديد تاريخ البداية وتاريخ النهاية" }, 400, origin);
+    if (endDate < startDate) return json({ error: "تاريخ النهاية يجب أن يكون بعد أو مساويًا لتاريخ البداية" }, 400, origin);
+
+    const requestedEmployeeId = String(body.employeeId || "").trim();
+    const employeeId = actor.role === "staff" ? actor.id : requestedEmployeeId;
+    if (!employeeId) return json({ error: "الموظف مطلوب" }, 400, origin);
+    const employee = await env.DB.prepare("SELECT id,job_number AS jobNumber,name FROM employees WHERE id=? AND status='active' LIMIT 1").bind(employeeId).first<{ id: string; jobNumber: string; name: string }>();
     if (!employee) return json({ error: "الموظف غير موجود" }, 404, origin);
 
     const requestId = uid();
     const createdAt = now();
     const reason = String(body.reason || "").trim();
+    const createdByManager = actor.role !== "staff";
+    const initialStatus = createdByManager ? "approved" : "pending";
     await env.DB.prepare(
-      "INSERT INTO requests(id,employee_id,employee_name,job_number,type,reason,status,created_at) VALUES(?,?,?,?,?,?,?,?)"
-    ).bind(requestId, employee.id, employee.name, employee.jobNumber, type, reason, "pending", createdAt).run();
+      "INSERT INTO requests(id,employee_id,employee_name,job_number,type,reason,status,created_at,start_date,end_date) VALUES(?,?,?,?,?,?,?,?,?,?)"
+    ).bind(requestId, employee.id, employee.name, employee.jobNumber, type, reason, initialStatus, createdAt, startDate, endDate).run();
+
+    if (createdByManager) {
+      try {
+        await notify(env, employee.id, type === "leave" ? "تم تسجيل إجازة" : "تم تسجيل استئذان", `${typeLabel(type)} من ${startDate} إلى ${endDate}.`, "success", "/employee/notifications");
+      } catch {
+        // The request remains authoritative in D1 even if push delivery fails.
+      }
+      return json({ ok: true, id: requestId, status: initialStatus, startDate, endDate }, 201, origin);
+    }
 
     const admins = await env.DB.prepare(
       "SELECT id FROM admin_accounts WHERE active=1 AND role IN ('owner','manager') ORDER BY CASE role WHEN 'owner' THEN 0 ELSE 1 END"
     ).all<{ id: string }>();
     const recipients = (admins.results || []).map(row => String(row.id || "").trim()).filter(Boolean);
-    if (!recipients.length) {
-      return json({ ok: true, id: requestId, status: "pending", notification: "queued" }, 201, origin);
-    }
+    if (!recipients.length) return json({ ok: true, id: requestId, status: "pending", notification: "queued", startDate, endDate }, 201, origin);
 
     try {
       for (const recipientId of recipients) {
-        await notify(env, recipientId, "طلب موظف جديد", `${employee.name} أرسل طلب ${typeLabel(type)}.`, "info", `/manager/requests`);
+        await notify(env, recipientId, "طلب موظف جديد", `${employee.name} أرسل طلب ${typeLabel(type)} من ${startDate} إلى ${endDate}.`, "info", `/manager/requests`);
       }
     } catch (error) {
-      return json({ ok: true, id: requestId, status: "pending", notification: "pending", detail: error instanceof Error ? error.message : String(error) }, 201, origin);
+      return json({ ok: true, id: requestId, status: "pending", notification: "pending", detail: error instanceof Error ? error.message : String(error), startDate, endDate }, 201, origin);
     }
 
-    return json({ ok: true, id: requestId, status: "pending" }, 201, origin);
+    return json({ ok: true, id: requestId, status: "pending", startDate, endDate }, 201, origin);
   }
 
   if (requestMatch && method === "PATCH") {
