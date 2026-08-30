@@ -112,22 +112,6 @@ export default function ManagerDashboard() {
         <StatusShortcut label="الإجازات" value={leaveIds.size} icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />} tone="leave" onClick={() => setFilter("leave")} active={filter === "leave"} />
       </section>
 
-      <section className="hud-card p-5 mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-lg font-extrabold">ملخص الدوام</h2>
-            <p className="text-xs text-muted-foreground mt-1">D1 هو مصدر الحقيقة. الموظفون الإداريون يحتاجون بصمة يوم العمل، بينما الموظفون التناوبيون يُقيّمون وفق دورة العمل/الراحة والنوبة الممتدة.</p>
-          </div>
-        </div>
-        <div className="grid gap-3 md:grid-cols-5">
-          <StatusCard label="حاضر" value={presentIds.size} tone="present" />
-          <StatusCard label="غائب" value={absentIds.size} tone="absent" />
-          <StatusCard label="متأخر" value={lateIds.size} tone="late" />
-          <StatusCard label="راحة" value={restIds.size} tone="rest" />
-          <StatusCard label="إجازة" value={leaveIds.size} tone="leave" />
-        </div>
-      </section>
-
       <section className="hud-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
@@ -164,9 +148,4 @@ const Kpi = memo(function Kpi({ label, value, accent }: { label: string; value: 
 function StatusShortcut({ label, value, icon, tone, onClick, active }: { label: string; value: number; icon: React.ReactNode; tone: "rest" | "leave"; onClick: () => void; active: boolean }) {
   const style = tone === "rest" ? "border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300" : "border-violet-500/30 bg-violet-500/5 text-violet-700 dark:text-violet-300";
   return <button type="button" onClick={onClick} aria-pressed={active} className={`hud-card flex items-center justify-between gap-3 p-4 text-right transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${style} ${active ? "ring-2 ring-primary/40" : ""}`}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background/70" aria-hidden="true">{icon}</span><span className="min-w-0 flex-1"><span className="block text-xs font-bold">{label}</span><span className="mt-1 block text-2xl font-black mono">{value}</span></span><span className="text-[10px] font-semibold opacity-70">عرض القائمة</span></button>;
-}
-
-function StatusCard({ label, value, tone }: { label: string; value: number; tone: "present" | "absent" | "late" | "rest" | "leave" }) {
-  const style = tone === "present" ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300" : tone === "absent" ? "border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300" : tone === "rest" ? "border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300" : tone === "leave" ? "border-violet-500/30 bg-violet-500/5 text-violet-700 dark:text-violet-300" : "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300";
-  return <div className={`rounded-xl border p-4 ${style}`}><div className="text-xs font-bold">{label}</div><div className="mt-1 text-2xl font-black mono">{value}</div></div>;
 }
