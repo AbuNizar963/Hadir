@@ -19,8 +19,6 @@ permissions:
   contents: read
 
 env:
-  # Frontend deployment is intentionally isolated from the API/D1 deployment.
-  # This token must have Cloudflare Pages permissions only for the Hadir account.
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   PAGES_PRODUCTION_URL: https://hadir-9rq.pages.dev
@@ -42,9 +40,6 @@ jobs:
           bun-version: 1.2.15
 
       - name: Install dependencies
-        # Keep the install reproducible once package.json and bun.lock are aligned.
-        # For the current repository, bun install is intentionally used because the
-        # lockfile has required reconciliation during the recent recovery work.
         run: bun install
 
       - name: Typecheck
@@ -81,9 +76,7 @@ jobs:
 
           data = json.loads(Path("/tmp/pages-projects.json").read_text(encoding="utf-8"))
           if not data.get("success"):
-              raise SystemExit(
-                  f"Cloudflare Pages project lookup failed: {data.get('errors') or []}"
-              )
+              raise SystemExit(f"Cloudflare Pages project lookup failed: {data.get('errors') or []}")
 
           projects = data.get("result") or []
           names = [p.get("name") for p in projects if p.get("name")]
@@ -91,19 +84,9 @@ jobs:
           project = next((name for name in preferred if name in names), None)
 
           if not project:
-              print(
-                  "Existing Pages projects:",
-                  ", ".join(names) or "<none>",
-                  file=sys.stderr,
-              )
-              raise SystemExit(
-                  "No existing Hadir Cloudflare Pages project was found; "
-                  "refusing to create a new project"
-              )
+              print("Existing Pages projects:", ", ".join(names) or "<none>", file=sys.stderr)
+              raise SystemExit("No existing Hadir Cloudflare Pages project was found; refusing to create a new project")
 
-          # IMPORTANT: GITHUB_OUTPUT accepts only output records. Never append
-          # human-readable log lines here because a colon-containing line is
-          # parsed as an invalid output command and fails the workflow.
           Path("/tmp/pages-project-name").write_text(project, encoding="utf-8")
           PY
 
@@ -172,8 +155,16 @@ jobs:
           from pathlib import Path
 
           manifest=json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
-          assert manifest.get("start_url")=="./", manifest
-          assert manifest.get("scope")=="./", manifest
+
+          # The production manifest intentionally uses absolute root paths.
+          # Keep CI aligned with the actual install contract instead of rejecting
+          # a valid manifest because it still expects the older relative form.
+          assert manifest.get("id")=="/", manifest
+          assert manifest.get("start_url")=="/", manifest
+          assert manifest.get("scope")=="/", manifest
+          assert manifest.get("display")=="standalone", manifest
+          assert manifest.get("prefer_related_applications") is False, manifest
+          assert isinstance(manifest.get("icons"), list) and len(manifest["icons"]) >= 2, manifest
 
           sw=Path("/tmp/sw.js").read_text(encoding="utf-8")
           match=re.search(r'const CACHE="(hadir-shell-v\d+)";', sw)
