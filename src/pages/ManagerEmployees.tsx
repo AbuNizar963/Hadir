@@ -322,7 +322,7 @@ export default function ManagerEmployees() {
     try {
       const token = localStorage.getItem("hadir.api.token.admin") || "";
       const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-      const res = await fetch(`${api}/api/workforce/live`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ employeeId: e.id, ...patch }), cache: "no-store" });
+      const res = await fetch(`${api}/api/manager/workforce-controls/${encodeURIComponent(e.id)}`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ employeeId: e.id, ...patch }), cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ إعدادات Workforce.");
       await load(false);
