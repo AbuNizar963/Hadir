@@ -15,6 +15,8 @@ type Env = {
   PROFILE_IMAGES?: R2Bucket;
 };
 
+let leaveSchemaReady: Promise<void> | null = null;
+
 function origin(request: Request, env: Env) {
   const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
   const configured = [String(env.APP_ORIGIN || ""), String(env.APP_ORIGINS || "")]
@@ -71,19 +73,27 @@ export default {
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
 
       try {
-        await env.DB.prepare(`CREATE TABLE IF NOT EXISTS leave_requests (
-          id TEXT PRIMARY KEY,
-          employee_id TEXT NOT NULL,
-          type TEXT NOT NULL,
-          start_date TEXT NOT NULL,
-          end_date TEXT NOT NULL,
-          reason TEXT,
-          status TEXT NOT NULL DEFAULT 'pending',
-          reviewer_id TEXT,
-          reviewed_at TEXT,
-          created_at TEXT NOT NULL
-        )`).run();
-        await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_leave_requests_employee_dates ON leave_requests(employee_id,start_date,end_date)").run();
+        if (!leaveSchemaReady) {
+          leaveSchemaReady = env.DB.batch([
+            env.DB.prepare(`CREATE TABLE IF NOT EXISTS leave_requests (
+              id TEXT PRIMARY KEY,
+              employee_id TEXT NOT NULL,
+              type TEXT NOT NULL,
+              start_date TEXT NOT NULL,
+              end_date TEXT NOT NULL,
+              reason TEXT,
+              status TEXT NOT NULL DEFAULT 'pending',
+              reviewer_id TEXT,
+              reviewed_at TEXT,
+              created_at TEXT NOT NULL
+            )`),
+            env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_leave_requests_employee_dates ON leave_requests(employee_id,start_date,end_date)"),
+          ]).then(() => undefined).catch(error => {
+            leaveSchemaReady = null;
+            throw error;
+          });
+        }
+        await leaveSchemaReady;
 
         const actorProbe = new URL(request.url);
         actorProbe.pathname = "/api/me";
