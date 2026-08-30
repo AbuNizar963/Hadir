@@ -4,6 +4,8 @@ const original = (await import("./index")).default;
 const { handleProfileImageRequest } = await import("./r2");
 const encoder = new TextEncoder();
 const PASSWORD_ITERATIONS = 100000;
+const RECOVERY_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RECOVERY_RATE_LIMIT_MAX = 5;
 
 function b64(data: ArrayBuffer | Uint8Array) {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -22,6 +24,28 @@ async function hashPassword(password: string) {
 async function sha256(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
   return b64(digest);
+}
+
+async function checkRecoveryRateLimit(req: Request, env: Env) {
+  const ip = req.headers.get("CF-Connecting-IP") || "unknown";
+  const deviceId = req.headers.get("x-device-id") || "";
+  const key = await sha256(`${ip}|${deviceId}`);
+  const now = Date.now();
+  const row = await env.DB.prepare(`
+    INSERT INTO recovery_rate_limits(key,window_start,attempts)
+    VALUES(?,?,1)
+    ON CONFLICT(key) DO UPDATE SET
+      window_start=CASE
+        WHEN excluded.window_start-recovery_rate_limits.window_start>=? THEN excluded.window_start
+        ELSE recovery_rate_limits.window_start
+      END,
+      attempts=CASE
+        WHEN excluded.window_start-recovery_rate_limits.window_start>=? THEN 1
+        ELSE recovery_rate_limits.attempts+1
+      END
+    RETURNING attempts
+  `).bind(key, now, RECOVERY_RATE_LIMIT_WINDOW_MS, RECOVERY_RATE_LIMIT_WINDOW_MS).first<{ attempts: number }>();
+  return Number(row?.attempts || 0) <= RECOVERY_RATE_LIMIT_MAX;
 }
 
 function json(data: unknown, status: number, origin: string) {
@@ -184,6 +208,12 @@ async function saveCompanySettings(req: Request, env: Env, origin: string) {
 async function recovery(req: Request, env: Env, origin: string) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS" } });
   if (req.method !== "POST") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
+  try {
+    if (!(await checkRecoveryRateLimit(req, env))) return json({ error: "محاولات الاستعادة كثيرة. حاول بعد قليل." }, 429, origin);
+  } catch (error) {
+    console.error("تعذر تطبيق حد محاولات استعادة المالك:", error);
+    return json({ error: "خدمة استعادة المالك غير متاحة مؤقتًا" }, 503, origin);
+  }
   if (!env.OWNER_RECOVERY_CODE) {
     const configured = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_code_hash' LIMIT 1").first<{value:string}>().catch(() => null);
     if (!configured?.value) return json({ error: "استعادة المالك غير مفعلة على الخادم" }, 503, origin);
@@ -244,8 +274,8 @@ async function recovery(req: Request, env: Env, origin: string) {
     await env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(timestamp).run();
     return json({ ok: true, username, message: "تم إنشاء حساب المالك الأول بنجاح. يمكنك تسجيل الدخول الآن." }, existing ? 200 : 201, origin);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return json({ error: "تعذر إنشاء/إعادة تعيين حساب المالك في قاعدة البيانات", detail }, 500, origin);
+    console.error("فشل تنفيذ استعادة المالك:", error);
+    return json({ error: "تعذر إنشاء/إعادة تعيين حساب المالك في قاعدة البيانات" }, 500, origin);
   }
 }
 
