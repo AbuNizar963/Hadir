@@ -34,7 +34,8 @@ export default function ManagerReports(){
  const period=mode==="daily"?date:mode==="monthly"?month:year;
  const dates=useMemo(()=>range(mode,period),[mode,period]);
  const index=useMemo(()=>auditIndex(audit),[audit]);
- const summaries=useMemo<Summary[]>(()=>employees.map(employee=>calculateSummary(employee,dates,index,settings)),[employees,dates,index,settings]);
+ const calculatedSummaries=useMemo<Summary[]>(()=>employees.map(employee=>calculateSummary(employee,dates,index,settings)),[employees,dates,index,settings]);
+ const summaries=useMemo<Summary[]>(()=>mode==="daily"?calculatedSummaries.filter(s=>s.workDays>0):calculatedSummaries,[calculatedSummaries,mode]);
  const expandedEmployee=useMemo(()=>expanded?summaries.find(s=>s.employee.id===expanded)?.employee:null,[expanded,summaries]);
  const expandedDays=useMemo(()=>expandedEmployee?calculateDetails(expandedEmployee,dates,index,settings,requests):[],[expandedEmployee,dates,index,settings,requests]);
  const total=useMemo(()=>summaries.reduce((a,s)=>({present:a.present+s.present,absent:a.absent+s.absent,early:a.early+s.early,late:a.late+s.late,open:a.open+s.open,off:a.off+s.off}),{present:0,absent:0,early:0,late:0,open:0,off:0}),[summaries]);
