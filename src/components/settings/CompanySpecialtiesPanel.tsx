@@ -6,6 +6,35 @@ import { getBackendSettings, saveBackendSettings } from "@/lib/backend";
 import { compressProfileImageDataUrl } from "@/lib/imageCompression";
 
 const clean = (values: string[]) => Array.from(new Set(values.map(v => v.trim()).filter(Boolean)));
+const COMPANY_LOGO_API = `${String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "")}/api/company/logo`;
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0) throw new Error("صيغة الشعار غير صالحة.");
+  const mime = /^data:([^;]+);base64$/i.exec(dataUrl.slice(0, comma))?.[1] || "image/webp";
+  const binary = atob(dataUrl.slice(comma + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes], { type: mime });
+}
+
+async function uploadCompanyLogo(dataUrl: string): Promise<string> {
+  const blob = dataUrlToBlob(dataUrl);
+  const form = new FormData();
+  form.append("file", blob, "company-logo.webp");
+  const token = localStorage.getItem("hadir.api.token.admin") || "";
+  const response = await fetch(COMPANY_LOGO_API, { method: "POST", headers: token ? { authorization: `Bearer ${token}` } : undefined, body: form, credentials: "include", cache: "no-store" });
+  const data = await response.json().catch(() => ({})) as { error?: unknown; url?: unknown };
+  if (!response.ok || typeof data.url !== "string" || !data.url) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ شعار الشركة في R2.");
+  return data.url;
+}
+
+async function deleteCompanyLogo(): Promise<void> {
+  const token = localStorage.getItem("hadir.api.token.admin") || "";
+  const response = await fetch(COMPANY_LOGO_API, { method: "DELETE", headers: token ? { authorization: `Bearer ${token}` } : undefined, credentials: "include", cache: "no-store" });
+  const data = await response.json().catch(() => ({})) as { error?: unknown };
+  if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر إزالة شعار الشركة من R2.");
+}
 
 export default function CompanySpecialtiesPanel() {
   const [items, setItems] = useState<string[]>([]);
@@ -73,16 +102,25 @@ export default function CompanySpecialtiesPanel() {
         reader.onerror = () => reject(new Error("تعذر قراءة الصورة"));
         reader.readAsDataURL(file);
       });
-      const compressed = await compressProfileImageDataUrl(raw, {
-        maxWidth: 512,
-        maxHeight: 512,
-        quality: 0.82,
-        type: "image/webp",
-        maxBytes: 100 * 1024,
-      });
-      await persist({ brandLogo: compressed });
+      const compressed = await compressProfileImageDataUrl(raw, { maxWidth: 512, maxHeight: 512, quality: 0.82, type: "image/webp", maxBytes: 100 * 1024 });
+      const logoUrl = await uploadCompanyLogo(compressed);
+      await persist({ brandLogo: logoUrl });
+      setMessage("تم رفع الشعار وتخزينه في R2");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "تعذر تجهيز الشعار");
+      setSaving(false);
+    }
+  }
+
+  async function removeLogo() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      await deleteCompanyLogo();
+      await persist({ brandLogo: null });
+      setMessage("تم حذف الشعار من R2");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "تعذر إزالة الشعار");
       setSaving(false);
     }
   }
@@ -109,14 +147,14 @@ export default function CompanySpecialtiesPanel() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-bold">شعار الشركة / الجهة</div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">تتم معالجة الصورة وضغطها قبل حفظها مركزيًا.</div>
+                  <div className="mt-1 text-[11px] text-muted-foreground">تتم معالجة الصورة وضغطها بصيغة WebP ثم تخزينها بأمان في R2.</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <label className="btn-secondary inline-flex cursor-pointer items-center gap-2">
                       <ImagePlus className="h-4 w-4" />
                       {brandLogo ? "تغيير الشعار" : "رفع الشعار"}
                       <input type="file" accept="image/*" className="sr-only" disabled={saving} onChange={e => { const file = e.target.files?.[0]; e.currentTarget.value = ""; void handleLogo(file); }} />
                     </label>
-                    {brandLogo && <button type="button" disabled={saving} onClick={() => void persist({ brandLogo: null })} className="btn-secondary text-destructive disabled:opacity-50"><X className="mr-1 inline h-4 w-4" />إزالة الشعار</button>}
+                    {brandLogo && <button type="button" disabled={saving} onClick={() => void removeLogo()} className="btn-secondary text-destructive disabled:opacity-50"><X className="mr-1 inline h-4 w-4" />إزالة الشعار</button>}
                   </div>
                 </div>
               </div>
