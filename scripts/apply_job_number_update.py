@@ -4,6 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Production-safe/idempotent: patch only when the exact current route marker exists.
 # Never replace a source file wholesale and never touch historical attendance rows.
+# V2 also targets the canonical current employee API in backend/src/index.ts.
 
 def patch_index():
     target = ROOT / "backend/src/index.ts"
