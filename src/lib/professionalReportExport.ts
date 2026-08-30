@@ -3,7 +3,7 @@ import { getSettings } from "@/lib/storage";
 
 export type ProfessionalReportMode = "daily" | "monthly" | "annual";
 export type ProfessionalReportSummary = {
-  employee: { name: string; jobNumber?: string | number | null };
+  employee: { name: string; jobNumber?: string | number | null; specialties?: string[] };
   workDays: number;
   present: number;
   absent: number;
@@ -16,6 +16,7 @@ export type ProfessionalReportSummary = {
 export type ProfessionalReportDay = {
   employee: string;
   jobNumber?: string | number | null;
+  specialty?: string;
   date: string;
   day: string;
   status: string;
@@ -100,6 +101,7 @@ export function downloadProfessionalAttendanceReport(args: {
 }) {
   const { mode, period, generatedAt, summaries, dailyRows, chartData, absenceRows } = args;
   const brandName = String(getSettings().brandName || "HADIR").trim() || "HADIR";
+  const specialtyOf = (employee: ProfessionalReportSummary["employee"]) => employee.specialties?.map(x => String(x).trim()).filter(Boolean)[0] || "غير محدد";
   const total = summaries.reduce((a, s) => ({
     workDays: a.workDays + s.workDays,
     present: a.present + s.present,
@@ -144,37 +146,37 @@ export function downloadProfessionalAttendanceReport(args: {
   finishSheet(dashboard, "A5");
   setWidths(dashboard, [24, 28, 24, 28]);
 
-  const summaryHeader: ExcelCell[] = ["الموظف", "الرقم الوظيفي", "أيام العمل", "حاضر", "غياب", "انصراف مبكر", "تأخر", "تسجيل ناقص", "راحة/عطلة", "ساعات العمل", "نسبة الحضور"];
-  const summaryData: ExcelCell[][] = summaries.map((s) => [s.employee.name, s.employee.jobNumber ?? "", s.workDays, s.present, s.absent, s.early, s.late, s.open, s.off, `${Math.floor(s.worked / 60)}س ${s.worked % 60}د`, s.workDays ? s.present / s.workDays : 0]);
+  const summaryHeader: ExcelCell[] = ["الموظف", "الرقم الوظيفي", "نوع العمل", "أيام العمل", "حاضر", "غياب", "انصراف مبكر", "تأخر", "تسجيل ناقص", "راحة/عطلة", "ساعات العمل", "نسبة الحضور"];
+  const summaryData: ExcelCell[][] = summaries.map((s) => [s.employee.name, s.employee.jobNumber ?? "", specialtyOf(s.employee), s.workDays, s.present, s.absent, s.early, s.late, s.open, s.off, `${Math.floor(s.worked / 60)}س ${s.worked % 60}د`, s.workDays ? s.present / s.workDays : 0]);
   const summary = XLSX.utils.aoa_to_sheet([[`${brandName} · ملخص حضور الموظفين · ${period}`], [], summaryHeader, ...summaryData]);
   summary["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: summaryHeader.length - 1 } }];
   autoFitColumns(summary, [summaryHeader, ...summaryData], 12, 30);
   styleExcelTable(summary, 2, Math.max(2, summaryData.length + 2), 0, summaryHeader.length - 1, 2, 0);
   styleReportWorkbook(summary, 4, 3, summaryData.length + 2);
   for (let r = 3; r < summaryData.length + 3; r += 1) {
-    const c = summary[XLSX.utils.encode_cell({ r, c: 10 })];
+    const c = summary[XLSX.utils.encode_cell({ r, c: 11 })];
     if (c) { c.z = "0.0%"; c.s = { ...(c.s || {}), font: { name: "Arial", sz: 10, bold: true, color: { rgb: "075985" } }, fill: { fgColor: { rgb: "E0F2FE" } } }; }
   }
   finishSheet(summary, "A3");
 
-  const detailHeader: ExcelCell[] = ["الموظف", "الرقم الوظيفي", "التاريخ", "اليوم", "الحالة", "وقت الحضور", "وقت الانصراف", "مدة العمل", "دقائق التأخر", "دقائق الانصراف المبكر", "تفصيل اليوم"];
-  const detail = XLSX.utils.aoa_to_sheet([[`${brandName} · السجل اليومي للحضور والانصراف · ${period}`], [], detailHeader, ...dailyRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, r.status, r.checkIn, r.checkOut, r.worked, r.late, r.early, r.detail] as ExcelCell[])]);
+  const detailHeader: ExcelCell[] = ["الموظف", "الرقم الوظيفي", "نوع العمل", "التاريخ", "اليوم", "الحالة", "وقت الحضور", "وقت الانصراف", "مدة العمل", "دقائق التأخر", "دقائق الانصراف المبكر", "تفصيل اليوم"];
+  const detail = XLSX.utils.aoa_to_sheet([[`${brandName} · السجل اليومي للحضور والانصراف · ${period}`], [], detailHeader, ...dailyRows.map((r) => [r.employee, r.jobNumber ?? "", r.specialty ?? "غير محدد", r.date, r.day, r.status, r.checkIn, r.checkOut, r.worked, r.late, r.early, r.detail] as ExcelCell[])]);
   detail["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: detailHeader.length - 1 } }];
-  autoFitColumns(detail, [detailHeader, ...dailyRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, r.status, r.checkIn, r.checkOut, r.worked, r.late, r.early, r.detail])], 11, 38);
+  autoFitColumns(detail, [detailHeader, ...dailyRows.map((r) => [r.employee, r.jobNumber ?? "", r.specialty ?? "غير محدد", r.date, r.day, r.status, r.checkIn, r.checkOut, r.worked, r.late, r.early, r.detail])], 11, 38);
   styleExcelTable(detail, 2, Math.max(2, dailyRows.length + 2), 0, detailHeader.length - 1, 2, 0);
-  styleReportWorkbook(detail, 4, 3, dailyRows.length + 2);
+  styleReportWorkbook(detail, 5, 3, dailyRows.length + 2);
   for (let r = 3; r < dailyRows.length + 3; r += 1) {
-    const cell = detail[XLSX.utils.encode_cell({ r, c: 4 })];
+    const cell = detail[XLSX.utils.encode_cell({ r, c: 5 })];
     if (cell) cardStyle(cell, statusTone(String(cell.v ?? "")));
   }
   finishSheet(detail, "A3");
 
-  const absenceHeader: ExcelCell[] = ["الموظف", "الرقم الوظيفي", "تاريخ الغياب", "اليوم", "الحالة", "سبب/تفصيل"];
-  const absence = XLSX.utils.aoa_to_sheet([[`${brandName} · سجل أيام الغياب · ${period}`], [], absenceHeader, ...absenceRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, "غياب", r.detail] as ExcelCell[])]);
+  const absenceHeader: ExcelCell[] = ["الموظف", "الرقم الوظيفي", "نوع العمل", "تاريخ الغياب", "اليوم", "الحالة", "سبب/تفصيل"];
+  const absence = XLSX.utils.aoa_to_sheet([[`${brandName} · سجل أيام الغياب · ${period}`], [], absenceHeader, ...absenceRows.map((r) => [r.employee, r.jobNumber ?? "", r.specialty ?? "غير محدد", r.date, r.day, "غياب", r.detail] as ExcelCell[])]);
   absence["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: absenceHeader.length - 1 } }];
-  autoFitColumns(absence, [absenceHeader, ...absenceRows.map((r) => [r.employee, r.jobNumber ?? "", r.date, r.day, "غياب", r.detail])], 12, 42);
+  autoFitColumns(absence, [absenceHeader, ...absenceRows.map((r) => [r.employee, r.jobNumber ?? "", r.specialty ?? "غير محدد", r.date, r.day, "غياب", r.detail])], 12, 42);
   styleExcelTable(absence, 2, Math.max(2, absenceRows.length + 2), 0, absenceHeader.length - 1, 2, 0);
-  styleReportWorkbook(absence, 4, 3, absenceRows.length + 2);
+  styleReportWorkbook(absence, 5, 3, absenceRows.length + 2);
   finishSheet(absence, "A3");
 
   const totalStatus = chartData.reduce((sum, x) => sum + x.value, 0);
