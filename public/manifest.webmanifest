@@ -1,22 +1,26 @@
 {
-  "id": "./",
+  "id": "/",
   "name": "حاضر · نظام الحضور والانصراف",
   "short_name": "حاضر",
   "description": "نظام حاضر لتسجيل الحضور والانصراف وإدارة الموظفين",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display_override": ["standalone", "window-controls-overlay", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#0b0f14",
   "theme_color": "#0b0f14",
   "categories": ["business", "productivity"],
   "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
   "icons": [
-    { "src": "./pwa-icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "./pwa-icon.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "./pwa-icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "/pwa-icon.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/pwa-icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/pwa-icon.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "maskable" },
+    { "src": "/pwa-icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
   ]
 }
