@@ -7,6 +7,8 @@ on:
     paths:
       - "src/**"
       - "public/**"
+      - "functions/**"
+      - ".env.production"
       - "index.html"
       - "package.json"
       - "bun.lock"
@@ -156,9 +158,6 @@ jobs:
 
           manifest=json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
 
-          # The production manifest intentionally uses absolute root paths.
-          # Keep CI aligned with the actual install contract instead of rejecting
-          # a valid manifest because it still expects the older relative form.
           assert manifest.get("id")=="/", manifest
           assert manifest.get("start_url")=="/", manifest
           assert manifest.get("scope")=="/", manifest
