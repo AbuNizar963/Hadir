@@ -13,7 +13,11 @@ if "specialties?: string[]; }" not in s:
 
 panel = ROOT / "src/components/settings/CompanySpecialtiesPanel.tsx"
 panel.parent.mkdir(parents=True, exist_ok=True)
-panel.write_text('''import { useEffect, useState } from "react";
+# Do not overwrite an existing panel: production UI changes must survive this
+# compatibility workflow. Only create the legacy specialties panel when the
+# file is genuinely missing.
+if not panel.exists():
+    panel.write_text('''import { useEffect, useState } from "react";
 import { BriefcaseBusiness, Plus, Trash2 } from "lucide-react";
 import type { Settings } from "@/types";
 import { getSettings, saveSettings } from "@/lib/storage";
