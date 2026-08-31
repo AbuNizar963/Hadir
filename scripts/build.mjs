@@ -23,6 +23,7 @@ run("node", ["scripts/repair-manager-report-patch.mjs"]);
 run("node", ["scripts/patch-manager-reports-final.mjs"]);
 run("node", ["scripts/patch-manager-reports-final2.mjs"]);
 run("node", ["scripts/patch-employee-form-defaults.mjs"]);
+run("node", ["scripts/patch-manager-employee-save.mjs"]);
 
 const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
 if (bun.status === 0 && !bun.error) {
