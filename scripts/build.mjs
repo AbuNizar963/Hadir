@@ -10,8 +10,6 @@ function run(command, args) {
   return true;
 }
 
-// Cloudflare Pages can be configured to skip its automatic dependency install.
-// Keep the build self-sufficient without reinstalling when dependencies already exist.
 if (!existsSync(vitePackage)) {
   const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
   if (bun.status === 0 && !bun.error) {
@@ -21,11 +19,10 @@ if (!existsSync(vitePackage)) {
   }
 }
 
-// Repair the generated report patch before it is executed. This keeps the
-// historical patch chain buildable without changing attendance data.
 run("node", ["scripts/repair-manager-report-patch.mjs"]);
 run("node", ["scripts/patch-manager-reports-final.mjs"]);
 run("node", ["scripts/patch-manager-reports-final2.mjs"]);
+run("node", ["scripts/patch-employee-form-defaults.mjs"]);
 
 const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
 if (bun.status === 0 && !bun.error) {
@@ -36,9 +33,6 @@ if (bun.status === 0 && !bun.error) {
   run("npm", ["run", "build"]);
 }
 
-// Emit a deployment fingerprint from the actual commit used by the builder.
-// Cloudflare Pages exposes CF_PAGES_COMMIT_SHA for Git-integrated builds;
-// GitHub Actions exposes GITHUB_SHA for its own verification build.
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || gitSha.stdout?.trim() || "unknown";
 const branch = process.env.CF_PAGES_BRANCH || process.env.GITHUB_REF_NAME || "unknown";
