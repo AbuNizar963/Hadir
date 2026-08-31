@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const vitePackage = new URL("../node_modules/vite/package.json", import.meta.url);
+const employeePage = new URL("../src/pages/ManagerEmployees.tsx", import.meta.url);
 
 function run(command, args) {
   const result = spawnSync(command, args, { stdio: "inherit", shell: false });
@@ -25,7 +26,14 @@ run("node", ["scripts/patch-manager-reports-final2.mjs"]);
 run("node", ["scripts/patch-employee-form-defaults.mjs"]);
 run("node", ["scripts/patch-manager-employee-save.mjs"]);
 
-// Keep employee editing fixes in the production build path as a deterministic patch.
+// Production must never ship the legacy employee-save path or the stale checkout-policy call.
+const employeeSource = readFileSync(employeePage, "utf8");
+if (employeeSource.includes("saveCheckoutPolicy")) {
+  throw new Error("Production build blocked: stale saveCheckoutPolicy reference remains in ManagerEmployees.tsx.");
+}
+if (!employeeSource.includes("earlyCheckoutGraceMinutes: earlyCheckoutGrace")) {
+  throw new Error("Production build blocked: employee save payload is missing earlyCheckoutGraceMinutes.");
+}
 
 const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
 if (bun.status === 0 && !bun.error) {
