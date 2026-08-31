@@ -34,7 +34,7 @@ jobs:
         env:
           VITE_BASE_PATH: /
       - name: Deploy existing production Pages project
-        run: npx wrangler@4 pages deploy dist --project-name hadir-9rq --branch main --commit-dirty=true
+        run: npx wrangler@4 pages deploy dist --project-name hadir --branch main --commit-dirty=true
       - name: Verify production build
         env:
           PRODUCTION_URL: https://hadir-9rq.pages.dev
