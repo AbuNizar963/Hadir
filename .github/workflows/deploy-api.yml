@@ -99,7 +99,7 @@ jobs:
           with open(sys.argv[1], encoding='utf-8') as f:
               data=json.load(f)
           assert data.get('ok') is True, data
-          assert data.get('d1') is True, data
+          assert data.get('database') == 'D1', data
           PY
 
       - name: Verify production Pages CORS
