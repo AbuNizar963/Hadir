@@ -21,8 +21,9 @@ if (!existsSync(vitePackage)) {
   }
 }
 
-// Apply the validated report correction before Vite compiles the app.
+// Apply the validated report corrections before Vite compiles the app.
 run("node", ["scripts/patch-manager-reports-final.mjs"]);
+run("node", ["scripts/patch-manager-reports-final2.mjs"]);
 
 const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
 if (bun.status === 0 && !bun.error) {
