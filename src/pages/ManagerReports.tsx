@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getEmployees, getSettings } from "@/lib/storage";
 import { getBackendAudit, getBackendEmployees, getBackendRequests } from "@/lib/backend";
+import { getDailyStatus, type DailyStatusRow } from "@/lib/dailyStatus";
 import { getEmployeeWorkPeriod } from "@/lib/schedule";
 import { formatDate, formatDurationMinutes, formatTime, minutesBetween } from "@/lib/utils";
 import { FileSpreadsheet, FileText, Database, Loader2, ChevronDown, ChevronUp, AlertTriangle, UserX, LogOut, BarChart3, Printer } from "lucide-react";
@@ -53,6 +54,20 @@ function auditIndex(a: Audit[]) {
   }
   return m;
 }
+function dailyStatusIndex(rows: DailyStatusRow[]) {
+  const m = new Map<string, DailyStatusRow>();
+  for (const row of rows) m.set(`${row.employeeId}|${row.attendanceDay}`, row);
+  return m;
+}
+function statusFromDaily(row: DailyStatusRow): Status {
+  if (row.status === "PRESENT") return "present";
+  if (row.status === "LATE") return "late";
+  if (row.status === "ABSENT") return "absent";
+  if (row.status === "LEAVE") return "leave";
+  if (row.status === "PERMISSION") return "permission";
+  if (row.status === "REST") return "off";
+  return "open";
+}
 function approvedRequestFor(requests: RequestRow[], employeeId: string, date: string) {
   return requests.find(r => {
     if (String(r.employeeId || "") !== String(employeeId)) return false;
@@ -69,10 +84,18 @@ function requestText(requests: RequestRow[], employeeId: string, date: string) {
   const reason = String(r.reason || "").trim();
   return `${label}${reason ? ` — ${reason}` : ""}`;
 }
-function calculateDetails(employee: Employee, dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[]): DayRow[] {
+function calculateDetails(employee: Employee, dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[], authoritative?: Map<string, DailyStatusRow>): DayRow[] {
   const detail: DayRow[] = [];
   for (const d of dates) {
-    const w = getEmployeeWorkPeriod(employee, d), k = key(d), req = approvedRequestFor(requests, employee.id, k);
+    const w = getEmployeeWorkPeriod(employee, d), k = key(d), req = approvedRequestFor(requests, employee.id, k), authoritativeRow = authoritative?.get(`${employee.id}|${k}`);
+    if (authoritativeRow) {
+      const cin = authoritativeRow.checkInAt ? new Date(authoritativeRow.checkInAt) : null;
+      const cout = authoritativeRow.checkOutAt ? new Date(authoritativeRow.checkOutAt) : null;
+      const worked = cin && cout ? Math.max(0, minutesBetween(cin.toISOString(), cout.toISOString())) : 0;
+      const status = statusFromDaily(authoritativeRow);
+      detail.push({ date: k, day: days[d.getDay()], status, checkIn: cin ? formatTime(cin.toISOString()) : "—", checkOut: cout ? formatTime(cout.toISOString()) : "—", worked, late: status === "late" ? Math.max(0, Math.round((cin?.getTime() || 0 - (w.start?.getTime() || 0)) / 60000)) : 0, early: status === "early" ? Math.max(0, Math.round(((w.end?.getTime() || 0) - (cout?.getTime() || 0)) / 60000)) : 0, detail: [w.detail || "حالة الدوام", requestText(requests, employee.id, k)].filter(Boolean).join(" · ") });
+      continue;
+    }
     if (!w.isWorkDay) { detail.push({ date: k, day: days[d.getDay()], status: "off", checkIn: "—", checkOut: "—", worked: 0, late: 0, early: 0, detail: w.detail || "لا يوجد دوام" }); continue; }
     if (req?.type === "leave") { detail.push({ date: k, day: days[d.getDay()], status: "leave", checkIn: "—", checkOut: "—", worked: 0, late: 0, early: 0, detail: requestText(requests, employee.id, k) }); continue; }
     if (req?.type === "permission") { detail.push({ date: k, day: days[d.getDay()], status: "permission", checkIn: "—", checkOut: "—", worked: 0, late: 0, early: 0, detail: requestText(requests, employee.id, k) }); continue; }
@@ -88,10 +111,24 @@ function calculateDetails(employee: Employee, dates: Date[], index: Map<string, 
   }
   return detail;
 }
-function calculateSummary(employee: Employee, dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[]): Summary {
+function calculateSummary(employee: Employee, dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[], authoritative?: Map<string, DailyStatusRow>): Summary {
   let workDays = 0, present = 0, absent = 0, early = 0, late = 0, open = 0, permission = 0, leave = 0, off = 0, worked = 0, lateMinutes = 0, earlyMinutes = 0;
   for (const d of dates) {
-    const w = getEmployeeWorkPeriod(employee, d), k = key(d), req = approvedRequestFor(requests, employee.id, k);
+    const w = getEmployeeWorkPeriod(employee, d), k = key(d), req = approvedRequestFor(requests, employee.id, k), authoritativeRow = authoritative?.get(`${employee.id}|${k}`);
+    if (authoritativeRow) {
+      const status = statusFromDaily(authoritativeRow);
+      if (status === "off") { off++; continue; }
+      if (status === "leave") { leave++; continue; }
+      if (status === "permission") { permission++; continue; }
+      workDays++;
+      if (status === "absent") { absent++; continue; }
+      if (status === "open") { open++; continue; }
+      if (status === "late") late++;
+      else if (status === "early") early++;
+      else present++;
+      if (authoritativeRow.checkInAt && authoritativeRow.checkOutAt) worked += Math.max(0, minutesBetween(authoritativeRow.checkInAt, authoritativeRow.checkOutAt));
+      continue;
+    }
     if (!w.isWorkDay) { off++; continue; }
     workDays++;
     if (req?.type === "leave") { leave++; continue; }
@@ -108,29 +145,31 @@ function calculateSummary(employee: Employee, dates: Date[], index: Map<string, 
   return { employee, workDays, present, absent, early, late, open, permission, leave, off, worked, lateMinutes, earlyMinutes };
 }
 function specialtyOf(e: Employee) { return (e.specialties || []).map(x => String(x).trim()).filter(Boolean)[0] || "غير محدد"; }
-function serviceRows(summaries: Summary[], dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[]) {
-  return summaries.map(s => { const d = calculateDetails(s.employee, dates, index, settings, requests)[0]; return { employee: s.employee, specialty: specialtyOf(s.employee), status: d.status, checkIn: d.checkIn, checkOut: d.checkOut, note: d.detail }; });
+function serviceRows(summaries: Summary[], dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[], authoritative?: Map<string, DailyStatusRow>) {
+  return summaries.map(s => { const d = calculateDetails(s.employee, dates, index, settings, requests, authoritative)[0]; return { employee: s.employee, specialty: specialtyOf(s.employee), status: d.status, checkIn: d.checkIn, checkOut: d.checkOut, note: d.detail }; });
 }
 
 export default function ManagerReports() {
   const [mode, setMode] = useState<Mode>("monthly"), [date, setDate] = useState(new Date().toISOString().slice(0, 10)), [month, setMonth] = useState(new Date().toISOString().slice(0, 7)), [year, setYear] = useState(String(new Date().getFullYear()));
-  const [employees, setEmployees] = useState<Employee[]>(getEmployees()), [audit, setAudit] = useState<Audit[]>([]), [requests, setRequests] = useState<RequestRow[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState<string | null>(null), [expanded, setExpanded] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>(getEmployees()), [audit, setAudit] = useState<Audit[]>([]), [requests, setRequests] = useState<RequestRow[]>([]), [dailyStatus, setDailyStatus] = useState<DailyStatusRow[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState<string | null>(null), [expanded, setExpanded] = useState<string | null>(null);
   const settings = getSettings();
   useEffect(() => { let stop = false; const load = async () => { setLoading(true); setError(null); const e: string[] = []; try { const x = await getBackendEmployees(); if (!stop && Array.isArray(x)) setEmployees(x); } catch (x) { e.push(`الموظفون: ${x instanceof Error ? x.message : "فشل الجلب"}`); } try { const x = await getBackendAudit(2000); if (!stop && Array.isArray(x)) setAudit(x as Audit[]); } catch (x) { e.push(`الحضور: ${x instanceof Error ? x.message : "فشل الجلب"}`); } try { const x = await getBackendRequests("admin"); if (!stop && Array.isArray(x)) setRequests(x as RequestRow[]); } catch (x) { e.push(`الطلبات: ${x instanceof Error ? x.message : "فشل الجلب"}`); } if (!stop) { setLoading(false); if (e.length) setError(e.join(" · ")); } }; void load(); const t = window.setInterval(() => { if (document.visibilityState === "visible") void load(); }, 60000); return () => { stop = true; clearInterval(t); }; }, []);
+  useEffect(() => { if (mode !== "daily") { setDailyStatus([]); return; } let stop = false; const loadDaily = async () => { try { const x = await getDailyStatus(date); if (!stop) setDailyStatus(Array.isArray(x.employees) ? x.employees : []); } catch (x) { if (!stop) setError(prev => [prev, `الحالة اليومية: ${x instanceof Error ? x.message : "فشل جلب الحالة اليومية"}`].filter(Boolean).join(" · ")); } }; void loadDaily(); return () => { stop = true; }; }, [mode, date]);
   const period = mode === "daily" ? date : mode === "monthly" ? month : year;
   const dates = useMemo(() => range(mode, period), [mode, period]);
   const index = useMemo(() => auditIndex(audit), [audit]);
-  const calculatedSummaries = useMemo(() => employees.map(employee => calculateSummary(employee, dates, index, settings, requests)), [employees, dates, index, settings, requests]);
+  const authoritative = useMemo(() => mode === "daily" ? dailyStatusIndex(dailyStatus) : undefined, [mode, dailyStatus]);
+  const calculatedSummaries = useMemo(() => employees.map(employee => calculateSummary(employee, dates, index, settings, requests, authoritative)), [employees, dates, index, settings, requests, authoritative]);
   const summaries = useMemo(() => mode === "daily" ? calculatedSummaries.filter(s => s.workDays > 0) : calculatedSummaries, [calculatedSummaries, mode]);
   const expandedEmployee = useMemo(() => expanded ? summaries.find(s => s.employee.id === expanded)?.employee : null, [expanded, summaries]);
-  const expandedDays = useMemo(() => expandedEmployee ? calculateDetails(expandedEmployee, dates, index, settings, requests) : [], [expandedEmployee, dates, index, settings, requests]);
+  const expandedDays = useMemo(() => expandedEmployee ? calculateDetails(expandedEmployee, dates, index, settings, requests, authoritative) : [], [expandedEmployee, dates, index, settings, requests, authoritative]);
   const total = useMemo(() => summaries.reduce((a, s) => ({ present: a.present + s.present, absent: a.absent + s.absent, early: a.early + s.early, late: a.late + s.late, open: a.open + s.open, permission: a.permission + s.permission, leave: a.leave + s.leave, off: a.off + s.off }), { present: 0, absent: 0, early: 0, late: 0, open: 0, permission: 0, leave: 0, off: 0 }), [summaries]);
   const chartData = [{ label: "حاضر", value: total.present }, { label: "غياب", value: total.absent }, { label: "استئذان", value: total.permission }, { label: "إجازة", value: total.leave }, { label: "انصراف مبكر", value: total.early }, { label: "تأخر", value: total.late }, { label: "تسجيل ناقص", value: total.open }], max = Math.max(1, ...chartData.map(x => x.value));
-  const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries, dates, index, settings, requests) : [], [mode, summaries, dates, index, settings, requests]);
+  const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries, dates, index, settings, requests, authoritative) : [], [mode, summaries, dates, index, settings, requests, authoritative]);
   const groups = useMemo(() => { const map = new Map<string, ServiceRow[]>(); for (const row of dailyServiceRows) { const list = map.get(row.specialty) || []; list.push(row); map.set(row.specialty, list); } const grouped = Array.from(map.entries()).map(([name, rows]) => ({ name, rows })); const specialtyOrder = (settings.specialties || []).map(x => String(x).trim()).filter(Boolean); const rank = new Map(specialtyOrder.map((name, index) => [name, index])); return grouped.sort((a, b) => { const ai = rank.get(a.name), bi = rank.get(b.name); if (ai !== undefined && bi !== undefined) return ai - bi; if (ai !== undefined) return -1; if (bi !== undefined) return 1; return 0; }); }, [dailyServiceRows, settings.specialties]);
   const groupColumns = useMemo(() => { const out: { name: string; rows: ServiceRow[] }[][] = []; for (let i = 0; i < groups.length; i += 2) out.push([groups[i], groups[i + 1]].filter(Boolean) as { name: string; rows: ServiceRow[] }[]); return out; }, [groups]);
-  const exportCsv = () => { const h = ["اسم الشركة", "الاختصاص", "الموظف", "الرقم الوظيفي", "التاريخ", "اليوم", "الحالة", "وقت الحضور", "وقت الانصراف", "مدة العمل", "دقائق التأخر", "دقائق الانصراف المبكر", "تفصيل اليوم"], d = summaries.flatMap(s => calculateDetails(s.employee, dates, index, settings, requests).map(day => [String(settings.brandName || "HADIR").trim() || "HADIR", specialtyOf(s.employee), s.employee.name, s.employee.jobNumber, day.date, day.day, labels[day.status], day.checkIn, day.checkOut, formatDurationMinutes(day.worked), day.late, day.early, day.detail] as CsvCell[])); downloadCSV(`Hadir-${mode}-${period}-attendance`, h, d); };
-  const exportExcel = () => { const sourceRows = mode === "daily" ? groups.flatMap(group => group.rows) : summaries.map(s => ({ employee: s.employee, specialty: specialtyOf(s.employee) })); const dailyRows = sourceRows.flatMap(row => { const employee = row.employee, details = calculateDetails(employee, dates, index, settings, requests); return details.map(day => ({ employee: employee.name, jobNumber: employee.jobNumber, specialty: specialtyOf(employee), date: day.date, day: day.day, status: labels[day.status], checkIn: day.checkIn, checkOut: day.checkOut, worked: formatDurationMinutes(day.worked), late: day.late, early: day.early, detail: day.detail })); }); const absenceRows = dailyRows.filter(row => row.status === "غياب"); downloadProfessionalAttendanceReport({ mode, period, generatedAt: new Date().toLocaleString("ar-EG"), summaries, dailyRows, absenceRows, chartData }); };
+  const exportCsv = () => { const h = ["اسم الشركة", "الاختصاص", "الموظف", "الرقم الوظيفي", "التاريخ", "اليوم", "الحالة", "وقت الحضور", "وقت الانصراف", "مدة العمل", "دقائق التأخر", "دقائق الانصراف المبكر", "تفصيل اليوم"], d = summaries.flatMap(s => calculateDetails(s.employee, dates, index, settings, requests, authoritative).map(day => [String(settings.brandName || "HADIR").trim() || "HADIR", specialtyOf(s.employee), s.employee.name, s.employee.jobNumber, day.date, day.day, labels[day.status], day.checkIn, day.checkOut, formatDurationMinutes(day.worked), day.late, day.early, day.detail] as CsvCell[])); downloadCSV(`Hadir-${mode}-${period}-attendance`, h, d); };
+  const exportExcel = () => { const sourceRows = mode === "daily" ? groups.flatMap(group => group.rows) : summaries.map(s => ({ employee: s.employee, specialty: specialtyOf(s.employee) })); const dailyRows = sourceRows.flatMap(row => { const employee = row.employee, details = calculateDetails(employee, dates, index, settings, requests, authoritative); return details.map(day => ({ employee: employee.name, jobNumber: employee.jobNumber, specialty: specialtyOf(employee), date: day.date, day: day.day, status: labels[day.status], checkIn: day.checkIn, checkOut: day.checkOut, worked: formatDurationMinutes(day.worked), late: day.late, early: day.early, detail: day.detail })); }); const absenceRows = dailyRows.filter(row => row.status === "غياب"); downloadProfessionalAttendanceReport({ mode, period, generatedAt: new Date().toLocaleString("ar-EG"), summaries, dailyRows, absenceRows, chartData }); };
   const title = mode === "daily" ? `يومي · ${formatDate(date)}` : mode === "monthly" ? `شهري · ${month}` : `سنوي · ${year}`;
   const printReport = () => window.print();
 
