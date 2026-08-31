@@ -1,0 +1,71 @@
+name: Fix employee VIP source
+
+on:
+  push:
+    branches: [fix/vip-employee-source-final]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: "!contains(github.event.head_commit.message, 'apply employee VIP source fix')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply focused VIP fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('src/pages/ManagerEmployees.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old_marker = 'if (response.ok && Array.isArray(controls)) {'
+          new_marker = 'if (false && response.ok && Array.isArray(controls)) {'
+          if old_marker not in s:
+              raise SystemExit('workforce-controls merge marker not found')
+          s = s.replace(old_marker, new_marker, 1)
+
+          pattern = re.compile(
+              r'  const updateWorkforce = async \(e: Employee, patch: \{ isVip\?: boolean; autoCheckIn\?: boolean; autoCheckOut\?: boolean \}\) => \{.*?\n  \};',
+              re.S,
+          )
+          replacement = '''  const updateWorkforce = async (e: Employee, patch: { isVip?: boolean; autoCheckIn?: boolean; autoCheckOut?: boolean }) => {
+    if (!isOwner) return;
+    try {
+      const result = await updateBackendEmployee(e.id, patch);
+      const saved = result.employee;
+      if (!saved) throw new Error("تعذر قراءة الموظف بعد الحفظ.");
+      setEmployees((prev) => prev.map((item) => item.id === e.id ? { ...item, ...saved } : item));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر حفظ إعدادات VIP.");
+      await load(false);
+    }
+  };'''
+          s2, n = pattern.subn(replacement, s, count=1)
+          if n != 1:
+              raise SystemExit('updateWorkforce handler not found')
+
+          p.write_text(s2, encoding='utf-8')
+          PY
+
+      - name: Typecheck
+        run: |
+          npm ci
+          npm run typecheck
+
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerEmployees.tsx
+          git rm .github/workflows/fix-vip-employee-source.yml
+          git commit -m "apply employee VIP source fix"
+          git push
