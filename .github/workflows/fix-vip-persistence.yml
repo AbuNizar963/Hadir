@@ -1,0 +1,59 @@
+name: Fix employee VIP persistence
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  repair:
+    if: "!contains(github.event.head_commit.message, 'fix: repair VIP persistence')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Patch ManagerEmployees VIP path
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('src/pages/ManagerEmployees.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old_controls = re.compile(r'''\n      if \(backendEnabled\) \{\n        try \{\n          const token = localStorage\.getItem\("hadir\.api\.token\.admin"\) \|\| "";\n          const api = String\(import\.meta\.env\.VITE_API_URL \|\| "https://hadir-api\.abunizar963\.workers\.dev"\)\.replace\(/\\\\\/$/, ""\);\n          const response = await fetch\(`\\$\{api\}/api/manager/workforce-controls`, \{ headers: \{ authorization: `Bearer \\$\{token\}`, "content-type": "application/json" \}, credentials: "include", cache: "no-store" \}\);\n          const controls = await response\.json\(\)\.catch\(\(\) => \[\]\);\n          if \(response\.ok && Array\.isArray\(controls\)\) \{\n            const byId = new Map\(controls\.map\(\(control: any\) => \[String\(control\.id\), control\]\)\);\n            next = next\.map\(\(employee\) => \{ const control = byId\.get\(String\(employee\.id\)\); if \(!control\) return employee; return \{ \.\.\.employee, isVip: Boolean\(control\.isVip\), autoCheckIn: Boolean\(control\.autoCheckIn\), autoCheckOut: Boolean\(control\.autoCheckOut\) \}; \}\);\n          \}\n''')
+          s2, n = old_controls.subn('\n', s, count=1)
+          if n != 1:
+              raise SystemExit('workforce-controls loader not found')
+
+          old_handler = re.compile(r'''  const updateWorkforce = async \(e: Employee, patch: \{ isVip\?: boolean; autoCheckIn\?: boolean; autoCheckOut\?: boolean \}\) => \{.*?\n  \};''', re.S)
+          new_handler = '''  const updateWorkforce = async (e: Employee, patch: { isVip?: boolean; autoCheckIn?: boolean; autoCheckOut?: boolean }) => {
+    if (!isOwner || !backendEnabled) return;
+    try {
+      const result = await updateBackendEmployee(e.id, patch);
+      const saved = result.employee;
+      if (!saved) throw new Error("تعذر قراءة الموظف بعد الحفظ.");
+      setEmployees((prev) => prev.map((item) => item.id === e.id ? { ...item, ...saved } : item));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر حفظ إعدادات VIP.");
+      await load(false);
+    }
+  };'''
+          s3, n = old_handler.subn(new_handler, s2, count=1)
+          if n != 1:
+              raise SystemExit('VIP handler not found')
+          p.write_text(s3, encoding='utf-8')
+          PY
+      - name: Verify
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+      - name: Commit repair and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerEmployees.tsx
+          git rm .github/workflows/fix-vip-persistence.yml
+          git commit -m "fix: repair VIP persistence"
+          git push
