@@ -40,4 +40,4 @@ if (!source.includes("earlyCheckoutGraceMinutes: earlyCheckoutGrace")) {
 }
 
 writeFileSync(file, source, "utf8");
-console.log("Manager employee save patch applied: one atomic employee PATCH with early checkout policy; no stale saveCheckoutPolicy reference.");
+console.log("Manager employee save patch applied: single verified D1 employee PATCH; no stale saveCheckoutPolicy reference.");
