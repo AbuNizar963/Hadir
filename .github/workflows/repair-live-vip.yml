@@ -1,0 +1,65 @@
+name: Repair LIVE DIRECTORY VIP
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: write
+jobs:
+  repair:
+    if: "!contains(github.event.head_commit.message, 'canonical VIP repair')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Apply canonical VIP save fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('src/pages/ManagerEmployees.tsx')
+          s = p.read_text()
+          pattern = r'  const updateWorkforce = async \(e: Employee, patch: \{ isVip\?: boolean; autoCheckIn\?: boolean; autoCheckOut\?: boolean \}\) => \{.*?\n  \};'
+          replacement = '''  const updateWorkforce = async (e: Employee, patch: { isVip?: boolean; autoCheckIn?: boolean; autoCheckOut?: boolean }) => {
+    if (!isOwner) return;
+    try {
+      const result = await updateBackendEmployee(e.id, patch);
+      const saved = result.employee;
+      if (!saved) throw new Error("تعذر قراءة الموظف بعد الحفظ من D1.");
+      setEmployees((prev) => prev.map((item) => item.id === e.id ? { ...item, ...saved } : item));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر حفظ إعدادات Workforce.");
+    }
+  };'''
+          s2, n = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('VIP handler not found')
+          s = s2
+          controls = r'\n      if \(backendEnabled\) \{\n        try \{\n          const token = localStorage\.getItem\("hadir\.api\.token\.admin"\) \|\| "";\n          const api = String\(import\.meta\.env\.VITE_API_URL \|\| "https://hadir-api\.abunizar963\.workers\.dev"\)\.replace\(/\\\\\/$/, ""\);\n          const response = await fetch\(`\$\{api\}/api/manager/workforce-controls`, \{ headers: \{ authorization: `Bearer \$\{token\}`, "content-type": "application/json" \}, credentials: "include", cache: "no-store" \}\);\n          const controls = await response\.json\(\)\.catch\(\(\) => \[\]\);\n          if \(response\.ok && Array\.isArray\(controls\)\) \{.*?\n          \}\n          const policyResponse ='
+          s2, n2 = re.subn(controls, '\n      if (backendEnabled) {\n        try {\n          const token = localStorage.getItem("hadir.api.token.admin") || "";\n          const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\\/$/, "");\n          const policyResponse =', s, count=1, flags=re.S)
+          if n2 != 1:
+              raise SystemExit('workforce overlay not found')
+          p.write_text(s2)
+          PY
+      - name: Verify frontend
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerEmployees.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: canonical VIP repair"
+          git push
+      - name: Remove temporary repair workflow
+        if: always()
+        run: |
+          git rm -f .github/workflows/repair-live-vip.yml || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: remove temporary VIP repair workflow" || true
+          git push || true
