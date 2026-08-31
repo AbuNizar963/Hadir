@@ -1,5 +1,6 @@
 import employeeGateway, { HadirRealtime } from "./employee-save-gateway";
 import { handleDailyStatus } from "./daily-status-api";
+import { handleWorkforceControls } from "./workforce-controls-gateway";
 
 type Env = {
   DB: D1Database;
@@ -29,7 +30,7 @@ function cors(request: Request, env: Env) {
     "access-control-allow-origin": origin(request, env),
     "access-control-allow-credentials": "true",
     "access-control-allow-headers": "authorization, content-type, x-device-id",
-    "access-control-allow-methods": "GET, OPTIONS",
+    "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
     "cache-control": "no-store",
     "vary": "Origin",
   };
@@ -77,13 +78,33 @@ export { HadirRealtime };
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const path = new URL(request.url).pathname.replace(/\/$/, "");
+    const headers = cors(request, env);
+
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
+
+    // Owner Workforce controls have their own narrow write boundary. Keeping
+    // this route here prevents the employee-save gateway from swallowing the
+    // command and makes the D1 write + read-after-write verification explicit.
+    if (path === "/api/workforce/live" && request.method === "PATCH") {
+      try {
+        const actor = await authenticatedActor(request, env, ctx);
+        const response = await handleWorkforceControls(request, env, actor);
+        const merged = new Headers(response.headers);
+        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers: merged });
+      } catch (error) {
+        console.error("production workforce-controls failed", error);
+        return new Response(JSON.stringify({ ok: false, error: "تعذر حفظ إعدادات Workforce في D1" }), {
+          status: 500,
+          headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+        });
+      }
+    }
 
     // The dashboard read path is owned by the same production Worker as the
     // employee write path. This prevents routing regressions between D1 reads
     // and writes while keeping the existing API surface intact.
     if (path === "/api/manager/daily-status") {
-      const headers = cors(request, env);
-      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
       if (request.method !== "GET") return new Response(JSON.stringify({ error: "الطريقة غير مدعومة" }), {
         status: 405,
         headers: { ...headers, "content-type": "application/json; charset=utf-8" },
