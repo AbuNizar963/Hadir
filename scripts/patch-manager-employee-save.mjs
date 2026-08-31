@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const file = new URL("../src/pages/ManagerEmployees.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 
-const payloadMarker = 'rotationStartDate: form.rotationStartDate || null, locationId: form.locationId || null, specialties,';
+const payloadMarker = 'locationId: form.locationId || null, specialties,';
 if (!source.includes(payloadMarker)) throw new Error("Manager employee save patch: payload marker not found.");
 if (!source.includes("earlyCheckoutGraceMinutes: earlyCheckoutGrace")) {
   source = source.replace(payloadMarker, `${payloadMarker}\n        earlyCheckoutGraceMinutes: earlyCheckoutGrace,`);
