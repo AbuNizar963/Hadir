@@ -25,6 +25,8 @@ run("node", ["scripts/patch-manager-reports-final2.mjs"]);
 run("node", ["scripts/patch-employee-form-defaults.mjs"]);
 run("node", ["scripts/patch-manager-employee-save.mjs"]);
 
+// Keep employee editing fixes in the production build path as a deterministic patch.
+
 const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
 if (bun.status === 0 && !bun.error) {
   if (!run("bun", ["run", "vite", "build"])) {
@@ -42,6 +44,6 @@ const deploymentUrl = process.env.CF_PAGES_URL || "";
 mkdirSync(new URL("../dist/", import.meta.url), { recursive: true });
 writeFileSync(
   new URL("../dist/build-version.json", import.meta.url),
-  `${JSON.stringify({ commitSha, branch, deploymentUrl }, null, 2)}\n`,
+  `${JSON.stringify({ commitSha, branch, deploymentUrl}, null, 2)}\n`,
   "utf8",
 );
