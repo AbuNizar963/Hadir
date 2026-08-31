@@ -16,9 +16,11 @@ import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnost
 import { startRealtimeSync } from "@/lib/realtime";
 import { installApiCredentials } from "@/lib/apiCredentials";
 import { installDeviceDirectoryEnhancer } from "./deviceDirectoryEnhancer";
+import { installWorkforceMutationBridge } from "@/lib/workforceMutationBridge";
 import "@/lib/qrPolyfill";
 
 installApiCredentials();
+installWorkforceMutationBridge();
 seedIfEmpty();
 installGlobalDiagnostics();
 startRealtimeSync();
