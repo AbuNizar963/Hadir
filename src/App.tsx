@@ -25,6 +25,7 @@ import ProtectedEmployee from "@/components/ProtectedEmployee";
 import ProtectedManager from "@/components/ProtectedManager";
 import RequireManagerRole from "@/components/RequireManagerRole";
 import PWAExperience from "@/components/system/PWAExperience";
+import { Toaster, toast } from "@/components/ui/sonner";
 import { currentManager, currentSession } from "@/lib/auth";
 import { setManagerSession, setSession } from "@/lib/storage";
 import { enableWebPush } from "@/lib/push";
@@ -38,6 +39,27 @@ const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abuniz
 type Role = "admin" | "employee";
 type User = AdminAccount | Employee;
 type TokenRestoreResult = { status: "restored"; user: User } | { status: "invalid" | "transient" };
+
+let globalActionNotificationsInstalled = false;
+
+function installGlobalActionNotifications() {
+  if (globalActionNotificationsInstalled || typeof window === "undefined") return;
+  globalActionNotificationsInstalled = true;
+  const originalFetch = window.fetch.bind(window);
+
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const method = String(init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+    const response = await originalFetch(input, init);
+    const isMutation = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+    const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const isHadirApi = requestUrl.startsWith("/api/") || requestUrl.startsWith(API_URL) || requestUrl.includes("hadir-api.abunizar963.workers.dev/api/");
+
+    if (isMutation && isHadirApi && response.ok) {
+      toast.success("تم تنفيذ الأمر بنجاح", { duration: 1000 });
+    }
+    return response;
+  };
+}
 
 function PushSessionBridge() {
   const location = useLocation();
@@ -163,7 +185,15 @@ function LaunchGateway() {
 }
 
 export default function App() {
+  useEffect(() => {
+    installGlobalActionNotifications();
+    return () => {
+      // Keep the single global interceptor alive for the SPA lifetime.
+    };
+  }, []);
+
   return <BrowserRouter basename={basename}>
+    <Toaster />
     <PushSessionBridge />
     <PWAExperience />
     <Routes>
