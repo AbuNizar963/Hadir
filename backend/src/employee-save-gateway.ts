@@ -2,19 +2,11 @@ import base, { HadirRealtime } from "./entry";
 
 type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string; JWT_SECRET?: string; OWNER_RECOVERY_CODE?: string; PROFILE_IMAGES?: R2Bucket; REALTIME: DurableObjectNamespace };
 type Role = "owner" | "manager" | "supervisor" | "staff";
-
 type Actor = { id: string; name: string; role: Role; username?: string };
 
 const json = (data: unknown, status: number, origin: string) => new Response(JSON.stringify(data), {
   status,
-  headers: {
-    "content-type": "application/json; charset=utf-8",
-    "access-control-allow-origin": origin,
-    "access-control-allow-credentials": "true",
-    "access-control-allow-headers": "authorization, content-type, x-device-id",
-    "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
-    "cache-control": "no-store",
-  },
+  headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "authorization, content-type, x-device-id", "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS", "cache-control": "no-store" },
 });
 
 function responseOrigin(request: Request, env: Env) {
@@ -23,21 +15,16 @@ function responseOrigin(request: Request, env: Env) {
   return incoming && (configured.length === 0 || configured.includes(incoming) || /^https:\/\/[^/]+\.pages\.dev$/i.test(incoming)) ? incoming : configured[0] || "*";
 }
 
-function tokenFromRequest(request: Request) {
-  const auth = request.headers.get("authorization") || "";
-  return auth.replace(/^Bearer\s+/i, "").trim();
-}
+function tokenFromRequest(request: Request) { return (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim(); }
 
 async function hashToken(token: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  let binary = "";
-  for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
+  let binary = ""; for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 async function adminActor(request: Request, env: Env): Promise<Actor | null> {
-  const token = tokenFromRequest(request);
-  if (!token) return null;
+  const token = tokenFromRequest(request); if (!token) return null;
   try {
     const hash = await hashToken(token);
     const session = await env.DB.prepare("SELECT user_id AS userId,user_type AS userType,role FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1").bind(hash).first<any>();
@@ -51,26 +38,13 @@ async function adminActor(request: Request, env: Env): Promise<Actor | null> {
 function employeeOut(row: any) {
   const parse = (value: unknown) => { try { return JSON.parse(String(value || "[]")); } catch { return []; } };
   return {
-    id: row.id,
-    jobNumber: row.job_number,
-    name: row.name,
-    pinHash: "",
-    status: row.status,
-    deviceId: row.device_id,
-    deviceLabel: row.device_label,
-    createdAt: row.created_at,
-    scheduleType: row.schedule_type,
-    rotationStartDate: row.rotation_start_date,
-    avatar: row.avatar || null,
-    workStartTime: row.work_start_time,
-    workEndTime: row.work_end_time,
-    gracePeriodMinutes: row.grace_period_minutes,
-    role: row.role,
-    locationId: row.location_id,
-    rotationDaysOn: row.rotation_days_on,
-    rotationDaysOff: row.rotation_days_off,
-    workDays: parse(row.work_days_json),
-    specialties: parse(row.specialties_json),
+    id: row.id, jobNumber: row.job_number, name: row.name, pinHash: "", status: row.status,
+    deviceId: row.device_id, deviceLabel: row.device_label, createdAt: row.created_at,
+    scheduleType: row.schedule_type, rotationStartDate: row.rotation_start_date, avatar: row.avatar || null,
+    workStartTime: row.work_start_time, workEndTime: row.work_end_time, gracePeriodMinutes: row.grace_period_minutes,
+    role: row.role, locationId: row.location_id, rotationDaysOn: row.rotation_days_on, rotationDaysOff: row.rotation_days_off,
+    workDays: parse(row.work_days_json), specialties: parse(row.specialties_json),
+    isVip: Boolean(Number(row.is_vip || 0)), autoCheckIn: Boolean(Number(row.auto_check_in || 0)), autoCheckOut: Boolean(Number(row.auto_check_out || 0)),
   };
 }
 
@@ -83,8 +57,7 @@ async function handleEmployeePatch(request: Request, env: Env, origin: string) {
   const current = await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();
   if (!current) return json({ error: "الموظف غير موجود" }, 404, origin);
   const body = await request.json().catch(() => ({})) as Record<string, any>;
-  const sets: string[] = [];
-  const values: any[] = [];
+  const sets: string[] = []; const values: any[] = [];
 
   if (body.jobNumber !== undefined) {
     const value = String(body.jobNumber || "").trim();
@@ -99,11 +72,16 @@ async function handleEmployeePatch(request: Request, env: Env, origin: string) {
     name: "name", status: "status", scheduleType: "schedule_type", rotationStartDate: "rotation_start_date",
     workStartTime: "work_start_time", workEndTime: "work_end_time", gracePeriodMinutes: "grace_period_minutes",
     locationId: "location_id", rotationDaysOn: "rotation_days_on", rotationDaysOff: "rotation_days_off", avatar: "avatar",
+    isVip: "is_vip", autoCheckIn: "auto_check_in", autoCheckOut: "auto_check_out",
   };
   for (const [key, column] of Object.entries(fields)) {
     if (body[key] === undefined) continue;
     let value = body[key];
     if (["gracePeriodMinutes", "rotationDaysOn", "rotationDaysOff"].includes(key)) value = Number(value);
+    if (["isVip", "autoCheckIn", "autoCheckOut"].includes(key)) {
+      if (typeof value !== "boolean") return json({ error: `القيمة ${key} يجب أن تكون true أو false` }, 400, origin);
+      value = value ? 1 : 0;
+    }
     if (["rotationStartDate", "workStartTime", "workEndTime", "locationId"].includes(key) && value === "") value = null;
     sets.push(`${column}=?`); values.push(value);
   }
@@ -114,8 +92,11 @@ async function handleEmployeePatch(request: Request, env: Env, origin: string) {
       const salt = crypto.getRandomValues(new Uint8Array(16));
       const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
       const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" }, key, 256);
-      const b64 = (data: ArrayBuffer | Uint8Array) => { let binary = ""; for (const byte of new Uint8Array(data)) binary += String.fromCharCode(byte); return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, ""); };
-      sets.push("pin_hash=?"); values.push(`pbkdf2$100000$${b64(salt)}$${b64(bits)}`);
+      let binary = ""; for (const byte of new Uint8Array(bits)) binary += String.fromCharCode(byte);
+      const b64 = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      let saltBinary = ""; for (const byte of salt) saltBinary += String.fromCharCode(byte);
+      const salt64 = btoa(saltBinary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      sets.push("pin_hash=?"); values.push(`pbkdf2$100000$${salt64}$${b64}`);
     }
   }
   if (body.specialties !== undefined) { sets.push("specialties_json=?"); values.push(JSON.stringify(Array.isArray(body.specialties) ? body.specialties : [])); }
@@ -141,9 +122,7 @@ export default {
     const origin = responseOrigin(request, env);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "authorization, content-type, x-device-id", "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS", "cache-control": "no-store" } });
     const path = new URL(request.url).pathname.replace(/\/$/, "");
-    if (request.method === "PATCH" && path.startsWith("/api/employees/") && !path.endsWith("/device") && !path.endsWith("/avatar") && !path.endsWith("/checkout-policy")) {
-      return handleEmployeePatch(request, env, origin);
-    }
+    if (request.method === "PATCH" && path.startsWith("/api/employees/") && !path.endsWith("/device") && !path.endsWith("/avatar") && !path.endsWith("/checkout-policy")) return handleEmployeePatch(request, env, origin);
     return base.fetch(request, env, ctx);
   },
 };
