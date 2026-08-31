@@ -21,10 +21,8 @@ if (!existsSync(vitePackage)) {
   }
 }
 
-// Apply deterministic source-level report corrections before Vite compiles the app.
-// The patches are idempotent and fail the build if expected source anchors change.
-run("node", ["scripts/patch-manager-reports.mjs"]);
-run("node", ["scripts/patch-manager-reports-v2.mjs"]);
+// Apply the validated report correction before Vite compiles the app.
+run("node", ["scripts/patch-manager-reports-final.mjs"]);
 
 const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
 if (bun.status === 0 && !bun.error) {
