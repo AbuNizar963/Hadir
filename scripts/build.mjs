@@ -21,7 +21,9 @@ if (!existsSync(vitePackage)) {
   }
 }
 
-// Apply the validated report corrections before Vite compiles the app.
+// Repair the generated report patch before it is executed. This keeps the
+// historical patch chain buildable without changing attendance data.
+run("node", ["scripts/repair-manager-report-patch.mjs"]);
 run("node", ["scripts/patch-manager-reports-final.mjs"]);
 run("node", ["scripts/patch-manager-reports-final2.mjs"]);
 
