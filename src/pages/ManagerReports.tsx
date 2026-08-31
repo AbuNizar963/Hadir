@@ -54,11 +54,7 @@ function auditIndex(a: Audit[]) {
   }
   return m;
 }
-function dailyStatusIndex(rows: DailyStatusRow[]) {
-  const m = new Map<string, DailyStatusRow>();
-  for (const row of rows) m.set(`${row.employeeId}|${row.attendanceDay}`, row);
-  return m;
-}
+function dailyStatusIndex(rows: DailyStatusRow[]) { const m = new Map<string, DailyStatusRow>(); for (const row of rows) m.set(`${row.employeeId}|${row.attendanceDay}`, row); return m; }
 function statusFromDaily(row: DailyStatusRow): Status {
   if (row.status === "PRESENT") return "present";
   if (row.status === "LATE") return "late";
@@ -69,44 +65,27 @@ function statusFromDaily(row: DailyStatusRow): Status {
   return "open";
 }
 function approvedRequestFor(requests: RequestRow[], employeeId: string, date: string) {
-  return requests.find(r => {
-    if (String(r.employeeId || "") !== String(employeeId)) return false;
-    if (r.status !== "approved" && r.status !== "confirmed") return false;
-    const start = String(r.startDate || r.createdAt || "").slice(0, 10);
-    const end = String(r.endDate || start).slice(0, 10);
-    return !!start && date >= start && date <= end;
-  });
+  return requests.find(r => { if (String(r.employeeId || "") !== String(employeeId)) return false; if (r.status !== "approved" && r.status !== "confirmed") return false; const start = String(r.startDate || r.createdAt || "").slice(0, 10); const end = String(r.endDate || start).slice(0, 10); return !!start && date >= start && date <= end; });
 }
-function requestText(requests: RequestRow[], employeeId: string, date: string) {
-  const r = approvedRequestFor(requests, employeeId, date);
-  if (!r) return "";
-  const label = r.type === "leave" ? "إجازة" : r.type === "permission" ? "استئذان" : "انصراف مبكر";
-  const reason = String(r.reason || "").trim();
-  return `${label}${reason ? ` — ${reason}` : ""}`;
-}
+function requestText(requests: RequestRow[], employeeId: string, date: string) { const r = approvedRequestFor(requests, employeeId, date); if (!r) return ""; const label = r.type === "leave" ? "إجازة" : r.type === "permission" ? "استئذان" : "انصراف مبكر"; const reason = String(r.reason || "").trim(); return `${label}${reason ? ` — ${reason}` : ""}`; }
 function calculateDetails(employee: Employee, dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[], authoritative?: Map<string, DailyStatusRow>): DayRow[] {
   const detail: DayRow[] = [];
   for (const d of dates) {
     const w = getEmployeeWorkPeriod(employee, d), k = key(d), req = approvedRequestFor(requests, employee.id, k), authoritativeRow = authoritative?.get(`${employee.id}|${k}`);
     if (authoritativeRow) {
-      const cin = authoritativeRow.checkInAt ? new Date(authoritativeRow.checkInAt) : null;
-      const cout = authoritativeRow.checkOutAt ? new Date(authoritativeRow.checkOutAt) : null;
-      const worked = cin && cout ? Math.max(0, minutesBetween(cin.toISOString(), cout.toISOString())) : 0;
-      const status = statusFromDaily(authoritativeRow);
-      detail.push({ date: k, day: days[d.getDay()], status, checkIn: cin ? formatTime(cin.toISOString()) : "—", checkOut: cout ? formatTime(cout.toISOString()) : "—", worked, late: status === "late" ? Math.max(0, Math.round((cin?.getTime() || 0 - (w.start?.getTime() || 0)) / 60000)) : 0, early: status === "early" ? Math.max(0, Math.round(((w.end?.getTime() || 0) - (cout?.getTime() || 0)) / 60000)) : 0, detail: [w.detail || "حالة الدوام", requestText(requests, employee.id, k)].filter(Boolean).join(" · ") });
+      const cin = authoritativeRow.checkInAt ? new Date(authoritativeRow.checkInAt) : null, cout = authoritativeRow.checkOutAt ? new Date(authoritativeRow.checkOutAt) : null;
+      const worked = cin && cout ? Math.max(0, minutesBetween(cin.toISOString(), cout.toISOString())) : 0, status = statusFromDaily(authoritativeRow);
+      const late = status === "late" && cin && w.start ? Math.max(0, Math.round((cin.getTime() - w.start.getTime()) / 60000)) : 0;
+      const early = status === "early" && cout && w.end ? Math.max(0, Math.round((w.end.getTime() - cout.getTime()) / 60000)) : 0;
+      detail.push({ date: k, day: days[d.getDay()], status, checkIn: cin ? formatTime(cin.toISOString()) : "—", checkOut: cout ? formatTime(cout.toISOString()) : "—", worked, late, early, detail: [w.detail || "حالة الدوام", requestText(requests, employee.id, k)].filter(Boolean).join(" · ") });
       continue;
     }
     if (!w.isWorkDay) { detail.push({ date: k, day: days[d.getDay()], status: "off", checkIn: "—", checkOut: "—", worked: 0, late: 0, early: 0, detail: w.detail || "لا يوجد دوام" }); continue; }
     if (req?.type === "leave") { detail.push({ date: k, day: days[d.getDay()], status: "leave", checkIn: "—", checkOut: "—", worked: 0, late: 0, early: 0, detail: requestText(requests, employee.id, k) }); continue; }
     if (req?.type === "permission") { detail.push({ date: k, day: days[d.getDay()], status: "permission", checkIn: "—", checkOut: "—", worked: 0, late: 0, early: 0, detail: requestText(requests, employee.id, k) }); continue; }
-    const s = index.get(`${employee.id}|${k}`), grace = employee.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10;
-    const cin = s?.in?.timestamp ? new Date(s.in.timestamp) : null, cout = s?.out?.timestamp ? new Date(s.out.timestamp) : null;
+    const s = index.get(`${employee.id}|${k}`), grace = employee.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10, cin = s?.in?.timestamp ? new Date(s.in.timestamp) : null, cout = s?.out?.timestamp ? new Date(s.out.timestamp) : null;
     let st: Status = "absent", lm = 0, em = 0, wd = 0;
-    if (cin) {
-      lm = w.start ? Math.max(0, Math.round((cin.getTime() - w.start.getTime()) / 60000) - grace) : 0;
-      if (cout) { wd = Math.max(0, minutesBetween(cin.toISOString(), cout.toISOString())); em = w.end ? Math.max(0, Math.round((w.end.getTime() - cout.getTime()) / 60000)) : 0; st = em ? "early" : lm ? "late" : "present"; }
-      else st = "open";
-    }
+    if (cin) { lm = w.start ? Math.max(0, Math.round((cin.getTime() - w.start.getTime()) / 60000) - grace) : 0; if (cout) { wd = Math.max(0, minutesBetween(cin.toISOString(), cout.toISOString())); em = w.end ? Math.max(0, Math.round((w.end.getTime() - cout.getTime()) / 60000)) : 0; st = em ? "early" : lm ? "late" : "present"; } else st = "open"; }
     detail.push({ date: k, day: days[d.getDay()], status: st, checkIn: cin ? formatTime(cin.toISOString()) : "—", checkOut: cout ? formatTime(cout.toISOString()) : "—", worked: wd, late: lm, early: em, detail: [w.detail || "يوم عمل", requestText(requests, employee.id, k)].filter(Boolean).join(" · ") });
   }
   return detail;
@@ -115,39 +94,19 @@ function calculateSummary(employee: Employee, dates: Date[], index: Map<string, 
   let workDays = 0, present = 0, absent = 0, early = 0, late = 0, open = 0, permission = 0, leave = 0, off = 0, worked = 0, lateMinutes = 0, earlyMinutes = 0;
   for (const d of dates) {
     const w = getEmployeeWorkPeriod(employee, d), k = key(d), req = approvedRequestFor(requests, employee.id, k), authoritativeRow = authoritative?.get(`${employee.id}|${k}`);
-    if (authoritativeRow) {
-      const status = statusFromDaily(authoritativeRow);
-      if (status === "off") { off++; continue; }
-      if (status === "leave") { leave++; continue; }
-      if (status === "permission") { permission++; continue; }
-      workDays++;
-      if (status === "absent") { absent++; continue; }
-      if (status === "open") { open++; continue; }
-      if (status === "late") late++;
-      else if (status === "early") early++;
-      else present++;
-      if (authoritativeRow.checkInAt && authoritativeRow.checkOutAt) worked += Math.max(0, minutesBetween(authoritativeRow.checkInAt, authoritativeRow.checkOutAt));
-      continue;
-    }
+    if (authoritativeRow) { const status = statusFromDaily(authoritativeRow); if (status === "off") { off++; continue; } if (status === "leave") { leave++; continue; } if (status === "permission") { permission++; continue; } workDays++; if (status === "absent") { absent++; continue; } if (status === "open") { open++; continue; } if (status === "late") late++; else if (status === "early") early++; else present++; if (authoritativeRow.checkInAt && authoritativeRow.checkOutAt) worked += Math.max(0, minutesBetween(authoritativeRow.checkInAt, authoritativeRow.checkOutAt)); continue; }
     if (!w.isWorkDay) { off++; continue; }
-    workDays++;
-    if (req?.type === "leave") { leave++; continue; }
-    if (req?.type === "permission") { permission++; continue; }
-    const s = index.get(`${employee.id}|${k}`), grace = employee.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10;
-    const cin = s?.in?.timestamp ? new Date(s.in.timestamp) : null, cout = s?.out?.timestamp ? new Date(s.out.timestamp) : null;
+    workDays++; if (req?.type === "leave") { leave++; continue; } if (req?.type === "permission") { permission++; continue; }
+    const s = index.get(`${employee.id}|${k}`), grace = employee.gracePeriodMinutes ?? settings.lateGraceMinutes ?? 10, cin = s?.in?.timestamp ? new Date(s.in.timestamp) : null, cout = s?.out?.timestamp ? new Date(s.out.timestamp) : null;
     if (!cin) { absent++; continue; }
     const lm = w.start ? Math.max(0, Math.round((cin.getTime() - w.start.getTime()) / 60000) - grace) : 0; lateMinutes += lm;
     if (!cout) { open++; late += lm ? 1 : 0; continue; }
-    const wd = Math.max(0, minutesBetween(cin.toISOString(), cout.toISOString())); worked += wd;
-    const em = w.end ? Math.max(0, Math.round((w.end.getTime() - cout.getTime()) / 60000)) : 0; earlyMinutes += em;
-    if (em) early++; else if (lm) late++; else present++;
+    const wd = Math.max(0, minutesBetween(cin.toISOString(), cout.toISOString())); worked += wd; const em = w.end ? Math.max(0, Math.round((w.end.getTime() - cout.getTime()) / 60000)) : 0; earlyMinutes += em; if (em) early++; else if (lm) late++; else present++;
   }
   return { employee, workDays, present, absent, early, late, open, permission, leave, off, worked, lateMinutes, earlyMinutes };
 }
 function specialtyOf(e: Employee) { return (e.specialties || []).map(x => String(x).trim()).filter(Boolean)[0] || "غير محدد"; }
-function serviceRows(summaries: Summary[], dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[], authoritative?: Map<string, DailyStatusRow>) {
-  return summaries.map(s => { const d = calculateDetails(s.employee, dates, index, settings, requests, authoritative)[0]; return { employee: s.employee, specialty: specialtyOf(s.employee), status: d.status, checkIn: d.checkIn, checkOut: d.checkOut, note: d.detail }; });
-}
+function serviceRows(summaries: Summary[], dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[], authoritative?: Map<string, DailyStatusRow>) { return summaries.map(s => { const d = calculateDetails(s.employee, dates, index, settings, requests, authoritative)[0]; return { employee: s.employee, specialty: specialtyOf(s.employee), status: d.status, checkIn: d.checkIn, checkOut: d.checkOut, note: d.detail }; }); }
 
 export default function ManagerReports() {
   const [mode, setMode] = useState<Mode>("monthly"), [date, setDate] = useState(new Date().toISOString().slice(0, 10)), [month, setMonth] = useState(new Date().toISOString().slice(0, 7)), [year, setYear] = useState(String(new Date().getFullYear()));
@@ -172,7 +131,6 @@ export default function ManagerReports() {
   const exportExcel = () => { const sourceRows = mode === "daily" ? groups.flatMap(group => group.rows) : summaries.map(s => ({ employee: s.employee, specialty: specialtyOf(s.employee) })); const dailyRows = sourceRows.flatMap(row => { const employee = row.employee, details = calculateDetails(employee, dates, index, settings, requests, authoritative); return details.map(day => ({ employee: employee.name, jobNumber: employee.jobNumber, specialty: specialtyOf(employee), date: day.date, day: day.day, status: labels[day.status], checkIn: day.checkIn, checkOut: day.checkOut, worked: formatDurationMinutes(day.worked), late: day.late, early: day.early, detail: day.detail })); }); const absenceRows = dailyRows.filter(row => row.status === "غياب"); downloadProfessionalAttendanceReport({ mode, period, generatedAt: new Date().toLocaleString("ar-EG"), summaries, dailyRows, absenceRows, chartData }); };
   const title = mode === "daily" ? `يومي · ${formatDate(date)}` : mode === "monthly" ? `شهري · ${month}` : `سنوي · ${year}`;
   const printReport = () => window.print();
-
   return <ManagerLayout title="التقارير" subtitle={title} actions={<div className="flex flex-wrap gap-2"><Button onClick={exportExcel} disabled={!summaries.length}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel</Button><Button variant="outline" onClick={exportCsv} disabled={!summaries.length}><FileText className="ml-2 h-4 w-4" />CSV</Button>{mode === "daily" && <Button variant="outline" onClick={printReport} disabled={!summaries.length}><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>}</div>}>
     <div className="hud-card p-4 mb-5 space-y-4 print:hidden">
       <div className="flex flex-wrap items-center gap-2"><div className="flex rounded-xl bg-secondary/50 p-1 border border-border/50">{(["daily", "monthly", "annual"] as Mode[]).map(v => <button key={v} onClick={() => { setMode(v); setExpanded(null); }} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap ${mode === v ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{v === "daily" ? "يومي" : v === "monthly" ? "شهري" : "سنوي"}</button>)}</div>{mode === "daily" && <input aria-label="تاريخ التقرير" type="date" className="input w-auto max-w-full" value={date} max={new Date().toISOString().slice(0, 10)} onChange={e => { setDate(e.target.value); setExpanded(null); }} />}{mode === "monthly" && <input aria-label="شهر التقرير" type="month" className="input w-auto max-w-full" value={month} max={new Date().toISOString().slice(0, 7)} onChange={e => { setMonth(e.target.value); setExpanded(null); }} />}{mode === "annual" && <input aria-label="سنة التقرير" type="number" className="input w-32 max-w-full" min="2000" max={new Date().getFullYear()} value={year} onChange={e => { setYear(e.target.value); setExpanded(null); }} />}</div>
@@ -180,24 +138,10 @@ export default function ManagerReports() {
       <div className="rounded-2xl border bg-background/50 p-4"><div className="flex items-center gap-2 mb-4 font-black"><BarChart3 className="h-5 w-5 text-primary" />تحليل الحضور والمخالفات</div><div className="space-y-3">{chartData.map(x => <div key={x.label} className="grid grid-cols-[minmax(95px,120px)_minmax(0,1fr)_40px] items-center gap-3 text-sm"><span className="font-bold truncate" title={x.label}>{x.label}</span><div className="h-3 rounded-full bg-secondary overflow-hidden"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.round(x.value / max * 100)}%` }} /></div><span className="mono text-left">{x.value}</span></div>)}</div></div>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><Database className="h-4 w-4 text-primary" /><span>مصدر التقرير: D1 — الموظفون والحضور والطلبات.</span>{loading && <><Loader2 className="h-3 w-3 animate-spin" />جاري القراءة من D1...</>}</div>{error && <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">{error}</div>}
     </div>
-
     {mode === "daily" ? <section className="service-report bg-white text-black rounded-none border shadow-sm print:border-0 print:shadow-none" dir="rtl">
-      <div className="p-5 md:p-7 border-b-2 border-black/70 text-center">
-        <div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div>
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold"><div>رئيس القسم : {settings.ownerName || "—"}</div><div>معاون رئيس القسم : {settings.managerName || "—"}</div></div>
-      </div>
-      <div className="p-3 md:p-5 space-y-4">{groupColumns.length ? groupColumns.map((pair, pi) => <div key={pi} className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-        {pair.map((group, gi) => <div key={group.name} className="border-2 border-black/70 overflow-hidden bg-white">
-          <div className="bg-slate-100 border-b-2 border-black/70 px-3 py-2 text-center font-black">{group.name}</div>
-          <table className="w-full table-fixed text-[11px] md:text-xs"><colgroup><col className="w-[8%]" /><col className="w-[22%]" /><col className="w-[34%]" /><col className="w-[36%]" /></colgroup><thead><tr className="border-b border-black/50"><th className="p-2 border-l border-black/30">ت</th><th className="p-2 border-l border-black/30">الصفة</th><th className="p-2 border-l border-black/30">الاسم</th><th className="p-2">ملاحظات</th></tr></thead><tbody>{group.rows.map((row, i) => <tr key={row.employee.id} className="border-b border-black/20 last:border-0 align-middle"><td className="p-2 border-l border-black/20 text-center font-bold">{i + 1}</td><td className="p-2 border-l border-black/20 font-semibold break-words">{specialtyOf(row.employee)}</td><td className="p-2 border-l border-black/20 font-bold break-words">{row.employee.name}<div className="font-normal text-[10px] mt-0.5">{row.employee.jobNumber}</div></td><td className="p-2 break-words"><span className={`inline-flex rounded-full px-1.5 py-0.5 font-bold ${cls[row.status]}`}>{labels[row.status]}</span>{row.checkIn !== "—" && <span className="mr-1">حضور {row.checkIn}</span>}{row.checkOut !== "—" && <span className="mr-1">انصراف {row.checkOut}</span>}{row.note && <div className="mt-1 text-[10px] leading-4">{row.note}</div>}</td></tr>)}</tbody></table>
-        </div>)}
-      </div>) : <div className="py-16 text-center text-muted-foreground">لا يوجد موظفون لديهم عمل في هذا التاريخ.</div>}
-      <div className="mt-4 border-t-2 border-black/70 pt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-bold"><div>عدد العاملين: {summaries.length}</div><div>حاضر: {total.present}</div><div>غياب: {total.absent}</div><div>استئذان/إجازة: {total.permission + total.leave}</div></div>
-      </div>
-    </section> : <div className="hud-card overflow-hidden">
-      <div className="overflow-x-auto"><table className="w-full min-w-[1180px] table-auto text-sm"><thead className="bg-secondary/50 text-xs"><tr>{["", "الموظف", "الرقم", "الاختصاص", "عمل", "حاضر", "غياب", "إذن", "إجازة", "مبكر", "تأخر", "ناقص", "ساعات العمل"].map((h, i) => <th key={i} className="px-3 py-3 text-right whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{summaries.map(s => <><tr key={s.employee.id} className="border-t align-middle"><td className="px-3 py-3">{s.absent || s.early ? <AlertTriangle className="h-4 w-4 text-orange-500" /> : null}</td><td className="px-3 py-3 font-bold"><button type="button" className="flex w-full min-w-0 items-center gap-2 text-right" onClick={() => setExpanded(expanded === s.employee.id ? null : s.employee.id)}>{expanded === s.employee.id ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}<span className="min-w-0 whitespace-normal break-words leading-6">{s.employee.name}</span></button></td><td className="px-3 py-3 mono whitespace-nowrap">{s.employee.jobNumber}</td><td className="px-3 py-3 whitespace-nowrap">{specialtyOf(s.employee)}</td><td className="px-3 py-3">{s.workDays}</td><td className="px-3 py-3 text-emerald-700 font-bold">{s.present}</td><td className="px-3 py-3 text-red-700 font-bold">{s.absent}</td><td className="px-3 py-3 text-sky-700 font-bold">{s.permission}</td><td className="px-3 py-3 text-violet-700 font-bold">{s.leave}</td><td className="px-3 py-3 text-orange-700 font-bold">{s.early}</td><td className="px-3 py-3 text-amber-700 font-bold">{s.late}</td><td className="px-3 py-3 text-yellow-700 font-bold">{s.open}</td><td className="px-3 py-3 mono whitespace-nowrap">{formatDurationMinutes(s.worked)}</td></tr>{expanded === s.employee.id && <tr key={`${s.employee.id}-details`}><td colSpan={13} className="p-0"><div className="p-4 bg-secondary/20 border-t"><div className="flex flex-wrap gap-2 mb-3 text-xs font-bold"><span className="inline-flex items-center gap-1"><UserX className="h-3 w-3 text-red-600" />الغياب: <span>{expandedDays.filter(d => d.status === "absent").map(d => d.date).join("، ") || "لا يوجد"}</span></span><span className="inline-flex items-center gap-1"><LogOut className="h-3 w-3 text-orange-600" />الانصراف المبكر: <span>{expandedDays.filter(d => d.status === "early").map(d => `${d.date} (${d.early} د)`).join("، ") || "لا يوجد"}</span></span></div><div className="overflow-x-auto"><table className="w-full min-w-[950px] table-auto text-xs"><thead><tr className="border-b">{["التاريخ", "اليوم", "الحالة", "الحضور", "الانصراف", "العمل", "التأخر", "المبكر", "التفصيل"].map(h => <th key={h} className="px-2 py-2 text-right whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{expandedDays.map(d => <tr key={d.date} className="border-b border-border/40"><td className="px-2 py-2 mono">{d.date}</td><td className="px-2 py-2">{d.day}</td><td className="px-2 py-2"><span className={`inline-flex rounded-full px-2 py-1 font-bold ${cls[d.status]}`}>{labels[d.status]}</span></td><td className="px-2 py-2 mono">{d.checkIn}</td><td className="px-2 py-2 mono">{d.checkOut}</td><td className="px-2 py-2 mono">{formatDurationMinutes(d.worked)}</td><td className="px-2 py-2 mono">{d.late ? `${d.late} د` : "—"}</td><td className="px-2 py-2 mono">{d.early ? `${d.early} د` : "—"}</td><td className="px-2 py-2 max-w-[250px] break-words">{d.detail}</td></tr>)}</tbody></table></div></div></td></tr>}</>)}</tbody></table></div>
-      {loading && !summaries.length && <div className="p-10 text-center text-muted-foreground">جاري تحميل التقرير من D1…</div>}{!loading && !summaries.length && <div className="p-10 text-center text-muted-foreground">لا توجد بيانات موظفين في D1.</div>}
-    </div>}
+      <div className="p-5 md:p-7 border-b-2 border-black/70 text-center"><div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div><div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold"><div>رئيس القسم : {settings.ownerName || "—"}</div><div>معاون رئيس القسم : {settings.managerName || "—"}</div></div></div>
+      <div className="p-3 md:p-5 space-y-4">{groupColumns.length ? groupColumns.map((pair, pi) => <div key={pi} className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">{pair.map((group, gi) => <div key={group.name} className="border-2 border-black/70 overflow-hidden bg-white"><div className="bg-slate-100 border-b-2 border-black/70 px-3 py-2 text-center font-black">{group.name}</div><table className="w-full table-fixed text-[11px] md:text-xs"><colgroup><col className="w-[8%]" /><col className="w-[22%]" /><col className="w-[34%]" /><col className="w-[36%]" /></colgroup><thead><tr className="border-b border-black/50"><th className="p-2 border-l border-black/30">ت</th><th className="p-2 border-l border-black/30">الصفة</th><th className="p-2 border-l border-black/30">الاسم</th><th className="p-2">ملاحظات</th></tr></thead><tbody>{group.rows.map((row, i) => <tr key={row.employee.id} className="border-b border-black/20 last:border-0 align-middle"><td className="p-2 border-l border-black/20 text-center font-bold">{i + 1}</td><td className="p-2 border-l border-black/20 font-semibold break-words">{specialtyOf(row.employee)}</td><td className="p-2 border-l border-black/20 font-bold break-words">{row.employee.name}<div className="font-normal text-[10px] mt-0.5">{row.employee.jobNumber}</div></td><td className="p-2 break-words"><span className={`inline-flex rounded-full px-1.5 py-0.5 font-bold ${cls[row.status]}`}>{labels[row.status]}</span>{row.checkIn !== "—" && <span className="mr-1">حضور {row.checkIn}</span>}{row.checkOut !== "—" && <span className="mr-1">انصراف {row.checkOut}</span>}{row.note && <div className="mt-1 text-[10px] leading-4">{row.note}</div>}</td></tr>)}</tbody></table></div>)}</div>) : <div className="py-16 text-center text-muted-foreground">لا يوجد موظفون لديهم عمل في هذا التاريخ.</div>}<div className="mt-4 border-t-2 border-black/70 pt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-bold"><div>عدد العاملين: {summaries.length}</div><div>حاضر: {total.present}</div><div>غياب: {total.absent}</div><div>استئذان/إجازة: {total.permission + total.leave}</div></div></div>
+    </section> : <div className="hud-card overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[1180px] table-auto text-sm"><thead className="bg-secondary/50 text-xs"><tr>{["", "الموظف", "الرقم", "الاختصاص", "عمل", "حاضر", "غياب", "إذن", "إجازة", "مبكر", "تأخر", "ناقص", "ساعات العمل"].map((h, i) => <th key={i} className="px-3 py-3 text-right whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{summaries.map(s => <><tr key={s.employee.id} className="border-t align-middle"><td className="px-3 py-3">{s.absent || s.early ? <AlertTriangle className="h-4 w-4 text-orange-500" /> : null}</td><td className="px-3 py-3 font-bold"><button type="button" className="flex w-full min-w-0 items-center gap-2 text-right" onClick={() => setExpanded(expanded === s.employee.id ? null : s.employee.id)}>{expanded === s.employee.id ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}<span className="min-w-0 whitespace-normal break-words leading-6">{s.employee.name}</span></button></td><td className="px-3 py-3 mono whitespace-nowrap">{s.employee.jobNumber}</td><td className="px-3 py-3 whitespace-nowrap">{specialtyOf(s.employee)}</td><td className="px-3 py-3">{s.workDays}</td><td className="px-3 py-3 text-emerald-700 font-bold">{s.present}</td><td className="px-3 py-3 text-red-700 font-bold">{s.absent}</td><td className="px-3 py-3 text-sky-700 font-bold">{s.permission}</td><td className="px-3 py-3 text-violet-700 font-bold">{s.leave}</td><td className="px-3 py-3 text-orange-700 font-bold">{s.early}</td><td className="px-3 py-3 text-amber-700 font-bold">{s.late}</td><td className="px-3 py-3 text-yellow-700 font-bold">{s.open}</td><td className="px-3 py-3 mono whitespace-nowrap">{formatDurationMinutes(s.worked)}</td></tr>{expanded === s.employee.id && <tr key={`${s.employee.id}-details`}><td colSpan={13} className="p-0"><div className="p-4 bg-secondary/20 border-t"><div className="flex flex-wrap gap-2 mb-3 text-xs font-bold"><span className="inline-flex items-center gap-1"><UserX className="h-3 w-3 text-red-600" />الغياب: <span>{expandedDays.filter(d => d.status === "absent").map(d => d.date).join("، ") || "لا يوجد"}</span></span><span className="inline-flex items-center gap-1"><LogOut className="h-3 w-3 text-orange-600" />الانصراف المبكر: <span>{expandedDays.filter(d => d.status === "early").map(d => `${d.date} (${d.early} د)`).join("، ") || "لا يوجد"}</span></span></div><div className="overflow-x-auto"><table className="w-full min-w-[950px] table-auto text-xs"><thead><tr className="border-b">{["التاريخ", "اليوم", "الحالة", "الحضور", "الانصراف", "العمل", "التأخر", "المبكر", "التفصيل"].map(h => <th key={h} className="px-2 py-2 text-right whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{expandedDays.map(d => <tr key={d.date} className="border-b border-border/40"><td className="px-2 py-2 mono">{d.date}</td><td className="px-2 py-2">{d.day}</td><td className="px-2 py-2"><span className={`inline-flex rounded-full px-2 py-1 font-bold ${cls[d.status]}`}>{labels[d.status]}</span></td><td className="px-2 py-2 mono">{d.checkIn}</td><td className="px-2 py-2 mono">{d.checkOut}</td><td className="px-2 py-2 mono">{formatDurationMinutes(d.worked)}</td><td className="px-2 py-2 mono">{d.late ? `${d.late} د` : "—"}</td><td className="px-2 py-2 mono">{d.early ? `${d.early} د` : "—"}</td><td className="px-2 py-2 max-w-[250px] break-words">{d.detail}</td></tr>)}</tbody></table></div></div></td></tr>}</>)}</tbody></table></div>{loading && !summaries.length && <div className="p-10 text-center text-muted-foreground">جاري تحميل التقرير من D1…</div>}{!loading && !summaries.length && <div className="p-10 text-center text-muted-foreground">لا توجد بيانات موظفين في D1.</div>}</div>}
     <style>{`@media print { body { background: #fff !important; } .service-report { width: 100% !important; } @page { size: A4 landscape; margin: 8mm; } }`}</style>
   </ManagerLayout>;
 }
