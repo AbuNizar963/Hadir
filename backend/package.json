@@ -8,7 +8,7 @@
     "check": "wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
     "migrate": "wrangler d1 migrations apply Hadir --remote",
-    "prepare": "node scripts/patch-employee-save.mjs"
+    "prepare": "node scripts/patch-employee-save.mjs && node scripts/ensure-employee-save-schema.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.2.2",
