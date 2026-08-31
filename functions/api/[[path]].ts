@@ -1,5 +1,6 @@
 const API_ORIGIN = "https://hadir-api.abunizar963.workers.dev";
 
+// Production proxy: employee mutations continue to reach the canonical D1-backed API.
 function upstreamUrl(request: Request, path?: string): URL {
   const suffix = String(path || "").replace(/^\/+/, "");
   const url = new URL(`${API_ORIGIN}/api/${suffix}`);
@@ -13,8 +14,6 @@ export async function onRequest(context: any): Promise<Response> {
   const target = upstreamUrl(request, path);
   const headers = new Headers(request.headers);
 
-  // The browser talks to Pages itself. Preserve authentication/device headers
-  // while making the upstream request identify the public Pages origin.
   headers.delete("host");
   headers.delete("content-length");
   headers.set("origin", new URL(request.url).origin);
