@@ -1,0 +1,166 @@
+/* Hadir · print-first A4 pagination
+ * Dedicated print layer for the daily service report.
+ * It intentionally removes screen layout constraints (grid/flex/overflow)
+ * so Chromium can paginate the report as normal block/table content.
+ */
+
+@page {
+  size: A4 portrait;
+  margin: 6mm;
+}
+
+@media print {
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .service-report {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+    contain: none !important;
+    box-shadow: none !important;
+  }
+
+  /* The screen report is built from nested grid rows. Grid/flex pagination is
+     intentionally disabled for print; normal block flow fills every page. */
+  .service-report > div:nth-child(2),
+  .service-report > div:nth-child(2) > .grid,
+  .service-report > div:nth-child(2) > .grid > div {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    float: none !important;
+    position: static !important;
+    transform: none !important;
+    contain: none !important;
+  }
+
+  .service-report > div:nth-child(2) {
+    padding: 0 !important;
+  }
+
+  .service-report > div:nth-child(2) > .grid {
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .service-report > div:nth-child(2) > .grid > div {
+    margin: 0 0 4mm !important;
+    padding: 0 !important;
+    break-before: auto !important;
+    break-after: auto !important;
+    break-inside: auto !important;
+    page-break-before: auto !important;
+    page-break-after: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  /* Critical: overflow:hidden makes some boxes monolithic to the print engine
+     and can leave the rest of an A4 page unused. */
+  .service-report * {
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  .service-report table {
+    display: table !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    overflow: visible !important;
+    break-before: auto !important;
+    break-after: auto !important;
+    break-inside: auto !important;
+    page-break-before: auto !important;
+    page-break-after: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .service-report thead {
+    display: table-header-group !important;
+  }
+
+  .service-report tbody {
+    display: table-row-group !important;
+  }
+
+  .service-report tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-before: auto !important;
+    break-after: auto !important;
+  }
+
+  .service-report th,
+  .service-report td {
+    padding: 1.5mm 1.8mm !important;
+    line-height: 1.25 !important;
+    vertical-align: middle !important;
+  }
+
+  .service-report > div:first-child {
+    padding: 3mm 0 !important;
+    margin: 0 0 3mm !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .service-report img {
+    max-height: 12mm !important;
+    max-width: 45mm !important;
+    width: auto !important;
+    height: auto !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .service-report .bg-slate-100 {
+    background: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .service-report > div:nth-child(2) > .mt-4 {
+    margin-top: 2mm !important;
+    padding-top: 2mm !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .service-report .rounded-full {
+    background: transparent !important;
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

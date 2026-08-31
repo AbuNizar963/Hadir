@@ -1,0 +1,263 @@
+/* Hadir · Workforce directory semantic status indicators
+ * The manager directory uses the dot as the employee-status signal:
+ * active = green, escaped/suspended = red. Device linkage must not turn an
+ * active employee yellow. This stylesheet is intentionally scoped to the
+ * LIVE DIRECTORY card grid so warning indicators elsewhere keep their meaning.
+ */
+
+section.hud-card.overflow-hidden.p-5.sm\:p-6 > div > div + div .live-status-dot[data-status="warning"] {
+  background: hsl(142 71% 45%) !important;
+  box-shadow: 0 0 0 3px hsl(142 71% 45% / .14), 0 0 12px hsl(142 71% 45% / .38) !important;
+  animation: hadir-status-pulse-green 1.8s ease-in-out infinite !important;
+}
+
+section.hud-card.overflow-hidden.p-5.sm\:p-6 article .live-status-dot[data-status="online"] {
+  background: hsl(142 71% 45%) !important;
+  box-shadow: 0 0 0 3px hsl(142 71% 45% / .14), 0 0 12px hsl(142 71% 45% / .38) !important;
+  animation: hadir-status-pulse-green 1.8s ease-in-out infinite !important;
+}
+
+section.hud-card.overflow-hidden.p-5.sm\:p-6 article .live-status-dot[data-status="danger"] {
+  background: hsl(0 72% 51%) !important;
+  box-shadow: 0 0 0 3px hsl(0 72% 51% / .14), 0 0 12px hsl(0 72% 51% / .38) !important;
+  animation: hadir-status-pulse-red 1.45s ease-in-out infinite !important;
+}
+
+@keyframes hadir-status-pulse-green {
+  0%, 100% { transform: scale(.9); opacity: .72; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+
+@keyframes hadir-status-pulse-red {
+  0%, 100% { transform: scale(.9); opacity: .72; }
+  50% { transform: scale(1.14); opacity: 1; }
+}
+
+/* Hadir · Settings UX polish
+ * Scoped to the settings page's existing <details class="hud-card group"> UI.
+ * No settings logic or routes are changed; this layer only improves hierarchy,
+ * disclosure affordances, keyboard focus, density and mobile ergonomics.
+ */
+
+details.hud-card.group {
+  --settings-accent: hsl(var(--primary));
+  --settings-accent-soft: hsl(var(--primary) / .10);
+  --settings-line: hsl(var(--border) / .72);
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  border-color: hsl(var(--border) / .78);
+  background:
+    linear-gradient(180deg, hsl(var(--card) / .92), hsl(var(--card) / .72));
+  box-shadow:
+    0 10px 30px hsl(222 40% 3% / .12),
+    inset 0 1px 0 hsl(var(--foreground) / .035);
+  transform: none;
+}
+
+details.hud-card.group::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(circle at 100% 0%, hsl(var(--primary) / .08), transparent 34%);
+  opacity: .9;
+}
+
+details.hud-card.group:hover {
+  transform: translateY(-1px);
+  border-color: hsl(var(--primary) / .30);
+  box-shadow:
+    0 16px 38px hsl(222 40% 3% / .16),
+    inset 0 1px 0 hsl(var(--foreground) / .04);
+}
+
+details.hud-card.group > summary {
+  position: relative;
+  min-height: 88px;
+  padding: 18px 20px;
+  background: linear-gradient(180deg, hsl(var(--foreground) / .018), transparent);
+  transition: background-color .2s ease, padding .2s ease;
+}
+
+details.hud-card.group > summary::-webkit-details-marker { display: none; }
+details.hud-card.group > summary::marker { display: none; }
+
+details.hud-card.group > summary:hover {
+  background: linear-gradient(90deg, hsl(var(--primary) / .075), transparent 72%);
+}
+
+details.hud-card.group > summary:focus-visible {
+  outline: 2px solid hsl(var(--ring) / .78);
+  outline-offset: -3px;
+  border-radius: inherit;
+}
+
+details.hud-card.group > summary > div:first-child {
+  min-width: 0;
+}
+
+details.hud-card.group > summary > div:first-child > span:first-child {
+  width: 46px;
+  height: 46px;
+  border: 1px solid hsl(var(--primary) / .16);
+  background: linear-gradient(145deg, hsl(var(--primary) / .14), hsl(var(--secondary) / .72));
+  box-shadow:
+    inset 0 1px 0 hsl(var(--foreground) / .06),
+    0 7px 18px hsl(var(--primary) / .08);
+  transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+
+details.hud-card.group > summary:hover > div:first-child > span:first-child {
+  transform: translateY(-1px) scale(1.025);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--foreground) / .08),
+    0 10px 24px hsl(var(--primary) / .12);
+}
+
+details.hud-card.group > summary svg {
+  stroke-width: 1.9;
+}
+
+details.hud-card.group > summary > svg:last-child {
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  border-radius: 999px;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--secondary) / .72);
+  border: 1px solid hsl(var(--border) / .65);
+  transition: transform .24s ease, color .2s ease, background-color .2s ease;
+}
+
+details.hud-card.group[open] > summary > svg:last-child {
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / .10);
+  transform: rotate(180deg);
+}
+
+details.hud-card.group > summary .mono {
+  font-size: 10px;
+  letter-spacing: .06em;
+  line-height: 1.2;
+  opacity: .88;
+}
+
+details.hud-card.group > summary .mono::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-end: 7px;
+  vertical-align: 1px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px hsl(var(--primary) / .09);
+}
+
+details.hud-card.group > summary .text-base {
+  letter-spacing: -.01em;
+}
+
+details.hud-card.group > summary .text-muted-foreground {
+  max-width: 58rem;
+  line-height: 1.7;
+}
+
+details.hud-card.group > div:last-child {
+  position: relative;
+  border-top-color: var(--settings-line);
+  background: linear-gradient(180deg, hsl(var(--secondary) / .12), transparent 25%);
+  animation: hadir-settings-panel-in .22s ease both;
+}
+
+details.hud-card.group[open] > div:last-child::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  inset-inline: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary) / .42), transparent);
+  pointer-events: none;
+}
+
+details.hud-card.group:has(> summary .text-destructive) {
+  --settings-accent: hsl(var(--destructive));
+  border-color: hsl(var(--destructive) / .30);
+}
+
+details.hud-card.group:has(> summary .text-destructive)::after {
+  background: radial-gradient(circle at 100% 0%, hsl(var(--destructive) / .09), transparent 34%);
+}
+
+details.hud-card.group:has(> summary .text-destructive) > summary:hover {
+  background: linear-gradient(90deg, hsl(var(--destructive) / .075), transparent 72%);
+}
+
+details.hud-card.group:has(> summary .text-destructive) > summary > div:first-child > span:first-child {
+  border-color: hsl(var(--destructive) / .18);
+  background: linear-gradient(145deg, hsl(var(--destructive) / .12), hsl(var(--secondary) / .72));
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / .05), 0 7px 18px hsl(var(--destructive) / .07);
+}
+
+details.hud-card.group:has(> summary .text-primary) > summary .mono::before {
+  background: hsl(var(--primary));
+}
+
+@keyframes hadir-settings-panel-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 639px) {
+  details.hud-card.group > summary {
+    min-height: 82px;
+    padding: 15px 14px;
+    gap: 10px;
+  }
+
+  details.hud-card.group > summary > div:first-child {
+    gap: 10px;
+  }
+
+  details.hud-card.group > summary > div:first-child > span:first-child {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+
+  details.hud-card.group > summary .text-base {
+    font-size: .94rem;
+    line-height: 1.45;
+  }
+
+  details.hud-card.group > summary .text-muted-foreground {
+    font-size: 10px;
+    line-height: 1.55;
+  }
+
+  details.hud-card.group > summary > svg:last-child {
+    width: 21px;
+    height: 21px;
+  }
+
+  details.hud-card.group > div:last-child {
+    padding: 14px;
+  }
+
+  details.hud-card.group[open] > div:last-child::before {
+    inset-inline: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  details.hud-card.group,
+  details.hud-card.group > summary,
+  details.hud-card.group > summary > div:first-child > span:first-child,
+  details.hud-card.group > summary > svg:last-child,
+  details.hud-card.group > div:last-child {
+    transition: none !important;
+    animation: none !important;
+  }
+}
