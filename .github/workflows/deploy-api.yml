@@ -34,9 +34,6 @@ jobs:
         working-directory: backend
         run: npm install --package-lock=false
 
-      - name: Apply deterministic employee save patch
-        run: node scripts/patch-employee-save-defaults.mjs
-
       - name: Validate Worker bundle
         working-directory: backend
         run: npm run check
