@@ -1,6 +1,5 @@
 import employeeGateway, { HadirRealtime } from "./employee-save-gateway";
 import { handleDailyStatus } from "./daily-status-api";
-import { handleWorkforceControls } from "./workforce-controls-gateway";
 
 type Env = {
   DB: D1Database;
@@ -73,6 +72,66 @@ async function authenticatedActor(request: Request, env: Env, ctx: ExecutionCont
   return data?.user || null;
 }
 
+async function handleWorkforcePatch(request: Request, env: Env, ctx: ExecutionContext, headers: Record<string, string>) {
+  const actor = await authenticatedActor(request, env, ctx);
+  if (!actor || actor.role !== "owner") {
+    return new Response(JSON.stringify({ ok: false, error: "المالك فقط يستطيع تعديل إعدادات Workforce" }), {
+      status: 403,
+      headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+    });
+  }
+
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  const employeeId = String(body.employeeId || "").trim();
+  if (!employeeId) {
+    return new Response(JSON.stringify({ ok: false, error: "رقم الموظف مطلوب" }), {
+      status: 400,
+      headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+    });
+  }
+
+  const patch: Record<string, unknown> = {};
+  for (const key of ["isVip", "autoCheckIn", "autoCheckOut"]) {
+    if (body[key] !== undefined) {
+      if (typeof body[key] !== "boolean") {
+        return new Response(JSON.stringify({ ok: false, error: `${key} يجب أن تكون true أو false` }), {
+          status: 400,
+          headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+        });
+      }
+      patch[key] = body[key];
+    }
+  }
+  if (!Object.keys(patch).length) {
+    return new Response(JSON.stringify({ ok: false, error: "لا توجد تغييرات" }), {
+      status: 400,
+      headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+    });
+  }
+
+  // Use the canonical employee PATCH implementation for Workforce toggles.
+  // This is the same D1 write/read-after-write path used by the employee editor,
+  // avoiding a second implementation that can drift from the canonical model.
+  const target = new URL(request.url);
+  target.pathname = `/api/employees/${encodeURIComponent(employeeId)}`;
+  target.search = "";
+  const response = await employeeGateway.fetch(new Request(target, {
+    method: "PATCH",
+    headers: request.headers,
+    body: JSON.stringify(patch),
+  }), env, ctx);
+  const data = await response.json().catch(() => ({}));
+  return new Response(JSON.stringify({
+    ...data,
+    ok: response.ok && data?.ok !== false,
+    employee: data?.employee || null,
+  }), {
+    status: response.status,
+    statusText: response.statusText,
+    headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+  });
+}
+
 export { HadirRealtime };
 
 export default {
@@ -82,18 +141,11 @@ export default {
 
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
 
-    // Owner Workforce controls have their own narrow write boundary. Keeping
-    // this route here prevents the employee-save gateway from swallowing the
-    // command and makes the D1 write + read-after-write verification explicit.
     if (path === "/api/workforce/live" && request.method === "PATCH") {
       try {
-        const actor = await authenticatedActor(request, env, ctx);
-        const response = await handleWorkforceControls(request, env, actor);
-        const merged = new Headers(response.headers);
-        for (const [key, value] of Object.entries(headers)) merged.set(key, value);
-        return new Response(response.body, { status: response.status, statusText: response.statusText, headers: merged });
+        return await handleWorkforcePatch(request, env, ctx, headers);
       } catch (error) {
-        console.error("production workforce-controls failed", error);
+        console.error("production workforce patch failed", error);
         return new Response(JSON.stringify({ ok: false, error: "تعذر حفظ إعدادات Workforce في D1" }), {
           status: 500,
           headers: { ...headers, "content-type": "application/json; charset=utf-8" },
@@ -101,9 +153,6 @@ export default {
       }
     }
 
-    // The dashboard read path is owned by the same production Worker as the
-    // employee write path. This prevents routing regressions between D1 reads
-    // and writes while keeping the existing API surface intact.
     if (path === "/api/manager/daily-status") {
       if (request.method !== "GET") return new Response(JSON.stringify({ error: "الطريقة غير مدعومة" }), {
         status: 405,
@@ -126,9 +175,6 @@ export default {
       }
     }
 
-    // Every other endpoint—including employee PATCH, attendance, requests,
-    // notifications, device security, company logo and /api/me—continues
-    // through the established employee gateway without changing its contract.
     return employeeGateway.fetch(request, env, ctx);
   },
 
