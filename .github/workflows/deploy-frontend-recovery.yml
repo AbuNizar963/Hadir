@@ -33,15 +33,20 @@ jobs:
       - run: bun run build
         env:
           VITE_BASE_PATH: /
-      - name: Deploy existing production Pages project
-        run: npx wrangler@4 pages deploy dist --project-name hadir --branch main --commit-dirty=true
+      - name: Deploy production Pages deployment
+        run: |
+          npx wrangler@4 pages deploy dist --project-name hadir \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-message "$GITHUB_SHA"
       - name: Verify production build
         env:
           PRODUCTION_URL: https://hadir-9rq.pages.dev
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 36); do
-            if curl -fsS --retry 3 --retry-delay 2 --retry-all-errors "$PRODUCTION_URL/build-version.json?recovery=$GITHUB_SHA&attempt=$attempt" -o /tmp/build-version.json; then
+          for attempt in $(seq 1 72); do
+            if curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
+              "$PRODUCTION_URL/build-version.json?recovery=$GITHUB_SHA&attempt=$attempt" \
+              -o /tmp/build-version.json; then
               python - <<'PY'
           import json, os, sys
           with open('/tmp/build-version.json', encoding='utf-8') as f:
@@ -55,5 +60,5 @@ jobs:
             fi
             sleep 5
           done
-          echo 'Production build verification timed out.'
+          echo 'Production build verification timed out after 6 minutes.'
           exit 1
