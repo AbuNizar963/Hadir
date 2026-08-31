@@ -99,7 +99,9 @@ jobs:
           with open(sys.argv[1], encoding='utf-8') as f:
               data=json.load(f)
           assert data.get('ok') is True, data
-          assert data.get('database') == 'D1', data
+          # Accept both health-response contracts currently used by production:
+          # the canonical {database:"D1"} shape and the legacy {d1:true} shape.
+          assert data.get('database') == 'D1' or data.get('d1') is True, data
           PY
 
       - name: Verify production Pages CORS
