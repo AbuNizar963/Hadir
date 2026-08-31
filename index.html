@@ -26,6 +26,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./workforce-card-polish.css" />
+    <style>
+      @media print {
+        html body .service-report.service-report > div:nth-child(2) > .grid > div {
+          break-inside: auto !important;
+          page-break-inside: auto !important;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
