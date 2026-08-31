@@ -27,10 +27,100 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./workforce-card-polish.css" />
     <style>
+      @page {
+        size: A4 portrait;
+        margin: 8mm 7mm 9mm;
+      }
+
       @media print {
+        html,
+        body {
+          width: 210mm !important;
+          min-height: 297mm !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #fff !important;
+        }
+
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        #root {
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        /* Daily service report: let the complete report flow continuously.
+           The previous rule only removed one break restriction; it did not
+           clear inherited break-before/after rules that could still force the
+           next group onto a fresh page. This remains strictly scoped to the
+           printable daily report. */
+        html body .service-report.service-report,
+        html body .service-report.service-report * {
+          break-before: auto !important;
+          break-after: auto !important;
+          page-break-before: auto !important;
+          page-break-after: auto !important;
+        }
+
+        html body .service-report.service-report {
+          width: 100% !important;
+          max-width: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: visible !important;
+        }
+
+        html body .service-report.service-report > div:nth-child(2),
+        html body .service-report.service-report > div:nth-child(2) > .grid {
+          display: block !important;
+          width: 100% !important;
+          max-width: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
         html body .service-report.service-report > div:nth-child(2) > .grid > div {
+          display: block !important;
+          width: 100% !important;
+          max-width: none !important;
+          margin: 0 0 3mm !important;
+          padding: 0 !important;
           break-inside: auto !important;
           page-break-inside: auto !important;
+        }
+
+        html body .service-report.service-report table {
+          width: 100% !important;
+          max-width: 100% !important;
+          border-collapse: collapse !important;
+          table-layout: fixed !important;
+        }
+
+        html body .service-report.service-report thead {
+          display: table-header-group !important;
+        }
+
+        html body .service-report.service-report tbody {
+          display: table-row-group !important;
+        }
+
+        html body .service-report.service-report tr {
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+        }
+
+        html body .service-report.service-report th,
+        html body .service-report.service-report td {
+          break-inside: avoid !important;
+          page-break-inside: avoid !important;
+        }
+
+        html body .service-report.service-report .grid {
+          grid-template-columns: none !important;
         }
       }
     </style>
