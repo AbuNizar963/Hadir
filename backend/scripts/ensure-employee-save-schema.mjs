@@ -6,7 +6,7 @@ let source = readFileSync(file, "utf8");
 const anchor = "async function ownerExists(env:Env)";
 if (!source.includes("ensureEmployeeSaveSchema")) {
   if (!source.includes(anchor)) throw new Error("Employee save schema guard: anchor not found.");
-  const helper = `let employeeSaveSchemaReady:Promise<void>|null=null;\nasync function ensureEmployeeSaveSchema(env:Env){if(!employeeSaveSchemaReady){employeeSaveSchemaReady=(async()=>{const columns=await env.DB.prepare("PRAGMA table_info(employees)").all<any>();const names=new Set((columns.results||[]).map((row:any)=>String(row.name||""));if(!names.has("early_checkout_grace_minutes")){await env.DB.prepare("ALTER TABLE employees ADD COLUMN early_checkout_grace_minutes INTEGER").run();}})().catch(error=>{employeeSaveSchemaReady=null;throw error;});}await employeeSaveSchemaReady;}\n`;
+  const helper = `let employeeSaveSchemaReady:Promise<void>|null=null;\nasync function ensureEmployeeSaveSchema(env:Env){if(!employeeSaveSchemaReady){employeeSaveSchemaReady=(async()=>{const columns=await env.DB.prepare("PRAGMA table_info(employees)").all<any>();const names=new Set((columns.results||[]).map((row:any)=>String(row.name||"")));if(!names.has("early_checkout_grace_minutes")){await env.DB.prepare("ALTER TABLE employees ADD COLUMN early_checkout_grace_minutes INTEGER").run();}})().catch(error=>{employeeSaveSchemaReady=null;throw error;});}await employeeSaveSchemaReady;}\n`;
   source = source.replace(anchor, helper + anchor);
 }
 
