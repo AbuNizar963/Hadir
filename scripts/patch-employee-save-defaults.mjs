@@ -1,0 +1,24 @@
+import { readFileSync, writeFileSync } from "node:fs";
+
+const file = new URL("../backend/src/index.ts", import.meta.url);
+let source = readFileSync(file, "utf8");
+
+const anchor = 'const id=decodeURIComponent(path.split("/").pop()||""),b=await body(req),sets:string[]=[],values:any[]=[];const current=await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();if(!current)return json({error:"الموظف غير موجود"},404,origin);';
+const replacement = 'const id=decodeURIComponent(path.split("/").pop()||""),b=await body(req),sets:string[]=[],values:any[]=[];const current=await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();if(!current)return json({error:"الموظف غير موجود"},404,origin);const previousScheduleType=String(current.schedule_type||"ADMIN").toUpperCase();';
+if (!source.includes(anchor)) throw new Error("Employee save patch: update anchor not found.");
+if (!source.includes("const previousScheduleType=String(current.schedule_type||\"ADMIN\").toUpperCase();")) {
+  source = source.replace(anchor, replacement);
+}
+
+const loopAnchor = 'for(const[k,col]of Object.entries({name:"name",status:"status",scheduleType:"schedule_type",rotationStartDate:"rotation_start_date",workStartTime:"work_start_time",workEndTime:"work_end_time",gracePeriodMinutes:"grace_period_minutes",role:"role",locationId:"location_id",rotationDaysOn:"rotation_days_on",rotationDaysOff:"rotation_days_off",avatar:"avatar"}))if(b[k]!==undefined){sets.push(`${col}=?`);values.push(b[k]);}';
+const loopReplacement = loopAnchor + 'if(String(b.scheduleType||"").toUpperCase()==="ADMIN"&&previousScheduleType==="ROTATION"){sets.push("work_start_time=?","work_end_time=?","work_days_json=?","rotation_start_date=?","rotation_days_on=?","rotation_days_off=?");values.push("08:00","16:00",JSON.stringify([0,1,2,3,4]),null,null,null);}' ;
+if (!source.includes(loopAnchor)) throw new Error("Employee save patch: field loop anchor not found.");
+if (!source.includes('previousScheduleType==="ROTATION"')) source = source.replace(loopAnchor, loopReplacement);
+
+const verifyAnchor = 'const employee=await env.DB.prepare("SELECT * FROM employees WHERE id=?").bind(id).first<any>();if(jobNumberChanged)await audit(env,req,actor.name,"employee-job-number-update","success",id,String(employee?.job_number||""),`تغيير الرقم الوظيفي من ${previousJobNumber} إلى ${String(employee?.job_number||"")}`);return json({ok:true,employee:employeeOut(employee),...(jobNumberChanged?{previousJobNumber}: {})},200,origin);';
+const verifyReplacement = 'const employee=await env.DB.prepare("SELECT * FROM employees WHERE id=?").bind(id).first<any>();if(!employee)return json({error:"تعذر قراءة بيانات الموظف بعد الحفظ"},500,origin);const requestedChecks:[[string,string,string?]]=[];if(b.name!==undefined)requestedChecks.push(["name",String(b.name),undefined]);if(b.jobNumber!==undefined)requestedChecks.push(["job_number",String(b.jobNumber).trim(),undefined]);if(b.scheduleType!==undefined)requestedChecks.push(["schedule_type",String(b.scheduleType).toUpperCase(),undefined]);if(b.workStartTime!==undefined)requestedChecks.push(["work_start_time",String(b.workStartTime||""),undefined]);if(b.workEndTime!==undefined)requestedChecks.push(["work_end_time",String(b.workEndTime||""),undefined]);if(b.status!==undefined)requestedChecks.push(["status",String(b.status),undefined]);if(b.workDays!==undefined)requestedChecks.push(["work_days_json",JSON.stringify(b.workDays),undefined]);for(const [field,expected] of requestedChecks){const actual=field==="work_days_json"?String(employee[field]||"[]"):String(employee[field]??"");if(actual!==expected&&!(field==="work_days_json"&&actual===JSON.stringify([0,1,2,3,4])&&String(b.scheduleType||"").toUpperCase()==="ADMIN"))return json({error:"الخادم لم يؤكد حفظ جميع تعديلات الموظف في D1",field},500,origin);}if(jobNumberChanged)await audit(env,req,actor.name,"employee-job-number-update","success",id,String(employee?.job_number||""),`تغيير الرقم الوظيفي من ${previousJobNumber} إلى ${String(employee?.job_number||"")}`);return json({ok:true,employee:employeeOut(employee),...(jobNumberChanged?{previousJobNumber}: {})},200,origin);';
+if (!source.includes(verifyAnchor)) throw new Error("Employee save patch: verification anchor not found.");
+if (!source.includes('الخادم لم يؤكد حفظ جميع تعديلات الموظف في D1')) source = source.replace(verifyAnchor, verifyReplacement);
+
+writeFileSync(file, source, "utf8");
+console.log("Employee save/default schedule patch applied.");
