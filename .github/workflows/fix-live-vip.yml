@@ -1,0 +1,95 @@
+name: Fix LIVE DIRECTORY VIP
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: contains(github.event.head_commit.message, 'fix: repair LIVE DIRECTORY VIP canonical save') == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Patch LIVE DIRECTORY to canonical employee save
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/ManagerEmployees.tsx')
+          s = p.read_text()
+          old = '''  const updateWorkforce = async (e: Employee, patch: { isVip?: boolean; autoCheckIn?: boolean; autoCheckOut?: boolean }) => {
+    if (!isOwner) return;
+    try {
+      const token = localStorage.getItem("hadir.api.token.admin") || "";
+      const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\\/$/, "");
+      const res = await fetch(`${api}/api/workforce/live`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify({ employeeId: e.id, ...patch }), cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ إعدادات Workforce.");
+      await load(false);
+    } catch (err) { setError(err instanceof Error ? err.message : "تعذر حفظ إعدادات Workforce."); await load(false); }
+  };'''
+          new = '''  const updateWorkforce = async (e: Employee, patch: { isVip?: boolean; autoCheckIn?: boolean; autoCheckOut?: boolean }) => {
+    if (!isOwner) return;
+    try {
+      const result = await updateBackendEmployee(e.id, patch);
+      const saved = result.employee;
+      if (!saved) throw new Error("تعذر قراءة الموظف بعد الحفظ من D1.");
+      setEmployees((prev) => prev.map((item) => item.id === e.id ? { ...item, ...saved } : item));
+      setError(null);
+    } catch (err) { setError(err instanceof Error ? err.message : "تعذر حفظ إعدادات Workforce."); }
+  };'''
+          if old not in s:
+              raise SystemExit('updateWorkforce block not found')
+          s = s.replace(old, new, 1)
+          start = '''      if (backendEnabled) {
+        try {
+          const token = localStorage.getItem("hadir.api.token.admin") || "";
+          const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\\/$/, "");
+          const response = await fetch(`${api}/api/manager/workforce-controls`, { headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, credentials: "include", cache: "no-store" });
+          const controls = await response.json().catch(() => []);
+          if (response.ok && Array.isArray(controls)) {
+            const byId = new Map(controls.map((control: any) => [String(control.id), control]));
+            next = next.map((employee) => { const control = byId.get(String(employee.id)); if (!control) return employee; return { ...employee, isVip: Boolean(control.isVip), autoCheckIn: Boolean(control.autoCheckIn), autoCheckOut: Boolean(control.autoCheckOut) }; });
+          }
+          const policyResponse = await fetch(`${api}/api/employee-checkout-policies`, { headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, credentials: "include", cache: "no-store" });
+          const policies = await policyResponse.json().catch(() => []);
+          if (policyResponse.ok && Array.isArray(policies)) {
+            const byId = new Map(policies.map((policy: any) => [String(policy.id), Number(policy.earlyCheckoutMinutes) || 0]));
+            next = next.map((employee) => ({ ...employee, earlyCheckoutGraceMinutes: byId.get(String(employee.id)) ?? employee.earlyCheckoutGraceMinutes ?? 0 }));
+          }
+        } catch {}
+      }
+'''
+          replacement = '''      if (backendEnabled) {
+        try {
+          const token = localStorage.getItem("hadir.api.token.admin") || "";
+          const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\\/$/, "");
+          const policyResponse = await fetch(`${api}/api/employee-checkout-policies`, { headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, credentials: "include", cache: "no-store" });
+          const policies = await policyResponse.json().catch(() => []);
+          if (policyResponse.ok && Array.isArray(policies)) {
+            const byId = new Map(policies.map((policy: any) => [String(policy.id), Number(policy.earlyCheckoutMinutes) || 0]));
+            next = next.map((employee) => ({ ...employee, earlyCheckoutGraceMinutes: byId.get(String(employee.id)) ?? employee.earlyCheckoutGraceMinutes ?? 0 }));
+          }
+        } catch {}
+      }
+'''
+          if start not in s:
+              raise SystemExit('stale workforce overlay block not found')
+          s = s.replace(start, replacement, 1)
+          p.write_text(s)
+          PY
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerEmployees.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: repair LIVE DIRECTORY VIP canonical save"
+          git push
+      - name: Remove temporary workflow
+        if: always()
+        run: |
+          git rm -f .github/workflows/fix-live-vip.yml || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: remove temporary VIP repair workflow" || true
+          git push || true
