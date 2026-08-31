@@ -35,6 +35,36 @@ function cors(request: Request, env: Env) {
   };
 }
 
+async function hashToken(token: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  let binary = "";
+  for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function bearerToken(request: Request) {
+  return String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+}
+
+async function ownerActor(request: Request, env: Env) {
+  const token = bearerToken(request);
+  if (!token) return null;
+  try {
+    const tokenHash = await hashToken(token);
+    const session = await env.DB.prepare(
+      "SELECT user_id AS userId,user_type AS userType,role FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1"
+    ).bind(tokenHash).first<any>();
+    if (!session || session.userType !== "admin") return null;
+    const admin = await env.DB.prepare(
+      "SELECT id,username,name,role,active FROM admin_accounts WHERE id=? LIMIT 1"
+    ).bind(session.userId).first<any>();
+    if (!admin || !admin.active || String(admin.role).toLowerCase() !== "owner") return null;
+    return { id: String(admin.id), username: String(admin.username || ""), name: String(admin.name || ""), role: "owner" as const };
+  } catch {
+    return null;
+  }
+}
+
 async function ensureLeaveSchema(env: Env) {
   if (!leaveSchemaReady) {
     leaveSchemaReady = env.DB.batch([
@@ -72,9 +102,40 @@ async function authenticatedActor(request: Request, env: Env, ctx: ExecutionCont
   return data?.user || null;
 }
 
-async function handleWorkforcePatch(request: Request, env: Env, ctx: ExecutionContext, headers: Record<string, string>) {
-  const actor = await authenticatedActor(request, env, ctx);
-  if (!actor || actor.role !== "owner") {
+function employeeOut(row: any) {
+  const parse = (value: unknown) => { try { return JSON.parse(String(value || "[]")); } catch { return []; } };
+  return {
+    id: row.id,
+    jobNumber: row.job_number,
+    name: row.name,
+    status: row.status,
+    deviceId: row.device_id,
+    deviceLabel: row.device_label,
+    createdAt: row.created_at,
+    scheduleType: row.schedule_type,
+    rotationStartDate: row.rotation_start_date,
+    avatar: row.avatar || null,
+    workStartTime: row.work_start_time,
+    workEndTime: row.work_end_time,
+    gracePeriodMinutes: row.grace_period_minutes,
+    role: row.role,
+    locationId: row.location_id,
+    rotationDaysOn: row.rotation_days_on,
+    rotationDaysOff: row.rotation_days_off,
+    workDays: parse(row.work_days_json),
+    specialties: parse(row.specialties_json),
+    isVip: Boolean(Number(row.is_vip || 0)),
+    autoCheckIn: Boolean(Number(row.auto_check_in || 0)),
+    autoCheckOut: Boolean(Number(row.auto_check_out || 0)),
+  };
+}
+
+async function handleWorkforcePatch(request: Request, env: Env, headers: Record<string, string>) {
+  // This endpoint is deliberately self-contained. It does not proxy the
+  // mutation through another Worker handler, so the production VIP controls
+  // have exactly one authenticated D1 write/read-back path.
+  const actor = await ownerActor(request, env);
+  if (!actor) {
     return new Response(JSON.stringify({ ok: false, error: "المالك فقط يستطيع تعديل إعدادات Workforce" }), {
       status: 403,
       headers: { ...headers, "content-type": "application/json; charset=utf-8" },
@@ -84,52 +145,92 @@ async function handleWorkforcePatch(request: Request, env: Env, ctx: ExecutionCo
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   const employeeId = String(body.employeeId || "").trim();
   if (!employeeId) {
-    return new Response(JSON.stringify({ ok: false, error: "رقم الموظف مطلوب" }), {
+    return new Response(JSON.stringify({ ok: false, error: "معرف الموظف مطلوب" }), {
       status: 400,
       headers: { ...headers, "content-type": "application/json; charset=utf-8" },
     });
   }
 
-  const patch: Record<string, unknown> = {};
-  for (const key of ["isVip", "autoCheckIn", "autoCheckOut"]) {
-    if (body[key] !== undefined) {
-      if (typeof body[key] !== "boolean") {
-        return new Response(JSON.stringify({ ok: false, error: `${key} يجب أن تكون true أو false` }), {
-          status: 400,
-          headers: { ...headers, "content-type": "application/json; charset=utf-8" },
-        });
-      }
-      patch[key] = body[key];
-    }
+  const current = await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
+  if (!current) {
+    return new Response(JSON.stringify({ ok: false, error: "الموظف غير موجود" }), {
+      status: 404,
+      headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+    });
   }
-  if (!Object.keys(patch).length) {
+
+  const mapping: Record<string, string> = {
+    isVip: "is_vip",
+    autoCheckIn: "auto_check_in",
+    autoCheckOut: "auto_check_out",
+  };
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  for (const key of Object.keys(mapping)) {
+    if (body[key] === undefined) continue;
+    if (typeof body[key] !== "boolean") {
+      return new Response(JSON.stringify({ ok: false, error: `${key} يجب أن تكون true أو false` }), {
+        status: 400,
+        headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+      });
+    }
+    sets.push(`${mapping[key]}=?`);
+    values.push(body[key] ? 1 : 0);
+  }
+  if (!sets.length) {
     return new Response(JSON.stringify({ ok: false, error: "لا توجد تغييرات" }), {
       status: 400,
       headers: { ...headers, "content-type": "application/json; charset=utf-8" },
     });
   }
 
-  // Use the canonical employee PATCH implementation for Workforce toggles.
-  // This is the same D1 write/read-after-write path used by the employee editor,
-  // avoiding a second implementation that can drift from the canonical model.
-  const target = new URL(request.url);
-  target.pathname = `/api/employees/${encodeURIComponent(employeeId)}`;
-  target.search = "";
-  const response = await employeeGateway.fetch(new Request(target, {
-    method: "PATCH",
-    headers: request.headers,
-    body: JSON.stringify(patch),
-  }), env, ctx);
-  const data = await response.json().catch(() => ({}));
-  return new Response(JSON.stringify({
-    ...data,
-    ok: response.ok && data?.ok !== false,
-    employee: data?.employee || null,
-  }), {
-    status: response.status,
-    statusText: response.statusText,
-    headers: { ...headers, "content-type": "application/json; charset=utf-8" },
-  });
+  values.push(employeeId);
+  try {
+    const result = await env.DB.prepare(`UPDATE employees SET ${sets.join(",")} WHERE id=?`).bind(...values).run();
+    if (!result.meta.changes) {
+      return new Response(JSON.stringify({ ok: false, error: "لم يتم تعديل سجل الموظف في D1" }), {
+        status: 409,
+        headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+      });
+    }
+
+    const saved = await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
+    if (!saved) {
+      return new Response(JSON.stringify({ ok: false, error: "تم التحديث لكن تعذر قراءة الموظف من D1" }), {
+        status: 500,
+        headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+      });
+    }
+
+    const returned = employeeOut(saved);
+    for (const key of Object.keys(mapping)) {
+      if (body[key] !== undefined && returned[key as keyof typeof returned] !== body[key]) {
+        return new Response(JSON.stringify({ ok: false, error: `فشل التحقق من حفظ ${key} في D1` }), {
+          status: 500,
+          headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+        });
+      }
+    }
+
+    await env.DB.prepare(
+      "INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)"
+    ).bind(
+      crypto.randomUUID(), employeeId, saved.job_number || "", actor.name || "المالك",
+      "workforce-controls", "success", "تحديث إعدادات Workforce من LIVE DIRECTORY",
+      new Date().toISOString(), "OWNER_PANEL", "unknown"
+    ).run().catch(() => undefined);
+
+    return new Response(JSON.stringify({ ok: true, employee: returned }), {
+      status: 200,
+      headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+    });
+  } catch (error) {
+    console.error("production workforce patch failed", error);
+    return new Response(JSON.stringify({ ok: false, error: "تعذر حفظ إعدادات Workforce في D1", detail: error instanceof Error ? error.message : String(error) }), {
+      status: 500,
+      headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+    });
+  }
 }
 
 export { HadirRealtime };
@@ -142,15 +243,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
 
     if (path === "/api/workforce/live" && request.method === "PATCH") {
-      try {
-        return await handleWorkforcePatch(request, env, ctx, headers);
-      } catch (error) {
-        console.error("production workforce patch failed", error);
-        return new Response(JSON.stringify({ ok: false, error: "تعذر حفظ إعدادات Workforce في D1" }), {
-          status: 500,
-          headers: { ...headers, "content-type": "application/json; charset=utf-8" },
-        });
-      }
+      return handleWorkforcePatch(request, env, headers);
     }
 
     if (path === "/api/manager/daily-status") {
