@@ -35,6 +35,7 @@ jobs:
           VITE_BASE_PATH: /
       - name: Deploy production Pages deployment
         run: |
+          set -euo pipefail
           npx wrangler@4 pages deploy dist --project-name hadir \
             --commit-hash "$GITHUB_SHA" \
             --commit-message "$GITHUB_SHA"
@@ -47,16 +48,22 @@ jobs:
             if curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
               "$PRODUCTION_URL/build-version.json?recovery=$GITHUB_SHA&attempt=$attempt" \
               -o /tmp/build-version.json; then
-              python - <<'PY'
-          import json, os, sys
+              if python - "$GITHUB_SHA" <<'PY'
+          import json, sys
+          expected = sys.argv[1]
           with open('/tmp/build-version.json', encoding='utf-8') as f:
-              data=json.load(f)
-          if data.get('commitSha') == os.environ['GITHUB_SHA']:
+              data = json.load(f)
+          actual = data.get('commitSha')
+          print('Production build version:', actual)
+          if actual == expected:
               print('Production serves the recovery deployment commit.')
               sys.exit(0)
-          print('Production is still serving:', data.get('commitSha'))
+          print('Production is still serving:', actual)
           sys.exit(1)
           PY
+              then
+                exit 0
+              fi
             fi
             sleep 5
           done
