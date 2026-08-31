@@ -10,6 +10,7 @@ on:
       - "functions/**"
       - "scripts/build.mjs"
       - "scripts/patch-manager-employee-save.mjs"
+      - "scripts/patch-employee-form-defaults.mjs"
       - ".github/workflows/deploy-frontend-recovery.yml"
 
 permissions:
