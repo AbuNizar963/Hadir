@@ -34,6 +34,7 @@ if (employeeSource.includes("saveCheckoutPolicy")) {
 if (!employeeSource.includes("earlyCheckoutGraceMinutes: earlyCheckoutGrace")) {
   throw new Error("Production build blocked: employee save payload is missing earlyCheckoutGraceMinutes.");
 }
+console.log("Employee save production verification: main PATCH path only; checkout value included in employee payload.");
 
 const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
 if (bun.status === 0 && !bun.error) {
