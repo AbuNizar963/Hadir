@@ -44,6 +44,12 @@ function range(mode: Mode, p: string) {
   for (let m = 0; m < 12; m++) for (let d = 1; d <= new Date(y, m + 1, 0).getDate(); d++) { const date = new Date(y, m, d, 12); if (date <= today) r.push(date); }
   return r;
 }
+function datesForEmployee(employee: Employee, dates: Date[]) {
+  const rawStart = String(employee.createdAt || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(rawStart)) return dates;
+  const start = dateOf(rawStart);
+  return dates.filter(d => d >= start);
+}
 function auditIndex(a: Audit[]) {
   const m = new Map<string, { in?: Audit; out?: Audit }>();
   for (const x of a) {
@@ -133,7 +139,7 @@ function calculateSummary(employee: Employee, dates: Date[], index: Map<string, 
 }
 function specialtyOf(e: Employee) { return (e.specialties || []).map(x => String(x).trim()).filter(Boolean)[0] || "غير محدد"; }
 function serviceRows(summaries: Summary[], dates: Date[], index: Map<string, { in?: Audit; out?: Audit }>, settings: ReturnType<typeof getSettings>, requests: RequestRow[], dailyStatus?: Map<string, DailyStatusRow>) {
-  return summaries.map(s => { const d = calculateDetails(s.employee, dates, index, settings, requests, dailyStatus)[0]; return { employee: s.employee, specialty: specialtyOf(s.employee), status: d.status, checkIn: d.checkIn, checkOut: d.checkOut, note: d.detail }; });
+  return summaries.map(s => { const d = calculateDetails(s.employee, datesForEmployee(s.employee, dates), index, settings, requests, dailyStatus)[0]; return { employee: s.employee, specialty: specialtyOf(s.employee), status: d.status, checkIn: d.checkIn, checkOut: d.checkOut, note: d.detail }; });
 }
 
 export default function ManagerReports() {
@@ -145,17 +151,20 @@ export default function ManagerReports() {
   const dates = useMemo(() => range(mode, period), [mode, period]);
   const index = useMemo(() => auditIndex(audit), [audit]);
   const dailyStatusMap = useMemo(() => new Map(dailyStatus.map(row => [row.employeeId, row])), [dailyStatus]);
-  const calculatedSummaries = useMemo(() => employees.map(employee => calculateSummary(employee, dates, index, settings, requests, mode === "daily" ? dailyStatusMap : undefined)), [employees, dates, index, settings, requests, mode, dailyStatusMap]);
+  const calculatedSummaries = useMemo(() => employees.map(employee => {
+    const employeeDates = datesForEmployee(employee, dates);
+    return calculateSummary(employee, employeeDates, index, settings, requests, mode === "daily" ? dailyStatusMap : undefined);
+  }), [employees, dates, index, settings, requests, mode, dailyStatusMap]);
   const summaries = useMemo(() => mode === "daily" ? calculatedSummaries.filter(s => s.workDays > 0) : calculatedSummaries, [calculatedSummaries, mode]);
   const expandedEmployee = useMemo(() => expanded ? summaries.find(s => s.employee.id === expanded)?.employee : null, [expanded, summaries]);
-  const expandedDays = useMemo(() => expandedEmployee ? calculateDetails(expandedEmployee, dates, index, settings, requests, mode === "daily" ? dailyStatusMap : undefined) : [], [expandedEmployee, dates, index, settings, requests, mode, dailyStatusMap]);
+  const expandedDays = useMemo(() => expandedEmployee ? calculateDetails(expandedEmployee, datesForEmployee(expandedEmployee, dates), index, settings, requests, mode === "daily" ? dailyStatusMap : undefined) : [], [expandedEmployee, dates, index, settings, requests, mode, dailyStatusMap]);
   const total = useMemo(() => summaries.reduce((a, s) => ({ present: a.present + s.present, absent: a.absent + s.absent, early: a.early + s.early, late: a.late + s.late, open: a.open + s.open, permission: a.permission + s.permission, leave: a.leave + s.leave, off: a.off + s.off }), { present: 0, absent: 0, early: 0, late: 0, open: 0, permission: 0, leave: 0, off: 0 }), [summaries]);
   const chartData = [{ label: "حاضر", value: total.present }, { label: "غياب", value: total.absent }, { label: "استئذان", value: total.permission }, { label: "إجازة", value: total.leave }, { label: "انصراف مبكر", value: total.early }, { label: "تأخر", value: total.late }, { label: "تسجيل ناقص", value: total.open }], max = Math.max(1, ...chartData.map(x => x.value));
   const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries, dates, index, settings, requests, dailyStatusMap) : [], [mode, summaries, dates, index, settings, requests, dailyStatusMap]);
   const groups = useMemo(() => { const map = new Map<string, ServiceRow[]>(); for (const row of dailyServiceRows) { const list = map.get(row.specialty) || []; list.push(row); map.set(row.specialty, list); } const grouped = Array.from(map.entries()).map(([name, rows]) => ({ name, rows })); const specialtyOrder = (settings.specialties || []).map(x => String(x).trim()).filter(Boolean); const rank = new Map(specialtyOrder.map((name, index) => [name, index])); return grouped.sort((a, b) => { const ai = rank.get(a.name), bi = rank.get(b.name); if (ai !== undefined && bi !== undefined) return ai - bi; if (ai !== undefined) return -1; if (bi !== undefined) return 1; return 0; }); }, [dailyServiceRows, settings.specialties]);
   const groupColumns = useMemo(() => { const out: { name: string; rows: ServiceRow[] }[][] = []; for (let i = 0; i < groups.length; i += 2) out.push([groups[i], groups[i + 1]].filter(Boolean) as { name: string; rows: ServiceRow[] }[]); return out; }, [groups]);
-  const exportCsv = () => { const h = ["اسم الشركة", "الاختصاص", "الموظف", "الرقم الوظيفي", "التاريخ", "اليوم", "الحالة", "وقت الحضور", "وقت الانصراف", "مدة العمل", "دقائق التأخر", "دقائق الانصراف المبكر", "تفصيل اليوم"], d = summaries.flatMap(s => calculateDetails(s.employee, dates, index, settings, requests, mode === "daily" ? dailyStatusMap : undefined).map(day => [String(settings.brandName || "HADIR").trim() || "HADIR", specialtyOf(s.employee), s.employee.name, s.employee.jobNumber, day.date, day.day, labels[day.status], day.checkIn, day.checkOut, formatDurationMinutes(day.worked), day.late, day.early, day.detail] as CsvCell[])); downloadCSV(`Hadir-${mode}-${period}-attendance`, h, d); };
-  const exportExcel = () => { const sourceRows = mode === "daily" ? groups.flatMap(group => group.rows) : summaries.map(s => ({ employee: s.employee, specialty: specialtyOf(s.employee) })); const dailyRows = sourceRows.flatMap(row => { const employee = row.employee, details = calculateDetails(employee, dates, index, settings, requests, mode === "daily" ? dailyStatusMap : undefined); return details.map(day => ({ employee: employee.name, jobNumber: employee.jobNumber, specialty: specialtyOf(employee), date: day.date, day: day.day, status: labels[day.status], checkIn: day.checkIn, checkOut: day.checkOut, worked: formatDurationMinutes(day.worked), late: day.late, early: day.early, detail: day.detail })); }); const absenceRows = dailyRows.filter(row => row.status === "غياب"); downloadProfessionalAttendanceReport({ mode, period, generatedAt: new Date().toLocaleString("ar-EG"), summaries, dailyRows, absenceRows, chartData }); };
+  const exportCsv = () => { const h = ["اسم الشركة", "الاختصاص", "الموظف", "الرقم الوظيفي", "التاريخ", "اليوم", "الحالة", "وقت الحضور", "وقت الانصراف", "مدة العمل", "دقائق التأخر", "دقائق الانصراف المبكر", "تفصيل اليوم"], d = summaries.flatMap(s => calculateDetails(s.employee, datesForEmployee(s.employee, dates), index, settings, requests, mode === "daily" ? dailyStatusMap : undefined).map(day => [String(settings.brandName || "HADIR").trim() || "HADIR", specialtyOf(s.employee), s.employee.name, s.employee.jobNumber, day.date, day.day, labels[day.status], day.checkIn, day.checkOut, formatDurationMinutes(day.worked), day.late, day.early, day.detail] as CsvCell[])); downloadCSV(`Hadir-${mode}-${period}-attendance`, h, d); };
+  const exportExcel = () => { const sourceRows = mode === "daily" ? groups.flatMap(group => group.rows) : summaries.map(s => ({ employee: s.employee, specialty: specialtyOf(s.employee) })); const dailyRows = sourceRows.flatMap(row => { const employee = row.employee, details = calculateDetails(employee, datesForEmployee(employee, dates), index, settings, requests, mode === "daily" ? dailyStatusMap : undefined); return details.map(day => ({ employee: employee.name, jobNumber: employee.jobNumber, specialty: specialtyOf(employee), date: day.date, day: day.day, status: labels[day.status], checkIn: day.checkIn, checkOut: day.checkOut, worked: formatDurationMinutes(day.worked), late: day.late, early: day.early, detail: day.detail })); }); const absenceRows = dailyRows.filter(row => row.status === "غياب"); downloadProfessionalAttendanceReport({ mode, period, generatedAt: new Date().toLocaleString("ar-EG"), summaries, dailyRows, absenceRows, chartData }); };
   const title = mode === "daily" ? `يومي · ${formatDate(date)}` : mode === "monthly" ? `شهري · ${month}` : `سنوي · ${year}`;
   const printReport = () => window.print();
 
