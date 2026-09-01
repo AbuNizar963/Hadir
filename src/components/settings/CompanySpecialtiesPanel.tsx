@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { BriefcaseBusiness, ImagePlus, Plus, Trash2, X } from "lucide-react";
 import type { Settings } from "@/types";
-import { getSettings, saveSettings } from "@/lib/storage";
+import { getSettings } from "@/lib/storage";
 import { getBackendSettings, saveBackendSettings } from "@/lib/backend";
 import { compressProfileImageDataUrl } from "@/lib/imageCompression";
 
@@ -65,6 +65,11 @@ export default function CompanySpecialtiesPanel() {
   }, []);
 
   async function persist(patch: Partial<Settings>) {
+    if (patch.brandLogo !== undefined && Object.keys(patch).length === 1) {
+      setBrandLogo(patch.brandLogo || null);
+      return;
+    }
+
     const current = getSettings();
     const nextSettings: Settings = { ...current, ...patch };
     if (patch.specialties) {
@@ -74,14 +79,13 @@ export default function CompanySpecialtiesPanel() {
     }
     if (patch.brandName !== undefined) setBrandName(patch.brandName || "");
     if (patch.brandLogo !== undefined) setBrandLogo(patch.brandLogo || null);
-    saveSettings(nextSettings);
     setSaving(true);
     setMessage(null);
     try {
       await saveBackendSettings(nextSettings);
       setMessage("تم حفظ البيانات مركزيًا");
-    } catch {
-      setMessage("تم حفظها محليًا، وتعذر مزامنة الخادم");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "تعذر مزامنة الخادم");
     } finally {
       setSaving(false);
     }
@@ -104,10 +108,11 @@ export default function CompanySpecialtiesPanel() {
       });
       const compressed = await compressProfileImageDataUrl(raw, { maxWidth: 512, maxHeight: 512, quality: 0.82, type: "image/webp", maxBytes: 100 * 1024 });
       const logoUrl = await uploadCompanyLogo(compressed);
-      await persist({ brandLogo: logoUrl });
-      setMessage("تم رفع الشعار وتخزينه في R2");
+      setBrandLogo(logoUrl);
+      setMessage("تم رفع الشعار وتخزينه في R2 وD1");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "تعذر تجهيز الشعار");
+    } finally {
       setSaving(false);
     }
   }
@@ -117,10 +122,11 @@ export default function CompanySpecialtiesPanel() {
     setMessage(null);
     try {
       await deleteCompanyLogo();
-      await persist({ brandLogo: null });
-      setMessage("تم حذف الشعار من R2");
+      setBrandLogo(null);
+      setMessage("تم حذف الشعار من R2 وD1");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "تعذر إزالة الشعار");
+    } finally {
       setSaving(false);
     }
   }
