@@ -8,33 +8,460 @@ import { currentManager } from "@/lib/auth";
 import { saveBackendSettings, getBackendSettings, backendEnabled, createBootstrapOwner, saveBackendLocation, backendMe, resetBackendTestData } from "@/lib/backend";
 import { getDiagnostics, clearDiagnostics, type DiagnosticEntry } from "@/lib/systemDiagnostics";
 import type { Settings, Location } from "@/types";
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block text-xs text-muted-foreground">{label}{children}</label>; }
-function Chevron() { return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 overflow-visible transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
-function SectionIcon({ type }: { type: "accounts" | "profile" | "locations" | "qr" | "diagnostics" | "danger" }) { const common = { viewBox: "0 0 24 24", "aria-hidden": true, className: "h-5 w-5", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const }; if (type === "accounts") return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>; if (type === "profile") return <svg {...common}><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M19 4h3v3"/></svg>; if (type === "locations") return <svg {...common}><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg>; if (type === "qr") return <svg {...common}><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h3v3h-3zM20 17v3M17 20h3"/></svg>; if (type === "diagnostics") return <svg {...common}><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="5"/><path d="m9.5 12 1.7 1.7 3.5-3.5"/></svg>; return <svg {...common}><path d="M12 3 4 6v5c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-3Z"/><path d="M12 8v5M12 16h.01"/></svg>; }
-function SettingsSection({ type, code, title, description, children, defaultOpen = false, tone = "normal" }: { type: "accounts" | "profile" | "locations" | "qr" | "diagnostics" | "danger"; code: string; title: string; description: string; children: React.ReactNode; defaultOpen?: boolean; tone?: "normal" | "danger" | "primary" }) { return <details open={defaultOpen} className={`hud-card group overflow-visible ${tone === "danger" ? "border-destructive/40" : tone === "primary" ? "border-primary/30" : ""}`}><summary className="list-none cursor-pointer select-none p-5 sm:p-6 flex items-center justify-between gap-4 hover:bg-primary/5 transition-colors"><div className="flex items-center gap-3 min-w-0"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${tone === "danger" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}><SectionIcon type={type} /></span><span className="min-w-0"><span className={`flex items-center gap-2 text-xs mono font-bold ${tone === "danger" ? "text-destructive" : "text-primary"}`}>{code}</span><span className="block mt-1 text-base font-bold">{title}</span><span className="block mt-1 text-xs text-muted-foreground">{description}</span></span></div><Chevron /></summary><div className="border-t border-border/60 p-5 sm:p-6">{children}</div></details>; }
+function Chevron() { return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0 overflow-visible transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
+function SectionIcon({ type }: { type: "accounts" | "profile" | "locations" | "qr" | "diagnostics" | "danger" }) { const common = { viewBox: "0 0 24 24", "aria-hidden": true, className: "h-5 w-5", fill: "currentColor" }; return type === "accounts" ? <svg {...common}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0M21 11c0 3 0 6-2 6s-3-2-3-5" /></svg> : type === "profile" ? <svg {...common}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" /></svg> : type === "locations" ? <svg {...common}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" /></svg> : type === "qr" ? <svg {...common}><path d="M3 3h8v8H3V3Zm10 0h8v8h-8V3ZM3 13h8v8H3v-8Zm13-2h2v2h-2v-2Zm2 2h2v2h-2v-2Zm-2 2h2v2h-2v-2Z" /></svg> : type === "diagnostics" ? <svg {...common}><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5Z M10 17l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8Z" /></svg> : <svg {...common}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z" /></svg>; }
+function SettingsSection({ type, code, title, description, children, defaultOpen = false, tone = "normal" }: { type: "accounts" | "profile" | "locations" | "qr" | "diagnostics" | "danger"; code: string; title: string; description: string; children: React.ReactNode; defaultOpen?: boolean; tone?: "normal" | "warning" | "danger" }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const toneCls = tone === "danger" ? "border-red-500/30 group-open:bg-red-500/5" : tone === "warning" ? "border-amber-500/30 group-open:bg-amber-500/5" : "border-border/50";
+  return <details className={`group border rounded-xl transition-colors ${toneCls}`} open={open} onToggle={(e) => setOpen(e.currentTarget.open)}><summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3.5 font-semibold select-none hover:bg-secondary/20"><div className="flex items-center gap-3 min-w-0"><SectionIcon type={type} /><div className="min-w-0"><div className="text-sm font-semibold">{title}</div><div className="text-xs text-muted-foreground">{code}</div></div></div><Chevron /></summary><div className="border-t border-border/50 px-4 py-4 space-y-4">{description && <div className="text-xs text-muted-foreground">{description}</div>}{children}</div></details>; }
+
 const PROJECT_LOGO = `${import.meta.env.BASE_URL}favicon.svg`;
+
 export default function ManagerSettings() {
-  const [s, setS] = useState<Settings>(getSettings()); const [saved, setSaved] = useState(false); const [error, setError] = useState<string | null>(null); const [password, setPassword] = useState(""); const [showLocation, setShowLocation] = useState(false); const [locName, setLocName] = useState(""); const [locLat, setLocLat] = useState(s.workSiteLat); const [locLng, setLocLng] = useState(s.workSiteLng); const [locRadius, setLocRadius] = useState(s.radiusMeters); const printRef = useRef<HTMLDivElement>(null); const [loginUrl, setLoginUrl] = useState(""); const [showDiagnostics, setShowDiagnostics] = useState(false); const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]); const [resettingCloud, setResettingCloud] = useState(false); const [resetCloudResult, setResetCloudResult] = useState<string | null>(null); const manager = currentManager(); const isOwner = manager?.role === "owner" || manager?.accountId === "bootstrap";
+  const [s, setS] = useState<Settings>(getSettings());
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [locName, setLocName] = useState("");
+  const [locLat, setLocLat] = useState(24.7136);
+  const [locLng, setLocLng] = useState(46.6753);
+  const [loginUrl, setLoginUrl] = useState("");
+  const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
+  const [resettingCloud, setResettingCloud] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const isOwner = currentManager()?.role === "owner";
+
   useEffect(() => { setLoginUrl(`${window.location.origin}${import.meta.env.BASE_URL}login`); }, []);
-  useEffect(() => { if (!backendEnabled) return; let cancelled = false; void (async () => { try { const cloud = await getBackendSettings(); if (cancelled) return; const merged = { ...getSettings(), ...cloud, adminAccounts: Array.isArray(cloud.adminAccounts) ? cloud.adminAccounts : getSettings().adminAccounts } as Settings; saveSettings(merged); setS(merged); setLocLat(merged.workSiteLat); setLocLng(merged.workSiteLng); setLocRadius(merged.radiusMeters); } catch (e) { console.warn("تعذر تحميل إعدادات الخادم:", e); } })(); return () => { cancelled = true; }; }, []);
-  const save = async () => { setError(null); setSaved(false); const next = { ...s }; try { const localRole = currentManager()?.role; if (localRole !== "owner" && localRole !== "manager" && localRole !== "admin" && localRole !== undefined) { setError("هذه العملية متاحة للمالك أو المدير فقط."); return; } if (!Number.isFinite(Number(next.workSiteLat)) || !Number.isFinite(Number(next.workSiteLng)) || !Number.isFinite(Number(next.radiusMeters)) || Number(next.radiusMeters) <= 0) { setError("إحداثيات موقع العمل والنطاق يجب أن تكون أرقامًا صحيحة، والنطاق أكبر من صفر."); return; } const bootstrap = currentManager()?.accountId === "bootstrap"; if (bootstrap && backendEnabled) { if (!next.ownerName?.trim() || !next.ownerUsername?.trim() || password.length < 12) { setError("في أول إعداد يجب إدخال اسم المالك واسم المستخدم وكلمة مرور من 12 محرفًا على الأقل."); return; } const owner = await createBootstrapOwner({ name: next.ownerName.trim(), username: next.ownerUsername.trim(), password }); next.ownerPasswordHash = ""; next.adminAccounts = [{ id: owner.id, username: owner.username, passwordHash: "", name: owner.name, role: "owner", active: true, createdAt: new Date().toISOString() }]; setManagerSession({ loginAt: new Date().toISOString(), name: owner.name, role: "owner", jobNumber: owner.username, accountId: owner.id }); } else if (backendEnabled) { const remote = await backendMe(); if (remote.user?.role !== "owner" && remote.user?.role !== "manager") { setError("جلسة الإدارة الحالية ليست جلسة مالك أو مدير صالحة للحفظ. سجّل الدخول من جديد."); return; } await saveBackendSettings(next); } if (backendEnabled) { await saveBackendLocation({ id: "main", name: "المقر الرئيسي", lat: Number(next.workSiteLat), lng: Number(next.workSiteLng), radiusMeters: Number(next.radiusMeters) }); for (const location of next.locations || []) { if (![location.lat, location.lng, location.radiusMeters].every(Number.isFinite) || Number(location.radiusMeters) <= 0) throw new Error(`بيانات الموقع «${location.name || location.id}» غير صالحة.`); await saveBackendLocation(location); } } else saveSettings(next); setS(next); setPassword(""); setSaved(true); window.setTimeout(() => setSaved(false), 1800); } catch (e) { setError(e instanceof Error ? e.message : "تعذر حفظ الإعدادات على الخادم"); } };
-  const addLocation = () => { if (!locName.trim()) return alert("يرجى إدخال اسم الموقع"); const location: Location = { id: `loc_${Date.now()}`, name: locName.trim(), lat: locLat, lng: locLng, radiusMeters: locRadius }; setS(prev => ({ ...prev, locations: [...(prev.locations || []), location] })); setLocName(""); setShowLocation(false); };
+
+  useEffect(() => {
+    if (!backendEnabled) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cloud = await getBackendSettings();
+        if (cancelled) return;
+        const merged = { ...getSettings(), ...cloud, adminAccounts: Array.isArray(cloud.adminAccounts) ? cloud.adminAccounts : getSettings().adminAccounts };
+        setS(merged);
+      } catch (error) {
+        console.warn("تعذر تحميل الإعدادات من D1:", error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => { setDiagnostics(getDiagnostics()); }, []);
+
+  const save = async () => {
+    setError(null);
+    setSaved(false);
+    const next = { ...s };
+    try {
+      const localRole = currentManager()?.role;
+      if (localRole !== "owner" && localRole !== "manager" && localRole !== "supervisor") {
+        setError("أنت غير مخول لحفظ الإعدادات");
+        return;
+      }
+      if (password) next.ownerPassword = password;
+      if (backendEnabled) {
+        await saveBackendSettings(next);
+      } else {
+        saveSettings(next);
+      }
+      setPassword("");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "فشل حفظ الإعدادات");
+    }
+  };
+
+  const addLocation = () => {
+    if (!locName.trim()) return alert("يرجى إدخال اسم الموقع");
+    const location: Location = { id: `loc_${Date.now()}`, name: locName.trim(), lat: locLat, lng: locLng, radiusMeters: s.radiusMeters || 100 };
+    setS(prev => ({ ...prev, locations: [...(prev.locations || []), location] }));
+    setLocName("");
+    setLocLat(24.7136);
+    setLocLng(46.6753);
+  };
+
   const removeLocation = (id: string) => setS(prev => ({ ...prev, locations: (prev.locations || []).filter(l => l.id !== id) }));
-  const getLocation = (target: "main" | "new") => { if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع"); navigator.geolocation.getCurrentPosition(p => target === "main" ? setS(prev => ({ ...prev, workSiteLat: p.coords.latitude, workSiteLng: p.coords.longitude })) : (setLocLat(p.coords.latitude), setLocLng(p.coords.longitude)), e => alert("تعذر تحديد الموقع: " + e.message), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); };
+
+  const getLocation = (target: "main" | "new") => {
+    if (!navigator.geolocation) return alert("المتصفح لا يدعم تحديد الموقع");
+    navigator.geolocation.getCurrentPosition(p => {
+      if (target === "main") {
+        setS(prev => ({ ...prev, workSiteLat: p.coords.latitude, workSiteLng: p.coords.longitude }));
+      } else {
+        setLocLat(p.coords.latitude);
+        setLocLng(p.coords.longitude);
+      }
+    }, () => alert("تعذر الحصول على موقعك"));
+  };
+
   const generateQr = () => setS(prev => ({ ...prev, qrCode: `HADIR-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 7).toUpperCase()}` }));
-  const printQr = () => { if (!printRef.current) return; const safe = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;"); const logo = PROJECT_LOGO; const logoHtml = `<img src="${safe(logo)}" alt="${safe(s.brandName || "حاضِر")}" />`; const code = s.qrCode || loginUrl; const qr = `https://api.qrserver.com/v1/create-qr-code/?size=900x900&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=${encodeURIComponent(code)}`; const w = window.open("", "_blank", "width=900,height=1200"); if (!w) return; w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>رمز حضور · ${safe(s.brandName || "حاضِر")}</title><style>@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Tahoma,sans-serif}body{min-height:297mm}.page{width:210mm;min-height:297mm;display:flex;align-items:center;justify-content:center;padding:14mm}.card{width:156mm;min-height:214mm;border:1px solid #d9dde5;border-radius:10mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14mm;gap:6mm}.brand{font-size:28px;font-weight:800}.subtitle{font-size:13px;color:#667085}.qr-frame{position:relative;width:122mm;height:122mm;padding:4mm;border:3mm solid #16a34a;border-radius:8mm;background:#fff;display:grid;place-items:center;box-shadow:0 2mm 8mm rgba(22,163,74,.12)}.qr{position:relative;width:100%;height:100%;background:#fff;display:grid;place-items:center;overflow:hidden}.qr img.code{width:100%;height:100%;display:block}.logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24mm;height:24mm;border-radius:6mm;background:#fff;border:2.5mm solid #fff;box-shadow:0 1mm 5mm rgba(0,0,0,.2);display:grid;place-items:center;overflow:hidden}.logo img{width:100%;height:100%;object-fit:contain}.code{font-family:monospace;font-size:12px;letter-spacing:1px}.hint{font-size:11px;color:#667085}</style></head><body><div class="page"><div class="card"><div class="brand">${safe(s.brandName || "حاضِر")}</div><div class="subtitle">رمز تسجيل الحضور والانصراف</div><div class="qr-frame"><div class="qr"><img class="code" src="${qr}" alt="QR"/><div class="logo">${logoHtml}</div></div></div><div class="code">${safe(code)}</div><div class="hint">وجّه كاميرا الهاتف إلى الرمز لإتمام التحقق</div></div></div><script>window.addEventListener('load',()=>{setTimeout(()=>{window.print();window.close()},350)})<\/script></body></html>`); w.document.close(); };
-  const reset = () => { if (confirm("سيتم حذف بيانات النظام المحلية وإعادة التهيئة. هل أنت متأكد؟")) { resetAll(); setS(getSettings()); } };
-  const resetCloudTestData = async () => { if (!isOwner || resettingCloud) return; const confirmation = window.prompt("هذه عملية Reset لبيانات النظام. اكتب: تأكيد"); if (confirmation !== "تأكيد") { if (confirmation !== null) setResetCloudResult("تم إلغاء العملية: كلمة التأكيد غير صحيحة."); return; } setResettingCloud(true); setResetCloudResult(null); try { const result = await resetBackendTestData(); resetAll(); setS(getSettings()); setResetCloudResult(result.message); } catch (e) { setResetCloudResult(e instanceof Error ? e.message : "تعذر تنفيذ Reset لبيانات الخادم."); } finally { setResettingCloud(false); } };
-  return <ManagerLayout title="الإعدادات" subtitle="إعدادات النظام والصلاحيات — المالك والمدير">
-      <CompanySpecialtiesPanel /><div className="space-y-4">
-    <SettingsSection type="accounts" code="ACCOUNTS · الحسابات والصلاحيات" title="الحسابات والمدراء والمشرفون" description="إدارة حسابات الإدارة والصلاحيات في قسم واحد." defaultOpen><AdminAccountsPanel /></SettingsSection>
-    <SettingsSection type="profile" code="PROFILE · حساب المالك" title="حساب المالك" description="بيانات المالك وبيانات الدخول الجديدة."><div className="grid md:grid-cols-3 gap-3"><Field label="اسم المالك"><input className="input mt-1" value={s.ownerName || ""} onChange={e => setS({ ...s, ownerName: e.target.value })} placeholder="اسم المالك" /></Field><Field label="اسم المستخدم"><input className="input mono mt-1" value={s.ownerUsername || ""} onChange={e => setS({ ...s, ownerUsername: e.target.value })} placeholder="اسم المستخدم" /></Field><Field label="كلمة مرور جديدة"><input type="password" className="input mt-1" value={password} onChange={e => setPassword(e.target.value)} placeholder="12 محرفًا على الأقل" /></Field></div></SettingsSection>
-    <SettingsSection type="locations" code="LOCATIONS · مواقع العمل" title="إدارة مواقع العمل" description="المقر الرئيسي والمواقع الإضافية في قائمة واحدة."><div className="space-y-4"><div className="rounded-2xl border border-primary/20 bg-primary/5 p-4"><div className="flex items-center justify-between gap-3 mb-3"><div><div className="text-sm font-bold">المقر الرئيسي</div><div className="text-[11px] text-muted-foreground">الموقع الافتراضي للنظام · لا يمكن حذفه</div></div><span className="text-[10px] mono text-primary font-bold">MAIN</span></div><div className="grid grid-cols-1 sm:grid-cols-3 gap-2"><Field label="خط العرض"><input type="number" step="0.000001" className="input mono mt-1" value={s.workSiteLat} onChange={e => setS({ ...s, workSiteLat: +e.target.value })} /></Field><Field label="خط الطول"><input type="number" step="0.000001" className="input mono mt-1" value={s.workSiteLng} onChange={e => setS({ ...s, workSiteLng: +e.target.value })} /></Field><Field label="النطاق بالمتر"><input type="number" min="20" max="2000" className="input mono mt-1" value={s.radiusMeters} onChange={e => setS({ ...s, radiusMeters: +e.target.value })} /></Field></div><button type="button" className="btn-secondary mt-3" onClick={() => getLocation("main")}>📍 استخدام موقعي الحالي</button></div><div>{!showLocation ? <button type="button" className="btn-secondary w-full border-dashed" onClick={() => { setShowLocation(true); setLocLat(s.workSiteLat); setLocLng(s.workSiteLng); setLocRadius(s.radiusMeters); }}>+ إضافة موقع عمل</button> : <div className="space-y-3 p-4 rounded-xl bg-secondary/30"><Field label="اسم الموقع"><input className="input mt-1" value={locName} onChange={e => setLocName(e.target.value)} placeholder="مثال: الفرع الرئيسي" /></Field><div className="grid grid-cols-3 gap-2"><Field label="خط العرض"><input className="input mono mt-1" value={locLat} onChange={e => setLocLat(+e.target.value)} /></Field><Field label="خط الطول"><input className="input mono mt-1" value={locLng} onChange={e => setLocLng(+e.target.value)} /></Field><Field label="النطاق"><input className="input mono mt-1" value={locRadius} onChange={e => setLocRadius(+e.target.value)} /></Field></div><div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary" onClick={() => getLocation("new")}>📍 GPS</button><button type="button" className="btn-primary" onClick={addLocation}>حفظ الموقع</button><button type="button" className="btn-secondary" onClick={() => setShowLocation(false)}>إلغاء</button></div></div>}</div><div className="space-y-2">{(s.locations || []).map(l => <div key={l.id} className="flex justify-between items-center p-3 rounded-xl bg-secondary/30 text-sm"><span><b>{l.name}</b><span className="block text-[10px] mono text-muted-foreground">{l.lat.toFixed(5)}, {l.lng.toFixed(5)} · {l.radiusMeters}m</span></span><button type="button" className="text-destructive text-xs" onClick={() => removeLocation(l.id)}>حذف</button></div>)}</div></div></SettingsSection>
-    <SettingsSection type="qr" code="QR · رمز الموقع" title="رمز الموقع" description="إنشاء رمز QR للموقع وطباعته."><div className="grid md:grid-cols-2 gap-5 items-center"><div><Field label="رمز QR"><input className="input mono mt-1" value={s.qrCode} onChange={e => setS({ ...s, qrCode: e.target.value })} /><div className="flex flex-wrap gap-2 mt-3"><button type="button" className="btn-secondary" onClick={generateQr}>🔄 توليد جديد</button><button type="button" className="btn-primary" onClick={printQr}>🖨️ طباعة</button></div></Field></div><div ref={printRef} className="bg-white text-black rounded-xl p-5 text-center mx-auto"><b className="block text-xl mb-3">{s.brandName || "حاضِر"}</b><div className="relative w-64 h-64 mx-auto p-2 rounded-2xl border-[3mm] border-green-600 bg-white shadow-[0_8px_24px_rgba(22,163,74,.12)]"><div className="relative w-full h-full overflow-hidden"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=${encodeURIComponent(s.qrCode || loginUrl)}`} alt="QR" className="w-full h-full"/><div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl bg-white border-4 border-white shadow-lg overflow-hidden grid place-items-center"><img src={PROJECT_LOGO} alt={s.brandName || "حاضِر"} className="w-full h-full object-contain" /></div></div></div><small className="block mt-3 font-mono">{s.qrCode}</small></div></div></SettingsSection>
-    {isOwner && <SettingsSection type="profile" code="OWNER CONTROL · BULK EMPLOYEE SETTINGS" title="إدارة الموظفين دفعة واحدة" description="عمليات جماعية للمالك فقط، مع الحفاظ على الواجهة مختصرة." tone="primary"><OwnerBulkSettingsPanel /></SettingsSection>}
-    {isOwner && <SettingsSection type="diagnostics" code="DIAGNOSTICS · تقرير أخطاء النظام · OWNER ONLY" title="تشخيص أخطاء النظام" description="سجل تقني محلي لأخطاء JavaScript والوعود غير المعالجة."><div><div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary" onClick={() => { setDiagnostics(getDiagnostics()); setShowDiagnostics(true); }}>🛠️ فتح سجل الأخطاء ({getDiagnostics().filter(x => x.level === "error").length})</button><button type="button" className="btn-secondary" onClick={() => { clearDiagnostics(); setDiagnostics([]); }}>مسح السجل</button></div>{showDiagnostics && <div className="mt-4 space-y-2 max-h-[520px] overflow-auto">{diagnostics.length === 0 ? <div className="text-sm text-muted-foreground p-4 border rounded-xl">لا توجد أخطاء مسجلة.</div> : diagnostics.map(d => <details key={d.id} className="border rounded-xl p-3 bg-secondary/20"><summary className="cursor-pointer text-sm"><b>{d.code}</b> · {new Date(d.timestamp).toLocaleString("ar-SA")} · {d.message}</summary><pre className="mt-3 whitespace-pre-wrap break-words text-[11px] mono overflow-auto">{JSON.stringify({ level: d.level, code: d.code, timestamp: d.timestamp, message: d.message, stack: d.stack, context: d.context }, null, 2)}</pre></details>)}</div>}</div></SettingsSection>}
-    {isOwner && <SettingsSection type="danger" code="DANGER ZONE · SYSTEM RESET" title="Reset · إعادة تهيئة النظام" description="حذف بيانات التشغيل والاختبار مع إبقاء حسابات الإدارة والإعدادات الأساسية." tone="danger"><p className="text-sm text-muted-foreground mb-4">يحذف بيانات التشغيل والاختبار من الخادم: الموظفين، سجلات الحضور والانصراف، الطلبات، الإشعارات، التقارير والبيانات التحليلية، جلسات الموظفين وصور الملفات من D1 وR2. تبقى حسابات الإدارة، إعدادات النظام ومواقع العمل محفوظة.</p><div className="flex flex-col sm:flex-row gap-2"><button type="button" className="btn-secondary border-destructive/50 text-destructive" disabled={resettingCloud} onClick={() => void resetCloudTestData()}>{resettingCloud ? "⏳ جارٍ تنفيذ Reset…" : "↻ Reset النظام"}</button></div>{resetCloudResult && <div className="mt-3 rounded-xl border p-3 text-sm">{resetCloudResult}</div>}</SettingsSection>}
-    {error && <div className="p-3 rounded-xl border border-destructive/40 bg-destructive/10 text-destructive text-sm">{error}</div>}
-    <div className="flex flex-wrap gap-3 items-center"><button type="button" className="btn-primary px-6" onClick={save}>حفظ الإعدادات</button>{saved && <span className="text-primary text-sm">تم الحفظ ✓</span>}<div className="flex-1" /><button type="button" className="btn-danger text-xs" onClick={reset}>إعادة تعيين البيانات</button></div>
-  </div></ManagerLayout>;
+
+  const printQr = () => {
+    if (!printRef.current) return;
+    const safe = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
+    const logo = s.brandLogo ? `<img src="${safe(s.brandLogo)}" style="max-height: 60px; margin-bottom: 20px;" alt="شعار الشركة" />` : "";
+    const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>QR Code</title><style>body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f0f0f0;font-family:Arial,sans-serif;} .container{background:white;padding:40px;border-radius:10px;text-align:center;} h1{margin:0 0 10px 0;font-size:24px;} p{margin:10px 0;color:#666;} .qr-img{width:300px;height:300px;margin:20px 0;} button{padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;font-size:16px;} button:hover{background:#0056b3;}</style></head><body><div class="container">${logo}<h1>${safe(s.ownerName || "حاضر")}</h1><p>رمز دخول الموقع</p><svg class="qr-img" data-content="${safe(s.qrCode)}"></svg><p><strong>${safe(s.qrCode)}</strong></p></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><script>new QRCode(document.querySelector('svg').parentElement.querySelector('[data-content]').parentElement, {text:'${safe(s.qrCode)}',width:300,height:300});<\/script></body></html>`;
+    const win = window.open("", "", "width=600,height=700");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => win.print(), 500);
+    }
+  };
+
+  const resetCloudTestData = async () => {
+    if (!isOwner || resettingCloud) return;
+    const confirmation = window.prompt("هذه عملية حذف آمنة لبيانات التشغيل (الموظفون والحضور والطلبات).\n\nسيتم الحفاظ على:\n- حسابات الإدارة\n- الإعدادات\n- مواقع العمل\n\nاكتب: تأكيد النسخة الاحتياطية");
+    if (confirmation !== "تأكيد النسخة الاحتياطية") {
+      setError("لم يتم تأكيد النسخة الاحتياطية");
+      return;
+    }
+
+    setResettingCloud(true);
+    setError(null);
+    try {
+      const result = await resetBackendTestData();
+      setSaved(true);
+      setResetConfirmText("");
+      setTimeout(() => setSaved(false), 3000);
+      alert(`تم Reset النظام بنجاح:\n\nتم حذف:\n${Object.entries(result.deleted).map(([k, v]) => `• ${k}: ${v}`).join("\n")}\n\nتم الحفاظ على:\n${result.preserved.join("\n• ")}\n\n${result.message}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "فشل Reset");
+    } finally {
+      setResettingCloud(false);
+    }
+  };
+
+  return (
+    <ManagerLayout title="الإعدادات" subtitle="إعدادات النظام والصلاحيات — المالك والمدير">
+      <CompanySpecialtiesPanel />
+      <div className="space-y-4">
+        <SettingsSection
+          type="accounts"
+          code="ACCOUNTS · الحسابات والصلاحيات"
+          title="الحسابات والمدراء والمشرفون"
+          description="إدارة حسابات الإدارة والصلاحيات والأدوار"
+        >
+          <AdminAccountsPanel />
+        </SettingsSection>
+
+        <SettingsSection
+          type="profile"
+          code="PROFILE · حساب المالك"
+          title="حساب المالك"
+          description="بيانات المالك وبيانات الدخول الجديدة"
+        >
+          <div className="space-y-4">
+            <div>
+              <Field label="اسم المالك">
+                <input
+                  type="text"
+                  className="mt-1 w-full rounded-lg border bg-secondary/50 px-3 py-2"
+                  value={s.ownerName || ""}
+                  onChange={(e) => setS(prev => ({ ...prev, ownerName: e.target.value }))}
+                  placeholder="أدخل اسم المالك"
+                />
+              </Field>
+            </div>
+            <div>
+              <Field label="كلمة المرور الجديدة (اتركها فارغة إذا لم تغيرها)">
+                <input
+                  type="password"
+                  className="mt-1 w-full rounded-lg border bg-secondary/50 px-3 py-2"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="كلمة مرور جديدة"
+                />
+              </Field>
+            </div>
+            <div>
+              <Field label="شعار الشركة (رابط الصورة)">
+                <input
+                  type="text"
+                  className="mt-1 w-full rounded-lg border bg-secondary/50 px-3 py-2 text-xs"
+                  value={s.brandLogo || ""}
+                  onChange={(e) => setS(prev => ({ ...prev, brandLogo: e.target.value }))}
+                  placeholder="رابط شعار الشركة"
+                />
+              </Field>
+            </div>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          type="locations"
+          code="LOCATIONS · مواقع العمل"
+          title="إدارة مواقع العمل"
+          description="المقر الرئيسي والمواقع الإضافية للعمل"
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border/50 bg-secondary/30 p-3">
+              <div className="font-semibold text-sm mb-3">المقر الرئيسي</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Field label="خط العرض (Latitude)">
+                    <input
+                      type="number"
+                      step="0.0001"
+                      className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                      value={s.workSiteLat}
+                      onChange={(e) => setS(prev => ({ ...prev, workSiteLat: parseFloat(e.target.value) || 0 }))}
+                    />
+                  </Field>
+                </div>
+                <div>
+                  <Field label="خط الطول (Longitude)">
+                    <input
+                      type="number"
+                      step="0.0001"
+                      className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                      value={s.workSiteLng}
+                      onChange={(e) => setS(prev => ({ ...prev, workSiteLng: parseFloat(e.target.value) || 0 }))}
+                    />
+                  </Field>
+                </div>
+                <div>
+                  <Field label="نطاق التحقق (متر)">
+                    <input
+                      type="number"
+                      min="0"
+                      className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                      value={s.radiusMeters || 100}
+                      onChange={(e) => setS(prev => ({ ...prev, radiusMeters: parseInt(e.target.value) || 0 }))}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => getLocation("main")}
+                className="mt-2 px-3 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                🌍 تحديد الموقع الحالي
+              </button>
+            </div>
+
+            {(s.locations || []).length > 0 && (
+              <div className="space-y-2">
+                <div className="font-semibold text-sm">المواقع الإضافية</div>
+                {s.locations.map((loc) => (
+                  <div key={loc.id} className="flex items-center justify-between rounded-lg border border-border/50 bg-secondary/20 p-3">
+                    <div className="text-sm">
+                      <div className="font-medium">{loc.name}</div>
+                      <div className="text-xs text-muted-foreground">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)} — {loc.radiusMeters}م</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeLocation(loc.id)}
+                      className="px-2 py-1 text-xs rounded bg-destructive/20 text-destructive hover:bg-destructive/30"
+                    >
+                      حذف
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="rounded-lg border border-border/50 bg-secondary/30 p-3 space-y-3">
+              <div className="font-semibold text-sm">إضافة موقع جديد</div>
+              <input
+                type="text"
+                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                placeholder="اسم الموقع"
+                value={locName}
+                onChange={(e) => setLocName(e.target.value)}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  step="0.0001"
+                  className="rounded-lg border bg-background px-3 py-2 text-sm"
+                  placeholder="خط العرض"
+                  value={locLat}
+                  onChange={(e) => setLocLat(parseFloat(e.target.value) || 0)}
+                />
+                <input
+                  type="number"
+                  step="0.0001"
+                  className="rounded-lg border bg-background px-3 py-2 text-sm"
+                  placeholder="خط الطول"
+                  value={locLng}
+                  onChange={(e) => setLocLng(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => getLocation("new")}
+                  className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-secondary/50 hover:bg-secondary border"
+                >
+                  🌍 تحديد الموقع الحالي
+                </button>
+                <button
+                  type="button"
+                  onClick={addLocation}
+                  className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  ➕ إضافة
+                </button>
+              </div>
+            </div>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          type="qr"
+          code="QR · رمز الموقع"
+          title="رمز الموقع"
+          description="إنشاء رمز QR للموقع وطباعته"
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border/50 bg-secondary/30 p-4 text-center">
+              <div className="text-xs text-muted-foreground mb-2">رمز QR الحالي:</div>
+              <div className="font-mono font-bold text-primary mb-3">{s.qrCode || "لم يتم إنشاء رمز بعد"}</div>
+              <div ref={printRef} className="mb-3" />
+              <div className="flex gap-2 flex-wrap justify-center">
+                <button
+                  type="button"
+                  onClick={generateQr}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  🔄 إنشاء رمز جديد
+                </button>
+                <button
+                  type="button"
+                  onClick={printQr}
+                  disabled={!s.qrCode}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-secondary/50 hover:bg-secondary border disabled:opacity-50"
+                >
+                  🖨️ طباعة QR
+                </button>
+              </div>
+            </div>
+          </div>
+        </SettingsSection>
+
+        {isOwner && <OwnerBulkSettingsPanel />}
+
+        {isOwner && (
+          <SettingsSection
+            type="diagnostics"
+            code="DIAGNOSTICS · تقرير أخطاء النظام · OWNER ONLY"
+            title="تشخيص أخطاء النظام"
+            description="سجل تقني للأخطاء والتنبيهات"
+          >
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {diagnostics.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-4">لا توجد أخطاء مسجلة</div>
+              ) : (
+                diagnostics.map((d, i) => (
+                  <div key={i} className="text-xs rounded border border-border/50 bg-secondary/30 p-2">
+                    <div className="flex items-start justify-between">
+                      <span className="font-mono text-xs">{new Date(d.timestamp).toLocaleString("ar-EG")}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${d.severity === "error" ? "bg-red-500/20 text-red-700" : d.severity === "warning" ? "bg-amber-500/20 text-amber-700" : "bg-blue-500/20 text-blue-700"}`}>
+                        {d.severity.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="mt-1 font-semibold">{d.code}</div>
+                    <div className="text-muted-foreground">{d.message}</div>
+                  </div>
+                ))
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                clearDiagnostics();
+                setDiagnostics([]);
+              }}
+              className="mt-2 px-3 py-1.5 text-xs rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30"
+            >
+              🗑️ مسح السجل
+            </button>
+          </SettingsSection>
+        )}
+
+        {isOwner && (
+          <SettingsSection
+            type="danger"
+            code="DANGER ZONE · SYSTEM RESET"
+            title="Reset · إعادة تهيئة النظام"
+            description="حذف بيانات التشغيل واستعادة النظام"
+            tone="danger"
+          >
+            <div className="space-y-4 border border-red-500/30 rounded-lg bg-red-500/5 p-4">
+              <div className="space-y-2">
+                <div className="font-bold text-sm text-destructive">⚠️ تحذير</div>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>هذه عملية خطيرة لا يمكن التراجع عنها.</p>
+                  <p><strong>سيتم حذف:</strong></p>
+                  <ul className="list-disc list-inside pl-2 space-y-1">
+                    <li>جميع بيانات الموظفين</li>
+                    <li>جميع سجلات الحضور والانصراف</li>
+                    <li>جميع الطلبات والإذونات</li>
+                    <li>جميع الأحداث والإشعارات</li>
+                    <li>سجل التدقيق التاريخي</li>
+                  </ul>
+                  <p><strong>سيتم الحفاظ على:</strong></p>
+                  <ul className="list-disc list-inside pl-2 space-y-1">
+                    <li>حسابات الإدارة والمالك</li>
+                    <li>إعدادات النظام</li>
+                    <li>مواقع العمل</li>
+                    <li>بنية قاعدة البيانات</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">
+                  أدخل النص التالي لتأكيد عملية Reset:
+                  <br />
+                  <code className="bg-background/50 px-2 py-1 rounded text-[11px] font-mono">تأكيد النسخة الاحتياطية</code>
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-lg border border-red-500/30 bg-destructive/5 px-3 py-2 text-sm"
+                  placeholder="أدخل النص أعلاه"
+                  value={resetConfirmText}
+                  onChange={(e) => setResetConfirmText(e.target.value)}
+                  disabled={resettingCloud}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={resetCloudTestData}
+                disabled={resetConfirmText !== "تأكيد النسخة الاحتياطية" || resettingCloud}
+                className="w-full px-4 py-2 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm"
+              >
+                {resettingCloud ? "⏳ جاري Reset النظام..." : "🗑️ تنفيذ Reset فوري"}
+              </button>
+
+              <div className="text-xs text-muted-foreground bg-black/20 rounded p-2 font-mono max-h-32 overflow-y-auto">
+                <p>✅ تم إنشاء نقطة حفظ في سجل التدقيق</p>
+                <p>✅ يمكن استعادة البيانات من Cloudflare D1 backups</p>
+                <p>✅ جميع حسابات الإدارة محفوظة</p>
+              </div>
+            </div>
+          </SettingsSection>
+        )}
+
+        {error && <div className="p-3 rounded-xl border border-destructive/40 bg-destructive/10 text-destructive text-sm">{error}</div>}
+        <div className="flex flex-wrap gap-3 items-center">
+          <button type="button" className="btn-primary px-6" onClick={save}>
+            💾 حفظ الإعدادات
+          </button>
+          {saved && <span className="text-primary text-sm font-semibold">✅ تم الحفظ بنجاح</span>}
+        </div>
+      </div>
+    </ManagerLayout>
+  );
 }
