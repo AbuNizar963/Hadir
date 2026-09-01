@@ -34,3 +34,4 @@ fs.writeFileSync(scanPath, scan);
 
 console.log("QR-only patch applied: legacy QR design restored and QR scanning cadence optimized.");
 // Temporary helper; removed automatically after successful verification.
+// QR-only CI retry: use the repository's pinned Bun toolchain.
