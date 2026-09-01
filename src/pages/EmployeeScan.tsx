@@ -157,7 +157,7 @@ export default function EmployeeScan() {
     if (!navigator.mediaDevices?.getUserMedia) { setError("هذا المتصفح لا يدعم الكاميرا. يمكنك إدخال قيمة QR يدويًا."); return; }
     try {
       stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16 / 9 } }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 }, aspectRatio: { ideal: 16 / 9 } }, audio: false });
       mediaStreamRef.current = stream;
       const track = stream.getVideoTracks()[0];
       const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean } | undefined;
@@ -189,7 +189,7 @@ export default function EmployeeScan() {
     scanningRef.current = true;
     const scan = async () => {
       if (cancelled || !scanningRef.current || !videoRef.current || video.readyState < 2) {
-        if (!cancelled && scanningRef.current) scanTimerRef.current = window.setTimeout(() => void scan(), 250);
+        if (!cancelled && scanningRef.current) scanTimerRef.current = window.setTimeout(() => void scan(), 120);
         return;
       }
       try {
@@ -197,9 +197,9 @@ export default function EmployeeScan() {
         const value = codes.find((code) => code.rawValue)?.rawValue?.trim();
         if (value) { setQrInput(value); stopCamera(); return; }
       } catch { /* keep scanning */ }
-      if (!cancelled && scanningRef.current) scanTimerRef.current = window.setTimeout(() => void scan(), 250);
+      if (!cancelled && scanningRef.current) scanTimerRef.current = window.setTimeout(() => void scan(), 120);
     };
-    scanTimerRef.current = window.setTimeout(() => void scan(), 300);
+    scanTimerRef.current = window.setTimeout(() => void scan(), 120);
     return () => { cancelled = true; scanningRef.current = false; if (scanTimerRef.current !== null) { window.clearTimeout(scanTimerRef.current); scanTimerRef.current = null; } };
   }, [isCameraActive]);
 
