@@ -2,80 +2,28 @@ name: QR-only isolated fix
 
 on:
   push:
-    branches:
-      - qr-only-fix-20260901
+    branches: [qr-only-fix-20260901]
 
 permissions:
   contents: write
 
 jobs:
-  apply-qr-only-fix:
+  apply:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout branch
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Apply only QR changes
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
+      - name: Apply QR-only patch
+        run: node scripts/qr-only-fix.mjs
 
-          const settingsPath = 'src/pages/ManagerSettings.tsx';
-          const scanPath = 'src/pages/EmployeeScan.tsx';
-
-          let settings = fs.readFileSync(settingsPath, 'utf8');
-          const oldPrintQr = `  const printQr = () => {
-    if (!printRef.current) return;
-    const safe = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\\\"/g, "&quot;");
-    const logo = PROJECT_LOGO;
-    const logoHtml = \`<img src="\${safe(logo)}" alt="\${safe(s.brandName || "حاضِر")}" />\`;
-    const code = s.qrCode || loginUrl;
-    const qr = \`https://api.qrserver.com/v1/create-qr-code/?size=900x900&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=\${encodeURIComponent(code)}\`;
-    const w = window.open("", "_blank", "width=900,height=1200");
-    if (!w) return;
-    w.document.write(\`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>رمز حضور · \${safe(s.brandName || "حاضِر")}</title><style>@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Tahoma,sans-serif}body{min-height:297mm}.page{width:210mm;min-height:297mm;display:flex;align-items:center;justify-content:center;padding:14mm}.card{width:156mm;min-height:214mm;border:1px solid #d9dde5;border-radius:10mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14mm;gap:6mm}.brand{font-size:28px;font-weight:800}.subtitle{font-size:13px;color:#667085}.qr-frame{position:relative;width:122mm;height:122mm;padding:4mm;border:3mm solid #16a34a;border-radius:8mm;background:#fff;display:grid;place-items:center;box-shadow:0 2mm 8mm rgba(22,163,74,.12)}.qr{position:relative;width:100%;height:100%;background:#fff;display:grid;place-items:center;overflow:hidden}.qr img.code{width:100%;height:100%;display:block}.logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:24mm;height:24mm;border-radius:6mm;background:#fff;border:2.5mm solid #fff;box-shadow:0 1mm 5mm rgba(0,0,0,.2);display:grid;place-items:center;overflow:hidden}.logo img{width:100%;height:100%;object-fit:contain}.code{font-family:monospace;font-size:12px;letter-spacing:1px}.hint{font-size:11px;color:#667085}</style></head><body><div class="page"><div class="card"><div class="brand">\${safe(s.brandName || "حاضِر")}</div><div class="subtitle">رمز تسجيل الحضور والانصراف</div><div class="qr-frame"><div class="qr"><img class="code" src="\${qr}" alt="QR"/><div class="logo">\${logoHtml}</div></div></div><div class="code">\${safe(code)}</div><div class="hint">وجّه كاميرا الهاتف إلى الرمز لإتمام التحقق</div></div></div><script>window.addEventListener('load',()=>{setTimeout(()=>{window.print();window.close()},350)})<\\/script></body></html>\`);
-    w.document.close();
-  };`;
-
-          const printPattern = /  const printQr = \(\) => \{[\\s\\S]*?\n  \};(?=\n\n  const resetCloudTestData)/;
-          if (!printPattern.test(settings)) {
-            throw new Error('QR-only fix aborted: current printQr block does not match the expected production version.');
-          }
-          settings = settings.replace(printPattern, oldPrintQr);
-          fs.writeFileSync(settingsPath, settings);
-
-          let scan = fs.readFileSync(scanPath, 'utf8');
-          const cameraOld = 'video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16 / 9 } }, audio: false';
-          const cameraNew = 'video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 }, aspectRatio: { ideal: 16 / 9 } }, audio: false';
-          if (!scan.includes(cameraOld)) throw new Error('QR-only fix aborted: expected camera constraints not found.');
-          scan = scan.replace(cameraOld, cameraNew);
-          const timerOld = 'scanTimerRef.current = window.setTimeout(() => void scan(), 250);';
-          const timerNew = 'scanTimerRef.current = window.setTimeout(() => void scan(), 120);';
-          const timerCount = (scan.match(new RegExp(timerOld.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), 'g')) || []).length;
-          if (timerCount !== 2) throw new Error(`QR-only fix aborted: expected 2 QR scan timers, found ${timerCount}.`);
-          scan = scan.replaceAll(timerOld, timerNew);
-          const initialOld = 'scanTimerRef.current = window.setTimeout(() => void scan(), 300);';
-          const initialNew = 'scanTimerRef.current = window.setTimeout(() => void scan(), 120);';
-          if (!scan.includes(initialOld)) throw new Error('QR-only fix aborted: initial QR scan timer not found.');
-          scan = scan.replace(initialOld, initialNew);
-          fs.writeFileSync(scanPath, scan);
-          NODE
-
-      - name: Verify only QR files changed
-        shell: bash
+      - name: Verify scope and code
         run: |
           git diff --check
-          files=$(git diff --name-only)
-          expected=$'src/pages/EmployeeScan.tsx\nsrc/pages/ManagerSettings.tsx'
-          if [ "$files" != "$expected" ]; then
-            echo "Unexpected changed files:"
-            printf '%s\n' "$files"
-            exit 1
-          fi
+          test "$(git diff --name-only)" = $'src/pages/EmployeeScan.tsx\nsrc/pages/ManagerSettings.tsx'
           grep -q 'api.qrserver.com/v1/create-qr-code/?size=900x900&ecc=H&margin=3' src/pages/ManagerSettings.tsx
           ! grep -q 'cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js' src/pages/ManagerSettings.tsx
           grep -q 'width: { ideal: 1280 }' src/pages/EmployeeScan.tsx
@@ -92,12 +40,11 @@ jobs:
           VITE_BASE_PATH: /
         run: bun run build
 
-      - name: Commit QR-only changes and remove temporary workflow
-        shell: bash
+      - name: Commit and remove temporary patch files
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/qr-only-fix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/qr-only-fix.yml scripts/qr-only-fix.mjs
           git add src/pages/EmployeeScan.tsx src/pages/ManagerSettings.tsx
-          git commit -m "fix: restore legacy QR design and speed up QR scanning"
+          git commit -m 'fix: restore legacy QR design and speed up QR scanning'
           git push origin HEAD:qr-only-fix-20260901
