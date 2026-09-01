@@ -33,3 +33,4 @@ scan = scan.replace(initialOld, initialNew);
 fs.writeFileSync(scanPath, scan);
 
 console.log("QR-only patch applied: ManagerSettings legacy QR + faster EmployeeScan QR detection.");
+// This file is intentionally temporary and is removed by the workflow after a successful build.
