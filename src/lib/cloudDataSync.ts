@@ -1,6 +1,10 @@
 import { subscribeD1View, getD1View } from "@/lib/d1View";
 import { syncReportData } from "@/lib/reportSync";
 
+export async function hydrateLocalData() {
+  await syncReportData();
+}
+
 export async function initializeDataSync() {
   if (typeof window === "undefined") return;
   
