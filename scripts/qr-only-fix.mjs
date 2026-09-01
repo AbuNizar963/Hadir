@@ -5,11 +5,11 @@ const settingsPath = "src/pages/ManagerSettings.tsx";
 const scanPath = "src/pages/EmployeeScan.tsx";
 const legacySettings = execFileSync("git", ["show", "505908851972d6520543dd6393459750fe937bc2:src/pages/ManagerSettings.tsx"], { encoding: "utf8" });
 
-const legacyMatch = legacySettings.match(/  const printQr = \(\) => \{[\s\S]*?\n  \};(?=\n  const reset(?:CloudTestData)? =)/);
+const legacyMatch = legacySettings.match(/  const printQr = \(\) => \{[\s\S]*?(?=  const reset =)/);
 if (!legacyMatch) throw new Error("QR-only fix aborted: legacy QR block was not found in the known backup commit.");
 
 let settings = fs.readFileSync(settingsPath, "utf8");
-const currentPattern = /  const printQr = \(\) => \{[\s\S]*?\n  \};(?=\n\n  const resetCloudTestData)/;
+const currentPattern = /  const printQr = \(\) => \{[\s\S]*?(?=  const resetCloudTestData =)/;
 if (!currentPattern.test(settings)) throw new Error("QR-only fix aborted: current printQr block does not match the expected production version.");
 settings = settings.replace(currentPattern, legacyMatch[0]);
 fs.writeFileSync(settingsPath, settings);
@@ -32,5 +32,5 @@ if (!scan.includes(initialOld)) throw new Error("QR-only fix aborted: initial QR
 scan = scan.replace(initialOld, initialNew);
 fs.writeFileSync(scanPath, scan);
 
-console.log("QR-only patch applied: ManagerSettings legacy QR + faster EmployeeScan QR detection.");
-// This file is intentionally temporary and is removed by the workflow after a successful build.
+console.log("QR-only patch applied: legacy QR design restored and QR scanning cadence optimized.");
+// Temporary helper; removed automatically after successful verification.
