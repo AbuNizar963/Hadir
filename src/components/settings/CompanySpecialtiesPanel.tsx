@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { BriefcaseBusiness, ImagePlus, Plus, Trash2, X } from "lucide-react";
+import { BriefcaseBusiness, ImagePlus, Plus, Trash2, X, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Settings } from "@/types";
-import { getSettings } from "@/lib/storage";
+import { getSettings, saveSettings } from "@/lib/storage";
 import { getBackendSettings, saveBackendSettings } from "@/lib/backend";
 import { compressProfileImageDataUrl } from "@/lib/imageCompression";
 
@@ -79,6 +79,9 @@ export default function CompanySpecialtiesPanel() {
     }
     if (patch.brandName !== undefined) setBrandName(patch.brandName || "");
     if (patch.brandLogo !== undefined) setBrandLogo(patch.brandLogo || null);
+    // Keep the browser cache synchronized for the report UI while the source of
+    // truth remains the central backend settings record.
+    saveSettings(nextSettings);
     setSaving(true);
     setMessage(null);
     try {
@@ -131,6 +134,14 @@ export default function CompanySpecialtiesPanel() {
     }
   }
 
+  async function moveSpecialty(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= items.length || saving) return;
+    const next = [...items];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    await persist({ specialties: next });
+  }
+
   return (
     <section className="rounded-2xl border border-border/70 bg-card/60 p-5 shadow-sm">
       <div className="space-y-6">
@@ -178,8 +189,22 @@ export default function CompanySpecialtiesPanel() {
                 <input type="text" inputMode="text" autoCapitalize="none" autoCorrect="off" value={value} onChange={e => setValue(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); const v = value.trim(); if (v && !items.includes(v)) { void persist({ specialties: [...items, v] }); setValue(""); } } }} placeholder="مثال: سائق" className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
                 <button type="button" disabled={saving || !value.trim() || items.includes(value.trim())} onClick={() => { const v = value.trim(); if (v && !items.includes(v)) { void persist({ specialties: [...items, v] }); setValue(""); } }} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-50"><Plus className="h-4 w-4" />إضافة</button>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {items.length ? items.map(item => <span key={item} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-bold">{item}<button type="button" disabled={saving} onClick={() => void persist({ specialties: items.filter(x => x !== item) })} className="rounded-full p-0.5 text-muted-foreground hover:text-destructive disabled:opacity-50" aria-label={`حذف ${item}`}><Trash2 className="h-3.5 w-3.5" /></button></span>) : <span className="text-xs text-muted-foreground">لم تتم إضافة تخصصات بعد.</span>}
+              <div className="mt-4 rounded-2xl border border-border/60 bg-background/40 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="text-[11px] font-bold text-muted-foreground">ترتيب الظهور في التقرير اليومي</div>
+                  <div className="text-[10px] text-muted-foreground">استخدم الأسهم لتحريك التخصص</div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {items.length ? items.map((item, index) => (
+                    <div key={item} className="inline-flex items-center gap-1 rounded-xl border border-border bg-background px-2 py-1.5 shadow-sm" draggable onDragStart={e => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(index)); }} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const from = Number(e.dataTransfer.getData("text/plain")); if (!Number.isInteger(from) || from === index || from < 0 || from >= items.length) return; const next = [...items]; const [moved] = next.splice(from, 1); next.splice(index, 0, moved); void persist({ specialties: next }); }}>
+                      <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground" aria-hidden="true" />
+                      <span className="max-w-[180px] truncate text-xs font-bold" title={item}>{item}</span>
+                      <button type="button" disabled={saving || index === 0} onClick={() => void moveSpecialty(index, -1)} className="rounded-md p-1 text-muted-foreground hover:bg-secondary disabled:opacity-30" aria-label={`نقل ${item} إلى الأمام`}><ChevronRight className="h-3.5 w-3.5" /></button>
+                      <button type="button" disabled={saving || index === items.length - 1} onClick={() => void moveSpecialty(index, 1)} className="rounded-md p-1 text-muted-foreground hover:bg-secondary disabled:opacity-30" aria-label={`نقل ${item} إلى الخلف`}><ChevronLeft className="h-3.5 w-3.5" /></button>
+                      <button type="button" disabled={saving} onClick={() => void persist({ specialties: items.filter(x => x !== item) })} className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-destructive disabled:opacity-50" aria-label={`حذف ${item}`}><Trash2 className="h-3.5 w-3.5" /></button>
+                    </div>
+                  )) : <span className="text-xs text-muted-foreground">لم تتم إضافة تخصصات بعد.</span>}
+                </div>
               </div>
             </div>
           </div>
