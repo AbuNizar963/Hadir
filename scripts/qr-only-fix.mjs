@@ -5,7 +5,7 @@ const settingsPath = "src/pages/ManagerSettings.tsx";
 const scanPath = "src/pages/EmployeeScan.tsx";
 const legacySettings = execFileSync("git", ["show", "505908851972d6520543dd6393459750fe937bc2:src/pages/ManagerSettings.tsx"], { encoding: "utf8" });
 
-const legacyMatch = legacySettings.match(/  const printQr = \(\) => \{[\s\S]*?\n  \};(?=\n  const resetCloudTestData)/);
+const legacyMatch = legacySettings.match(/  const printQr = \(\) => \{[\s\S]*?\n  \};(?=\n  const reset(?:CloudTestData)? =)/);
 if (!legacyMatch) throw new Error("QR-only fix aborted: legacy QR block was not found in the known backup commit.");
 
 let settings = fs.readFileSync(settingsPath, "utf8");
