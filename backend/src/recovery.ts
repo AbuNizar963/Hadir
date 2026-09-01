@@ -1,0 +1,363 @@
+type Env = { DB: D1Database; PROFILE_IMAGES: R2Bucket; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_RECOVERY_CODE?: string };
+
+const original = (await import("./index")).default;
+const { handleProfileImageRequest } = await import("./r2");
+const encoder = new TextEncoder();
+const PASSWORD_ITERATIONS = 100000;
+const RECOVERY_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RECOVERY_RATE_LIMIT_MAX = 5;
+
+function b64(data: ArrayBuffer | Uint8Array) {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function hashPassword(password: string) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: PASSWORD_ITERATIONS, hash: "SHA-256" }, key, 256);
+  return `pbkdf2$${PASSWORD_ITERATIONS}$${b64(salt)}$${b64(bits)}`;
+}
+
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
+  return b64(digest);
+}
+
+async function checkRecoveryRateLimit(req: Request, env: Env) {
+  const ip = req.headers.get("CF-Connecting-IP") || "unknown";
+  const deviceId = req.headers.get("x-device-id") || "";
+  const key = await sha256(`${ip}|${deviceId}`);
+  const now = Date.now();
+  const row = await env.DB.prepare(`
+    INSERT INTO recovery_rate_limits(key,window_start,attempts)
+    VALUES(?,?,1)
+    ON CONFLICT(key) DO UPDATE SET
+      window_start=CASE
+        WHEN excluded.window_start-recovery_rate_limits.window_start>=? THEN excluded.window_start
+        ELSE recovery_rate_limits.window_start
+      END,
+      attempts=CASE
+        WHEN excluded.window_start-recovery_rate_limits.window_start>=? THEN 1
+        ELSE recovery_rate_limits.attempts+1
+      END
+    RETURNING attempts
+  `).bind(key, now, RECOVERY_RATE_LIMIT_WINDOW_MS, RECOVERY_RATE_LIMIT_WINDOW_MS).first<{ attempts: number }>();
+  return Number(row?.attempts || 0) <= RECOVERY_RATE_LIMIT_MAX;
+}
+
+function json(data: unknown, status: number, origin: string) {
+  return new Response(JSON.stringify(data), { status, headers: {
+    "content-type": "application/json; charset=utf-8",
+    "access-control-allow-origin": origin,
+    "access-control-allow-credentials": "true",
+    "access-control-allow-headers": "content-type, authorization, x-device-id",
+    "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
+    "cache-control": "no-store",
+  }});
+}
+
+async function ensureRecoveryTables(db: D1Database) {
+  await db.batch([
+    db.prepare("CREATE TABLE IF NOT EXISTS admin_accounts (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS locations (id TEXT PRIMARY KEY, name TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, radius_meters REAL NOT NULL)"),
+  ]);
+}
+
+async function syncMainLocation(db: D1Database, settings: Record<string, unknown>) {
+  const lat = Number(settings.workSiteLat);
+  const lng = Number(settings.workSiteLng);
+  const radiusMeters = Number(settings.radiusMeters);
+  if (![lat, lng, radiusMeters].every(Number.isFinite) || radiusMeters < 0) return false;
+  await db.prepare("INSERT INTO locations(id,name,lat,lng,radius_meters) VALUES('main',?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,lat=excluded.lat,lng=excluded.lng,radius_meters=excluded.radius_meters")
+    .bind(lat, lng, radiusMeters).run();
+  return true;
+}
+
+async function recoverLocationFromSettings(db: D1Database) {
+  const rows = await db.prepare("SELECT key,value FROM settings WHERE key IN ('workSiteLat','workSiteLng','radiusMeters')").all<{key:string,value:string}>();
+  const settings: Record<string, unknown> = {};
+  for (const row of rows.results) {
+    try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
+  }
+  const synced = await syncMainLocation(db, settings);
+  if (!synced) return null;
+  return await db.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id='main' LIMIT 1").first<any>();
+}
+
+async function actorFromOriginal(req: Request, env: Env) {
+  const url = new URL(req.url);
+  url.pathname = "/api/me";
+  url.search = "";
+  const probe = await original.fetch(new Request(url, { method: "GET", headers: req.headers }), env, {} as ExecutionContext);
+  if (!probe.ok) return null;
+  return (await probe.json().catch(() => ({})) as any).user || null;
+}
+
+async function generateOwnerRecovery(req: Request, env: Env, origin: string) {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS" } });
+  if (req.method !== "POST") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
+  const actor = await actorFromOriginal(req, env);
+  if (!actor || actor.role !== "owner") return json({ error: "هذه العملية متاحة للمالك فقط" }, 403, origin);
+  await ensureRecoveryTables(env.DB);
+  const owner = await env.DB.prepare("SELECT id FROM admin_accounts WHERE role='owner' AND active=1 LIMIT 1").first<{ id: string }>();
+  if (!owner) return json({ error: "لم يتم العثور على حساب مالك فعال" }, 404, origin);
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  const code = b64(bytes).replace(/[^A-Za-z0-9]/g, "").slice(0, 24);
+  const codeHash = await sha256(code);
+  const timestamp = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_code_hash',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(codeHash),
+    env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind("")
+  ]);
+  return json({ ok: true, code, createdAt: timestamp, message: "تم إنشاء رمز استعادة جديد. احفظه الآن؛ لن يظهر مرة أخرى." }, 200, origin);
+}
+
+const DEFAULT_SETTINGS: Record<string, unknown> = {
+  qrCode: "HADIR-SITE-01-STATIC",
+  workSiteLat: 24.7136,
+  workSiteLng: 46.6753,
+  radiusMeters: 100,
+  workStart: "08:00",
+  workEnd: "16:00",
+  lateGraceMinutes: 10,
+  earlyCheckoutGraceMinutes: 0,
+  ownerUsername: "",
+  ownerName: "المالك",
+  managerUsername: "",
+  managerName: "",
+  supervisorUsername: "",
+  supervisorName: "",
+  brandName: "حاضِر",
+  brandLogo: null,
+  workTypes: [],
+  specialties: [],
+};
+
+const SETTINGS_KEYS = new Set(Object.keys(DEFAULT_SETTINGS));
+
+function parseSetting(value: string): unknown {
+  try { return JSON.parse(value); } catch { return value; }
+}
+
+async function readCompanySettings(env: Env) {
+  await ensureRecoveryTables(env.DB);
+  const rows = await env.DB.prepare("SELECT key,value FROM settings").all<{ key: string; value: string }>();
+  const settings: Record<string, unknown> = { ...DEFAULT_SETTINGS };
+  for (const row of rows.results || []) {
+    if (SETTINGS_KEYS.has(row.key)) settings[row.key] = parseSetting(row.value);
+  }
+  const admins = await env.DB.prepare("SELECT id,username,name,role,active,created_at AS createdAt FROM admin_accounts ORDER BY name").all<any>();
+  const locations = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name").all<any>();
+  return { ...settings, adminAccounts: admins.results || [], locations: locations.results || [] };
+}
+
+async function saveCompanySettings(req: Request, env: Env, origin: string) {
+  const actor = await actorFromOriginal(req, env);
+  if (!actor || !["owner", "manager"].includes(String(actor.role))) return json({ error: "غير مصرح" }, 403, origin);
+  if (req.method === "GET") return json(await readCompanySettings(env), 200, origin);
+  if (req.method !== "PUT") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
+
+  const input = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const entries: Array<[string, string]> = [];
+  for (const key of SETTINGS_KEYS) {
+    if (input[key] === undefined) continue;
+    if (key === "brandName") {
+      const name = String(input[key] || "").trim();
+      if (name.length > 120) return json({ error: "اسم الشركة يجب ألا يتجاوز 120 محرفًا" }, 400, origin);
+      entries.push([key, JSON.stringify(name)]);
+      continue;
+    }
+    if (key === "brandLogo") {
+      const logo = input[key] == null || input[key] === "" ? null : String(input[key]);
+      if (logo && (!logo.startsWith("data:image/webp;base64,") || logo.length > 140000)) return json({ error: "شعار الشركة غير صالح أو حجمه كبير جدًا" }, 400, origin);
+      entries.push([key, JSON.stringify(logo)]);
+      continue;
+    }
+    if (key === "specialties" || key === "workTypes") {
+      if (!Array.isArray(input[key])) return json({ error: `قيمة ${key} يجب أن تكون قائمة` }, 400, origin);
+      const values = Array.from(new Set((input[key] as unknown[]).map(v => String(v).trim()).filter(Boolean)));
+      if (values.some(v => v.length > 120)) return json({ error: `قيم ${key} لا يمكن أن تتجاوز 120 محرفًا` }, 400, origin);
+      entries.push([key, JSON.stringify(values)]);
+      continue;
+    }
+    entries.push([key, JSON.stringify(input[key])]);
+  }
+
+  if (input.ownerName !== undefined || input.ownerUsername !== undefined) {
+    const ownerId = actor.role === "owner" ? actor.id : null;
+    if (ownerId) {
+      const name = input.ownerName === undefined ? undefined : String(input.ownerName || "").trim();
+      const username = input.ownerUsername === undefined ? undefined : String(input.ownerUsername || "").trim();
+      if (name !== undefined && !name) return json({ error: "اسم المالك لا يمكن أن يكون فارغًا" }, 400, origin);
+      if (username !== undefined && !username) return json({ error: "اسم المستخدم لا يمكن أن يكون فارغًا" }, 400, origin);
+      await env.DB.prepare("UPDATE admin_accounts SET name=COALESCE(?,name), username=COALESCE(?,username) WHERE id=? AND role='owner'").bind(name ?? null, username ?? null, ownerId).run();
+    }
+  }
+
+  if (entries.length) {
+    await env.DB.batch(entries.map(([key, value]) => env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key, value)));
+  }
+  await syncMainLocation(env.DB, input);
+  return json({ ok: true }, 200, origin);
+}
+
+async function recovery(req: Request, env: Env, origin: string) {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS" } });
+  if (req.method !== "POST") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
+  try {
+    if (!(await checkRecoveryRateLimit(req, env))) return json({ error: "محاولات الاستعادة كثيرة. حاول بعد قليل." }, 429, origin);
+  } catch (error) {
+    console.error("تعذر تطبيق حد محاولات استعادة المالك:", error);
+    return json({ error: "خدمة استعادة المالك غير متاحة مؤقتًا" }, 503, origin);
+  }
+  if (!env.OWNER_RECOVERY_CODE) {
+    const configured = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_code_hash' LIMIT 1").first<{value:string}>().catch(() => null);
+    if (!configured?.value) return json({ error: "استعادة المالك غير مفعلة على الخادم" }, 503, origin);
+  }
+
+  const input = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const code = String(input.recoveryCode || "");
+  const password = String(input.newPassword || "");
+  const name = String(input.ownerName || "").trim();
+  const username = String(input.ownerUsername || "").trim();
+  if (!code || !password) return json({ error: "رمز الاستعادة وكلمة المرور الجديدة مطلوبان" }, 400, origin);
+  if (password.length < 12) return json({ error: "كلمة المرور الجديدة يجب أن تكون 12 محرفًا على الأقل" }, 400, origin);
+
+  let validCode = false;
+  const stored = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_code_hash' LIMIT 1").first<{value:string}>().catch(() => null);
+  if (stored?.value) validCode = (await sha256(code)) === stored.value;
+  if (!validCode && env.OWNER_RECOVERY_CODE && code.length === env.OWNER_RECOVERY_CODE.length) {
+    let diff = 0;
+    for (let i = 0; i < code.length; i++) diff |= code.charCodeAt(i) ^ env.OWNER_RECOVERY_CODE.charCodeAt(i);
+    validCode = diff === 0;
+  }
+  if (!validCode) return json({ error: "رمز الاستعادة غير صحيح" }, 401, origin);
+
+  try {
+    await ensureRecoveryTables(env.DB);
+    const used = await env.DB.prepare("SELECT value FROM settings WHERE key='owner_recovery_used'").first<{ value: string }>();
+    if (used?.value) return json({ error: "تم استخدام رمز استعادة المالك مسبقًا. أنشئ رمزًا جديدًا ثم أعد المحاولة." }, 409, origin);
+
+    const owner = await env.DB.prepare("SELECT id,username,name FROM admin_accounts WHERE role='owner' LIMIT 1").first<{ id: string; username: string; name: string }>();
+    const passwordHash = await hashPassword(password);
+    const timestamp = new Date().toISOString();
+
+    if (owner) {
+      await env.DB.prepare("UPDATE admin_accounts SET password_hash=?,active=1 WHERE id=? AND role='owner'").bind(passwordHash, owner.id).run();
+      const updated = await env.DB.prepare("SELECT id FROM admin_accounts WHERE id=? AND role='owner' AND active=1 LIMIT 1").bind(owner.id).first();
+      if (!updated) throw new Error("لم يتم تحديث حساب المالك");
+      await env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(timestamp).run();
+      return json({ ok: true, username: owner.username, message: "تمت إعادة تعيين كلمة مرور المالك. استخدم اسم المستخدم نفسه لتسجيل الدخول." }, 200, origin);
+    }
+
+    if (!name || !username) return json({ error: "لم يتم العثور على حساب مالك. أدخل اسم المالك واسم المستخدم لإنشاء حساب المالك الأول." }, 400, origin);
+    if (username.length < 3 || username.length > 64) return json({ error: "اسم المستخدم يجب أن يكون بين 3 و64 حرفًا" }, 400, origin);
+    if (!/^[A-Za-z0-9_.@-]+$/.test(username)) return json({ error: "اسم المستخدم يحتوي على أحرف غير مدعومة" }, 400, origin);
+
+    const existing = await env.DB.prepare("SELECT id,role FROM admin_accounts WHERE username=? LIMIT 1").bind(username).first<{ id: string; role: string }>();
+    if (existing) {
+      if (existing.role === "owner") {
+        await env.DB.prepare("UPDATE admin_accounts SET password_hash=?,name=?,active=1 WHERE id=?").bind(passwordHash, name, existing.id).run();
+      } else {
+        await env.DB.prepare("UPDATE admin_accounts SET password_hash=?,name=?,role='owner',active=1 WHERE id=?").bind(passwordHash, name, existing.id).run();
+      }
+    } else {
+      await env.DB.prepare("INSERT INTO admin_accounts(id,username,password_hash,name,role,active,created_at) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(), username, passwordHash, name, "owner", 1, timestamp).run();
+    }
+
+    const created = await env.DB.prepare("SELECT id,username,name FROM admin_accounts WHERE username=? AND role='owner' AND active=1 LIMIT 1").bind(username).first();
+    if (!created) throw new Error("تم تنفيذ عملية قاعدة البيانات لكن لم يظهر حساب المالك عند التحقق");
+    await env.DB.prepare("INSERT INTO settings(key,value) VALUES('owner_recovery_used',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(timestamp).run();
+    return json({ ok: true, username, message: "تم إنشاء حساب المالك الأول بنجاح. يمكنك تسجيل الدخول الآن." }, existing ? 200 : 201, origin);
+  } catch (error) {
+    console.error("فشل تنفيذ استعادة المالك:", error);
+    return json({ error: "تعذر إنشاء/إعادة تعيين حساب المالك في قاعدة البيانات" }, 500, origin);
+  }
+}
+
+async function validatePasswordRules(req: Request, path: string, origin: string) {
+  if ((path === "/api/bootstrap/owner" || path === "/api/admins") && req.method === "POST") {
+    const b = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+    const password = String(b.password || "");
+    if (password.length < 12) return json({ error: "كلمة مرور الإدارة والمالك يجب أن تكون 12 محرفًا على الأقل" }, 400, origin);
+  }
+  if (path.startsWith("/api/admins/") && req.method === "PATCH") {
+    const b = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+    if (b.password !== undefined && String(b.password || "").length < 12) return json({ error: "كلمة مرور الإدارة يجب أن تكون 12 محرفًا على الأقل" }, 400, origin);
+  }
+  if (path === "/api/employees" && req.method === "POST") {
+    const b = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+    const pin = String(b.pin || b.password || "");
+    if (!/^\d{4}$/.test(pin)) return json({ error: "رمز PIN للموظف يجب أن يكون 4 أرقام بالضبط" }, 400, origin);
+  }
+  if (path.startsWith("/api/employees/") && req.method === "PATCH" && !path.endsWith("/device")) {
+    const b = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+    if (b.pin !== undefined || b.password !== undefined) {
+      const pin = String(b.pin ?? b.password ?? "");
+      if (!/^\d{4}$/.test(pin)) return json({ error: "رمز PIN للموظف يجب أن يكون 4 أرقام بالضبط" }, 400, origin);
+    }
+  }
+  return null;
+}
+
+export default {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(req.url);
+    const origin = env.APP_ORIGIN || "*";
+    const path = url.pathname.replace(/\/$/, "") || "/";
+    if (path === "/api/auth/recover-owner") return recovery(req, env, origin);
+    if (path === "/api/auth/generate-owner-recovery") return generateOwnerRecovery(req, env, origin);
+    if (path === "/api/settings" && (req.method === "GET" || req.method === "PUT")) return saveCompanySettings(req, env, origin);
+    const ruleError = await validatePasswordRules(req, path, origin);
+    if (ruleError) return ruleError;
+
+    /* JOB_NUMBER_UPDATE_PATCH_V1 */
+    const employeePatch = path.match(/^\/api\/employees\/([^/]+)$/);
+    if (employeePatch && req.method === "PATCH") {
+      const actor = await actorFromOriginal(req, env);
+      if (!actor || !["owner", "manager"].includes(String(actor.role))) return json({ error: "غير مصرح" }, 403, origin);
+      await ensureRecoveryTables(env.DB);
+      const employeeId = decodeURIComponent(employeePatch[1]);
+      const body = await req.clone().json().catch(() => ({})) as Record<string, unknown>;
+      if (body.jobNumber === undefined) return original.fetch(req, env, {} as ExecutionContext);
+      const nextJobNumber = String(body.jobNumber || "").trim();
+      if (!nextJobNumber) return json({ error: "الرقم الوظيفي لا يمكن أن يكون فارغًا" }, 400, origin);
+      if (nextJobNumber.length > 64 || !/^[A-Za-z0-9_-]+$/.test(nextJobNumber)) return json({ error: "الرقم الوظيفي يجب أن يحتوي على أحرف وأرقام و _ أو - فقط وبحد أقصى 64 محرفًا" }, 400, origin);
+      const employee = await env.DB.prepare("SELECT id,job_number AS jobNumber,name FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
+      if (!employee) return json({ error: "الموظف غير موجود" }, 404, origin);
+      const duplicate = await env.DB.prepare("SELECT id FROM employees WHERE job_number=? AND id<>? LIMIT 1").bind(nextJobNumber, employeeId).first<any>();
+      if (duplicate) return json({ error: "الرقم الوظيفي مستخدم من موظف آخر" }, 409, origin);
+      try {
+        await env.DB.prepare("UPDATE employees SET job_number=? WHERE id=?").bind(nextJobNumber, employeeId).run();
+      } catch (error) {
+        return json({ error: "تعذر تحديث الرقم الوظيفي", detail: error instanceof Error ? error.message : String(error) }, 409, origin);
+      }
+      const updated = await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,role,device_id AS deviceId,device_label AS deviceLabel,created_at AS createdAt,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,location_id AS locationId,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,specialties_json AS specialtiesJson,work_days_json AS workDaysJson,avatar FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
+      await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), employeeId, nextJobNumber, actor.name || "", "employee-job-number-update", "success", `تغيير الرقم الوظيفي من ${employee.jobNumber} إلى ${nextJobNumber}`, new Date().toISOString(), req.headers.get("x-device-id") || "unknown", req.headers.get("CF-Connecting-IP") || "unknown").run().catch(() => undefined);
+      return json({ ok: true, employee: updated, previousJobNumber: employee.jobNumber }, 200, origin);
+    }
+    if (path.match(/^\/api\/employees\/[^/]+\/avatar$/)) {
+      const actor = await actorFromOriginal(req, env);
+      return handleProfileImageRequest(req, env, actor, origin);
+    }
+
+    if (path === "/api/employee-location" && req.method === "GET") {
+      const response = await original.fetch(req, env, ctx);
+      if (response.status !== 404) return response;
+      try {
+        await ensureRecoveryTables(env.DB);
+        const location = await recoverLocationFromSettings(env.DB);
+        if (location) return json({ location }, 200, origin);
+      } catch (error) {
+        console.error("تعذر استرجاع موقع الموظف من D1:", error);
+      }
+      return response;
+    }
+
+    return original.fetch(req, env, ctx);
+  },
+};
