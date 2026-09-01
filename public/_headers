@@ -9,3 +9,4 @@
 
 /
   Cache-Control: no-cache, no-store, must-revalidate
+  Permissions-Policy: geolocation=(self), camera=(self)
