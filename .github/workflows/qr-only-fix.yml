@@ -17,6 +17,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+
       - name: Apply QR-only patch
         run: node scripts/qr-only-fix.mjs
 
@@ -30,7 +35,7 @@ jobs:
           grep -q 'scanTimerRef.current = window.setTimeout(() => void scan(), 120);' src/pages/EmployeeScan.tsx
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --no-frozen-lockfile
 
       - name: Typecheck
         run: bun run typecheck
