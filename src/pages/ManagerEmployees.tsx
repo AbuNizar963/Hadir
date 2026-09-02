@@ -220,8 +220,40 @@ export default function ManagerEmployees() {
   useEffect(() => {
     void load(true);
     try { const raw = localStorage.getItem("hadir.manager_session"); const s = raw ? JSON.parse(raw) : null; if (s?.role) setRole(String(s.role)); } catch {}
-    const timer = window.setInterval(() => void load(false), 15000);
-    return () => window.clearInterval(timer);
+
+    let disposed = false;
+    let refreshTimer: number | undefined;
+    const scheduleRefresh = () => {
+      if (disposed || document.visibilityState === "hidden") return;
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = undefined;
+        void load(false);
+      }, 250);
+    };
+    const onCloudDataChanged = () => scheduleRefresh();
+    const onD1ViewChanged = () => scheduleRefresh();
+    const onOnline = () => scheduleRefresh();
+    const onVisibility = () => { if (document.visibilityState === "visible") scheduleRefresh(); };
+
+    window.addEventListener("hadir:cloud-data-changed", onCloudDataChanged);
+    window.addEventListener("hadir:d1-view-changed", onD1ViewChanged);
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    const fallbackTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load(false);
+    }, 120000);
+
+    return () => {
+      disposed = true;
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+      window.clearInterval(fallbackTimer);
+      window.removeEventListener("hadir:cloud-data-changed", onCloudDataChanged);
+      window.removeEventListener("hadir:d1-view-changed", onD1ViewChanged);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [load]);
 
   const setField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => setForm((v) => ({ ...v, [key]: value })), []);
