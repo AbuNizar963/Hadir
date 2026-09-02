@@ -33,9 +33,14 @@ export default function PWAExperience() {
     let cancelled = false;
     let timer: number | undefined;
     let observedWorker: ServiceWorker | null = null;
+    let currentBuildVersion = "";
 
     const shouldShowUpdate = () => {
-      if (!cancelled && sessionStorage.getItem(UPDATE_DISMISSED_KEY) !== "1") setUpdateVisible(true);
+      try {
+        if (!cancelled && sessionStorage.getItem(UPDATE_DISMISSED_KEY) !== "1") setUpdateVisible(true);
+      } catch {
+        if (!cancelled) setUpdateVisible(true);
+      }
     };
 
     const observeInstallingWorker = (worker: ServiceWorker) => {
@@ -46,6 +51,31 @@ export default function PWAExperience() {
         if (worker.state === "installed" && navigator.serviceWorker.controller) shouldShowUpdate();
       };
       worker.addEventListener("statechange", onStateChange);
+    };
+
+    const getBuildVersion = async () => {
+      const base = import.meta.env.BASE_URL || "/";
+      const url = new URL("build-version.json", new URL(base, window.location.origin));
+      url.searchParams.set("check", String(Date.now()));
+      const response = await fetch(url.toString(), { cache: "no-store", credentials: "same-origin" });
+      if (!response.ok) return "";
+      const data = await response.json().catch(() => null) as { commitSha?: unknown } | null;
+      return typeof data?.commitSha === "string" ? data.commitSha.trim() : "";
+    };
+
+    const checkDeploymentVersion = async () => {
+      if (cancelled || document.visibilityState !== "visible" || !navigator.onLine) return;
+      try {
+        const buildVersion = await getBuildVersion();
+        if (!buildVersion || cancelled) return;
+        if (!currentBuildVersion) {
+          currentBuildVersion = buildVersion;
+          return;
+        }
+        if (buildVersion !== currentBuildVersion) shouldShowUpdate();
+      } catch {
+        // A failed version check must never interrupt the running application.
+      }
     };
 
     const checkForUpdate = async () => {
@@ -69,26 +99,31 @@ export default function PWAExperience() {
       if (registration.installing) observeInstallingWorker(registration.installing);
     };
 
+    const checkAll = async () => {
+      await checkDeploymentVersion();
+      await checkForUpdate();
+    };
+
     const schedule = () => {
       if (timer !== undefined) window.clearTimeout(timer);
       if (document.visibilityState !== "visible") return;
       timer = window.setTimeout(() => {
         timer = undefined;
-        void checkForUpdate();
+        void checkAll();
         schedule();
-      }, 300000);
+      }, 60000);
     };
-    const onVisibility = () => { if (document.visibilityState === "visible") { void checkForUpdate(); schedule(); } else if (timer !== undefined) { window.clearTimeout(timer); timer = undefined; } };
-    const onOnline = () => { void checkForUpdate(); schedule(); };
-    void checkForUpdate(); schedule(); document.addEventListener("visibilitychange", onVisibility); window.addEventListener("online", onOnline);
+    const onVisibility = () => { if (document.visibilityState === "visible") { void checkAll(); schedule(); } else if (timer !== undefined) { window.clearTimeout(timer); timer = undefined; } };
+    const onOnline = () => { void checkAll(); schedule(); };
+    void checkAll(); schedule(); document.addEventListener("visibilitychange", onVisibility); window.addEventListener("online", onOnline);
     return () => { cancelled = true; observedWorker = null; if (timer !== undefined) window.clearTimeout(timer); document.removeEventListener("visibilitychange", onVisibility); window.removeEventListener("online", onOnline); };
   }, []);
 
   useEffect(() => { const onControllerChange = () => { setUpdating(false); window.location.reload(); }; navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange); return () => navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange); }, []);
   const dismissInstall = () => { try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {} setInstallVisible(false); setManualInstallVisible(false); };
   const install = async () => { if (!installEvent) return; const currentEvent = installEvent; setInstallEvent(null); setInstallVisible(false); await currentEvent.prompt(); const choice = await currentEvent.userChoice; if (choice.outcome === "dismissed") { try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {} } };
-  const update = async () => { setUpdating(true); const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined); if (registration?.waiting) { registration.waiting.postMessage({ type: "SKIP_WAITING" }); return; } await registration?.update().catch(() => undefined); setUpdating(false); };
-  const dismissUpdate = () => { sessionStorage.setItem(UPDATE_DISMISSED_KEY, "1"); setUpdateVisible(false); };
+  const update = async () => { setUpdating(true); const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined); if (registration?.waiting) { registration.waiting.postMessage({ type: "SKIP_WAITING" }); return; } await registration?.update().catch(() => undefined); if (registration?.waiting) { registration.waiting.postMessage({ type: "SKIP_WAITING" }); return; } setUpdating(false); window.location.reload(); };
+  const dismissUpdate = () => { try { sessionStorage.setItem(UPDATE_DISMISSED_KEY, "1"); } catch {} setUpdateVisible(false); };
 
   if (offline) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-amber-500/30 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-center gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-xl">📡</div><div className="min-w-0 flex-1"><p className="font-bold">أنت غير متصل بالإنترنت</p><p className="mt-0.5 text-xs text-muted-foreground">تم الحفاظ على جلسة الدخول. سيُستأنف الاتصال تلقائيًا عند عودته.</p></div></div></div>;
   if (updateVisible) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-xl">✨</div><div className="min-w-0 flex-1"><p className="font-bold">تحديث جديد لحاضر متاح</p><p className="mt-1 text-xs leading-5 text-muted-foreground">سيتم تحديث واجهة التطبيق بأمان دون حذف بياناتك المحلية أو جلسة تسجيل الدخول.</p><div className="mt-3 flex gap-2"><button type="button" onClick={update} disabled={updating} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">{updating ? "جارٍ التحديث…" : "تحديث الآن"}</button><button type="button" onClick={dismissUpdate} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">لاحقًا</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissUpdate} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
