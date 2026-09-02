@@ -1,39 +1,75 @@
 -- Canonicalize exact duplicate work locations without changing historical attendance records.
 -- `main` remains the canonical row whenever it belongs to a duplicate group.
-CREATE TEMP TABLE location_dedup AS
-SELECT
-  CASE WHEN MAX(CASE WHEN id = 'main' THEN 1 ELSE 0 END) = 1 THEN 'main' ELSE MIN(id) END AS canonical_id,
-  name, lat, lng, radius_meters
-FROM locations
-GROUP BY name, lat, lng, radius_meters;
+-- Do not use CREATE TEMP TABLE here: D1 remote /query rejects TEMP schema writes.
 
 UPDATE employees
 SET location_id = (
-  SELECT d.canonical_id
-  FROM location_dedup d
-  JOIN locations l ON l.id = employees.location_id
-  WHERE l.name = d.name
-    AND l.lat = d.lat
-    AND l.lng = d.lng
-    AND l.radius_meters = d.radius_meters
-  LIMIT 1
+  SELECT CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM locations main_location
+      WHERE main_location.id = 'main'
+        AND main_location.name = current_location.name
+        AND main_location.lat = current_location.lat
+        AND main_location.lng = current_location.lng
+        AND main_location.radius_meters = current_location.radius_meters
+    ) THEN 'main'
+    ELSE (
+      SELECT MIN(canonical_candidate.id)
+      FROM locations canonical_candidate
+      WHERE canonical_candidate.name = current_location.name
+        AND canonical_candidate.lat = current_location.lat
+        AND canonical_candidate.lng = current_location.lng
+        AND canonical_candidate.radius_meters = current_location.radius_meters
+    )
+  END
+  FROM locations current_location
+  WHERE current_location.id = employees.location_id
 )
 WHERE location_id IS NOT NULL
   AND EXISTS (
     SELECT 1
-    FROM location_dedup d
-    JOIN locations l ON l.id = employees.location_id
-    WHERE l.name = d.name
-      AND l.lat = d.lat
-      AND l.lng = d.lng
-      AND l.radius_meters = d.radius_meters
+    FROM locations current_location
+    JOIN locations duplicate_candidate
+      ON duplicate_candidate.name = current_location.name
+     AND duplicate_candidate.lat = current_location.lat
+     AND duplicate_candidate.lng = current_location.lng
+     AND duplicate_candidate.radius_meters = current_location.radius_meters
+     AND duplicate_candidate.id <> current_location.id
+    WHERE current_location.id = employees.location_id
   );
 
-DELETE FROM locations
-WHERE id NOT IN (SELECT canonical_id FROM location_dedup);
+DELETE FROM locations AS duplicate_location
+WHERE EXISTS (
+    SELECT 1
+    FROM locations same_group
+    WHERE same_group.id <> duplicate_location.id
+      AND same_group.name = duplicate_location.name
+      AND same_group.lat = duplicate_location.lat
+      AND same_group.lng = duplicate_location.lng
+      AND same_group.radius_meters = duplicate_location.radius_meters
+  )
+  AND duplicate_location.id <> CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM locations main_location
+      WHERE main_location.id = 'main'
+        AND main_location.name = duplicate_location.name
+        AND main_location.lat = duplicate_location.lat
+        AND main_location.lng = duplicate_location.lng
+        AND main_location.radius_meters = duplicate_location.radius_meters
+    ) THEN 'main'
+    ELSE (
+      SELECT MIN(canonical_candidate.id)
+      FROM locations canonical_candidate
+      WHERE canonical_candidate.name = duplicate_location.name
+        AND canonical_candidate.lat = duplicate_location.lat
+        AND canonical_candidate.lng = duplicate_location.lng
+        AND canonical_candidate.radius_meters = duplicate_location.radius_meters
+    )
+  END;
 
-DROP TABLE location_dedup;
-
--- Prevent future exact duplicates.
+-- Prevent future exact duplicates. Migration 0006 replaces this index with an
+-- idempotent trigger because the API may PUT a newly generated location ID.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_locations_exact_unique
 ON locations(name, lat, lng, radius_meters);
