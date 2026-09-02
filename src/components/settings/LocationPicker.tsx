@@ -1,6 +1,13 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
+import { setWorkerUrl } from "maplibre-gl";
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "leaflet/dist/leaflet.css";
+import "maplibre-gl/dist/maplibre-gl.css";
+
+// MapLibre GL v6 needs an explicit worker URL when bundled by Vite.
+// Without this, the map shell mounts but vector tiles never render.
+setWorkerUrl(workerUrl);
 
 type LocationPickerProps = {
   lat: number;
@@ -34,11 +41,10 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
       started = true;
 
       try {
-        // Keep MapLibre out of the initial application bundle: the map is admin-only
-        // and should load only when the location picker actually becomes visible.
+        // The map remains lazy: MapLibre and the Leaflet adapter are loaded only
+        // when this admin-only picker becomes visible.
         await import("maplibre-gl");
         const { maplibreGL } = await import("@maplibre/maplibre-gl-leaflet");
-        await import("maplibre-gl/dist/maplibre-gl.css");
 
         if (disposed || !host.isConnected || mapRef.current) return;
 
@@ -48,7 +54,9 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
           zoomControl: true,
           attributionControl: true,
           preferCanvas: true,
-          minZoom: 2,
+          minZoom: 1,
+          maxBounds: [[-90, -180], [90, 180]],
+          maxBoundsViscosity: 1,
         }).setView([safeLat, safeLng], 16);
 
         map.attributionControl.addAttribution(OPENFREEMAP_ATTRIBUTION);
@@ -96,7 +104,7 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
         host.dataset.leafletCleanup = "1";
         (host as HTMLDivElement & { __leafletCleanup?: () => void }).__leafletCleanup = cleanup;
       } catch (error) {
-        // Do not let an optional admin map failure break Settings or any attendance flow.
+        // Map failure must never block Settings or any attendance flow.
         console.warn("تعذر تحميل خريطة تحديد الموقع:", error);
         started = false;
       }
