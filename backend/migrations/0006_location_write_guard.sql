@@ -29,7 +29,8 @@ BEGIN
       ELSE MIN(existing.id)
     END
     FROM locations existing
-    WHERE existing.name = NEW.name
+    WHERE existing.id <> NEW.id
+      AND existing.name = NEW.name
       AND existing.lat = NEW.lat
       AND existing.lng = NEW.lng
       AND existing.radius_meters = NEW.radius_meters
