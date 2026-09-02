@@ -20,13 +20,11 @@ function scheduleFor(employee:EmployeeRow,day:string){const kind=String(employee
   const firstStart=localDateTimeUtc(startDay,employee.workStartTime||"09:00");
   const on=Math.max(1,Math.floor(Number(employee.rotationDaysOn??4))),off=Math.max(0,Math.floor(Number(employee.rotationDaysOff??4))),cycle=on+off;
   if(cycle<=0)return{work:false,status:"INVALID" as const,start:null,end:null};
-  const targetStart=localDateTimeUtc(day,"00:00");
-  if(targetStart.getTime()<firstStart.getTime())return{work:false,status:"NOT_STARTED" as const,start:null,end:null};
-  const elapsed=targetStart.getTime()-firstStart.getTime(),cycleMs=cycle*DAY_MS;
-  let cycleIndex=Math.floor(elapsed/cycleMs);if(cycleIndex<0)cycleIndex=0;
-  let periodStart=new Date(firstStart.getTime()+cycleIndex*cycleMs),periodEnd=new Date(periodStart.getTime()+on*DAY_MS);
-  if(targetStart.getTime()>=periodEnd.getTime()){cycleIndex+=1;periodStart=new Date(firstStart.getTime()+cycleIndex*cycleMs);periodEnd=new Date(periodStart.getTime()+on*DAY_MS);}
-  if(targetStart.getTime()<periodStart.getTime()||targetStart.getTime()>=periodEnd.getTime())return{work:false,status:"REST" as const,start:null,end:null};
+  const offset=Math.floor(dayNumber(day)-dayNumber(startDay));
+  if(offset<0)return{work:false,status:"NOT_STARTED" as const,start:null,end:null};
+  const cycleMs=cycle*DAY_MS,cycleIndex=Math.floor(offset/cycle),cycleDay=((offset%cycle)+cycle)%cycle;
+  const periodStart=new Date(firstStart.getTime()+cycleIndex*cycleMs),periodEnd=new Date(periodStart.getTime()+on*DAY_MS);
+  if(cycleDay>=on)return{work:false,status:"REST" as const,start:null,end:null};
   return{work:true,status:"WORK" as const,start:periodStart,end:periodEnd};
 }
 
@@ -51,7 +49,7 @@ export async function handleDailyStatus(req:Request,env:Env,actor:any){
     const result=employees.map(employee=>{
       const id=String(employee.id),schedule=scheduleFor(employee,day),rows=byEmployee.get(id)||[];let checkIn=rows.find(r=>String(r.type)==="check-in")||null;let checkOut=[...rows].reverse().find(r=>String(r.type)==="check-out")||null;const isRotation=String(employee.scheduleType||"").trim().toUpperCase()==="ROTATION";
       if(isRotation&&schedule.work){const startDay=String(employee.rotationStartDate||"").slice(0,10);const on=Math.max(1,Math.floor(Number(employee.rotationDaysOn??4)));const off=Math.max(0,Math.floor(Number(employee.rotationDaysOff??4)));const cycle=on+off;const offset=Math.floor(dayNumber(day)-dayNumber(startDay));const cycleDay=((offset%cycle)+cycle)%cycle;const cycleStart=addDays(day,-cycleDay);if(!checkIn){const candidate=(historicalByEmployee.get(id)||[]).find((r:any)=>String(r.type)==="check-in"&&String(r.timestamp)>=localDateTimeUtc(cycleStart,"00:00").toISOString());if(candidate)checkIn=candidate;}if(!checkOut){const candidate=[...(historicalByEmployee.get(id)||[])].reverse().find((r:any)=>String(r.type)==="check-out"&&String(r.timestamp)>=localDateTimeUtc(cycleStart,"00:00").toISOString());if(candidate)checkOut=candidate;}}
-      let status:Status;if(leaveIds.has(id))status="LEAVE";else if(permissionIds.has(id))status="PERMISSION";else if(schedule.status==="REST")status="REST";else if(schedule.status==="NOT_STARTED")status="NOT_STARTED";else if(schedule.status==="INVALID")status="INVALID";else if(checkIn){const grace=Number.isFinite(Number(employee.gracePeriodMinutes))?Math.max(0,Number(employee.gracePeriodMinutes)):10;status=isRotation?"PRESENT":(schedule.start&&Date.parse(String(checkIn.timestamp))>schedule.start.getTime()+grace*60000?"LATE":"PRESENT");}else if(schedule.start&&schedule.end&&day===dayKey(now)&&now.getTime()<schedule.start.getTime())status="NOT_STARTED";else if(Number(employee.isVip)===1&&schedule.start&&schedule.end&&day===dayKey(now)&&now.getTime()>=schedule.start.getTime()&&now.getTime()<schedule.end.getTime())status="PRESENT";else if(!schedule.work)status="REST";else status="ABSENT";
+      let status:Status;if(leaveIds.has(id))status="LEAVE";else if(permissionIds.has(id))status="PERMISSION";else if(schedule.status==="REST")status="REST";else if(schedule.status==="NOT_STARTED")status="NOT_STARTED";else if(schedule.status==="INVALID")status="INVALID";else if(day===dayKey(now)&&schedule.end&&now.getTime()>=schedule.end.getTime())status="REST";else if(day===dayKey(now)&&schedule.start&&now.getTime()<schedule.start.getTime())status="NOT_STARTED";else if(checkIn){const grace=Number.isFinite(Number(employee.gracePeriodMinutes))?Math.max(0,Number(employee.gracePeriodMinutes)):10;status=isRotation?"PRESENT":(schedule.start&&Date.parse(String(checkIn.timestamp))>schedule.start.getTime()+grace*60000?"LATE":"PRESENT");}else if(Number(employee.isVip)===1&&schedule.start&&schedule.end&&day===dayKey(now)&&now.getTime()>=schedule.start.getTime()&&now.getTime()<schedule.end.getTime())status="PRESENT";else if(!schedule.work)status="REST";else status="ABSENT";
       return{attendanceDay:day,employeeId:id,employeeName:String(employee.name||""),jobNumber:String(employee.jobNumber||""),status,scheduleType:String(employee.scheduleType||"ADMIN").toUpperCase(),checkInAt:checkIn?.timestamp||null,checkOutAt:checkOut?.timestamp||null,scheduledStart:schedule.start?.toISOString()||null,scheduledEnd:schedule.end?.toISOString()||null};
     });
     const computedAt=new Date().toISOString();
