@@ -74,7 +74,7 @@ export async function handleCompanyLogoRequest(
     if (!key) return new Response(null, { status: 404, headers: { "access-control-allow-origin": origin, "cache-control": "no-store" } });
     const object = await env.PROFILE_IMAGES.get(key);
     if (!object) return new Response(null, { status: 404, headers: { "access-control-allow-origin": origin, "cache-control": "no-store" } });
-    const headers = new Headers({ "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "cache-control": "public, max-age=300, must-revalidate" });
+    const headers = new Headers({ "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "cache-control": "no-store" });
     object.writeHttpMetadata(headers);
     headers.set("content-type", LOGO_CONTENT_TYPE);
     headers.set("etag", object.httpEtag);
