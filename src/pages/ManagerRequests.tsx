@@ -66,8 +66,29 @@ export default function ManagerRequests() {
 
   useEffect(() => {
     void load(true);
-    const timer = window.setInterval(() => void load(false), 10000);
-    return () => window.clearInterval(timer);
+    let refreshTimer: number | null = null;
+    const scheduleRefresh = () => {
+      if (document.visibilityState !== "visible") return;
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        void load(false);
+      }, 250);
+    };
+    const onVisibility = () => { if (document.visibilityState === "visible") void load(false); };
+    window.addEventListener("hadir:cloud-data-changed", scheduleRefresh);
+    window.addEventListener("hadir:d1-view-changed", scheduleRefresh);
+    window.addEventListener("focus", scheduleRefresh);
+    window.addEventListener("online", scheduleRefresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      window.removeEventListener("hadir:cloud-data-changed", scheduleRefresh);
+      window.removeEventListener("hadir:d1-view-changed", scheduleRefresh);
+      window.removeEventListener("focus", scheduleRefresh);
+      window.removeEventListener("online", scheduleRefresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   const pending = useMemo(() => requests.filter(r => r.status === "pending"), [requests]);
