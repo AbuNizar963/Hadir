@@ -31,7 +31,6 @@ export default function PWAExperience() {
 
   useEffect(() => {
     let cancelled = false;
-    let timer: number | undefined;
     let observedWorker: ServiceWorker | null = null;
     let currentBuildVersion = "";
 
@@ -64,7 +63,7 @@ export default function PWAExperience() {
     };
 
     const checkDeploymentVersion = async () => {
-      if (cancelled || document.visibilityState !== "visible" || !navigator.onLine) return;
+      if (cancelled || !navigator.onLine) return;
       try {
         const buildVersion = await getBuildVersion();
         if (!buildVersion || cancelled) return;
@@ -79,7 +78,7 @@ export default function PWAExperience() {
     };
 
     const checkForUpdate = async () => {
-      if (cancelled || document.visibilityState !== "visible" || !("serviceWorker" in navigator)) return;
+      if (cancelled || !("serviceWorker" in navigator)) return;
       const registration = await navigator.serviceWorker.getRegistration().catch(() => undefined);
       if (!registration || cancelled) return;
 
@@ -90,8 +89,7 @@ export default function PWAExperience() {
 
       if (registration.installing) observeInstallingWorker(registration.installing);
 
-      // Force the browser to re-check the deployed service worker instead of
-      // waiting for the browser's own background update cadence.
+      // Check the deployed service worker when the application is opened.
       await registration.update().catch(() => undefined);
       if (cancelled) return;
 
@@ -99,24 +97,15 @@ export default function PWAExperience() {
       if (registration.installing) observeInstallingWorker(registration.installing);
     };
 
-    const checkAll = async () => {
+    // Intentionally run once per application load/open only. There is no
+    // background polling, visibility polling, or periodic update request.
+    const checkOnOpen = async () => {
       await checkDeploymentVersion();
       await checkForUpdate();
     };
 
-    const schedule = () => {
-      if (timer !== undefined) window.clearTimeout(timer);
-      if (document.visibilityState !== "visible") return;
-      timer = window.setTimeout(() => {
-        timer = undefined;
-        void checkAll();
-        schedule();
-      }, 60000);
-    };
-    const onVisibility = () => { if (document.visibilityState === "visible") { void checkAll(); schedule(); } else if (timer !== undefined) { window.clearTimeout(timer); timer = undefined; } };
-    const onOnline = () => { void checkAll(); schedule(); };
-    void checkAll(); schedule(); document.addEventListener("visibilitychange", onVisibility); window.addEventListener("online", onOnline);
-    return () => { cancelled = true; observedWorker = null; if (timer !== undefined) window.clearTimeout(timer); document.removeEventListener("visibilitychange", onVisibility); window.removeEventListener("online", onOnline); };
+    void checkOnOpen();
+    return () => { cancelled = true; observedWorker = null; };
   }, []);
 
   useEffect(() => { const onControllerChange = () => { setUpdating(false); window.location.reload(); }; navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange); return () => navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange); }, []);
