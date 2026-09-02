@@ -37,9 +37,12 @@ export default function ManagerDashboard() {
   useEffect(() => {
     let active = true;
     let inFlight = false;
+    let queued = false;
     const load = async () => {
-      if (inFlight) return;
+      if (!active) return;
+      if (inFlight) { queued = true; return; }
       inFlight = true;
+      queued = false;
       try {
         const [result, escapes] = await Promise.all([
           getDailyStatus(today),
@@ -56,17 +59,22 @@ export default function ManagerDashboard() {
         setLoading(false);
       } finally {
         inFlight = false;
+        if (active && queued) window.setTimeout(() => void load(), 0);
       }
     };
     setLoading(true);
     void load();
-    const timer = window.setInterval(() => void load(), 5000);
-    const refresh = () => void load();
+    const refresh = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    window.addEventListener("hadir:cloud-data-changed", refresh as EventListener);
+    window.addEventListener("hadir:d1-view-changed", refresh);
     window.addEventListener("focus", refresh);
     window.addEventListener("online", refresh);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      window.removeEventListener("hadir:cloud-data-changed", refresh as EventListener);
+      window.removeEventListener("hadir:d1-view-changed", refresh);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);
     };
