@@ -11,7 +11,10 @@ details.hud-card.group>summary{min-height:64px!important;padding:11px 14px!impor
 details.hud-card.group>summary>div:first-child{min-width:0!important}
 details.hud-card.group>summary>div:first-child>span:first-child{width:38px!important;height:38px!important;border-radius:11px!important}
 details.hud-card.group>summary .text-base{font-size:.92rem!important;line-height:1.3!important}
-details.hud-card.group>summary .text-muted-foreground{font-size:10px!important;line-height:1.4!important;margin-top:2px!important}
+details.hud-card.group>summary .text-muted-foreground{font-size:10px!important;line-height:1.4!important;margin-top:2px!important;display:block!important;position:relative!important;padding-inline-end:24px!important}
+details.hud-card.group>summary .text-muted-foreground::after{content:"ⓘ";position:absolute;inset-inline-end:0;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:18px;height:18px;border:1px solid hsl(var(--primary)/.25);border-radius:999px;color:hsl(var(--primary));font-size:11px;font-weight:800;cursor:help}
+details.hud-card.group>summary .text-muted-foreground::before{content:"اضغط لعرض إعدادات هذا القسم";position:absolute;inset-inline-end:0;top:calc(100% + 8px);z-index:40;width:max-content;max-width:min(220px,70vw);padding:7px 9px;border-radius:9px;background:hsl(var(--popover));color:hsl(var(--popover-foreground));border:1px solid hsl(var(--border));box-shadow:0 8px 24px hsl(222 40% 3%/.16);font-size:10px;line-height:1.4;font-weight:600;opacity:0;pointer-events:none;transform:translateY(-3px);transition:opacity .15s ease,transform .15s ease}
+details.hud-card.group>summary .text-muted-foreground:hover::before,details.hud-card.group>summary .text-muted-foreground:focus-visible::before{opacity:1;transform:translateY(0)}
 details.hud-card.group>summary>svg:last-child{width:18px!important;height:18px!important}
 details.hud-card.group>div:last-child{padding:13px 14px!important}
 details.hud-card.group[open]>summary{border-bottom:1px solid hsl(var(--border)/.45)}
