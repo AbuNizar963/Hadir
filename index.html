@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="apple-touch-icon" href="./pwa-icon.svg" />
+    <link rel="apple-touch-icon" href="./favicon.svg" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#0b0f14" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -21,7 +21,7 @@
     <meta property="og:locale" content="ar_SA" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="حاضر · نظام الحضور والانصراف الإلكتروني" />
-    <meta name="twitter:description" content="تسجيل الحضور والانصراف عبر الويب مع التحقق من الموقع الجغرافي وربط الجهاز." />
+    <meta name="twitter:description" content="تسجيل الحضور والانصراف عبر الويب مع التحقق من الجهاز والموقع الجغرافي وربط الجهاز." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
@@ -35,7 +35,7 @@
       (() => {
         const API = (window.__HADIR_API__ || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
         const FALLBACK_MS = 120000;
-        const iconUrl = new URL("./pwa-icon.svg", document.baseURI).href;
+        const iconUrl = new URL("./favicon.svg", document.baseURI).href;
         const token = () => localStorage.getItem("hadir.api.token.employee") || localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token") || "";
         const sessionExists = () => Boolean(localStorage.getItem("hadir.session") || localStorage.getItem("hadir.manager_session"));
         const seenKey = "hadir.browser.notifications.seen";
