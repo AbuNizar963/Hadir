@@ -148,3 +148,5 @@ jobs:
             200|401) exit 0 ;;
             *) echo "Unexpected /api/bootstrap status: $code"; exit 1;;
           esac
+
+      # Keep the workflow push-triggered so D1 migrations are applied with the API deployment.
