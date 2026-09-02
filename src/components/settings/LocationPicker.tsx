@@ -1,13 +1,6 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
-import { setWorkerUrl } from "maplibre-gl";
-import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "leaflet/dist/leaflet.css";
-import "maplibre-gl/dist/maplibre-gl.css";
-
-// MapLibre GL v6 needs an explicit worker URL when bundled by Vite.
-// Without this, the map shell mounts but vector tiles never render.
-setWorkerUrl(workerUrl);
 
 type LocationPickerProps = {
   lat: number;
@@ -17,8 +10,9 @@ type LocationPickerProps = {
   className?: string;
 };
 
-const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
-const OPENFREEMAP_ATTRIBUTION = "OpenFreeMap © OpenMapTiles Data from OpenStreetMap";
+const SATELLITE_TILES =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const SATELLITE_ATTRIBUTION = "© Esri, Maxar, Earthstar Geographics";
 
 export default function LocationPicker({ lat, lng, radiusMeters, onChange, className = "" }: LocationPickerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -36,31 +30,63 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
     let disposed = false;
     let observer: IntersectionObserver | null = null;
 
+    const locateControl = L.Control.extend({
+      options: { position: "bottomright" as L.ControlPosition },
+      onAdd(map: L.Map) {
+        const button = L.DomUtil.create("button", "hadir-map-location-control");
+        button.type = "button";
+        button.title = "تحديد موقعي";
+        button.setAttribute("aria-label", "تحديد موقعي");
+        button.innerHTML = "<span aria-hidden=\"true\">⌾</span>";
+        L.DomEvent.disableClickPropagation(button);
+        L.DomEvent.on(button, "click", (event) => {
+          L.DomEvent.stop(event);
+          if (!("geolocation" in navigator)) return;
+          button.disabled = true;
+          button.setAttribute("aria-busy", "true");
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              if (!disposed) {
+                map.setView([position.coords.latitude, position.coords.longitude], Math.max(map.getZoom(), 17), { animate: true });
+              }
+              button.disabled = false;
+              button.removeAttribute("aria-busy");
+            },
+            () => {
+              button.disabled = false;
+              button.removeAttribute("aria-busy");
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+          );
+        });
+        return button;
+      },
+    });
+
     const initMap = async () => {
       if (started || disposed || !host.isConnected || mapRef.current) return;
       started = true;
-
       try {
-        // The map remains lazy: MapLibre and the Leaflet adapter are loaded only
-        // when this admin-only picker becomes visible.
-        await import("maplibre-gl");
-        const { maplibreGL } = await import("@maplibre/maplibre-gl-leaflet");
-
         if (disposed || !host.isConnected || mapRef.current) return;
-
         const safeLat = Number.isFinite(lat) ? lat : 24.7136;
         const safeLng = Number.isFinite(lng) ? lng : 46.6753;
         const map = L.map(host, {
           zoomControl: true,
           attributionControl: true,
           preferCanvas: true,
-          minZoom: 1,
-          maxBounds: [[-90, -180], [90, 180]],
-          maxBoundsViscosity: 1,
+          minZoom: 2,
+          maxZoom: 19,
+          worldCopyJump: true,
         }).setView([safeLat, safeLng], 16);
 
-        map.attributionControl.addAttribution(OPENFREEMAP_ATTRIBUTION);
-        maplibreGL({ style: OPENFREEMAP_STYLE }).addTo(map);
+        L.tileLayer(SATELLITE_TILES, {
+          attribution: SATELLITE_ATTRIBUTION,
+          maxZoom: 19,
+          maxNativeZoom: 19,
+          crossOrigin: true,
+        }).addTo(map);
+
+        new locateControl().addTo(map);
 
         const marker = L.circleMarker([safeLat, safeLng], {
           radius: 9,
@@ -89,7 +115,6 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
         window.setTimeout(resize, 0);
         window.setTimeout(resize, 120);
         window.addEventListener("resize", resize);
-
         observer?.disconnect();
         observer = null;
 
@@ -100,12 +125,9 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
           markerRef.current = null;
           radiusRef.current = null;
         };
-
-        host.dataset.leafletCleanup = "1";
         (host as HTMLDivElement & { __leafletCleanup?: () => void }).__leafletCleanup = cleanup;
       } catch (error) {
-        // Map failure must never block Settings or any attendance flow.
-        console.warn("تعذر تحميل خريطة تحديد الموقع:", error);
+        console.warn("تعذر تحميل خريطة القمر الصناعي لتحديد الموقع:", error);
         started = false;
       }
     };
@@ -125,7 +147,6 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
       const cleanupHost = host as HTMLDivElement & { __leafletCleanup?: () => void };
       cleanupHost.__leafletCleanup?.();
       delete cleanupHost.__leafletCleanup;
-      delete host.dataset.leafletCleanup;
     };
   }, []);
 
@@ -142,9 +163,27 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
 
   return (
     <div className={`overflow-hidden rounded-2xl border border-border/70 bg-muted/20 ${className}`}>
-      <div ref={hostRef} className="h-64 w-full sm:h-80" aria-label="خريطة مجانية لتحديد الموقع" />
+      <style>{`
+        .hadir-map-location-control {
+          width: 38px;
+          height: 38px;
+          border: 0;
+          border-radius: 9999px;
+          background: rgba(255,255,255,.96);
+          box-shadow: 0 2px 10px rgba(0,0,0,.25);
+          display: grid;
+          place-items: center;
+          cursor: pointer;
+          color: #1f2937;
+          font-size: 22px;
+          line-height: 1;
+        }
+        .hadir-map-location-control:hover { background: #fff; transform: scale(1.04); }
+        .hadir-map-location-control:disabled { opacity: .6; cursor: wait; }
+      `}</style>
+      <div ref={hostRef} className="h-64 w-full sm:h-80" aria-label="خريطة القمر الصناعي لتحديد الموقع" />
       <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-card/90 px-3 py-2 text-[10px] text-muted-foreground">
-        <span>اضغط على الخريطة لتحديد النقطة بدقة</span>
+        <span>اضغط زر ⌾ لتحديد موقعك، أو اضغط على الخريطة لاختيار النقطة</span>
         <span className="mono">{Number.isFinite(lat) ? lat.toFixed(6) : "—"}, {Number.isFinite(lng) ? lng.toFixed(6) : "—"}</span>
       </div>
     </div>
