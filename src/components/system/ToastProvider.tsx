@@ -3,7 +3,7 @@ import { Toaster, toast as sonnerToast } from "@/components/ui/sonner";
 import "./toast.css";
 
 const defaults = { position: "top-center" as const, richColors: true, closeButton: true, dir: "rtl" as const, visibleToasts: 4 };
-const TOAST_DURATION = 1000;
+const TOAST_DURATION = 1500;
 
 export function ToastProvider() {
   return <Toaster {...defaults} toastOptions={{ duration: TOAST_DURATION }} />;
