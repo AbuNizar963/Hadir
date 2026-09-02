@@ -154,12 +154,6 @@ export default function PWAExperience() {
         return;
       }
 
-      const rememberDetectedBuild = () => {
-        const versionToRemember = pendingBuildVersionRef.current || detectedBuildVersionRef.current;
-        if (!versionToRemember) return;
-        try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, versionToRemember); } catch {}
-      };
-
       const applyWaitingWorker = (worker: ServiceWorker | null) => {
         if (!worker) return false;
         worker.postMessage({ type: "SKIP_WAITING" });
@@ -168,26 +162,41 @@ export default function PWAExperience() {
 
       if (applyWaitingWorker(registration.waiting)) return;
 
+      const installedWorkerPromise = new Promise<ServiceWorker | null>(resolve => {
+        let settled = false;
+        let worker: ServiceWorker | null = null;
+        const finish = (value: ServiceWorker | null) => {
+          if (settled) return;
+          settled = true;
+          if (worker) worker.removeEventListener("statechange", onStateChange);
+          registration.removeEventListener("updatefound", onUpdateFound);
+          resolve(value);
+        };
+        const onStateChange = () => {
+          if (!worker) return;
+          if (worker.state === "installed") finish(worker);
+          else if (worker.state === "redundant") finish(null);
+        };
+        const watchWorker = (candidate: ServiceWorker | null) => {
+          if (!candidate || worker === candidate) return;
+          worker = candidate;
+          worker.addEventListener("statechange", onStateChange);
+          onStateChange();
+        };
+        const onUpdateFound = () => watchWorker(registration.installing);
+        registration.addEventListener("updatefound", onUpdateFound);
+        watchWorker(registration.installing);
+        window.setTimeout(() => finish(null), 20000);
+      });
+
       await registration.update();
+
       if (applyWaitingWorker(registration.waiting)) return;
 
-      const installingWorker = registration.installing;
-      if (installingWorker) {
-        const installed = await new Promise<boolean>(resolve => {
-          let settled = false;
-          const finish = (value: boolean) => { if (settled) return; settled = true; installingWorker.removeEventListener("statechange", onStateChange); resolve(value); };
-          const onStateChange = () => {
-            if (installingWorker.state === "installed") finish(true);
-            else if (installingWorker.state === "redundant") finish(false);
-          };
-          installingWorker.addEventListener("statechange", onStateChange);
-          if (installingWorker.state === "installed") finish(true);
-          window.setTimeout(() => finish(false), 15000);
-        });
-        if (installed) {
-          installingWorker.postMessage({ type: "SKIP_WAITING" });
-          return;
-        }
+      const installedWorker = await installedWorkerPromise;
+      if (installedWorker) {
+        installedWorker.postMessage({ type: "SKIP_WAITING" });
+        return;
       }
 
       setUpdating(false);
