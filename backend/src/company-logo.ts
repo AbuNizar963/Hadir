@@ -26,10 +26,10 @@ function canManage(actor: Actor | null): boolean {
   return actor?.role === "owner" || actor?.role === "manager";
 }
 
-function logoUrl(request: Request): string {
+function logoUrl(request: Request, version?: string): string {
   const url = new URL(request.url);
   url.pathname = "/api/company/logo";
-  url.search = "";
+  url.search = version ? `?v=${encodeURIComponent(version)}` : "";
   return url.toString();
 }
 
@@ -96,6 +96,7 @@ export async function handleCompanyLogoRequest(
     const previous = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_KEY_SETTING).first<{ value: string }>();
     const previousKey = String(previous?.value || "").trim();
     const key = `company/logo-${crypto.randomUUID()}.webp`;
+    const publicUrl = logoUrl(req, key);
     await env.PROFILE_IMAGES.put(key, file.stream(), {
       httpMetadata: { contentType: LOGO_CONTENT_TYPE, cacheControl: "public, max-age=31536000, immutable" },
       customMetadata: { purpose: "company-logo", uploadedBy: resolvedActor?.id || "unknown" },
@@ -104,7 +105,7 @@ export async function handleCompanyLogoRequest(
     try {
       await env.DB.batch([
         env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_KEY_SETTING, key),
-        env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_URL_SETTING, logoUrl(req)),
+        env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_URL_SETTING, publicUrl),
       ]);
     } catch (error) {
       await env.PROFILE_IMAGES.delete(key).catch(() => undefined);
@@ -113,7 +114,7 @@ export async function handleCompanyLogoRequest(
     }
 
     if (previousKey && previousKey !== key && previousKey.startsWith("company/logo-")) await env.PROFILE_IMAGES.delete(previousKey).catch(() => undefined);
-    return json({ ok: true, url: logoUrl(req), key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
+    return json({ ok: true, url: publicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
   }
 
   if (req.method === "DELETE") {
