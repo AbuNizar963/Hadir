@@ -1,3 +1,4 @@
+import { CheckCircle2, CircleAlert, Info, LoaderCircle, XCircle } from "lucide-react";
 import { Toaster, toast as sonnerToast } from "@/components/ui/sonner";
 
 const defaults = { position: "top-center" as const, richColors: true, closeButton: true, dir: "rtl" as const, visibleToasts: 4 };
@@ -15,11 +16,13 @@ export function userFacingError(error: unknown, fallback = "حدث خطأ غير
   return message.length > 220 ? fallback : message;
 }
 
+const options = { position: "top-center" as const };
+
 export const toast = {
-  success: (message: string, description?: string) => sonnerToast.success(message, { description }),
-  error: (message: string, description?: string) => sonnerToast.error(message, { description, duration: 6500 }),
-  warning: (message: string, description?: string) => sonnerToast.warning(message, { description, duration: 5500 }),
-  info: (message: string, description?: string) => sonnerToast.info(message, { description }),
-  loading: (message: string, description?: string) => sonnerToast.loading(message, { description }),
+  success: (message: string, description?: string) => sonnerToast.success(message, { ...options, description, icon: <CheckCircle2 aria-hidden="true" /> }),
+  error: (message: string, description?: string) => sonnerToast.error(message, { ...options, description, duration: 6500, icon: <XCircle aria-hidden="true" /> }),
+  warning: (message: string, description?: string) => sonnerToast.warning(message, { ...options, description, duration: 5500, icon: <CircleAlert aria-hidden="true" /> }),
+  info: (message: string, description?: string) => sonnerToast.info(message, { ...options, description, icon: <Info aria-hidden="true" /> }),
+  loading: (message: string, description?: string) => sonnerToast.loading(message, { ...options, description, duration: Infinity, icon: <LoaderCircle className="animate-spin" aria-hidden="true" /> }),
   dismiss: (id?: string | number) => sonnerToast.dismiss(id),
 };
