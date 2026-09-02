@@ -6,6 +6,7 @@ const MAX_LOGO_BYTES = 100 * 1024;
 const LOGO_CONTENT_TYPE = "image/webp";
 const LOGO_KEY_SETTING = "brandLogoR2Key";
 const LOGO_URL_SETTING = "brandLogo";
+const SESSION_COOKIE = "hadir_session";
 
 function json(data: unknown, status: number, origin: string): Response {
   return new Response(JSON.stringify(data), {
@@ -32,6 +33,30 @@ function logoUrl(request: Request): string {
   return url.toString();
 }
 
+function requestToken(req: Request): string {
+  const cookie = req.headers.get("cookie") || "";
+  const item = cookie.split(";").map((v) => v.trim()).find((v) => v.startsWith(`${SESSION_COOKIE}=`));
+  if (item) return decodeURIComponent(item.slice(SESSION_COOKIE.length + 1));
+  return (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+}
+
+async function authenticatedActor(req: Request, env: Env): Promise<Actor | null> {
+  const raw = requestToken(req);
+  if (!raw) return null;
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+    let binary = "";
+    for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
+    const tokenHash = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    const session = await env.DB.prepare("SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1").bind(tokenHash).first<{ userId: string; userType: string }>();
+    if (!session || session.userType !== "admin") return null;
+    const row = await env.DB.prepare("SELECT id,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1").bind(session.userId).first<{ id: string; role: Role; active: number }>();
+    return row ? { id: String(row.id), role: row.role } : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function handleCompanyLogoRequest(
   req: Request,
   env: Env,
@@ -56,7 +81,8 @@ export async function handleCompanyLogoRequest(
     return new Response(object.body, { status: 200, headers });
   }
 
-  if (!canManage(actor)) return json({ error: "غير مصرح" }, 403, origin);
+  const resolvedActor = actor || await authenticatedActor(req, env);
+  if (!canManage(resolvedActor)) return json({ error: "غير مصرح" }, 403, origin);
 
   if (req.method === "POST") {
     const contentType = (req.headers.get("content-type") || "").split(";", 1)[0].toLowerCase();
@@ -72,7 +98,7 @@ export async function handleCompanyLogoRequest(
     const key = `company/logo-${crypto.randomUUID()}.webp`;
     await env.PROFILE_IMAGES.put(key, file.stream(), {
       httpMetadata: { contentType: LOGO_CONTENT_TYPE, cacheControl: "public, max-age=31536000, immutable" },
-      customMetadata: { purpose: "company-logo", uploadedBy: actor?.id || "unknown" },
+      customMetadata: { purpose: "company-logo", uploadedBy: resolvedActor?.id || "unknown" },
     });
 
     try {
