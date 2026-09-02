@@ -166,11 +166,14 @@ jobs:
           assert isinstance(manifest.get("icons"), list) and len(manifest["icons"]) >= 2, manifest
 
           sw=Path("/tmp/sw.js").read_text(encoding="utf-8")
-          match=re.search(r'const CACHE="(hadir-shell-v\d+)";', sw)
-          assert match, "production service-worker shell cache version declaration is missing"
+          version_match=re.search(r'const BUILD_VERSION="([0-9a-f]{40})";', sw)
+          assert version_match, "production service-worker build version declaration is missing"
+          cache_match=re.search(r'const CACHE=`hadir-shell-\$\{BUILD_VERSION\}`;', sw)
+          assert cache_match, "production service-worker shell cache declaration is missing"
           assert "SKIP_WAITING" in sw, "service-worker update activation handler is missing"
           assert "notificationclick" in sw, "service-worker notification click handler is missing"
-          print(f"Production PWA verified: {match.group(1)}")
+          assert version_match.group(1)==__import__("os").environ["GITHUB_SHA"], "service-worker build version does not match deployed commit"
+          print(f"Production PWA verified: {version_match.group(1)}")
           PY
 
       - name: Deployment complete
