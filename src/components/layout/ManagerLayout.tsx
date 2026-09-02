@@ -46,7 +46,55 @@ export default function ManagerLayout({ title, subtitle, actions, children }: { 
   const [theme, setTheme] = useState<"light" | "dark" | "system">(readTheme());
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
-  useEffect(() => { let active = true; const load = async () => { try { const server = await loadServerNotifications(); if (active) setNotifications(server.filter(n => n.userId === currentUserId)); } catch { try { const all = getNotifications(currentUserId); if (active) setNotifications(Array.isArray(all) ? all.filter(n => n.userId === currentUserId || n.userId === "manager" || n.userId === "admin" || n.userId === "all") : []); } catch { if (active) setNotifications([]); } } }; void load(); const i = setInterval(() => void load(), 5000); return () => { active = false; clearInterval(i); }; }, [currentUserId]);
+  useEffect(() => {
+    let active = true;
+    let fallbackTimer: number | undefined;
+    let inFlight = false;
+    let queued = false;
+    const load = async () => {
+      if (inFlight) { queued = true; return; }
+      inFlight = true;
+      try {
+        const server = await loadServerNotifications();
+        if (active) setNotifications(server.filter(n => n.userId === currentUserId));
+      } catch {
+        try {
+          const all = getNotifications(currentUserId);
+          if (active) setNotifications(Array.isArray(all) ? all.filter(n => n.userId === currentUserId || n.userId === "manager" || n.userId === "admin" || n.userId === "all") : []);
+        } catch {
+          if (active) setNotifications([]);
+        }
+      } finally {
+        inFlight = false;
+        if (queued) { queued = false; void load(); }
+        scheduleFallback();
+      }
+    };
+    const scheduleFallback = () => {
+      if (!active) return;
+      window.clearTimeout(fallbackTimer);
+      if (document.visibilityState !== "visible") return;
+      fallbackTimer = window.setTimeout(() => void load(), 120000);
+    };
+    const refresh = () => { if (document.visibilityState === "visible") void load(); };
+    const onStorage = (event: StorageEvent) => { if (event.key === "hadir.api.token.admin" || event.key === "managerAuth") refresh(); };
+    void load();
+    window.addEventListener("hadir:cloud-data-changed", refresh);
+    window.addEventListener("hadir:d1-view-changed", refresh);
+    window.addEventListener("hadir:notifications-changed", refresh);
+    window.addEventListener("online", refresh);
+    window.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { void load(); } else window.clearTimeout(fallbackTimer); });
+    window.addEventListener("storage", onStorage);
+    return () => {
+      active = false;
+      window.clearTimeout(fallbackTimer);
+      window.removeEventListener("hadir:cloud-data-changed", refresh);
+      window.removeEventListener("hadir:d1-view-changed", refresh);
+      window.removeEventListener("hadir:notifications-changed", refresh);
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [currentUserId]);
   useEffect(() => { applyTheme(theme); try { localStorage.setItem(THEME_KEY, theme); } catch {} }, [theme]);
   useEffect(() => { if (theme !== "system") return; const media = window.matchMedia("(prefers-color-scheme: dark)"); const onChange = () => applyTheme("system"); media.addEventListener?.("change", onChange); return () => media.removeEventListener?.("change", onChange); }, [theme]);
   const unreadCount = notifications.filter(n => !n.read).length;
