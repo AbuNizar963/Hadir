@@ -31,14 +31,20 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
     const base = import.meta.env.BASE_URL || "/";
     const swUrl = new URL("sw.js", new URL(base, window.location.origin)).toString();
     const scope = new URL(base, window.location.origin).pathname;
-    navigator.serviceWorker.register(swUrl, { scope }).then(registration => {
+    navigator.serviceWorker.register(swUrl, { scope, updateViaCache: "none" }).then(registration => {
+      const notifyUpdateAvailable = () => {
+        window.dispatchEvent(new CustomEvent("hadir:sw-update-available"));
+      };
+
+      if (registration.waiting && navigator.serviceWorker.controller) notifyUpdateAvailable();
+
       void registration.update();
       registration.addEventListener("updatefound", () => {
         const worker = registration.installing;
         if (!worker) return;
         worker.addEventListener("statechange", () => {
           if (worker.state === "installed" && navigator.serviceWorker.controller) {
-            void registration.update();
+            notifyUpdateAvailable();
           }
         });
       });
