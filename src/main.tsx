@@ -27,6 +27,13 @@ installDeviceDirectoryEnhancer();
 installNavigationScrollPersistence();
 
 if ("serviceWorker" in navigator && window.isSecureContext) {
+  const onServiceWorkerMessage = (event: MessageEvent) => {
+    if (event.data?.type === "HADIR_SW_UPDATE_AVAILABLE") {
+      window.dispatchEvent(new CustomEvent("hadir:sw-update-available"));
+    }
+  };
+  navigator.serviceWorker.addEventListener("message", onServiceWorkerMessage);
+
   window.addEventListener("load", () => {
     const base = import.meta.env.BASE_URL || "/";
     const swUrl = new URL("sw.js", new URL(base, window.location.origin)).toString();
