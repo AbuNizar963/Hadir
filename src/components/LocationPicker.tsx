@@ -14,13 +14,7 @@ const SATELLITE_TILES =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const SATELLITE_ATTRIBUTION = "© Esri, Maxar, Earthstar Geographics";
 
-export default function LocationPicker({
-  lat,
-  lng,
-  radiusMeters,
-  onChange,
-  className = "",
-}: LocationPickerProps) {
+export default function LocationPicker({ lat, lng, radiusMeters, onChange, className = "" }: LocationPickerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.CircleMarker | null>(null);
@@ -36,13 +30,50 @@ export default function LocationPicker({
     let disposed = false;
     let observer: IntersectionObserver | null = null;
 
+    const locateControl = L.Control.extend({
+      options: { position: "bottomright" as L.ControlPosition },
+      onAdd(map: L.Map) {
+        const button = L.DomUtil.create("button", "hadir-map-location-control");
+        button.type = "button";
+        button.title = "تحديد موقعي";
+        button.setAttribute("aria-label", "تحديد موقعي");
+        button.innerHTML = "<span aria-hidden=\"true\">⌾</span>";
+
+        L.DomEvent.disableClickPropagation(button);
+        L.DomEvent.on(button, "click", (event) => {
+          L.DomEvent.stop(event);
+          if (!("geolocation" in navigator)) return;
+
+          button.disabled = true;
+          button.setAttribute("aria-busy", "true");
+
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              if (!disposed) {
+                map.setView([position.coords.latitude, position.coords.longitude], Math.max(map.getZoom(), 17), {
+                  animate: true,
+                });
+              }
+              button.disabled = false;
+              button.removeAttribute("aria-busy");
+            },
+            () => {
+              button.disabled = false;
+              button.removeAttribute("aria-busy");
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+          );
+        });
+
+        return button;
+      },
+    });
+
     const initMap = async () => {
       if (started || disposed || !host.isConnected || mapRef.current) return;
       started = true;
 
       try {
-        // Keep the map admin-only and lazy: it is never loaded by attendance,
-        // login, or employee location verification flows.
         await import("leaflet");
         if (disposed || !host.isConnected || mapRef.current) return;
 
@@ -62,6 +93,8 @@ export default function LocationPicker({
           maxZoom: 19,
           maxNativeZoom: 19,
         }).addTo(map);
+
+        new locateControl().addTo(map);
 
         const marker = L.circleMarker([safeLat, safeLng], {
           radius: 9,
@@ -91,30 +124,6 @@ export default function LocationPicker({
         window.setTimeout(resize, 120);
         window.addEventListener("resize", resize);
 
-        // Center on the manager's current device position when permission is
-        // available. This ONLY changes the camera; it never changes/saves the
-        // configured location coordinates or radius.
-        if ("geolocation" in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              if (disposed || !mapRef.current) return;
-              map.setView(
-                [position.coords.latitude, position.coords.longitude],
-                Math.max(map.getZoom(), 17),
-                { animate: true },
-              );
-            },
-            () => {
-              // Permission denied/unavailable: retain the configured location.
-            },
-            {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 60000,
-            },
-          );
-        }
-
         observer?.disconnect();
         observer = null;
 
@@ -128,19 +137,15 @@ export default function LocationPicker({
 
         (host as HTMLDivElement & { __leafletCleanup?: () => void }).__leafletCleanup = cleanup;
       } catch (error) {
-        // Map failure must never block Settings or any attendance flow.
         console.warn("تعذر تحميل خريطة القمر الصناعي لتحديد الموقع:", error);
         started = false;
       }
     };
 
     if ("IntersectionObserver" in window) {
-      observer = new IntersectionObserver(
-        (entries) => {
-          if (entries.some((entry) => entry.isIntersecting)) void initMap();
-        },
-        { rootMargin: "160px" },
-      );
+      observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void initMap();
+      }, { rootMargin: "160px" });
       observer.observe(host);
     } else {
       void initMap();
@@ -169,12 +174,28 @@ export default function LocationPicker({
 
   return (
     <div className={`overflow-hidden rounded-2xl border border-border/70 bg-muted/20 ${className}`}>
+      <style>{`
+        .hadir-map-location-control {
+          width: 38px;
+          height: 38px;
+          border: 0;
+          border-radius: 9999px;
+          background: rgba(255,255,255,.96);
+          box-shadow: 0 2px 10px rgba(0,0,0,.25);
+          display: grid;
+          place-items: center;
+          cursor: pointer;
+          color: #1f2937;
+          font-size: 22px;
+          line-height: 1;
+        }
+        .hadir-map-location-control:hover { background: #fff; transform: scale(1.04); }
+        .hadir-map-location-control:disabled { opacity: .6; cursor: wait; }
+      `}</style>
       <div ref={hostRef} className="h-64 w-full sm:h-80" aria-label="خريطة القمر الصناعي لتحديد الموقع" />
       <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-card/90 px-3 py-2 text-[10px] text-muted-foreground">
-        <span>تتمركز الخريطة تلقائيًا على موقعك الحالي، واضغط لتحديد النقطة</span>
-        <span className="mono">
-          {Number.isFinite(lat) ? lat.toFixed(6) : "—"}, {Number.isFinite(lng) ? lng.toFixed(6) : "—"}
-        </span>
+        <span>اضغط زر ⌾ لتحديد موقعك، أو اضغط على الخريطة لاختيار النقطة</span>
+        <span className="mono">{Number.isFinite(lat) ? lat.toFixed(6) : "—"}, {Number.isFinite(lng) ? lng.toFixed(6) : "—"}</span>
       </div>
     </div>
   );
