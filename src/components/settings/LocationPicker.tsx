@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getBackendLocations } from "@/lib/backend";
 
 type LocationPickerProps = {
   lat: number;
@@ -76,25 +75,15 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
       try {
         if (disposed || !host.isConnected || mapRef.current) return;
 
-        // D1 is authoritative for the company's main location. Do not use the
-        // local default coordinates before the cloud location has been checked.
-        let initialLat = Number(lat);
-        let initialLng = Number(lng);
-        let initialRadius = Number(radiusMeters);
-        try {
-          const locations = await getBackendLocations("admin");
-          const main = locations.find((location) => String(location.id) === "main");
-          if (main && validCoordinate(main.lat, main.lng)) {
-            initialLat = Number(main.lat);
-            initialLng = Number(main.lng);
-            initialRadius = Number(main.radiusMeters);
-          }
-        } catch (error) {
-          console.warn("تعذر قراءة موقع الشركة الرئيسي من D1، سيتم استخدام إعدادات الصفحة الحالية:", error);
-        }
+        // The coordinates supplied by the settings editor are authoritative.
+        // This is important when editing a branch/location: never replace its
+        // coordinates with the company's main location while the map loads.
+        const initialLat = Number(lat);
+        const initialLng = Number(lng);
+        const initialRadius = Number(radiusMeters);
 
         if (!validCoordinate(initialLat, initialLng)) {
-          console.warn("موقع الشركة الرئيسي غير صالح؛ لن يتم فتح الخريطة على موقع افتراضي.");
+          console.warn("إحداثيات الموقع المحدد غير صالحة؛ لن يتم فتح الخريطة على موقع افتراضي.");
           started = false;
           return;
         }
