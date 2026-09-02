@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }> };
 const INSTALL_DISMISSED_KEY = "hadir.pwa.install.dismissed";
@@ -19,6 +19,9 @@ export default function PWAExperience() {
   const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && !navigator.onLine);
   const [standalone, setStandalone] = useState(() => isStandalone());
   const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState(false);
+  const detectedBuildVersionRef = useRef("");
+  const pendingBuildVersionRef = useRef("");
 
   useEffect(() => { const media = window.matchMedia?.("(display-mode: standalone)"); const onDisplayModeChange = () => setStandalone(isStandalone()); media?.addEventListener?.("change", onDisplayModeChange); window.addEventListener("pageshow", onDisplayModeChange); return () => { media?.removeEventListener?.("change", onDisplayModeChange); window.removeEventListener("pageshow", onDisplayModeChange); }; }, []);
   useEffect(() => {
@@ -33,8 +36,6 @@ export default function PWAExperience() {
   useEffect(() => {
     let cancelled = false;
     let observedWorker: ServiceWorker | null = null;
-    let pendingBuildVersion = "";
-    let detectedBuildVersion = "";
 
     const shouldShowUpdate = () => {
       try {
@@ -72,7 +73,7 @@ export default function PWAExperience() {
       try {
         const buildVersion = await getBuildVersion();
         if (!buildVersion || cancelled) return;
-        detectedBuildVersion = buildVersion;
+        detectedBuildVersionRef.current = buildVersion;
         let lastOpenBuildVersion = "";
         try { lastOpenBuildVersion = localStorage.getItem(UPDATE_BUILD_VERSION_KEY)?.trim() || ""; } catch {}
         if (!lastOpenBuildVersion) {
@@ -80,7 +81,7 @@ export default function PWAExperience() {
           return;
         }
         if (buildVersion !== lastOpenBuildVersion) {
-          pendingBuildVersion = buildVersion;
+          pendingBuildVersionRef.current = buildVersion;
           shouldShowUpdate();
           return;
         }
@@ -125,38 +126,49 @@ export default function PWAExperience() {
     };
   }, []);
 
-  useEffect(() => { const onControllerChange = () => { setUpdating(false); window.location.reload(); }; navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange); return () => navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange); }, []);
+  useEffect(() => {
+    const onControllerChange = () => {
+      const versionToRemember = pendingBuildVersionRef.current || detectedBuildVersionRef.current;
+      if (versionToRemember) {
+        try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, versionToRemember); } catch {}
+      }
+      setUpdating(false);
+      window.location.reload();
+    };
+    navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
+    return () => navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange);
+  }, []);
+
   const dismissInstall = () => { try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {} setInstallVisible(false); setManualInstallVisible(false); };
   const install = async () => { if (!installEvent) return; const currentEvent = installEvent; setInstallEvent(null); setInstallVisible(false); await currentEvent.prompt(); const choice = await currentEvent.userChoice; if (choice.outcome === "dismissed") { try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {} } };
+
   const update = async () => {
     if (updating) return;
     setUpdating(true);
+    setUpdateError(false);
     try {
       const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
       if (!registration) {
-        if (detectedBuildVersion) {
-          try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, detectedBuildVersion); } catch {}
-        }
-        window.location.reload();
+        setUpdating(false);
+        setUpdateError(true);
         return;
       }
 
       const rememberDetectedBuild = () => {
-        const versionToRemember = pendingBuildVersion || detectedBuildVersion;
+        const versionToRemember = pendingBuildVersionRef.current || detectedBuildVersionRef.current;
         if (!versionToRemember) return;
         try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, versionToRemember); } catch {}
       };
 
       const applyWaitingWorker = (worker: ServiceWorker | null) => {
         if (!worker) return false;
-        rememberDetectedBuild();
         worker.postMessage({ type: "SKIP_WAITING" });
         return true;
       };
 
       if (applyWaitingWorker(registration.waiting)) return;
 
-      await registration.update().catch(() => undefined);
+      await registration.update();
       if (applyWaitingWorker(registration.waiting)) return;
 
       const installingWorker = registration.installing;
@@ -173,22 +185,23 @@ export default function PWAExperience() {
           window.setTimeout(() => finish(false), 15000);
         });
         if (installed) {
-          rememberDetectedBuild();
           installingWorker.postMessage({ type: "SKIP_WAITING" });
           return;
         }
       }
 
-      rememberDetectedBuild();
-      window.location.reload();
+      setUpdating(false);
+      setUpdateError(true);
     } catch {
       setUpdating(false);
+      setUpdateError(true);
     }
   };
-  const dismissUpdate = () => { try { sessionStorage.setItem(UPDATE_DISMISSED_KEY, "1"); } catch {} setUpdateVisible(false); };
+
+  const dismissUpdate = () => { try { sessionStorage.setItem(UPDATE_DISMISSED_KEY, "1"); } catch {} setUpdateVisible(false); setUpdateError(false); };
 
   if (offline) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-amber-500/30 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-center gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-xl">📡</div><div className="min-w-0 flex-1"><p className="font-bold">أنت غير متصل بالإنترنت</p><p className="mt-0.5 text-xs text-muted-foreground">تم الحفاظ على جلسة الدخول. سيُستأنف الاتصال تلقائيًا عند عودته.</p></div></div></div>;
-  if (updateVisible) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-xl">✨</div><div className="min-w-0 flex-1"><p className="font-bold">تحديث جديد لحاضر متاح</p><p className="mt-1 text-xs leading-5 text-muted-foreground">سيتم تحديث واجهة التطبيق بأمان دون حذف بياناتك المحلية أو جلسة تسجيل الدخول.</p><div className="mt-3 flex gap-2"><button type="button" onClick={update} disabled={updating} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">{updating ? "جارٍ التحديث…" : "تحديث الآن"}</button><button type="button" onClick={dismissUpdate} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">لاحقًا</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissUpdate} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
+  if (updateVisible) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-xl">✨</div><div className="min-w-0 flex-1"><p className="font-bold">تحديث جديد لحاضر متاح</p><p className="mt-1 text-xs leading-5 text-muted-foreground">سيتم تحديث واجهة التطبيق بأمان دون حذف بياناتك المحلية أو جلسة تسجيل الدخول.</p>{updateError && <p className="mt-2 text-xs leading-5 text-destructive">تعذر تثبيت التحديث الآن. لم يتم إعادة تحميل التطبيق، ويمكنك المحاولة مرة أخرى.</p>}<div className="mt-3 flex gap-2"><button type="button" onClick={update} disabled={updating} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">{updating ? "جارٍ التحديث…" : "تحديث الآن"}</button><button type="button" onClick={dismissUpdate} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">لاحقًا</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissUpdate} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   if (installVisible && installEvent) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📱</div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">هذا هو تثبيت PWA الحقيقي، وليس اختصارًا عاديًا. سيعمل حاضر بواجهة مستقلة عن المتصفح ويحافظ على جلسة الحساب.</p><div className="mt-3 flex gap-2"><button type="button" onClick={install} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">تثبيت الآن</button><button type="button" onClick={dismissInstall} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">ليس الآن</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   if (manualInstallVisible && isAndroid() && !installEvent) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📲</div><div className="min-w-0 flex-1"><p className="font-bold">تثبيت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">إذا لم يظهر زر التثبيت التلقائي، افتح قائمة Chrome ⋮ ثم اختر «تثبيت التطبيق» أو «Install app». لا تستخدم «إضافة إلى الشاشة الرئيسية» لأنها قد تنشئ اختصارًا فقط.</p><button type="button" onClick={dismissInstall} className="mt-3 rounded-xl border border-border px-4 py-2 text-sm font-medium">فهمت</button></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   if (manualInstallVisible && isIos() && isMobile()) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📲</div><div className="min-w-0 flex-1"><p className="font-bold">أضف حاضر إلى الشاشة الرئيسية</p><p className="mt-1 text-xs leading-5 text-muted-foreground">على iPhone أو iPad: افتح قائمة المشاركة في Safari ثم اختر «إضافة إلى الشاشة الرئيسية». هذه هي طريقة تثبيت PWA الرسمية على أجهزة Apple.</p><button type="button" onClick={dismissInstall} className="mt-3 rounded-xl border border-border px-4 py-2 text-sm font-medium">فهمت</button></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
