@@ -1,6 +1,17 @@
 name: Hadir Frontend CI
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "public/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig*.json"
+      - "vite.config.*"
+      - ".github/workflows/ci-frontend.yml"
   pull_request:
     paths:
       - "src/**"
