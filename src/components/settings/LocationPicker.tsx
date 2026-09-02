@@ -21,36 +21,84 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
   onChangeRef.current = onChange;
 
   useEffect(() => {
-    if (!hostRef.current || mapRef.current) return;
+    const host = hostRef.current;
+    if (!host || mapRef.current) return;
 
-    const safeLat = Number.isFinite(lat) ? lat : 24.7136;
-    const safeLng = Number.isFinite(lng) ? lng : 46.6753;
-    const map = L.map(hostRef.current, { zoomControl: true, attributionControl: true }).setView([safeLat, safeLng], 18);
-    L.tileLayer(SATELLITE_URL, { maxZoom: 20, attribution: "© Esri, Maxar, Earthstar Geographics" }).addTo(map);
+    let started = false;
+    let observer: IntersectionObserver | null = null;
 
-    const marker = L.circleMarker([safeLat, safeLng], { radius: 9, weight: 3, fillOpacity: 0.9 }).addTo(map);
-    const radius = L.circle([safeLat, safeLng], { radius: Math.max(1, Number(radiusMeters) || 100), weight: 2, fillOpacity: 0.12 }).addTo(map);
+    const initMap = () => {
+      if (started || !host.isConnected || mapRef.current) return;
+      started = true;
 
-    map.on("click", (event: L.LeafletMouseEvent) => {
-      const nextLat = Number(event.latlng.lat.toFixed(7));
-      const nextLng = Number(event.latlng.lng.toFixed(7));
-      marker.setLatLng([nextLat, nextLng]);
-      radius.setLatLng([nextLat, nextLng]);
-      onChangeRef.current(nextLat, nextLng);
-    });
+      const safeLat = Number.isFinite(lat) ? lat : 24.7136;
+      const safeLng = Number.isFinite(lng) ? lng : 46.6753;
+      const map = L.map(host, {
+        zoomControl: true,
+        attributionControl: true,
+        preferCanvas: true,
+      }).setView([safeLat, safeLng], 16);
 
-    mapRef.current = map;
-    markerRef.current = marker;
-    radiusRef.current = radius;
-    const resize = () => map.invalidateSize();
-    window.setTimeout(resize, 80);
-    window.addEventListener("resize", resize);
+      L.tileLayer(SATELLITE_URL, {
+        maxZoom: 19,
+        maxNativeZoom: 18,
+        keepBuffer: 0,
+        updateWhenIdle: true,
+        updateWhenZooming: false,
+        detectRetina: false,
+        attribution: "© Esri, Maxar, Earthstar Geographics",
+      }).addTo(map);
+
+      const marker = L.circleMarker([safeLat, safeLng], { radius: 9, weight: 3, fillOpacity: 0.9 }).addTo(map);
+      const radius = L.circle([safeLat, safeLng], { radius: Math.max(1, Number(radiusMeters) || 100), weight: 2, fillOpacity: 0.12 }).addTo(map);
+
+      map.on("click", (event: L.LeafletMouseEvent) => {
+        const nextLat = Number(event.latlng.lat.toFixed(7));
+        const nextLng = Number(event.latlng.lng.toFixed(7));
+        marker.setLatLng([nextLat, nextLng]);
+        radius.setLatLng([nextLat, nextLng]);
+        onChangeRef.current(nextLat, nextLng);
+      });
+
+      mapRef.current = map;
+      markerRef.current = marker;
+      radiusRef.current = radius;
+
+      const resize = () => map.invalidateSize({ pan: false });
+      window.setTimeout(resize, 0);
+      window.setTimeout(resize, 120);
+      window.addEventListener("resize", resize);
+
+      observer?.disconnect();
+      observer = null;
+
+      const cleanup = () => {
+        window.removeEventListener("resize", resize);
+        map.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+        radiusRef.current = null;
+      };
+
+      host.dataset.leafletCleanup = "1";
+      (host as HTMLDivElement & { __leafletCleanup?: () => void }).__leafletCleanup = cleanup;
+    };
+
+    if ("IntersectionObserver" in window) {
+      observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) initMap();
+      }, { rootMargin: "160px" });
+      observer.observe(host);
+    } else {
+      initMap();
+    }
+
     return () => {
-      window.removeEventListener("resize", resize);
-      map.remove();
-      mapRef.current = null;
-      markerRef.current = null;
-      radiusRef.current = null;
+      observer?.disconnect();
+      const cleanupHost = host as HTMLDivElement & { __leafletCleanup?: () => void };
+      cleanupHost.__leafletCleanup?.();
+      delete cleanupHost.__leafletCleanup;
+      delete host.dataset.leafletCleanup;
     };
   }, []);
 
