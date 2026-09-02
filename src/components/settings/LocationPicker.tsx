@@ -25,7 +25,13 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.CircleMarker | null>(null);
   const radiusRef = useRef<L.Circle | null>(null);
+  const latRef = useRef(lat);
+  const lngRef = useRef(lng);
+  const radiusMetersRef = useRef(radiusMeters);
   const onChangeRef = useRef(onChange);
+  latRef.current = lat;
+  lngRef.current = lng;
+  radiusMetersRef.current = radiusMeters;
   onChangeRef.current = onChange;
 
   useEffect(() => {
@@ -75,12 +81,13 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
       try {
         if (disposed || !host.isConnected || mapRef.current) return;
 
-        // The coordinates supplied by the settings editor are authoritative.
-        // This is important when editing a branch/location: never replace its
-        // coordinates with the company's main location while the map loads.
-        const initialLat = Number(lat);
-        const initialLng = Number(lng);
-        const initialRadius = Number(radiusMeters);
+        // Read the latest coordinates at the moment the map is created.
+        // Backend settings may arrive after this component mounts but before
+        // IntersectionObserver initializes the map; never fall back to stale
+        // coordinates captured by the first render.
+        const initialLat = Number(latRef.current);
+        const initialLng = Number(lngRef.current);
+        const initialRadius = Number(radiusMetersRef.current);
 
         if (!validCoordinate(initialLat, initialLng)) {
           console.warn("إحداثيات الموقع المحدد غير صالحة؛ لن يتم فتح الخريطة على موقع افتراضي.");
