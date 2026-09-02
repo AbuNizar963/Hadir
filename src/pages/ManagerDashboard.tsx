@@ -25,6 +25,27 @@ function statusLabel(row: DailyStatusRow) {
 function isPresent(row: DailyStatusRow) { return row.status === "PRESENT" || row.status === "LATE"; }
 function isRest(row: DailyStatusRow) { return row.status === "REST" || row.status === "NOT_STARTED"; }
 
+function alignCurrentShiftStatus(row: DailyStatusRow, nowMs: number, today: string): DailyStatusRow {
+  if (row.attendanceDay !== today || row.status === "LEAVE" || row.status === "PERMISSION" || row.status === "INVALID") return row;
+  const start = row.scheduledStart ? Date.parse(row.scheduledStart) : NaN;
+  const end = row.scheduledEnd ? Date.parse(row.scheduledEnd) : NaN;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return row;
+
+  // The dashboard is a live view: a shift that is currently running must not be
+  // displayed as REST/NOT_STARTED merely because the rotation day crossed midnight.
+  if (nowMs >= start && nowMs < end && isRest(row)) {
+    return { ...row, status: "PRESENT" };
+  }
+
+  // Once the scheduled window has ended, do not keep showing the employee as
+  // PRESENT/LATE. They are off-duty until the next scheduled period.
+  if (nowMs >= end && isPresent(row)) {
+    return { ...row, status: "REST" };
+  }
+
+  return row;
+}
+
 export default function ManagerDashboard() {
   const [rows, setRows] = useState<DailyStatusRow[]>([]);
   const [escapeEvents, setEscapeEvents] = useState<Array<{ employeeId: string; status: "escaped" | "returned" }>>([]);
@@ -32,7 +53,13 @@ export default function ManagerDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const today = todayKey();
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -80,11 +107,12 @@ export default function ManagerDashboard() {
     };
   }, [today]);
 
-  const presentIds = useMemo(() => new Set(rows.filter(isPresent).map((row) => row.employeeId)), [rows]);
-  const lateIds = useMemo(() => new Set(rows.filter((row) => row.status === "LATE").map((row) => row.employeeId)), [rows]);
-  const absentIds = useMemo(() => new Set(rows.filter((row) => row.status === "ABSENT").map((row) => row.employeeId)), [rows]);
-  const restIds = useMemo(() => new Set(rows.filter(isRest).map((row) => row.employeeId)), [rows]);
-  const leaveIds = useMemo(() => new Set(rows.filter((row) => row.status === "LEAVE").map((row) => row.employeeId)), [rows]);
+  const currentRows = useMemo(() => rows.map((row) => alignCurrentShiftStatus(row, nowMs, today)), [rows, nowMs, today]);
+  const presentIds = useMemo(() => new Set(currentRows.filter(isPresent).map((row) => row.employeeId)), [currentRows]);
+  const lateIds = useMemo(() => new Set(currentRows.filter((row) => row.status === "LATE").map((row) => row.employeeId)), [currentRows]);
+  const absentIds = useMemo(() => new Set(currentRows.filter((row) => row.status === "ABSENT").map((row) => row.employeeId)), [currentRows]);
+  const restIds = useMemo(() => new Set(currentRows.filter(isRest).map((row) => row.employeeId)), [currentRows]);
+  const leaveIds = useMemo(() => new Set(currentRows.filter((row) => row.status === "LEAVE").map((row) => row.employeeId)), [currentRows]);
   const escapedIds = useMemo(() => {
     const latest = new Map<string, "escaped" | "returned">();
     for (const event of escapeEvents) {
@@ -93,7 +121,7 @@ export default function ManagerDashboard() {
     return new Set([...latest.entries()].filter(([, status]) => status === "escaped").map(([employeeId]) => employeeId));
   }, [escapeEvents]);
 
-  const filteredRows = useMemo(() => rows.filter((row) => {
+  const filteredRows = useMemo(() => currentRows.filter((row) => {
     const id = row.employeeId;
     if (search && !row.employeeName.includes(search)) return false;
     if (filter === "present" && !presentIds.has(id)) return false;
@@ -103,7 +131,7 @@ export default function ManagerDashboard() {
     if (filter === "leave" && !leaveIds.has(id)) return false;
     if (filter === "escaped" && !escapedIds.has(id)) return false;
     return true;
-  }), [rows, search, filter, presentIds, absentIds, lateIds, restIds, leaveIds, escapedIds]);
+  }), [currentRows, search, filter, presentIds, absentIds, lateIds, restIds, leaveIds, escapedIds]);
 
   const displayDate = useMemo(() => new Date(`${today}T12:00:00+03:00`), [today]);
   const filters: Array<[Filter, string]> = [
@@ -121,7 +149,7 @@ export default function ManagerDashboard() {
       </section>
 
       <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4" aria-label="حالات الدوام">
-        <StatusShortcut label="إجمالي الموظفين" value={rows.length} icon={<Users className="h-5 w-5" aria-hidden="true" />} tone="all" onClick={() => setFilter("all")} active={filter === "all"} />
+        <StatusShortcut label="إجمالي الموظفين" value={currentRows.length} icon={<Users className="h-5 w-5" aria-hidden="true" />} tone="all" onClick={() => setFilter("all")} active={filter === "all"} />
         <StatusShortcut label="الحضور" value={presentIds.size} icon={<UserCheck className="h-5 w-5" aria-hidden="true" />} tone="present" onClick={() => setFilter("present")} active={filter === "present"} />
         <StatusShortcut label="الغياب" value={absentIds.size} icon={<UserX className="h-5 w-5" aria-hidden="true" />} tone="absent" onClick={() => setFilter("absent")} active={filter === "absent"} />
         <StatusShortcut label="المتأخرون" value={lateIds.size} icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} tone="late" onClick={() => setFilter("late")} active={filter === "late"} />
