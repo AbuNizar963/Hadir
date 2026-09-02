@@ -7,7 +7,10 @@ const APP_SHELL=[
 ];
 
 self.addEventListener("install",event=>event.waitUntil(
-  caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL))
+  caches.open(CACHE)
+    .then(cache=>cache.addAll(APP_SHELL))
+    .then(()=>self.clients.matchAll({type:"window",includeUncontrolled:true}))
+    .then(clients=>clients.forEach(client=>client.postMessage({type:"HADIR_SW_UPDATE_AVAILABLE"})))
 ));
 
 self.addEventListener("activate",event=>event.waitUntil(
