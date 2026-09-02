@@ -9,7 +9,7 @@ const APP_SHELL=[
 
 self.addEventListener("install",event=>event.waitUntil(
   caches.open(CACHE)
-    .then(cache=>cache.addAll(APP_SHELL))
+    .then(cache=>Promise.all(APP_SHELL.map(url=>cache.add(url).catch(()=>undefined))))
     .then(()=>self.clients.matchAll({type:"window",includeUncontrolled:true}))
     .then(clients=>clients.forEach(client=>client.postMessage({type:"HADIR_SW_UPDATE_AVAILABLE"})))
 ));
