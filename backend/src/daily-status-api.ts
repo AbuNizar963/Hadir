@@ -4,6 +4,7 @@ const TZ = "Asia/Damascus";
 const DAY_MS = 86_400_000;
 type Status = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "NOT_STARTED" | "INVALID";
 type EmployeeRow = { id:string; name:string; jobNumber:string; status:string; scheduleType:string; workStartTime:string|null; workEndTime:string|null; workDaysJson:string|null; rotationStartDate:string|null; rotationDaysOn:number|null; rotationDaysOff:number|null; gracePeriodMinutes:number|null; isVip:number|null };
+type DailyStatusStoredRow = { employeeId:string; status:string; checkInAt:string|null; checkOutAt:string|null; scheduleType:string };
 const CORS_HEADERS={"access-control-allow-origin":"*","access-control-allow-headers":"authorization, content-type","access-control-allow-methods":"GET, OPTIONS","cache-control":"no-store"};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8",...CORS_HEADERS}});
 function tzParts(date:Date){const p=new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(date);const get=(t:string)=>p.find(x=>x.type===t)?.value||"";return{year:Number(get("year")),month:Number(get("month")),day:Number(get("day")),hour:Number(get("hour")),minute:Number(get("minute"))};}
@@ -54,7 +55,12 @@ export async function handleDailyStatus(req:Request,env:Env,actor:any){
       return{attendanceDay:day,employeeId:id,employeeName:String(employee.name||""),jobNumber:String(employee.jobNumber||""),status,scheduleType:String(employee.scheduleType||"ADMIN").toUpperCase(),checkInAt:checkIn?.timestamp||null,checkOutAt:checkOut?.timestamp||null,scheduledStart:schedule.start?.toISOString()||null,scheduledEnd:schedule.end?.toISOString()||null};
     });
     const computedAt=new Date().toISOString();
-    if(result.length)await env.DB.batch(result.map(row=>env.DB.prepare("INSERT INTO daily_attendance_status(attendance_day,employee_id,status,check_in_at,check_out_at,schedule_type,computed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(attendance_day,employee_id) DO UPDATE SET status=excluded.status,check_in_at=excluded.check_in_at,check_out_at=excluded.check_out_at,schedule_type=excluded.schedule_type,computed_at=excluded.computed_at").bind(row.attendanceDay,row.employeeId,row.status,row.checkInAt,row.checkOutAt,row.scheduleType,computedAt)));
+    if(result.length){
+      const storedQuery=await env.DB.prepare("SELECT employee_id AS employeeId,status,check_in_at AS checkInAt,check_out_at AS checkOutAt,schedule_type AS scheduleType FROM daily_attendance_status WHERE attendance_day=?").bind(day).all<DailyStatusStoredRow>();
+      const stored=new Map((storedQuery.results||[]).map(row=>[String(row.employeeId),row]));
+      const changed=result.filter(row=>{const previous=stored.get(row.employeeId);return !previous||String(previous.status||"")!==row.status||String(previous.checkInAt||"")!==String(row.checkInAt||"")||String(previous.checkOutAt||"")!==String(row.checkOutAt||"")||String(previous.scheduleType||"")!==row.scheduleType;});
+      if(changed.length)await env.DB.batch(changed.map(row=>env.DB.prepare("INSERT INTO daily_attendance_status(attendance_day,employee_id,status,check_in_at,check_out_at,schedule_type,computed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(attendance_day,employee_id) DO UPDATE SET status=excluded.status,check_in_at=excluded.check_in_at,check_out_at=excluded.check_out_at,schedule_type=excluded.schedule_type,computed_at=excluded.computed_at").bind(row.attendanceDay,row.employeeId,row.status,row.checkInAt,row.checkOutAt,row.scheduleType,computedAt)));
+    }
     const counts=result.reduce<Record<string,number>>((acc,row)=>{acc[row.status]=(acc[row.status]||0)+1;return acc;},{});
     return json({attendanceDay:day,timezone:TZ,computedAt,total:result.length,counts,employees:result});
   }catch(error){console.error("daily-status failed",error);return json({error:"تعذر قراءة حالة الدوام من D1"},500);}
