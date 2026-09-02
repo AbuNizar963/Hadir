@@ -34,6 +34,7 @@ export default function PWAExperience() {
     let cancelled = false;
     let observedWorker: ServiceWorker | null = null;
     let pendingBuildVersion = "";
+    let detectedBuildVersion = "";
 
     const shouldShowUpdate = () => {
       try {
@@ -71,6 +72,7 @@ export default function PWAExperience() {
       try {
         const buildVersion = await getBuildVersion();
         if (!buildVersion || cancelled) return;
+        detectedBuildVersion = buildVersion;
         let lastOpenBuildVersion = "";
         try { lastOpenBuildVersion = localStorage.getItem(UPDATE_BUILD_VERSION_KEY)?.trim() || ""; } catch {}
         if (!lastOpenBuildVersion) {
@@ -132,15 +134,22 @@ export default function PWAExperience() {
     try {
       const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
       if (!registration) {
+        if (detectedBuildVersion) {
+          try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, detectedBuildVersion); } catch {}
+        }
         window.location.reload();
         return;
       }
 
+      const rememberDetectedBuild = () => {
+        const versionToRemember = pendingBuildVersion || detectedBuildVersion;
+        if (!versionToRemember) return;
+        try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, versionToRemember); } catch {}
+      };
+
       const applyWaitingWorker = (worker: ServiceWorker | null) => {
         if (!worker) return false;
-        if (pendingBuildVersion) {
-          try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, pendingBuildVersion); } catch {}
-        }
+        rememberDetectedBuild();
         worker.postMessage({ type: "SKIP_WAITING" });
         return true;
       };
@@ -163,12 +172,14 @@ export default function PWAExperience() {
           if (installingWorker.state === "installed") finish(true);
           window.setTimeout(() => finish(false), 15000);
         });
-        if (installed && applyWaitingWorker(registration.waiting)) return;
+        if (installed) {
+          rememberDetectedBuild();
+          installingWorker.postMessage({ type: "SKIP_WAITING" });
+          return;
+        }
       }
 
-      if (pendingBuildVersion) {
-        try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, pendingBuildVersion); } catch {}
-      }
+      rememberDetectedBuild();
       window.location.reload();
     } catch {
       setUpdating(false);
