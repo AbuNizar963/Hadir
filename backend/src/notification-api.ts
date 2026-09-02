@@ -11,23 +11,10 @@ const json = (data: unknown, status = 200, origin = "*") => new Response(JSON.st
   },
 });
 
-const cutoffIso = () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-async function cleanup(db: D1Database) {
-  const cutoff = cutoffIso();
-  await db.batch([
-    db.prepare("DELETE FROM notifications WHERE created_at < ?").bind(cutoff),
-    db.prepare("DELETE FROM notification_user_state WHERE deleted_at IS NOT NULL AND deleted_at < ?").bind(cutoff),
-    db.prepare("DELETE FROM notification_user_state WHERE notification_id NOT IN (SELECT id FROM notifications)")
-  ]).catch(() => undefined);
-}
-
 export async function handleNotificationApi(req: Request, env: Env, actor: Actor, origin: string): Promise<Response | null> {
   const path = new URL(req.url).pathname.replace(/\/$/, "") || "/";
   if (!["/api/notifications", "/api/notifications/read", "/api/notifications/deleted"].includes(path)) return null;
   if (!actor) return json({ error: "غير مصرح" }, 401, origin);
-
-  await cleanup(env.DB);
   const userId = String(actor.id).trim();
   if (!userId) return json({ error: "المستخدم غير صالح" }, 401, origin);
 
