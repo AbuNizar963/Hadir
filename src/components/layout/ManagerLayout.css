@@ -1,0 +1,91 @@
+/* HADIR manager shell — presentation-only layer. Navigation, auth, notifications and routes remain unchanged. */
+.manager-shell {
+  background:
+    radial-gradient(circle at 100% 0%, hsl(var(--primary) / 0.055), transparent 34rem),
+    radial-gradient(circle at 0% 18%, hsl(var(--primary) / 0.035), transparent 28rem),
+    hsl(var(--background));
+}
+
+.manager-shell > .manager-topbar {
+  box-shadow: 0 10px 30px hsl(var(--foreground) / 0.045);
+}
+
+.manager-shell .manager-brand-row {
+  min-height: 82px;
+}
+
+.manager-shell .manager-tool {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: linear-gradient(180deg, hsl(var(--background) / 0.94), hsl(var(--card) / 0.78));
+  box-shadow: 0 1px 0 hsl(var(--foreground) / 0.04), inset 0 1px 0 hsl(var(--background) / 0.5);
+}
+
+.manager-shell .manager-tool::after {
+  content: "";
+  position: absolute;
+  inset: auto 12px 0;
+  height: 2px;
+  border-radius: 999px;
+  background: hsl(var(--primary) / 0.18);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform .2s ease;
+}
+
+.manager-shell .manager-tool:hover::after { transform: scaleX(1); }
+
+.manager-shell .manager-nav {
+  scrollbar-width: none;
+}
+
+.manager-shell .manager-nav::-webkit-scrollbar { display: none; }
+
+.manager-shell .manager-nav a {
+  min-height: 58px;
+  border: 1px solid transparent;
+  position: relative;
+}
+
+.manager-shell .manager-nav a[aria-current="page"] {
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.16), hsl(var(--primary) / 0.075));
+  border-color: hsl(var(--primary) / 0.28);
+  box-shadow: 0 7px 18px hsl(var(--primary) / 0.08);
+}
+
+.manager-shell .manager-page-header {
+  position: relative;
+  border-bottom-color: hsl(var(--border) / 0.72);
+}
+
+.manager-shell .manager-page-header::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  width: 72px;
+  height: 3px;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  box-shadow: 0 0 22px hsl(var(--primary) / 0.35);
+}
+
+.manager-shell .manager-content > * {
+  animation: hadir-manager-enter .28s ease-out both;
+}
+
+@keyframes hadir-manager-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .manager-shell .manager-brand-row { min-height: 72px; }
+  .manager-shell .manager-nav a { min-width: 82px; min-height: 54px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manager-shell .manager-content > * { animation: none; }
+  .manager-shell .manager-tool::after { transition: none; }
+}
