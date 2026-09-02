@@ -36,12 +36,6 @@
 
 .manager-shell .manager-tool:hover::after { transform: scaleX(1); }
 
-.manager-shell .manager-nav {
-  scrollbar-width: none;
-}
-
-.manager-shell .manager-nav::-webkit-scrollbar { display: none; }
-
 .manager-shell .manager-nav a {
   min-height: 58px;
   border: 1px solid transparent;
