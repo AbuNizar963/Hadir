@@ -24,7 +24,7 @@ export default function Brand({ className }: { className?: string }) {
     <div className={cn("flex items-center w-full", className)}>
       <div className="flex items-center gap-2.5">
         <img
-          src={`${import.meta.env.BASE_URL}pwa-icon.svg`}
+          src={`${import.meta.env.BASE_URL}favicon.svg`}
           alt="شعار تطبيق حاضر"
           className="h-9 w-9 rounded-xl object-cover border border-primary/30"
         />
