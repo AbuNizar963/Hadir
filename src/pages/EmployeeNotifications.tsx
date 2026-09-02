@@ -4,6 +4,7 @@ import { currentSession } from "@/lib/auth";
 import { getNotifications, markAllAsRead, markAsRead, removeNotification, type AppNotification } from "@/lib/notifications";
 
 const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+const FALLBACK_REFRESH_MS = 120000;
 
 function authHeaders() {
   const h = new Headers();
@@ -40,11 +41,36 @@ export default function EmployeeNotifications() {
     } finally { setLoading(false); }
   }, [userId]);
 
-  useEffect(() => { void refresh(); const t = window.setInterval(() => void refresh(), 15000); return () => window.clearInterval(t); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+    let timer: number | null = null;
+    const scheduleFallback = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      if (document.visibilityState !== "visible") return;
+      timer = window.setTimeout(() => { timer = null; void refresh(); }, FALLBACK_REFRESH_MS);
+    };
+    const onDataChanged = () => {
+      if (document.visibilityState === "visible") void refresh();
+      scheduleFallback();
+    };
+    const onVisibility = () => { if (document.visibilityState === "visible") { void refresh(); scheduleFallback(); } else if (timer !== null) { window.clearTimeout(timer); timer = null; } };
+    window.addEventListener("hadir:cloud-data-changed", onDataChanged);
+    window.addEventListener("hadir:d1-view-changed", onDataChanged);
+    window.addEventListener("online", onDataChanged);
+    document.addEventListener("visibilitychange", onVisibility);
+    scheduleFallback();
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      window.removeEventListener("hadir:cloud-data-changed", onDataChanged);
+      window.removeEventListener("hadir:d1-view-changed", onDataChanged);
+      window.removeEventListener("online", onDataChanged);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [refresh]);
 
   const unread = useMemo(() => items.filter(n => !n.read).length, [items]);
   const readOne = async (id: string) => { markAsRead(id); setItems(v => v.map(n => n.id === id ? { ...n, read: true } : n)); await fetch(`${API_URL}/api/notifications/read`, { method: "POST", headers: new Headers({ ...Object.fromEntries(authHeaders().entries()), "content-type": "application/json" }), credentials: "include", body: JSON.stringify({ id }) }).catch(() => undefined); };
-  const readAll = async () => { markAllAsRead(userId); setItems(v => v.map(n => ({ ...n, read: true }))); await fetch(`${API_URL}/api/notifications/read`, { method: "POST", headers: new Headers({ ...Object.fromEntries(authHeaders().entries()), "content-type": "application/json" }), credentials: "include", body: "{}" }).catch(() => undefined); };
+  const readAll = async () => { markAllAsRead(userId); setItems(v => v.map(n => ({ ...n, read: true }))); await fetch(`${API_URL}/api/notifications/read`, { method: "POST", headers: new Headers({ ...Object.fromEntries(authHeaders().entries()), "content-type": "application/json" }), credentials: "include", body: JSON.stringify({}) }).catch(() => undefined); };
 
   return <div className="max-w-3xl mx-auto space-y-4" dir="rtl">
     <section className="hud-card p-5 sm:p-6">
