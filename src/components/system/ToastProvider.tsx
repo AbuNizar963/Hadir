@@ -1,5 +1,6 @@
 import { CheckCircle2, CircleAlert, Info, LoaderCircle, XCircle } from "lucide-react";
 import { Toaster, toast as sonnerToast } from "@/components/ui/sonner";
+import "./toast.css";
 
 const defaults = { position: "top-center" as const, richColors: true, closeButton: true, dir: "rtl" as const, visibleToasts: 4 };
 
