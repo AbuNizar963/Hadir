@@ -1,0 +1,129 @@
+/* HADIR Action Feedback — intentionally separate from persistent Notifications. */
+.toaster[data-sonner-toaster][data-x-position="center"] {
+  top: max(1rem, env(safe-area-inset-top, 0px) + .5rem) !important;
+  left: 50% !important;
+  right: auto !important;
+  width: min(calc(100vw - 1.5rem), 28rem) !important;
+  transform: translateX(-50%) !important;
+  z-index: 2147483000 !important;
+}
+
+.toaster .hadir-toast {
+  position: relative !important;
+  width: 100% !important;
+  min-height: 68px !important;
+  overflow: hidden !important;
+  direction: rtl !important;
+  border: 1px solid hsl(var(--border) / .9) !important;
+  border-radius: 18px !important;
+  background: hsl(var(--card) / .96) !important;
+  color: hsl(var(--card-foreground)) !important;
+  box-shadow: 0 18px 55px hsl(222 40% 3% / .34), 0 2px 10px hsl(222 40% 3% / .18), inset 0 1px 0 hsl(var(--foreground) / .07) !important;
+  backdrop-filter: blur(18px) saturate(1.15) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.15) !important;
+  padding: 13px 48px 13px 16px !important;
+  gap: 11px !important;
+}
+
+.toaster .hadir-toast::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: hsl(var(--primary));
+  box-shadow: 0 0 18px hsl(var(--primary) / .45);
+}
+
+.toaster .hadir-toast[data-type="error"]::before { background: hsl(var(--destructive)); box-shadow: 0 0 18px hsl(var(--destructive) / .45); }
+.toaster .hadir-toast[data-type="warning"]::before { background: hsl(var(--warning)); box-shadow: 0 0 18px hsl(var(--warning) / .45); }
+.toaster .hadir-toast[data-type="info"]::before { background: hsl(var(--accent)); box-shadow: 0 0 18px hsl(var(--accent) / .45); }
+
+.toaster .hadir-toast [data-icon] {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 13px !important;
+  background: hsl(var(--primary) / .12) !important;
+  color: hsl(var(--primary)) !important;
+}
+
+.toaster .hadir-toast[data-type="error"] [data-icon] { background: hsl(var(--destructive) / .12) !important; color: hsl(var(--destructive)) !important; }
+.toaster .hadir-toast[data-type="warning"] [data-icon] { background: hsl(var(--warning) / .14) !important; color: hsl(var(--warning)) !important; }
+.toaster .hadir-toast[data-type="info"] [data-icon] { background: hsl(var(--accent) / .12) !important; color: hsl(var(--accent)) !important; }
+
+.toaster .hadir-toast [data-icon] svg {
+  width: 23px !important;
+  height: 23px !important;
+  stroke-width: 2.25 !important;
+}
+
+.toaster .hadir-toast-title {
+  display: block !important;
+  font-family: 'Cairo', system-ui, sans-serif !important;
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+  font-weight: 800 !important;
+  letter-spacing: -.01em !important;
+}
+
+.toaster .hadir-toast-description {
+  margin-top: 2px !important;
+  font-family: 'Cairo', system-ui, sans-serif !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+.toaster .hadir-toast-close {
+  position: absolute !important;
+  inset-inline-start: 10px !important;
+  inset-inline-end: auto !important;
+  top: 10px !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 9px !important;
+  border: 1px solid hsl(var(--border) / .8) !important;
+  background: hsl(var(--secondary) / .8) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  opacity: .78 !important;
+  transition: transform .16s ease, opacity .16s ease, background .16s ease !important;
+}
+
+.toaster .hadir-toast-close:hover,
+.toaster .hadir-toast-close:focus-visible {
+  opacity: 1 !important;
+  transform: scale(1.05) !important;
+  background: hsl(var(--secondary)) !important;
+  outline: 2px solid hsl(var(--ring) / .35) !important;
+  outline-offset: 2px !important;
+}
+
+.toaster .hadir-toast[data-type="loading"] [data-icon] svg { animation: hadir-toast-spin .9s linear infinite !important; }
+
+.toaster .hadir-toast[data-mounted="true"] { animation: hadir-toast-in .26s cubic-bezier(.22,1,.36,1) both !important; }
+.toaster .hadir-toast[data-removed="true"] { animation: hadir-toast-out .2s ease both !important; }
+
+@keyframes hadir-toast-in {
+  from { opacity: 0; transform: translateY(-14px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes hadir-toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-8px) scale(.98); }
+}
+@keyframes hadir-toast-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .toaster .hadir-toast,
+  .toaster .hadir-toast[data-mounted="true"],
+  .toaster .hadir-toast[data-removed="true"],
+  .toaster .hadir-toast[data-type="loading"] [data-icon] svg { animation: none !important; }
+}
+
+@media (max-width: 480px) {
+  .toaster[data-sonner-toaster][data-x-position="center"] { width: min(calc(100vw - 1rem), 28rem) !important; }
+  .toaster .hadir-toast { min-height: 64px !important; border-radius: 16px !important; padding: 11px 44px 11px 13px !important; }
+  .toaster .hadir-toast [data-icon] { width: 38px !important; height: 38px !important; min-width: 38px !important; border-radius: 11px !important; }
+  .toaster .hadir-toast [data-icon] svg { width: 21px !important; height: 21px !important; }
+}
