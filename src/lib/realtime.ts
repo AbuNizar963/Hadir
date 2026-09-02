@@ -3,24 +3,35 @@ let socket: WebSocket | null = null;
 let reconnectTimer: number | null = null;
 let pollTimer: number | null = null;
 let stopped = false;
+let connected = false;
 
 function getToken(): string {
   if (typeof window === "undefined") return "";
   return localStorage.getItem("hadir.api.token.admin") || localStorage.getItem("hadir.api.token.employee") || localStorage.getItem("hadir.api.token") || localStorage.getItem("hadir.auth.token") || "";
 }
 
-function schedulePoll() {
-  if (stopped || typeof window === "undefined" || pollTimer !== null) return;
+function clearPoll() {
+  if (typeof window === "undefined") return;
+  if (pollTimer !== null) window.clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+function scheduleFallbackPoll() {
+  if (stopped || connected || typeof window === "undefined" || pollTimer !== null || !getToken()) return;
   pollTimer = window.setInterval(() => {
-    if (stopped || !getToken()) return;
+    if (stopped || connected || !getToken() || document.visibilityState !== "visible") return;
     window.dispatchEvent(new Event("hadir:d1-view-changed"));
-  }, 15000);
+  }, 120000);
 }
 
 function connect() {
   if (stopped || typeof window === "undefined" || socket) return;
   const token = getToken();
-  if (!token) { schedulePoll(); return; }
+  if (!token) {
+    connected = false;
+    scheduleFallbackPoll();
+    return;
+  }
   const wsUrl = API_URL.replace(/^https:/i, "wss:").replace(/^http:/i, "ws:") + "/api/realtime?token=" + encodeURIComponent(token);
   try {
     const ws = new WebSocket(wsUrl);
@@ -34,35 +45,57 @@ function connect() {
         }
       } catch { /* ignore malformed realtime messages */ }
     };
-    ws.onopen = () => schedulePoll();
+    ws.onopen = () => {
+      connected = true;
+      clearPoll();
+      window.dispatchEvent(new CustomEvent("hadir:realtime-status", { detail: { connected: true } }));
+    };
     ws.onclose = () => {
       if (socket === ws) socket = null;
-      schedulePoll();
+      connected = false;
+      window.dispatchEvent(new CustomEvent("hadir:realtime-status", { detail: { connected: false } }));
+      scheduleFallbackPoll();
       if (!stopped && reconnectTimer === null) reconnectTimer = window.setTimeout(() => { reconnectTimer = null; connect(); }, 30000);
     };
     ws.onerror = () => { try { ws.close(); } catch {} };
   } catch {
-    schedulePoll();
+    connected = false;
+    scheduleFallbackPoll();
   }
 }
 
-export function startRealtimeSync() { stopped = false; schedulePoll(); connect(); }
+export function startRealtimeSync() {
+  stopped = false;
+  connected = false;
+  clearPoll();
+  connect();
+}
+
 export function stopRealtimeSync() {
   stopped = true;
+  connected = false;
   socket?.close();
   socket = null;
   if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
   reconnectTimer = null;
-  if (pollTimer !== null) window.clearInterval(pollTimer);
-  pollTimer = null;
+  clearPoll();
 }
 
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
     if (["hadir.api.token.admin", "hadir.api.token.employee", "hadir.api.token", "hadir.auth.token"].includes(event.key || "")) {
+      clearPoll();
       socket?.close();
       socket = null;
+      connected = false;
       if (event.newValue) connect();
+      else window.dispatchEvent(new CustomEvent("hadir:realtime-status", { detail: { connected: false } }));
+    }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      if (getToken() && !socket) connect();
+      window.dispatchEvent(new Event("hadir:d1-view-changed"));
     }
   });
 }
