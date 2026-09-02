@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }> };
 const INSTALL_DISMISSED_KEY = "hadir.pwa.install.dismissed";
 const UPDATE_DISMISSED_KEY = "hadir.pwa.update.dismissed";
+const UPDATE_BUILD_VERSION_KEY = "hadir.pwa.last-open-build-version";
 const PWA_INSTALL_VERSION = "v3";
 function isStandalone() { if (typeof window === "undefined") return false; return window.matchMedia?.("(display-mode: standalone)").matches || ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone)); }
 function isIos() { if (typeof navigator === "undefined") return false; return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
@@ -32,7 +33,7 @@ export default function PWAExperience() {
   useEffect(() => {
     let cancelled = false;
     let observedWorker: ServiceWorker | null = null;
-    let currentBuildVersion = "";
+    let pendingBuildVersion = "";
 
     const shouldShowUpdate = () => {
       try {
@@ -67,11 +68,17 @@ export default function PWAExperience() {
       try {
         const buildVersion = await getBuildVersion();
         if (!buildVersion || cancelled) return;
-        if (!currentBuildVersion) {
-          currentBuildVersion = buildVersion;
+        let lastOpenBuildVersion = "";
+        try { lastOpenBuildVersion = localStorage.getItem(UPDATE_BUILD_VERSION_KEY)?.trim() || ""; } catch {}
+        if (!lastOpenBuildVersion) {
+          try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, buildVersion); } catch {}
           return;
         }
-        if (buildVersion !== currentBuildVersion) shouldShowUpdate();
+        if (buildVersion !== lastOpenBuildVersion) {
+          pendingBuildVersion = buildVersion;
+          shouldShowUpdate();
+          return;
+        }
       } catch {
         // A failed version check must never interrupt the running application.
       }
@@ -100,6 +107,7 @@ export default function PWAExperience() {
     // Intentionally run once per application load/open only. There is no
     // background polling, visibility polling, or periodic update request.
     const checkOnOpen = async () => {
+      try { sessionStorage.removeItem(UPDATE_DISMISSED_KEY); } catch {}
       await checkDeploymentVersion();
       await checkForUpdate();
     };
@@ -111,7 +119,7 @@ export default function PWAExperience() {
   useEffect(() => { const onControllerChange = () => { setUpdating(false); window.location.reload(); }; navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange); return () => navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange); }, []);
   const dismissInstall = () => { try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {} setInstallVisible(false); setManualInstallVisible(false); };
   const install = async () => { if (!installEvent) return; const currentEvent = installEvent; setInstallEvent(null); setInstallVisible(false); await currentEvent.prompt(); const choice = await currentEvent.userChoice; if (choice.outcome === "dismissed") { try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {} } };
-  const update = async () => { setUpdating(true); const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined); if (registration?.waiting) { registration.waiting.postMessage({ type: "SKIP_WAITING" }); return; } await registration?.update().catch(() => undefined); if (registration?.waiting) { registration.waiting.postMessage({ type: "SKIP_WAITING" }); return; } setUpdating(false); window.location.reload(); };
+  const update = async () => { setUpdating(true); const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined); if (registration?.waiting) { registration.waiting.postMessage({ type: "SKIP_WAITING" }); return; } await registration?.update().catch(() => undefined); if (registration?.waiting) { registration.waiting.postMessage({ type: "SKIP_WAITING" }); return; } if (pendingBuildVersion) { try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, pendingBuildVersion); } catch {} } setUpdating(false); window.location.reload(); };
   const dismissUpdate = () => { try { sessionStorage.setItem(UPDATE_DISMISSED_KEY, "1"); } catch {} setUpdateVisible(false); };
 
   if (offline) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-amber-500/30 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-center gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-xl">📡</div><div className="min-w-0 flex-1"><p className="font-bold">أنت غير متصل بالإنترنت</p><p className="mt-0.5 text-xs text-muted-foreground">تم الحفاظ على جلسة الدخول. سيُستأنف الاتصال تلقائيًا عند عودته.</p></div></div></div>;
