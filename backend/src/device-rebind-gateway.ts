@@ -57,15 +57,7 @@ export default {
     if (response) return response;
 
     const logoResponse = await handleCompanyLogoRequest(request, env, null, origin(request, env));
-    if (logoResponse) {
-      if (request.method === "GET" || request.method === "OPTIONS") return logoResponse;
-      const actorProbe = new URL(request.url);
-      actorProbe.pathname = "/api/me";
-      actorProbe.search = "";
-      const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
-      const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
-      return handleCompanyLogoRequest(request, env, actor, origin(request, env));
-    }
+    if (logoResponse) return logoResponse;
 
     const url = new URL(request.url);
     if (url.pathname.replace(/\/$/, "") === "/api/manager/daily-status") {
@@ -78,35 +70,51 @@ export default {
             env.DB.prepare(`CREATE TABLE IF NOT EXISTS leave_requests (
               id TEXT PRIMARY KEY,
               employee_id TEXT NOT NULL,
-              type TEXT NOT NULL,
               start_date TEXT NOT NULL,
               end_date TEXT NOT NULL,
+              type TEXT NOT NULL,
               reason TEXT,
               status TEXT NOT NULL DEFAULT 'pending',
-              reviewer_id TEXT,
+              created_at TEXT NOT NULL,
               reviewed_at TEXT,
+              reviewed_by TEXT
+            )`),
+            env.DB.prepare(`CREATE TABLE IF NOT EXISTS attendance_history (
+              id TEXT PRIMARY KEY,
+              employee_id TEXT NOT NULL,
+              date TEXT NOT NULL,
+              status TEXT,
+              check_in TEXT,
+              check_out TEXT,
+              late_minutes INTEGER DEFAULT 0,
+              early_checkout_minutes INTEGER DEFAULT 0,
+              notes TEXT,
               created_at TEXT NOT NULL
             )`),
-            env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_leave_requests_employee_dates ON leave_requests(employee_id,start_date,end_date)"),
-          ]).then(() => undefined).catch(error => {
-            leaveSchemaReady = null;
-            throw error;
-          });
+          ]).then(() => undefined).catch((error) => { leaveSchemaReady = null; throw error; });
         }
         await leaveSchemaReady;
 
-        const actorProbe = new URL(request.url);
-        actorProbe.pathname = "/api/me";
-        actorProbe.search = "";
-        const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
-        const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
-        const result = await handleDailyStatus(request, env, actor);
-        const headers = new Headers(result.headers);
-        for (const [key, value] of Object.entries(cors)) headers.set(key, value);
-        return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
+        const probeUrl = new URL(request.url);
+        probeUrl.pathname = "/api/me";
+        probeUrl.search = "";
+        const probe = await base.fetch(new Request(probeUrl, { method: "GET", headers: request.headers }), env, ctx);
+        if (!probe.ok) return dailyError("غير مصرح", request, env, 401);
+        const user = (await probe.json().catch(() => ({})) as any).user;
+        if (!user || !["owner", "manager"].includes(String(user.role))) return dailyError("غير مصرح", request, env, 403);
+        return handleDailyStatus(request, env, { id: String(user.id), role: String(user.role), name: String(user.name || "") } as any, cors);
       } catch (error) {
-        console.error("daily-status failed", error);
-        return dailyError("تعذر قراءة حالة الدوام من D1. تم تسجيل الخطأ في Worker Logs.", request, env);
+        console.error("daily-status gateway error", error);
+        return dailyError(error instanceof Error ? error.message : "تعذر تحميل حالة اليوم", request, env, 500);
+      }
+    }
+
+    if (url.pathname.replace(/\/$/, "") === "/api/automatic-vip") {
+      try {
+        return await runAutomaticVip(request, env, origin(request, env));
+      } catch (error) {
+        console.error("automatic-vip gateway error", error);
+        return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "تعذر تنفيذ VIP التلقائي" }), { status: 500, headers: { "content-type": "application/json", ...dailyCors(request, env) } });
       }
     }
 
@@ -114,12 +122,6 @@ export default {
   },
 
   async scheduled(controller: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    try {
-      const run = runAutomaticVip(env);
-      ctx.waitUntil(run);
-      await run;
-    } catch (error) {
-      console.error("automatic-vip cron failed", error);
-    }
+    if (typeof base.scheduled === "function") await base.scheduled(controller, env, ctx);
   },
 };
