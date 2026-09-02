@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { getBackendLocations } from "@/lib/backend";
 
 type LocationPickerProps = {
   lat: number;
@@ -13,6 +14,12 @@ type LocationPickerProps = {
 const SATELLITE_TILES =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const SATELLITE_ATTRIBUTION = "© Esri, Maxar, Earthstar Geographics";
+
+function validCoordinate(lat: unknown, lng: unknown): boolean {
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+}
 
 export default function LocationPicker({ lat, lng, radiusMeters, onChange, className = "" }: LocationPickerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -68,8 +75,30 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
       started = true;
       try {
         if (disposed || !host.isConnected || mapRef.current) return;
-        const safeLat = Number.isFinite(lat) ? lat : 24.7136;
-        const safeLng = Number.isFinite(lng) ? lng : 46.6753;
+
+        // D1 is authoritative for the company's main location. Do not use the
+        // local default coordinates before the cloud location has been checked.
+        let initialLat = Number(lat);
+        let initialLng = Number(lng);
+        let initialRadius = Number(radiusMeters);
+        try {
+          const locations = await getBackendLocations("admin");
+          const main = locations.find((location) => String(location.id) === "main");
+          if (main && validCoordinate(main.lat, main.lng)) {
+            initialLat = Number(main.lat);
+            initialLng = Number(main.lng);
+            initialRadius = Number(main.radiusMeters);
+          }
+        } catch (error) {
+          console.warn("تعذر قراءة موقع الشركة الرئيسي من D1، سيتم استخدام إعدادات الصفحة الحالية:", error);
+        }
+
+        if (!validCoordinate(initialLat, initialLng)) {
+          console.warn("موقع الشركة الرئيسي غير صالح؛ لن يتم فتح الخريطة على موقع افتراضي.");
+          started = false;
+          return;
+        }
+
         const map = L.map(host, {
           zoomControl: true,
           attributionControl: true,
@@ -77,7 +106,7 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
           minZoom: 2,
           maxZoom: 19,
           worldCopyJump: true,
-        }).setView([safeLat, safeLng], 16);
+        }).setView([initialLat, initialLng], 16);
 
         L.tileLayer(SATELLITE_TILES, {
           attribution: SATELLITE_ATTRIBUTION,
@@ -88,13 +117,13 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
 
         new locateControl().addTo(map);
 
-        const marker = L.circleMarker([safeLat, safeLng], {
+        const marker = L.circleMarker([initialLat, initialLng], {
           radius: 9,
           weight: 3,
           fillOpacity: 0.9,
         }).addTo(map);
-        const radius = L.circle([safeLat, safeLng], {
-          radius: Math.max(1, Number(radiusMeters) || 100),
+        const radius = L.circle([initialLat, initialLng], {
+          radius: Math.max(1, Number.isFinite(initialRadius) ? initialRadius : 100),
           weight: 2,
           fillOpacity: 0.12,
         }).addTo(map);
@@ -154,8 +183,8 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
     const map = mapRef.current;
     const marker = markerRef.current;
     const radius = radiusRef.current;
-    if (!map || !marker || !radius || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const center: L.LatLngExpression = [lat, lng];
+    if (!map || !marker || !radius || !validCoordinate(lat, lng)) return;
+    const center: L.LatLngExpression = [Number(lat), Number(lng)];
     marker.setLatLng(center);
     radius.setLatLng(center);
     radius.setRadius(Math.max(1, Number(radiusMeters) || 100));
@@ -185,7 +214,7 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
       <div ref={hostRef} className="h-64 w-full sm:h-80" aria-label="خريطة القمر الصناعي لتحديد الموقع" />
       <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-card/90 px-3 py-2 text-[10px] text-muted-foreground">
         <span>اضغط زر ⌾ لتحديد موقعك، أو اضغط على الخريطة لاختيار النقطة</span>
-        <span className="mono">{Number.isFinite(lat) ? lat.toFixed(6) : "—"}, {Number.isFinite(lng) ? lng.toFixed(6) : "—"}</span>
+        <span className="mono">{validCoordinate(lat, lng) ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}` : "—"}</span>
       </div>
     </div>
   );
