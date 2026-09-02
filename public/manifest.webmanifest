@@ -18,7 +18,7 @@
     "client_mode": ["navigate-existing", "auto"]
   },
   "icons": [
-    { "src": "/favicon.svg", "sizes": "192x192 512x512", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/favicon.svg", "sizes": "192x192 512x512", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "/favicon.svg?v=2", "sizes": "192x192 512x512", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/favicon.svg?v=2", "sizes": "192x192 512x512", "type": "image/svg+xml", "purpose": "maskable" }
   ]
 }
