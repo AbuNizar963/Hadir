@@ -43,6 +43,9 @@ export default function PWAExperience() {
       }
     };
 
+    const onServiceWorkerUpdateAvailable = () => shouldShowUpdate();
+    window.addEventListener("hadir:sw-update-available", onServiceWorkerUpdateAvailable);
+
     const observeInstallingWorker = (worker: ServiceWorker) => {
       if (observedWorker === worker) return;
       observedWorker = worker;
@@ -113,7 +116,11 @@ export default function PWAExperience() {
     };
 
     void checkOnOpen();
-    return () => { cancelled = true; observedWorker = null; };
+    return () => {
+      cancelled = true;
+      observedWorker = null;
+      window.removeEventListener("hadir:sw-update-available", onServiceWorkerUpdateAvailable);
+    };
   }, []);
 
   useEffect(() => { const onControllerChange = () => { setUpdating(false); window.location.reload(); }; navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange); return () => navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange); }, []);
