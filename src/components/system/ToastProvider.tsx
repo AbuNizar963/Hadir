@@ -3,9 +3,10 @@ import { Toaster, toast as sonnerToast } from "@/components/ui/sonner";
 import "./toast.css";
 
 const defaults = { position: "top-center" as const, richColors: true, closeButton: true, dir: "rtl" as const, visibleToasts: 4 };
+const TOAST_DURATION = 1000;
 
 export function ToastProvider() {
-  return <Toaster {...defaults} toastOptions={{ duration: Infinity }} />;
+  return <Toaster {...defaults} toastOptions={{ duration: TOAST_DURATION }} />;
 }
 
 export function userFacingError(error: unknown, fallback = "حدث خطأ غير متوقع. حاول مرة أخرى.") {
@@ -20,10 +21,10 @@ export function userFacingError(error: unknown, fallback = "حدث خطأ غير
 const options = { position: "top-center" as const };
 
 export const toast = {
-  success: (message: string, description?: string) => sonnerToast.success(message, { ...options, description, duration: Infinity, icon: <CheckCircle2 aria-hidden="true" /> }),
-  error: (message: string, description?: string) => sonnerToast.error(message, { ...options, description, duration: Infinity, icon: <XCircle aria-hidden="true" /> }),
-  warning: (message: string, description?: string) => sonnerToast.warning(message, { ...options, description, duration: Infinity, icon: <CircleAlert aria-hidden="true" /> }),
-  info: (message: string, description?: string) => sonnerToast.info(message, { ...options, description, duration: Infinity, icon: <Info aria-hidden="true" /> }),
+  success: (message: string, description?: string) => sonnerToast.success(message, { ...options, description, duration: TOAST_DURATION, icon: <CheckCircle2 aria-hidden="true" /> }),
+  error: (message: string, description?: string) => sonnerToast.error(message, { ...options, description, duration: TOAST_DURATION, icon: <XCircle aria-hidden="true" /> }),
+  warning: (message: string, description?: string) => sonnerToast.warning(message, { ...options, description, duration: TOAST_DURATION, icon: <CircleAlert aria-hidden="true" /> }),
+  info: (message: string, description?: string) => sonnerToast.info(message, { ...options, description, duration: TOAST_DURATION, icon: <Info aria-hidden="true" /> }),
   loading: (message: string, description?: string) => sonnerToast.loading(message, { ...options, description, duration: Infinity, icon: <LoaderCircle className="animate-spin" aria-hidden="true" /> }),
   dismiss: (id?: string | number) => sonnerToast.dismiss(id),
 };
