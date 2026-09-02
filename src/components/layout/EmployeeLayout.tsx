@@ -49,7 +49,6 @@ export default function EmployeeLayout({ title = "لوحة الموظف", subtit
   useEffect(() => {
     let active = true;
     let fallbackTimer: number | undefined;
-    let refreshTimer: number | undefined;
     const load = async () => { const count = await loadEmployeeUnreadCount(employeeId); if (active) setUnreadNotifications(count); };
     const scheduleFallback = () => { if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer); if (document.visibilityState !== "visible") return; fallbackTimer = window.setTimeout(() => { void load(); scheduleFallback(); }, 120000); };
     const refresh = () => { if (document.visibilityState === "visible") void load(); scheduleFallback(); };
@@ -62,7 +61,7 @@ export default function EmployeeLayout({ title = "لوحة الموظف", subtit
     window.addEventListener("online", refresh);
     const onVisibility = () => { if (document.visibilityState === "visible") refresh(); else if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer); };
     document.addEventListener("visibilitychange", onVisibility);
-    return () => { active = false; if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer); if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); window.removeEventListener("hadir:cloud-data-changed", refresh); window.removeEventListener("hadir:d1-view-changed", refresh); window.removeEventListener("hadir:notifications-changed", refresh); window.removeEventListener("storage", refresh); window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", onVisibility); };
+    return () => { active = false; if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer); window.removeEventListener("hadir:cloud-data-changed", refresh); window.removeEventListener("hadir:d1-view-changed", refresh); window.removeEventListener("hadir:notifications-changed", refresh); window.removeEventListener("storage", refresh); window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", onVisibility); };
   }, [employeeId]);
   const logout = async () => { try { await backendLogout(); } catch {} try { localStorage.removeItem("hadir.api.token.employee"); localStorage.removeItem("hadir.employee.session"); localStorage.removeItem("hadir.session"); localStorage.removeItem("employeeAuth"); } catch {} setMenuOpen(false); setThemeMenuOpen(false); navigate("/login", { replace: true }); };
   return <div className="min-h-screen bg-background text-foreground" dir="rtl">
