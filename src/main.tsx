@@ -16,6 +16,7 @@ import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnost
 import { startRealtimeSync } from "@/lib/realtime";
 import { installApiCredentials } from "@/lib/apiCredentials";
 import { installDeviceDirectoryEnhancer } from "./deviceDirectoryEnhancer";
+import { installNavigationScrollPersistence } from "@/lib/navigationScrollPersistence";
 import "@/lib/qrPolyfill";
 
 installApiCredentials();
@@ -23,6 +24,7 @@ seedIfEmpty();
 installGlobalDiagnostics();
 startRealtimeSync();
 installDeviceDirectoryEnhancer();
+installNavigationScrollPersistence();
 
 if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
