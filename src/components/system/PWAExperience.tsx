@@ -32,21 +32,56 @@ export default function PWAExperience() {
   useEffect(() => {
     let cancelled = false;
     let timer: number | undefined;
+    let observedWorker: ServiceWorker | null = null;
+
+    const shouldShowUpdate = () => {
+      if (!cancelled && sessionStorage.getItem(UPDATE_DISMISSED_KEY) !== "1") setUpdateVisible(true);
+    };
+
+    const observeInstallingWorker = (worker: ServiceWorker) => {
+      if (observedWorker === worker) return;
+      observedWorker = worker;
+      const onStateChange = () => {
+        if (cancelled) return;
+        if (worker.state === "installed" && navigator.serviceWorker.controller) shouldShowUpdate();
+      };
+      worker.addEventListener("statechange", onStateChange);
+    };
+
     const checkForUpdate = async () => {
       if (cancelled || document.visibilityState !== "visible" || !("serviceWorker" in navigator)) return;
       const registration = await navigator.serviceWorker.getRegistration().catch(() => undefined);
       if (!registration || cancelled) return;
-      if (registration.waiting && navigator.serviceWorker.controller) { if (sessionStorage.getItem(UPDATE_DISMISSED_KEY) !== "1") setUpdateVisible(true); return; }
-      const worker = registration.installing;
-      if (!worker) return;
-      const onStateChange = () => { if (cancelled) return; if (worker.state === "installed" && navigator.serviceWorker.controller && sessionStorage.getItem(UPDATE_DISMISSED_KEY) !== "1") setUpdateVisible(true); };
-      worker.addEventListener("statechange", onStateChange);
+
+      if (registration.waiting && navigator.serviceWorker.controller) {
+        shouldShowUpdate();
+        return;
+      }
+
+      if (registration.installing) observeInstallingWorker(registration.installing);
+
+      // Force the browser to re-check the deployed service worker instead of
+      // waiting for the browser's own background update cadence.
+      await registration.update().catch(() => undefined);
+      if (cancelled) return;
+
+      if (registration.waiting && navigator.serviceWorker.controller) shouldShowUpdate();
+      if (registration.installing) observeInstallingWorker(registration.installing);
     };
-    const schedule = () => { if (timer !== undefined) window.clearTimeout(timer); if (document.visibilityState !== "visible") return; timer = window.setTimeout(() => { timer = undefined; void checkForUpdate(); schedule(); }, 300000); };
+
+    const schedule = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      if (document.visibilityState !== "visible") return;
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        void checkForUpdate();
+        schedule();
+      }, 300000);
+    };
     const onVisibility = () => { if (document.visibilityState === "visible") { void checkForUpdate(); schedule(); } else if (timer !== undefined) { window.clearTimeout(timer); timer = undefined; } };
     const onOnline = () => { void checkForUpdate(); schedule(); };
     void checkForUpdate(); schedule(); document.addEventListener("visibilitychange", onVisibility); window.addEventListener("online", onOnline);
-    return () => { cancelled = true; if (timer !== undefined) window.clearTimeout(timer); document.removeEventListener("visibilitychange", onVisibility); window.removeEventListener("online", onOnline); };
+    return () => { cancelled = true; observedWorker = null; if (timer !== undefined) window.clearTimeout(timer); document.removeEventListener("visibilitychange", onVisibility); window.removeEventListener("online", onOnline); };
   }, []);
 
   useEffect(() => { const onControllerChange = () => { setUpdating(false); window.location.reload(); }; navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange); return () => navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange); }, []);
