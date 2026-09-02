@@ -1,0 +1,2 @@
+# Cloudflare D1 migrations must use LF line endings; CRLF can break remote trigger migrations.
+backend/migrations/*.sql text eol=lf
