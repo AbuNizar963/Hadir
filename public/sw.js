@@ -1,4 +1,4 @@
-const CACHE="hadir-shell-v8";
+const CACHE="hadir-shell-v9";
 const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[
   new URL("./",self.registration.scope).href,
