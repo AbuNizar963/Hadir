@@ -56,7 +56,7 @@ export default function WeatherPage(){
      {enableHighAccuracy:true,timeout:12000,maximumAge:0},
    );
  };
- useEffect(()=>{locate();const t=window.setInterval(locate,600000);return()=>window.clearInterval(t);},[]);
+ useEffect(()=>{let timer:number|undefined;const schedule=()=>{if(timer!==undefined)window.clearTimeout(timer);if(document.visibilityState!=="visible")return;timer=window.setTimeout(()=>{timer=undefined;locate();schedule();},600000);};const onVisibility=()=>{if(document.visibilityState==="visible"){locate();schedule();}else if(timer!==undefined){window.clearTimeout(timer);timer=undefined;}};locate();schedule();document.addEventListener("visibilitychange",onVisibility);return()=>{if(timer!==undefined)window.clearTimeout(timer);document.removeEventListener("visibilitychange",onVisibility);};},[]);
  const chart=useMemo(()=>w?.hours.slice(0,12)??[],[w]);
  const vals=chart.map(x=>tab==="rain"?x.rain:tab==="wind"?x.wind:x.humidity);
  const max=Math.max(1,...vals);
