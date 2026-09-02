@@ -26,40 +26,25 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
     const safeLat = Number.isFinite(lat) ? lat : 24.7136;
     const safeLng = Number.isFinite(lng) ? lng : 46.6753;
     const map = L.map(hostRef.current, { zoomControl: true, attributionControl: true }).setView([safeLat, safeLng], 18);
-    L.tileLayer(SATELLITE_URL, {
-      maxZoom: 20,
-      attribution: "© Esri, Maxar, Earthstar Geographics"
-    }).addTo(map);
+    L.tileLayer(SATELLITE_URL, { maxZoom: 20, attribution: "© Esri, Maxar, Earthstar Geographics" }).addTo(map);
 
-    const marker = L.circleMarker([safeLat, safeLng], {
-      radius: 9,
-      weight: 3,
-      fillOpacity: 0.9,
-      draggable: false
-    }).addTo(map);
-    const radius = L.circle([safeLat, safeLng], {
-      radius: Math.max(1, Number(radiusMeters) || 100),
-      weight: 2,
-      fillOpacity: 0.12
-    }).addTo(map);
+    const marker = L.circleMarker([safeLat, safeLng], { radius: 9, weight: 3, fillOpacity: 0.9 }).addTo(map);
+    const radius = L.circle([safeLat, safeLng], { radius: Math.max(1, Number(radiusMeters) || 100), weight: 2, fillOpacity: 0.12 }).addTo(map);
 
-    const select = (event: L.LeafletMouseEvent) => {
+    map.on("click", (event: L.LeafletMouseEvent) => {
       const nextLat = Number(event.latlng.lat.toFixed(7));
       const nextLng = Number(event.latlng.lng.toFixed(7));
       marker.setLatLng([nextLat, nextLng]);
       radius.setLatLng([nextLat, nextLng]);
       onChangeRef.current(nextLat, nextLng);
-    };
-    map.on("click", select);
+    });
 
     mapRef.current = map;
     markerRef.current = marker;
     radiusRef.current = radius;
-
     const resize = () => map.invalidateSize();
     window.setTimeout(resize, 80);
     window.addEventListener("resize", resize);
-
     return () => {
       window.removeEventListener("resize", resize);
       map.remove();
@@ -78,8 +63,6 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
     marker.setLatLng(center);
     radius.setLatLng(center);
     radius.setRadius(Math.max(1, Number(radiusMeters) || 100));
-    const current = map.getCenter();
-    if (Math.abs(current.lat - lat) > 0.000001 || Math.abs(current.lng - lng) > 0.000001) map.setView(center, Math.max(map.getZoom(), 18), { animate: false });
   }, [lat, lng, radiusMeters]);
 
   return (
