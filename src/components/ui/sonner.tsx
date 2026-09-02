@@ -3,7 +3,21 @@ import { Toaster as Sonner, toast } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
-const Toaster = ({ ...props }: ToasterProps) => {
+const defaultToastOptions: NonNullable<ToasterProps["toastOptions"]> = {
+  classNames: {
+    toast:
+      "hadir-toast group toast group-[.toaster]:bg-background/95 group-[.toaster]:text-foreground group-[.toaster]:border-border/80 group-[.toaster]:shadow-2xl",
+    title: "hadir-toast-title",
+    description: "hadir-toast-description",
+    closeButton: "hadir-toast-close",
+    actionButton:
+      "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+    cancelButton:
+      "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+  },
+}
+
+const Toaster = ({ toastOptions, ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
 
   return (
@@ -15,16 +29,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       expand
       className="toaster group"
       toastOptions={{
+        ...defaultToastOptions,
+        ...toastOptions,
         classNames: {
-          toast:
-            "hadir-toast group toast group-[.toaster]:bg-background/95 group-[.toaster]:text-foreground group-[.toaster]:border-border/80 group-[.toaster]:shadow-2xl",
-          title: "hadir-toast-title",
-          description: "hadir-toast-description",
-          closeButton: "hadir-toast-close",
-          actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+          ...defaultToastOptions.classNames,
+          ...toastOptions?.classNames,
         },
       }}
       {...props}
