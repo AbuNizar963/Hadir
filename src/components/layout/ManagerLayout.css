@@ -24,6 +24,20 @@
 
 .manager-shell .manager-nav {
   scrollbar-width: none;
+  position: relative;
+}
+
+.manager-shell .manager-nav::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: hsl(var(--primary));
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .manager-shell .manager-nav::-webkit-scrollbar { display: none; }
