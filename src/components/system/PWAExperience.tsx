@@ -147,12 +147,25 @@ export default function PWAExperience() {
     setUpdating(true);
     setUpdateError(false);
     try {
-      const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
-      if (!registration) {
-        setUpdating(false);
-        setUpdateError(true);
-        return;
-      }
+      const base = import.meta.env.BASE_URL || "/";
+      const baseUrl = new URL(base, window.location.origin);
+      const versionUrl = new URL("build-version.json", baseUrl);
+      versionUrl.searchParams.set("check", String(Date.now()));
+      const versionResponse = await fetch(versionUrl.toString(), { cache: "no-store", credentials: "same-origin" });
+      if (!versionResponse.ok) throw new Error("build-version-unavailable");
+      const versionData = await versionResponse.json().catch(() => null) as { commitSha?: unknown } | null;
+      const buildVersion = typeof versionData?.commitSha === "string" ? versionData.commitSha.trim() : "";
+      if (!buildVersion) throw new Error("build-version-invalid");
+      detectedBuildVersionRef.current = buildVersion;
+      pendingBuildVersionRef.current = buildVersion;
+
+      // Register the exact deployed worker URL again at the moment the user
+      // requests the update. This removes the race between the app opening and
+      // main.tsx registering the worker, and gives every deployment its own
+      // Service Worker script URL.
+      const swUrl = new URL("sw.js", baseUrl);
+      swUrl.searchParams.set("v", buildVersion);
+      const registration = await navigator.serviceWorker.register(swUrl.toString(), { scope: baseUrl.pathname, updateViaCache: "none" });
 
       const applyWaitingWorker = (worker: ServiceWorker | null) => {
         if (!worker) return false;
