@@ -126,7 +126,54 @@ export default function PWAExperience() {
   useEffect(() => { const onControllerChange = () => { setUpdating(false); window.location.reload(); }; navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange); return () => navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange); }, []);
   const dismissInstall = () => { try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {} setInstallVisible(false); setManualInstallVisible(false); };
   const install = async () => { if (!installEvent) return; const currentEvent = installEvent; setInstallEvent(null); setInstallVisible(false); await currentEvent.prompt(); const choice = await currentEvent.userChoice; if (choice.outcome === "dismissed") { try { sessionStorage.setItem(INSTALL_DISMISSED_KEY, PWA_INSTALL_VERSION); } catch {} } };
-  const update = async () => { setUpdating(true); const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined); if (registration?.waiting) { registration.waiting.postMessage({ type: "SKIP_WAITING" }); return; } await registration?.update().catch(() => undefined); if (registration?.waiting) { registration.waiting.postMessage({ type: "SKIP_WAITING" }); return; } if (pendingBuildVersion) { try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, pendingBuildVersion); } catch {} } setUpdating(false); window.location.reload(); };
+  const update = async () => {
+    if (updating) return;
+    setUpdating(true);
+    try {
+      const registration = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
+      if (!registration) {
+        window.location.reload();
+        return;
+      }
+
+      const applyWaitingWorker = (worker: ServiceWorker | null) => {
+        if (!worker) return false;
+        if (pendingBuildVersion) {
+          try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, pendingBuildVersion); } catch {}
+        }
+        worker.postMessage({ type: "SKIP_WAITING" });
+        return true;
+      };
+
+      if (applyWaitingWorker(registration.waiting)) return;
+
+      await registration.update().catch(() => undefined);
+      if (applyWaitingWorker(registration.waiting)) return;
+
+      const installingWorker = registration.installing;
+      if (installingWorker) {
+        const installed = await new Promise<boolean>(resolve => {
+          let settled = false;
+          const finish = (value: boolean) => { if (settled) return; settled = true; installingWorker.removeEventListener("statechange", onStateChange); resolve(value); };
+          const onStateChange = () => {
+            if (installingWorker.state === "installed") finish(true);
+            else if (installingWorker.state === "redundant") finish(false);
+          };
+          installingWorker.addEventListener("statechange", onStateChange);
+          if (installingWorker.state === "installed") finish(true);
+          window.setTimeout(() => finish(false), 15000);
+        });
+        if (installed && applyWaitingWorker(registration.waiting)) return;
+      }
+
+      if (pendingBuildVersion) {
+        try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, pendingBuildVersion); } catch {}
+      }
+      window.location.reload();
+    } catch {
+      setUpdating(false);
+    }
+  };
   const dismissUpdate = () => { try { sessionStorage.setItem(UPDATE_DISMISSED_KEY, "1"); } catch {} setUpdateVisible(false); };
 
   if (offline) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-amber-500/30 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-center gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-xl">📡</div><div className="min-w-0 flex-1"><p className="font-bold">أنت غير متصل بالإنترنت</p><p className="mt-0.5 text-xs text-muted-foreground">تم الحفاظ على جلسة الدخول. سيُستأنف الاتصال تلقائيًا عند عودته.</p></div></div></div>;
