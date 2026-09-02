@@ -41,6 +41,26 @@ jobs:
         working-directory: backend
         run: npm run check
 
+      - name: Preflight D1 access
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          output="$(npx wrangler d1 execute Hadir --remote --command "SELECT 1 AS ok;" 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ]; then
+            if printf '%s\n' "$output" | grep -Eqi 'not authorized|SQLITE_AUTH|code: 7500'; then
+              echo 'ERROR: CLOUDFLARE_API_DEPLOY_TOKEN can authenticate to Cloudflare but is not authorized to access the Hadir D1 database.'
+              echo 'Required account permission: D1 Edit, scoped to the account containing the Hadir database.'
+            else
+              echo 'ERROR: Unable to access the Hadir D1 database with CLOUDFLARE_API_DEPLOY_TOKEN.'
+            fi
+            exit "$status"
+          fi
+
       - name: Apply remote D1 migrations
         working-directory: backend
         run: npx wrangler d1 migrations apply Hadir --remote
