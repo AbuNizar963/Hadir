@@ -159,6 +159,7 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
     marker.setLatLng(center);
     radius.setLatLng(center);
     radius.setRadius(Math.max(1, Number(radiusMeters) || 100));
+    map.setView(center, Math.max(map.getZoom(), 16), { animate: false });
   }, [lat, lng, radiusMeters]);
 
   return (
