@@ -29,6 +29,7 @@ import { currentManager, currentSession } from "@/lib/auth";
 import { setManagerSession, setSession } from "@/lib/storage";
 import { enableWebPush } from "@/lib/push";
 import type { Employee, AdminAccount } from "@/types";
+import { ToastProvider } from "@/components/system/ToastProvider";
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
 const EmployeeShell = ({ children }: { children: React.ReactNode }) => <ProtectedEmployee><EmployeeLayout>{children}</EmployeeLayout></ProtectedEmployee>;
@@ -166,6 +167,7 @@ export default function App() {
   return <BrowserRouter basename={basename}>
     <PushSessionBridge />
     <PWAExperience />
+    <ToastProvider />
     <Routes>
       <Route path="/" element={<LaunchGateway />} />
       <Route path="/login" element={<EmployeeLogin />} />
