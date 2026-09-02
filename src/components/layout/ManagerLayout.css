@@ -22,20 +22,6 @@
   box-shadow: 0 1px 0 hsl(var(--foreground) / 0.04), inset 0 1px 0 hsl(var(--background) / 0.5);
 }
 
-.manager-shell .manager-tool::after {
-  content: "";
-  position: absolute;
-  inset: auto 12px 0;
-  height: 2px;
-  border-radius: 999px;
-  background: hsl(var(--primary) / 0.18);
-  transform: scaleX(0);
-  transform-origin: center;
-  transition: transform .2s ease;
-}
-
-.manager-shell .manager-tool:hover::after { transform: scaleX(1); }
-
 .manager-shell .manager-nav {
   scrollbar-width: none;
 }
@@ -87,5 +73,4 @@
 
 @media (prefers-reduced-motion: reduce) {
   .manager-shell .manager-content > * { animation: none; }
-  .manager-shell .manager-tool::after { transition: none; }
 }
