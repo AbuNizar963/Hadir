@@ -3,7 +3,7 @@ const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[
   new URL("./",self.registration.scope).href,
   new URL("./manifest.webmanifest",self.registration.scope).href,
-  new URL("./pwa-icon.svg",self.registration.scope).href
+  new URL("./favicon.svg",self.registration.scope).href
 ];
 
 self.addEventListener("install",event=>event.waitUntil(
@@ -49,7 +49,7 @@ self.addEventListener("push",event=>event.waitUntil((async()=>{
   const title=String(data.title||"إشعار جديد");
   const body=String(data.body||data.message||"لديك إشعار جديد في Hadir");
   const url=resolveNotificationUrl(data.url||data.path||"/");
-  const icon=new URL("./pwa-icon.svg",self.registration.scope).href;
+  const icon=new URL("./favicon.svg",self.registration.scope).href;
   await self.registration.showNotification(title,{body,icon,badge:icon,dir:"rtl",lang:"ar",tag:String(data.tag||`hadir-${data.type||"notification"}`),renotify:true,data:{url,type:String(data.type||"info"),notificationId:String(data.notificationId||data.id||"")}});
 })());
 
