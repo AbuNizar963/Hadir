@@ -24,6 +24,8 @@ env:
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   PAGES_PRODUCTION_URL: https://hadir-9rq.pages.dev
+  ANDROID_PACKAGE_NAME: com.hadir.attendance
+  ANDROID_SHA256: B6:FD:CF:4A:7D:B7:E6:0D:9C:3A:90:AA:6B:98:5E:96:5C:F1:F5:C0:9A:E6:03:D6:75:AB:6C:1E:3C:C2:AF:A4
 
 concurrency:
   group: hadir-frontend-production
@@ -51,55 +53,6 @@ jobs:
         env:
           VITE_BASE_PATH: /
         run: bun run build
-
-      - name: Generate production PWA raster icons from favicon.svg
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends librsvg2-bin
-          test -s public/favicon.svg
-          test -d dist
-          rsvg-convert -w 192 -h 192 -o dist/pwa-icon-192.png public/favicon.svg
-          rsvg-convert -w 512 -h 512 -o dist/pwa-icon-512.png public/favicon.svg
-          test -s dist/pwa-icon-192.png
-          test -s dist/pwa-icon-512.png
-
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          manifest_path = Path("dist/manifest.webmanifest")
-          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-          version = os.environ["GITHUB_SHA"]
-          query = f"?hadir_icon={version}"
-          manifest["icons"] = [
-              {
-                  "src": f"/pwa-icon-192.png{query}",
-                  "sizes": "192x192",
-                  "type": "image/png",
-                  "purpose": "any",
-              },
-              {
-                  "src": f"/pwa-icon-512.png{query}",
-                  "sizes": "512x512",
-                  "type": "image/png",
-                  "purpose": "any",
-              },
-          ]
-          manifest_path.write_text(
-              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
-              encoding="utf-8",
-          )
-
-          verified = json.loads(manifest_path.read_text(encoding="utf-8"))
-          icons = verified.get("icons") or []
-          assert any(icon.get("src") == f"/pwa-icon-192.png{query}" for icon in icons), verified
-          assert any(icon.get("src") == f"/pwa-icon-512.png{query}" for icon in icons), verified
-          assert all(icon.get("type") == "image/png" for icon in icons), verified
-          print("Local production bundle verified with versioned PNG PWA icons.")
-          PY
 
       - name: Validate frontend deployment credentials
         shell: bash
@@ -169,9 +122,9 @@ jobs:
               if python - <<'PY'
           import json, os
           from pathlib import Path
-          data=json.loads(Path("/tmp/build-version.json").read_text(encoding="utf-8"))
-          expected=os.environ["GITHUB_SHA"]
-          actual=data.get("commitSha")
+          data = json.loads(Path("/tmp/build-version.json").read_text(encoding="utf-8"))
+          expected = os.environ["GITHUB_SHA"]
+          actual = data.get("commitSha")
           if actual == expected:
               print(f"Cloudflare Pages production serves commit {expected}.")
               raise SystemExit(0)
@@ -188,10 +141,11 @@ jobs:
             sleep 5
           done
 
-      - name: Verify deployed PWA metadata and service worker
+      - name: Verify deployed PWA metadata and Digital Asset Links
         shell: bash
         run: |
           set -euo pipefail
+
           curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
             -H 'Cache-Control: no-cache, no-store' \
             "$PAGES_PRODUCTION_URL/manifest.webmanifest?hadir_ci=$GITHUB_SHA" \
@@ -202,29 +156,57 @@ jobs:
           import os
           from pathlib import Path
 
-          manifest=json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
-          expected=os.environ["GITHUB_SHA"]
-
-          assert manifest.get("id")=="/", manifest
-          assert manifest.get("start_url")=="/", manifest
-          assert manifest.get("scope")=="/", manifest
-          assert manifest.get("display")=="standalone", manifest
+          manifest = json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
+          expected = os.environ["GITHUB_SHA"]
+          assert manifest.get("id") == "/", manifest
+          assert manifest.get("start_url") == "/", manifest
+          assert manifest.get("scope") == "/", manifest
+          assert manifest.get("display") == "standalone", manifest
           assert manifest.get("prefer_related_applications") is False, manifest
           icons = manifest.get("icons")
           assert isinstance(icons, list) and len(icons) >= 2, manifest
-          assert any(icon.get("src") == f"/pwa-icon-192.png?hadir_icon={expected}" for icon in icons), manifest
-          assert any(icon.get("src") == f"/pwa-icon-512.png?hadir_icon={expected}" for icon in icons), manifest
-          assert all(icon.get("type") == "image/png" for icon in icons), manifest
-          print("Production PWA manifest verified with versioned PNG icons.")
+
+          # The production Git/Pages build keeps the canonical SVG favicon.
+          # The Android APK has its own native launcher icon; do not require
+          # the CI-only rasterization step to be present in Pages output.
+          icon_sources = [str(icon.get("src", "")) for icon in icons]
+          assert any("/favicon.svg" in src for src in icon_sources), manifest
+          assert all(icon.get("type") == "image/svg+xml" for icon in icons), manifest
+          assert all(expected in src for src in icon_sources if "/favicon.svg" in src), manifest
+          print("Production PWA manifest verified with versioned Hadir SVG icons.")
           PY
 
-          for icon in pwa-icon-192.png pwa-icon-512.png; do
-            curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
-              -H 'Cache-Control: no-cache, no-store' \
-              "$PAGES_PRODUCTION_URL/$icon?hadir_ci=$GITHUB_SHA" \
-              -o "/tmp/$icon"
-            test -s "/tmp/$icon"
-          done
+          curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
+            -H 'Cache-Control: no-cache, no-store' \
+            "$PAGES_PRODUCTION_URL/favicon.svg?hadir_ci=$GITHUB_SHA" \
+            -o /tmp/favicon.svg
+          test -s /tmp/favicon.svg
+
+          curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
+            -H 'Cache-Control: no-cache, no-store' \
+            "$PAGES_PRODUCTION_URL/.well-known/assetlinks.json?hadir_ci=$GITHUB_SHA" \
+            -o /tmp/assetlinks.json
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path("/tmp/assetlinks.json").read_text(encoding="utf-8"))
+          package_name = os.environ["ANDROID_PACKAGE_NAME"]
+          fingerprint = os.environ["ANDROID_SHA256"].upper()
+          assert isinstance(data, list) and data, data
+          match = False
+          for statement in data:
+              target = statement.get("target") or {}
+              fingerprints = [str(v).upper() for v in (target.get("sha256_cert_fingerprints") or [])]
+              relations = statement.get("relation") or []
+              if target.get("namespace") == "android_app" and target.get("package_name") == package_name and fingerprint in fingerprints and "delegate_permission/common.handle_all_urls" in relations:
+                  match = True
+                  break
+          assert match, data
+          print("Production Digital Asset Links verified for the signed Hadir Android package.")
+          PY
 
           for attempt in $(seq 1 36); do
             if curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
@@ -236,15 +218,14 @@ jobs:
           import re
           from pathlib import Path
 
-          sw=Path("/tmp/sw.js").read_text(encoding="utf-8")
-          version_match=re.search(r'const BUILD_VERSION="([0-9a-f]{40})";', sw)
+          sw = Path("/tmp/sw.js").read_text(encoding="utf-8")
+          version_match = re.search(r'const BUILD_VERSION="([0-9a-f]{40})";', sw)
           assert version_match, "production service-worker build version declaration is missing"
-          cache_match=re.search(r'const CACHE=`hadir-shell-\$\{BUILD_VERSION\}`;', sw)
-          assert cache_match, "production service-worker shell cache declaration is missing"
+          assert re.search(r'const CACHE=`hadir-shell-\$\{BUILD_VERSION\}`;', sw), "production service-worker shell cache declaration is missing"
           assert "SKIP_WAITING" in sw, "service-worker update activation handler is missing"
           assert "notificationclick" in sw, "service-worker notification click handler is missing"
-          expected=os.environ["GITHUB_SHA"]
-          actual=version_match.group(1)
+          expected = os.environ["GITHUB_SHA"]
+          actual = version_match.group(1)
           if actual == expected:
               print(f"Production PWA verified: {actual}")
               raise SystemExit(0)
