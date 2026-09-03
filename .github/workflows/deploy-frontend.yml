@@ -15,6 +15,7 @@ on:
       - "tsconfig*.json"
       - "vite.config.*"
       - "scripts/build.mjs"
+      - "scripts/patch-manager-report-header.mjs"
       - ".github/workflows/deploy-frontend.yml"
 
 permissions:
@@ -163,10 +164,6 @@ jobs:
           assert manifest.get("prefer_related_applications") is False, manifest
           icons = manifest.get("icons")
           assert isinstance(icons, list) and len(icons) >= 2, manifest
-
-          # The current PWA manifest intentionally uses the branded six-ray
-          # Hadir SVG as its canonical app icon. Android has its own native
-          # launcher icon; Pages does not need to rasterize it.
           icon_sources = [str(icon.get("src", "")) for icon in icons]
           assert all("/pwa-icon.svg" in src for src in icon_sources), manifest
           assert all(icon.get("type") == "image/svg+xml" for icon in icons), manifest
