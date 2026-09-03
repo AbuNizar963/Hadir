@@ -11,21 +11,18 @@ if (source.includes(oldState)) {
 
 const oldLoad = 'try { const nextLocations = await getBackendLocations("admin"); setLocations((prev) => JSON.stringify(prev) === JSON.stringify(nextLocations) ? prev : nextLocations); } catch {}';
 const newLoad = `try {
-          const [apiLocations, settings] = await Promise.all([
-            getBackendLocations("admin").catch(() => []),
-            getBackendSettings().catch(() => null),
-          ]);
-          const merged = new Map<string, Location>();
-          for (const location of Array.isArray(apiLocations) ? apiLocations : []) merged.set(String(location.id), location);
-          for (const location of Array.isArray(settings?.locations) ? settings.locations : []) merged.set(String(location.id), location);
-          const nextLocations = Array.from(merged.values()).filter((location) => location && String(location.name || "").trim());
+          const nextLocations = await getBackendLocations("admin");
           setLocations((prev) => JSON.stringify(prev) === JSON.stringify(nextLocations) ? prev : nextLocations);
-        } catch {}';
+        } catch {
+          const fallbackSettings = getSettings();
+          const fallbackLocations = Array.isArray(fallbackSettings.locations) ? fallbackSettings.locations : [];
+          setLocations((prev) => JSON.stringify(prev) === JSON.stringify(fallbackLocations) ? prev : fallbackLocations);
+        }`;
 if (source.includes(oldLoad)) {
   source = source.replace(oldLoad, newLoad);
-} else if (!source.includes('const [apiLocations, settings] = await Promise.all([')) {
+} else if (!source.includes('const nextLocations = await getBackendLocations("admin");')) {
   throw new Error("ManagerEmployees location sync anchor not found; refusing unsafe patch.");
 }
 
 writeFileSync(path, source, "utf8");
-console.log("ManagerEmployees location patch: saved Settings locations are merged into the employee work-location selector.");
+console.log("ManagerEmployees location patch: authoritative API locations are loaded, with local settings used only when the API is unavailable.");
