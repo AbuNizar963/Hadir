@@ -23,14 +23,17 @@ const newExcel = `  const exportExcel = async () => {\n    let reportSummaries =
 if (!oldExcel.test(source)) throw new Error("ManagerReports: Excel export anchor not found.");
 source = source.replace(oldExcel, newExcel);
 
-const attendancePriorityDetails = '    if (dailyStatus && serverStatus) st = serverStatus === "late" && !cout ? "open" : serverStatus;';
-const attendancePriorityDetailsReplacement = '    if (dailyStatus && serverStatus && !cin) st = serverStatus;';
-if (!source.includes(attendancePriorityDetails)) throw new Error("ManagerReports: daily status priority anchor not found.");
+// patch-manager-reports-final.mjs runs before this script and makes the daily
+// status override rotation-aware. Match that actual post-final shape so a real
+// check-in always wins over a stale D1 daily status.
+const attendancePriorityDetails = '    if (dailyStatus && serverStatus && !rotation) st = serverStatus === "late" && !cout ? "open" : serverStatus;';
+const attendancePriorityDetailsReplacement = '    if (dailyStatus && serverStatus && !rotation && !cin) st = serverStatus;';
+if (!source.includes(attendancePriorityDetails)) throw new Error("ManagerReports: daily status priority anchor not found after final patch.");
 source = source.replace(attendancePriorityDetails, attendancePriorityDetailsReplacement);
 
-const attendancePrioritySummary = '    if (serverStatus === "not_started") continue;\n    if (serverStatus === "off") { off++; continue; }\n    if (serverStatus === "leave") { leave++; continue; }\n    if (serverStatus === "permission") { permission++; continue; }\n    if (serverStatus === "absent") { absent++; continue; }';
-const attendancePrioritySummaryReplacement = '    if (serverStatus === "not_started" && !cin) continue;\n    if (serverStatus === "off" && !cin) { off++; continue; }\n    if (serverStatus === "leave" && !cin) { leave++; continue; }\n    if (serverStatus === "permission" && !cin) { permission++; continue; }\n    if (serverStatus === "absent" && !cin) { absent++; continue; }';
-if (!source.includes(attendancePrioritySummary)) throw new Error("ManagerReports: summary status priority anchor not found.");
+const attendancePrioritySummary = '    if (!rotation && serverStatus === "not_started") continue;\n    if (!rotation && serverStatus === "off") { off++; continue; }\n    if (!rotation && serverStatus === "leave") { leave++; continue; }\n    if (!rotation && serverStatus === "permission") { permission++; continue; }\n    if (!rotation && serverStatus === "absent") { absent++; continue; }';
+const attendancePrioritySummaryReplacement = '    if (!rotation && serverStatus === "not_started" && !cin) continue;\n    if (!rotation && serverStatus === "off" && !cin) { off++; continue; }\n    if (!rotation && serverStatus === "leave" && !cin) { leave++; continue; }\n    if (!rotation && serverStatus === "permission" && !cin) { permission++; continue; }\n    if (!rotation && serverStatus === "absent" && !cin) { absent++; continue; }';
+if (!source.includes(attendancePrioritySummary)) throw new Error("ManagerReports: summary status priority anchor not found after final patch.");
 source = source.replace(attendancePrioritySummary, attendancePrioritySummaryReplacement);
 
 const oldPrint = '  const printReport = () => window.print();';
