@@ -45,16 +45,17 @@ if (!hasShareButton) {
   if (!printButtonPattern.test(source)) {
     throw new Error("ManagerReports share patch: daily print action anchor not found; refusing unsafe replacement.");
   }
-  // Replace only the print control with both controls, preserving the original
-  // print action and placing PDF sharing immediately beside it.
   source = source.replace(printButtonPattern, dailyActions);
 } else if (!hasPrintButton) {
-  // A partial previous build may contain share without the print marker.
-  // Restore print immediately beside the existing share control.
   source = source.replace(shareButtonPattern, dailyActions);
 }
 
-if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !shareButtonPattern.test(source) || !source.includes("مشاركة PDF") || !source.includes("طباعة الخدمة") || !source.includes('data-hadir-print="true"')) {
+// Validate the actual injected JSX controls using stable markers. Avoid a
+// brittle full-control regex here because the upstream report patches may
+// legitimately adjust JSX whitespace or attributes without changing behavior.
+const hasRenderedShareControl = source.includes('onClick={sharePdf}') && source.includes('<Share2') && source.includes('مشاركة PDF');
+const hasRenderedPrintControl = source.includes('onClick={printReport}') && source.includes('<Printer') && source.includes('data-hadir-print="true"') && source.includes('طباعة الخدمة');
+if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !hasRenderedShareControl || !hasRenderedPrintControl) {
   throw new Error("ManagerReports share patch: PDF sharing and print buttons were not both applied completely.");
 }
 
