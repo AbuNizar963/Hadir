@@ -17,9 +17,6 @@ const cors = (origin: string) => ({
 });
 
 async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<string> {
-  const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
-  const logoMatch = html.match(logoTagPattern);
-  if (!logoMatch) return html;
   if (!env.PROFILE_IMAGES) throw new Error("R2 binding PROFILE_IMAGES غير موجود أثناء تجهيز PDF");
 
   const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1")
@@ -41,19 +38,19 @@ async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<s
   }
   const contentType = String(object.httpMetadata?.contentType || "image/webp").toLowerCase();
   const dataUrl = `data:${contentType};base64,${btoa(binary)}`;
+  const logoMarkup = `<img src="${dataUrl}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
 
-  // Replace the entire source/alt portion of the actual company-logo tag.
-  // The generated document therefore contains the R2 bytes directly and has
-  // no network dependency when Chromium renders the PDF.
-  const originalTag = logoMatch[0];
-  const embeddedTag = originalTag
-    .replace(/\bsrc=["'][^"']*["']/i, `src="${dataUrl}"`)
-    .replace(/\balt=["']شعار الشركة["']/i, 'alt=""');
-  if (embeddedTag === originalTag || !embeddedTag.includes(dataUrl)) {
-    throw new Error("تعذر تضمين شعار الشركة من R2 داخل مستند PDF");
-  }
+  // The UI header conditionally renders its logo from settings.brandLogo. A
+  // production PDF must not depend on that client-side URL being present.
+  // Always inject the current R2 object into the report itself. If an image
+  // placeholder already exists, replace it; otherwise add one at the top of
+  // the .service-report element.
+  const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
+  if (logoTagPattern.test(html)) return html.replace(logoTagPattern, logoMarkup);
 
-  return html.replace(originalTag, embeddedTag);
+  const serviceReportPattern = /(<[^>]+class=["'][^"']*\bservice-report\b[^"']*["'][^>]*>)/i;
+  if (!serviceReportPattern.test(html)) throw new Error("لم يتم العثور على حاوية التقرير لإضافة شعار الشركة");
+  return html.replace(serviceReportPattern, `$1<div class="pdf-company-logo" dir="rtl">${logoMarkup}</div>`);
 }
 
 export async function generateDailyReportPdf(req: Request, env: BrowserEnv, responseOrigin: string): Promise<Response> {
