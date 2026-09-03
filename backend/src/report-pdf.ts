@@ -1,7 +1,10 @@
 const MAX_HTML_BYTES = 12 * 1024 * 1024;
 const MAX_CSS_BYTES = 8 * 1024 * 1024;
 
-type BrowserEnv = { BROWSER?: BrowserRun };
+// The PDF renderer runs in Cloudflare Browser Run. Resolve the current logo
+// inside the Worker from D1 + R2, then embed the bytes into the HTML. This
+// avoids browser cookies, CORS, stale URLs, and external-image timing issues.
+type BrowserEnv = { BROWSER?: BrowserRun; DB: D1Database; PROFILE_IMAGES?: R2Bucket };
 
 type PdfPayload = {
   html?: unknown;
@@ -15,6 +18,34 @@ const cors = (origin: string) => ({
   "access-control-allow-headers": "content-type, authorization, x-device-id",
   "access-control-allow-methods": "POST,OPTIONS",
 });
+
+async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<string> {
+  if (!env.PROFILE_IMAGES || !html.includes('alt="شعار الشركة"')) return html;
+
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1")
+    .bind("brandLogoR2Key")
+    .first<{ value: string }>();
+  const key = String(row?.value || "").trim();
+  if (!key) return html;
+
+  const object = await env.PROFILE_IMAGES.get(key);
+  if (!object) return html;
+
+  const bytes = new Uint8Array(await object.arrayBuffer());
+  if (!bytes.length) return html;
+
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
+  }
+  const dataUrl = `data:image/webp;base64,${btoa(binary)}`;
+
+  // Only replace the source of the company-logo image. The rest of the report
+  // remains byte-for-byte unchanged before Chromium renders it.
+  return html.replace(/(<img\b[^>]*alt=["']شعار الشركة["'][^>]*\bsrc=["'])([^"']*)(["'])/i, `$1${dataUrl}$3`)
+    .replace(/(<img\b[^>]*\bsrc=["'])([^"']*)(["'][^>]*alt=["']شعار الشركة["'])/i, `$1${dataUrl}$3`);
+}
 
 export async function generateDailyReportPdf(req: Request, env: BrowserEnv, responseOrigin: string): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(responseOrigin) });
@@ -32,8 +63,9 @@ export async function generateDailyReportPdf(req: Request, env: BrowserEnv, resp
   if (/<\/?(script|iframe|object|embed)\b/i.test(html) || /javascript\s*:/i.test(html)) return new Response(JSON.stringify({ error: "محتوى PDF غير مسموح" }), { status: 400, headers: { ...cors(responseOrigin), "content-type": "application/json; charset=utf-8" } });
 
   try {
+    const renderedHtml = await embedCurrentCompanyLogo(html, env);
     const rendered = await env.BROWSER.quickAction("pdf", {
-      html,
+      html: renderedHtml,
       addStyleTag: css ? [{ content: css }] : [],
       gotoOptions: { waitUntil: "load", timeout: 60000 },
       waitForSelector: { selector: ".service-report", visible: true, timeout: 60000 },
