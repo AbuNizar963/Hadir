@@ -17,6 +17,7 @@ on:
       - "scripts/build.mjs"
       - "scripts/patch-manager-report-header.mjs"
       - "scripts/patch-manager-reports-live.mjs"
+      - "scripts/patch-manager-report-share.mjs"
       - ".github/workflows/deploy-frontend.yml"
 
 permissions:
