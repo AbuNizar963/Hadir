@@ -26,6 +26,9 @@ if (!existsSync(vitePackage)) {
 run("node", ["scripts/repair-manager-report-patch.mjs"]);
 run("node", ["scripts/patch-manager-reports-final.mjs"]);
 run("node", ["scripts/patch-manager-reports-final2.mjs"]);
+// Apply the production-time daily report snapshot fix after the historical
+// report patches, so report generation always reads the latest D1 state.
+run("node", ["scripts/patch-manager-reports-live.mjs"]);
 
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || gitSha.stdout?.trim() || "unknown";
