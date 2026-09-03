@@ -24,6 +24,7 @@ run("node", ["scripts/patch-manager-reports-final.mjs"]);
 run("node", ["scripts/patch-manager-reports-final2.mjs"]);
 run("node", ["scripts/patch-manager-reports-live.mjs"]);
 run("node", ["scripts/patch-manager-report-header.mjs"]);
+run("node", ["scripts/patch-manager-report-share.mjs"]);
 
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || gitSha.stdout?.trim() || "unknown";
