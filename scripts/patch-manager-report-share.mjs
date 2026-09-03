@@ -30,34 +30,32 @@ if (!source.includes('const sharePdf = async')) {
 const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf}><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : "مشاركة PDF"}</Button>';
 const printButton = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
 
-// The print button can be changed by earlier report patches, so match it by
-// semantic props/text rather than by one exact formatting shape. Never replace
-// the print control with the share control; the two controls must coexist.
+// Detect the actual rendered share control, not the text inside sharePdf().
+// The previous check only searched for "مشاركة PDF", which also exists inside
+// the share function and therefore incorrectly concluded that the button was
+// already present. That caused the build to restore print while skipping share.
+const shareButtonPattern = /<Button\b(?=[^>]*onClick=\{sharePdf\})(?=[^>]*disabled=\{!summaries\.length \|\| sharingPdf\})[^>]*>\s*<Share2\b[^>]*\/>\s*\{sharingPdf \? "جاري تجهيز PDF…" : "مشاركة PDF"\}\s*<\/Button>/s;
 const printButtonPattern = /<Button\b(?=[^>]*onClick=\{printReport\})(?=[^>]*disabled=\{!summaries\.length\})[^>]*>\s*<Printer\b[^>]*\/>\s*طباعة الخدمة\s*<\/Button>/s;
-const hasShareButton = source.includes("مشاركة PDF");
-const hasPrintMarker = source.includes('data-hadir-print="true"');
+
+const hasShareButton = shareButtonPattern.test(source);
+const hasPrintButton = source.includes('data-hadir-print="true"');
 
 if (!hasShareButton) {
   if (!printButtonPattern.test(source)) {
-    throw new Error("ManagerReports share patch: daily print action anchor not found; refusing to replace or remove the print button.");
+    throw new Error("ManagerReports share patch: daily print action anchor not found; refusing unsafe replacement.");
   }
+  // Replace only the print control with both controls, preserving the original
+  // print action and placing PDF sharing immediately beside it.
   source = source.replace(printButtonPattern, printButton + shareButton);
-} else if (!hasPrintMarker) {
-  // If a previous partial build already injected sharing, add/mark print next
-  // to it without removing the sharing action.
-  const sharePattern = /<Button\b(?=[^>]*onClick=\{sharePdf\})[^>]*>\s*<Share2\b[^>]*\/>\s*(?:\{sharingPdf \? "جاري تجهيز PDF…" : )?"?مشاركة PDF"?\s*<\/Button>/s;
-  if (printButtonPattern.test(source)) {
-    source = source.replace(printButtonPattern, printButton);
-  } else if (sharePattern.test(source)) {
-    source = source.replace(sharePattern, printButton + shareButton);
-  } else {
-    throw new Error("ManagerReports share patch: existing PDF share found but print action anchor is missing; refusing unsafe replacement.");
-  }
+} else if (!hasPrintButton) {
+  // A partial previous build may contain share without the print marker.
+  // Restore print immediately beside the existing share control.
+  source = source.replace(shareButtonPattern, printButton + shareButton);
 }
 
-if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !source.includes("مشاركة PDF") || !source.includes("طباعة الخدمة") || !source.includes('data-hadir-print="true"')) {
-  throw new Error("ManagerReports share patch: PDF sharing/print actions were not applied completely.");
+if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !shareButtonPattern.test(source) || !source.includes("مشاركة PDF") || !source.includes("طباعة الخدمة") || !source.includes('data-hadir-print="true"')) {
+  throw new Error("ManagerReports share patch: PDF sharing and print buttons were not both applied completely.");
 }
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports share patch: daily report preserves print and adds direct PDF sharing beside it.");
+console.log("ManagerReports share patch: daily report keeps print and injects PDF sharing beside it.");
