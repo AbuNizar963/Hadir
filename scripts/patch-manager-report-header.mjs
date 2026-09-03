@@ -18,9 +18,8 @@ if (source.includes(settingsAnchor)) {
 }
 
 // Replace only the exact daily-report header block. Do not use character offsets or broad regexes.
-const oldHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div>
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold"><div>رئيس القسم : {settings.ownerName || "—"}</div><div>معاون رئيس القسم : {settings.managerName || "—"}</div></div>`;
-const newHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-[3.1cm] w-[3.1cm] object-contain shrink-0" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام ليوم {days[dateOf(date).getDay()]} · {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div></div>`;
+const oldHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div>\n        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold"><div>رئيس القسم : {settings.ownerName || "—"}</div><div>معاون رئيس القسم : {settings.managerName || "—"}</div></div>`;
+const newHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-[3.1cm] w-[3.1cm] object-contain shrink-0" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام ليوم {days[dateOf(date).getDay()]} · ${String(dateOf(date).getDate()).padStart(2, "0")}/${String(dateOf(date).getMonth() + 1).padStart(2, "0")}/${dateOf(date).getFullYear()}</div></div>`;
 
 if (!source.includes(oldHeaderBlock)) throw new Error("ManagerReports: exact daily report header block not found.");
 source = source.replace(oldHeaderBlock, newHeaderBlock);
@@ -30,15 +29,25 @@ const newEmployeeCell = `<td className="p-2 border-l border-black/20 font-bold b
 if (!source.includes(oldEmployeeCell)) throw new Error("ManagerReports: daily employee self-number cell not found.");
 source = source.replace(oldEmployeeCell, newEmployeeCell);
 
-// Keep the existing print style block intact; only change the exact logo rule.
+// The component contains an older inline print block. Keep it synchronized with
+// the canonical external print stylesheet so browser print and Browser Run PDF
+// use the same A4 geometry and logo dimensions.
+const oldPageCss = "@page { size: A4 landscape; margin: 5mm 6mm; }";
+const newPageCss = "@page { size: A4 portrait; margin: 6mm; }";
+if (!source.includes(oldPageCss)) throw new Error("ManagerReports: inline print page rule not found.");
+source = source.replace(oldPageCss, newPageCss);
+
 const oldLogoCss = ".service-report img { max-height: 10mm !important; }";
 const newLogoCss = ".service-report img { width: 31mm !important; height: 31mm !important; max-width: 31mm !important; max-height: 31mm !important; object-fit: contain !important; }";
-if (source.includes(oldLogoCss)) source = source.replace(oldLogoCss, newLogoCss);
+if (!source.includes(oldLogoCss)) throw new Error("ManagerReports: inline logo print rule not found.");
+source = source.replace(oldLogoCss, newLogoCss);
 
-if (!source.includes('const [reportSettings, setReportSettings]')) throw new Error("ManagerReports: report settings hydration was not applied.");
+if (!source.includes('const [reportSettings, setReportSettings]')) throw new Error("ManagerReports: settings hydration was not applied.");
 if (!source.includes('getBackendSettings')) throw new Error("ManagerReports: backend settings hydration import was not applied.");
 if (!source.includes('className="h-[3.1cm] w-[3.1cm]')) throw new Error("ManagerReports: 3.1cm logo markup was not applied.");
 if (!source.includes('row.employee.name}</td>')) throw new Error("ManagerReports: employee self number removal was not applied.");
+if (!source.includes(newPageCss)) throw new Error("ManagerReports: A4 portrait print rule was not applied.");
+if (!source.includes(newLogoCss)) throw new Error("ManagerReports: 31mm logo print rule was not applied.");
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports header patch: exact daily header replacement; D1 settings hydrated on first mount; settings changes refresh report immediately; ordered specialties retained; company logo fixed at 3.1cm x 3.1cm; selected weekday/date applied; employee self number removed from daily report.");
+console.log("ManagerReports header patch: exact daily header replacement; D1 settings hydrated on first mount; settings changes refresh report immediately; ordered specialties retained; company logo fixed at 3.1cm x 3.1cm; selected weekday/date applied; employee self number removed from daily report; print output standardized to A4 portrait.");
