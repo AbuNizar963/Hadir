@@ -19,7 +19,7 @@ export default function PWAExperience() {
   const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && !navigator.onLine);
   const [standalone, setStandalone] = useState(() => isStandalone());
   const [updating, setUpdating] = useState(false);
-  const [updateError, setUpdateError] = useState(false);
+  const [updateError, setUpdateError] = useState("");
   const detectedBuildVersionRef = useRef("");
   const pendingBuildVersionRef = useRef("");
 
@@ -145,24 +145,20 @@ export default function PWAExperience() {
   const update = async () => {
     if (updating) return;
     setUpdating(true);
-    setUpdateError(false);
+    setUpdateError("");
     try {
       const base = import.meta.env.BASE_URL || "/";
       const baseUrl = new URL(base, window.location.origin);
       const versionUrl = new URL("build-version.json", baseUrl);
       versionUrl.searchParams.set("check", String(Date.now()));
       const versionResponse = await fetch(versionUrl.toString(), { cache: "no-store", credentials: "same-origin" });
-      if (!versionResponse.ok) throw new Error("build-version-unavailable");
+      if (!versionResponse.ok) throw new Error("تعذر الوصول إلى ملف إصدار النشر (build-version.json). تحقق من اتصال الإنترنت.");
       const versionData = await versionResponse.json().catch(() => null) as { commitSha?: unknown } | null;
       const buildVersion = typeof versionData?.commitSha === "string" ? versionData.commitSha.trim() : "";
-      if (!buildVersion) throw new Error("build-version-invalid");
+      if (!buildVersion) throw new Error("ملف إصدار النشر لا يحتوي على رقم إصدار صالح.");
       detectedBuildVersionRef.current = buildVersion;
       pendingBuildVersionRef.current = buildVersion;
 
-      // Register the exact deployed worker URL again at the moment the user
-      // requests the update. This removes the race between the app opening and
-      // main.tsx registering the worker, and gives every deployment its own
-      // Service Worker script URL.
       const swUrl = new URL("sw.js", baseUrl);
       swUrl.searchParams.set("v", buildVersion);
       const registration = await navigator.serviceWorker.register(swUrl.toString(), { scope: baseUrl.pathname, updateViaCache: "none" });
@@ -184,9 +180,6 @@ export default function PWAExperience() {
         }
       };
 
-      // The new worker may already be active by the time the user presses the
-      // button. In that case there is nothing left to install; simply record
-      // the deployed version and reload once to use it.
       if (activeWorkerIsTarget(registration.active)) {
         try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, buildVersion); } catch {}
         setUpdating(false);
@@ -239,17 +232,18 @@ export default function PWAExperience() {
       }
 
       setUpdating(false);
-      setUpdateError(true);
-    } catch {
+      setUpdateError(`لم يصل Service Worker الجديد إلى حالة التثبيت بعد 20 ثانية. الإصدار المطلوب: ${buildVersion.slice(0, 12)}…`);
+    } catch (error) {
       setUpdating(false);
-      setUpdateError(true);
+      const message = error instanceof Error && error.message ? error.message : "حدث خطأ غير معروف أثناء تثبيت Service Worker الجديد.";
+      setUpdateError(message);
     }
   };
 
-  const dismissUpdate = () => { try { sessionStorage.setItem(UPDATE_DISMISSED_KEY, "1"); } catch {} setUpdateVisible(false); setUpdateError(false); };
+  const dismissUpdate = () => { try { sessionStorage.setItem(UPDATE_DISMISSED_KEY, "1"); } catch {} setUpdateVisible(false); setUpdateError(""); };
 
   if (offline) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-amber-500/30 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-center gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-xl">📡</div><div className="min-w-0 flex-1"><p className="font-bold">أنت غير متصل بالإنترنت</p><p className="mt-0.5 text-xs text-muted-foreground">تم الحفاظ على جلسة الدخول. سيُستأنف الاتصال تلقائيًا عند عودته.</p></div></div></div>;
-  if (updateVisible) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-xl">✨</div><div className="min-w-0 flex-1"><p className="font-bold">تحديث جديد لحاضر متاح</p><p className="mt-1 text-xs leading-5 text-muted-foreground">سيتم تحديث واجهة التطبيق بأمان دون حذف بياناتك المحلية أو جلسة تسجيل الدخول.</p>{updateError && <p className="mt-2 text-xs leading-5 text-destructive">تعذر تثبيت التحديث الآن. لم يتم إعادة تحميل التطبيق، ويمكنك المحاولة مرة أخرى.</p>}<div className="mt-3 flex gap-2"><button type="button" onClick={update} disabled={updating} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">{updating ? "جارٍ التحديث…" : "تحديث الآن"}</button><button type="button" onClick={dismissUpdate} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">لاحقًا</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissUpdate} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
+  if (updateVisible) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-xl">✨</div><div className="min-w-0 flex-1"><p className="font-bold">تحديث جديد لحاضر متاح</p><p className="mt-1 text-xs leading-5 text-muted-foreground">سيتم تحديث واجهة التطبيق بأمان دون حذف بياناتك المحلية أو جلسة تسجيل الدخول.</p>{updateError && <p className="mt-2 text-xs leading-5 text-destructive">{updateError}</p>}<div className="mt-3 flex gap-2"><button type="button" onClick={update} disabled={updating} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">{updating ? "جارٍ التحديث…" : "تحديث الآن"}</button><button type="button" onClick={dismissUpdate} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">لاحقًا</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissUpdate} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   if (installVisible && installEvent) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📱</div><div className="min-w-0 flex-1"><p className="font-bold">ثبّت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">هذا هو تثبيت PWA الحقيقي، وليس اختصارًا عاديًا. سيعمل حاضر بواجهة مستقلة عن المتصفح ويحافظ على جلسة الحساب.</p><div className="mt-3 flex gap-2"><button type="button" onClick={install} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">تثبيت الآن</button><button type="button" onClick={dismissInstall} className="rounded-xl border border-border px-4 py-2 text-sm font-medium">ليس الآن</button></div></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   if (manualInstallVisible && isAndroid() && !installEvent) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📲</div><div className="min-w-0 flex-1"><p className="font-bold">تثبيت حاضر كتطبيق</p><p className="mt-1 text-xs leading-5 text-muted-foreground">إذا لم يظهر زر التثبيت التلقائي، افتح قائمة Chrome ⋮ ثم اختر «تثبيت التطبيق» أو «Install app». لا تستخدم «إضافة إلى الشاشة الرئيسية» لأنها قد تنشئ اختصارًا فقط.</p><button type="button" onClick={dismissInstall} className="mt-3 rounded-xl border border-border px-4 py-2 text-sm font-medium">فهمت</button></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
   if (manualInstallVisible && isIos() && isMobile()) return <div dir="rtl" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-2xl border border-primary/25 bg-background/95 p-4 shadow-2xl backdrop-blur-xl"><div className="flex items-start gap-3"><div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-2xl">📲</div><div className="min-w-0 flex-1"><p className="font-bold">أضف حاضر إلى الشاشة الرئيسية</p><p className="mt-1 text-xs leading-5 text-muted-foreground">على iPhone أو iPad: افتح قائمة المشاركة في Safari ثم اختر «إضافة إلى الشاشة الرئيسية». هذه هي طريقة تثبيت PWA الرسمية على أجهزة Apple.</p><button type="button" onClick={dismissInstall} className="mt-3 rounded-xl border border-border px-4 py-2 text-sm font-medium">فهمت</button></div><button type="button" aria-label="إغلاق" onClick={dismissInstall} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">✕</button></div></div>;
