@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const file = new URL("../src/pages/ManagerReports.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 
-if (source.includes("const refreshDailyReportSnapshot = async () =>")) {
+if (source.includes("const refreshDailyReportSnapshot = async ()")) {
   console.log("ManagerReports live patch: already applied.");
   process.exit(0);
 }
@@ -22,6 +22,11 @@ const oldExcel = /  const exportExcel = async \(\) => \{[\s\S]*?\n  const title 
 const newExcel = `  const exportExcel = async () => {\n    let reportSummaries = summaries;\n    let reportIndex = index;\n    let reportRequests = requests;\n    let reportDailyStatusMap = dailyStatusMap;\n    if (mode === "daily") {\n      const fresh = await refreshDailyReportSnapshot();\n      if (!fresh) return;\n      reportSummaries = fresh.summaries;\n      reportIndex = fresh.index;\n      reportRequests = fresh.requests;\n      reportDailyStatusMap = fresh.dailyStatusMap;\n    }\n    const sourceRows = reportSummaries.map(s => ({ employee: s.employee, specialty: specialtyOf(s.employee) }));\n    const dailyRows = sourceRows.flatMap(row => { const employee = row.employee, details = calculateDetails(employee, datesForEmployee(employee, dates), reportIndex, settings, reportRequests, mode === "daily" ? reportDailyStatusMap : undefined); return details.map(day => ({ employee: employee.name, jobNumber: employee.jobNumber, specialty: specialtyOf(employee), date: day.date, day: day.day, status: labels[day.status], checkIn: day.checkIn, checkOut: day.checkOut, worked: formatDurationMinutes(day.worked), late: day.late, early: day.early, detail: day.detail })); });\n    const absenceRows = dailyRows.filter(row => row.status === "غياب");\n    const reportTotal = reportSummaries.reduce((a, s) => ({ present: a.present + s.present, absent: a.absent + s.absent, early: a.early + s.early, late: a.late + s.late, open: a.open + s.open, permission: a.permission + s.permission, leave: a.leave + s.leave, off: a.off + s.off }), { present: 0, absent: 0, early: 0, late: 0, open: 0, permission: 0, leave: 0, off: 0 });\n    const reportChartData = [{ label: "حاضر", value: reportTotal.present }, { label: "غياب", value: reportTotal.absent }, { label: "استئذان", value: reportTotal.permission }, { label: "إجازة", value: reportTotal.leave }, { label: "انصراف مبكر", value: reportTotal.early }, { label: "تأخر", value: reportTotal.late }, { label: "تسجيل ناقص", value: reportTotal.open }];\n    downloadProfessionalAttendanceReport({ mode, period, generatedAt: new Date().toLocaleString("ar-EG"), summaries: reportSummaries, dailyRows, absenceRows, chartData: reportChartData });\n  };\n  const title = `;
 if (!oldExcel.test(source)) throw new Error("ManagerReports: Excel export anchor not found.");
 source = source.replace(oldExcel, newExcel);
+
+const oldPrint = '  const printReport = () => window.print();';
+const newPrint = '  const printReport = async () => { if (mode !== "daily") { window.print(); return; } const fresh = await refreshDailyReportSnapshot(); if (!fresh) return; window.requestAnimationFrame(() => window.print()); };';
+if (!source.includes(oldPrint)) throw new Error("ManagerReports: print anchor not found.");
+source = source.replace(oldPrint, newPrint);
 
 writeFileSync(file, source, "utf8");
 console.log("ManagerReports live patch: daily reports now refresh D1 snapshot at generation time.");
