@@ -4,10 +4,11 @@ const file = new URL("../src/pages/ManagerReports.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 
 const headerStart = source.indexOf('<div className="flex flex-col items-center gap-2">');
-const ownerStart = source.indexOf('<div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold">', headerStart);
+const reportBodyStart = source.indexOf('<div className="p-3 md:p-5 space-y-4">', headerStart);
 const newHeader = '<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-[3.1cm] w-[3.1cm] object-contain shrink-0" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام ليوم {days[dateOf(date).getDay()]} · {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div></div>';
 
 if (headerStart < 0) throw new Error("ManagerReports: report header start not found.");
+if (reportBodyStart < 0 || reportBodyStart <= headerStart) throw new Error("ManagerReports: report body anchor not found.");
 
 if (!source.includes('getBackendSettings')) {
   const importAnchor = 'import { getBackendAudit, getBackendEmployees, getBackendRequests } from "@/lib/backend";';
@@ -23,19 +24,7 @@ if (source.includes(settingsAnchor)) {
   throw new Error("ManagerReports: settings state anchor not found.");
 }
 
-if (source.includes('className="h-14 w-auto max-w-[180px] object-contain"')) {
-  source = source.replace(/<div className="flex flex-col items-center gap-2">[\s\S]*?<\/div>/, newHeader);
-} else if (source.includes('className="h-[3.1cm] w-[3.1cm] object-contain shrink-0"')) {
-  source = source.replace(/<div className="flex flex-col items-center gap-2">[\s\S]*?<\/div>/, newHeader);
-} else if (ownerStart >= 0) {
-  const ownerBlockEnd = source.indexOf('</div>', source.indexOf('</div>', source.indexOf('</div>', ownerStart) + 6) + 6);
-  if (ownerBlockEnd < 0) throw new Error("ManagerReports: legacy owner/assistant block boundary not found.");
-  source = source.slice(0, headerStart) + newHeader + source.slice(ownerBlockEnd + '</div>'.length);
-} else {
-  const headerEnd = source.indexOf('</div>', source.indexOf('</div>', source.indexOf('</div>', headerStart) + 6) + 6);
-  if (headerEnd < 0) throw new Error("ManagerReports: branding header boundary not found.");
-  source = source.slice(0, headerStart) + newHeader + source.slice(headerEnd + '</div>'.length);
-}
+source = source.slice(0, headerStart) + newHeader + '\n        ' + source.slice(reportBodyStart);
 
 source = source.replace(/<td className="p-2 border-l border-black\/20 font-bold break-words">\{row\.employee\.name\}<div className="font-normal text-\[10px\] mt-0\.5">\{row\.employee\.jobNumber\}<\/div><\/td>/, '<td className="p-2 border-l border-black/20 font-bold break-words">{row.employee.name}</td>');
 source = source.replace(/\.service-report img \{[^}]*\}/, '.service-report img { width: 31mm !important; height: 31mm !important; max-width: 31mm !important; max-height: 31mm !important; object-fit: contain !important; }');
