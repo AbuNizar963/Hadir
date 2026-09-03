@@ -153,11 +153,9 @@ jobs:
 
           python - <<'PY'
           import json
-          import os
           from pathlib import Path
 
           manifest = json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
-          expected = os.environ["GITHUB_SHA"]
           assert manifest.get("id") == "/", manifest
           assert manifest.get("start_url") == "/", manifest
           assert manifest.get("scope") == "/", manifest
@@ -166,21 +164,22 @@ jobs:
           icons = manifest.get("icons")
           assert isinstance(icons, list) and len(icons) >= 2, manifest
 
-          # The production Git/Pages build keeps the canonical SVG favicon.
-          # The Android APK has its own native launcher icon; do not require
-          # the CI-only rasterization step to be present in Pages output.
+          # The current PWA manifest intentionally uses the branded six-ray
+          # Hadir SVG as its canonical app icon. Android has its own native
+          # launcher icon; Pages does not need to rasterize it.
           icon_sources = [str(icon.get("src", "")) for icon in icons]
-          assert any("/favicon.svg" in src for src in icon_sources), manifest
+          assert all("/pwa-icon.svg" in src for src in icon_sources), manifest
           assert all(icon.get("type") == "image/svg+xml" for icon in icons), manifest
-          assert all(expected in src for src in icon_sources if "/favicon.svg" in src), manifest
-          print("Production PWA manifest verified with versioned Hadir SVG icons.")
+          purposes = [str(icon.get("purpose", "")) for icon in icons]
+          assert "any" in purposes and "maskable" in purposes, manifest
+          print("Production PWA manifest verified with the canonical Hadir SVG app icon.")
           PY
 
           curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
             -H 'Cache-Control: no-cache, no-store' \
-            "$PAGES_PRODUCTION_URL/favicon.svg?hadir_ci=$GITHUB_SHA" \
-            -o /tmp/favicon.svg
-          test -s /tmp/favicon.svg
+            "$PAGES_PRODUCTION_URL/pwa-icon.svg?hadir_ci=$GITHUB_SHA" \
+            -o /tmp/pwa-icon.svg
+          test -s /tmp/pwa-icon.svg
 
           curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
             -H 'Cache-Control: no-cache, no-store' \
