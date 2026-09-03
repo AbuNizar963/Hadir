@@ -1,4 +1,5 @@
 import base, { HadirRealtime } from "./device-rebind-gateway";
+import { generateDailyReportPdf } from "./report-pdf";
 
 type Env = {
   DB: D1Database;
@@ -8,6 +9,7 @@ type Env = {
   JWT_SECRET?: string;
   OWNER_RECOVERY_CODE?: string;
   PROFILE_IMAGES?: R2Bucket;
+  BROWSER?: BrowserRun;
 };
 
 type Actor = { id: string; name: string; role: "owner" | "manager" | "supervisor" | "staff" };
@@ -141,6 +143,11 @@ export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     const o = origin(req, env);
     const url = new URL(req.url);
+    if (url.pathname.replace(/\/$/, "") === "/api/reports/daily/pdf") {
+      const a = await actor(req, env);
+      if (!a) return json({ error: "غير مصرح" }, 401, o);
+      return generateDailyReportPdf(req, env, o);
+    }
     const match = url.pathname.match(/^\/api\/employees\/([^/]+)$/);
     if (match && req.method === "PATCH") {
       const a = await actor(req, env);
