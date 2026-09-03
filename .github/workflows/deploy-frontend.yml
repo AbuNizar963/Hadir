@@ -16,6 +16,7 @@ on:
       - "vite.config.*"
       - "scripts/build.mjs"
       - "scripts/patch-manager-report-header.mjs"
+      - "scripts/patch-manager-reports-live.mjs"
       - ".github/workflows/deploy-frontend.yml"
 
 permissions:
