@@ -3,12 +3,20 @@ import { readFileSync, writeFileSync } from "node:fs";
 const file = new URL("../src/pages/ManagerReports.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 
-const headerStart = source.indexOf('<div className="flex flex-col items-center gap-2">');
-const reportBodyStart = source.indexOf('<div className="p-3 md:p-5 space-y-4">', headerStart);
+const dailySectionStart = source.indexOf('<section className="service-report');
+const headerStart = dailySectionStart >= 0
+  ? source.indexOf('<div className="flex flex-col items-center gap-2">', dailySectionStart)
+  : -1;
+const ownerStart = headerStart >= 0
+  ? source.indexOf('<div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold">', headerStart)
+  : -1;
+const ownerEndMarker = ownerStart >= 0 ? '</div>\n      </div>' : "";
+const ownerEnd = ownerStart >= 0 ? source.indexOf(ownerEndMarker, ownerStart) : -1;
 const newHeader = '<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-[3.1cm] w-[3.1cm] object-contain shrink-0" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام ليوم {days[dateOf(date).getDay()]} · {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div></div>';
 
-if (headerStart < 0) throw new Error("ManagerReports: report header start not found.");
-if (reportBodyStart < 0 || reportBodyStart <= headerStart) throw new Error("ManagerReports: report body anchor not found.");
+if (dailySectionStart < 0) throw new Error("ManagerReports: daily report section anchor not found.");
+if (headerStart < 0) throw new Error("ManagerReports: daily report header start not found.");
+if (ownerStart < 0 || ownerEnd < 0) throw new Error("ManagerReports: owner header block anchor not found.");
 
 if (!source.includes('getBackendSettings')) {
   const importAnchor = 'import { getBackendAudit, getBackendEmployees, getBackendRequests } from "@/lib/backend";';
@@ -24,13 +32,15 @@ if (source.includes(settingsAnchor)) {
   throw new Error("ManagerReports: settings state anchor not found.");
 }
 
-source = source.slice(0, headerStart) + newHeader + '\n        ' + source.slice(reportBodyStart);
+source = source.slice(0, headerStart) + newHeader + '\n      ' + source.slice(ownerEnd + ownerEndMarker.length);
 
 source = source.replace(/<td className="p-2 border-l border-black\/20 font-bold break-words">\{row\.employee\.name\}<div className="font-normal text-\[10px\] mt-0\.5">\{row\.employee\.jobNumber\}<\/div><\/td>/, '<td className="p-2 border-l border-black/20 font-bold break-words">{row.employee.name}</td>');
 source = source.replace(/\.service-report img \{[^}]*\}/, '.service-report img { width: 31mm !important; height: 31mm !important; max-width: 31mm !important; max-height: 31mm !important; object-fit: contain !important; }');
 
 if (!source.includes('const [reportSettings, setReportSettings]')) throw new Error("ManagerReports: report settings hydration was not applied.");
 if (!source.includes('getBackendSettings')) throw new Error("ManagerReports: backend settings hydration import was not applied.");
+if (!source.includes('className="h-[3.1cm] w-[3.1cm]')) throw new Error("ManagerReports: 3.1cm logo markup was not applied.");
+if (!source.includes('row.employee.name}</td>')) throw new Error("ManagerReports: employee self number removal was not applied.");
 
 writeFileSync(file, source, "utf8");
 console.log("ManagerReports header patch: D1 settings hydrated on first mount; settings changes refresh report immediately; ordered specialties retained; company logo fixed at 3.1cm x 3.1cm; selected weekday/date applied; employee self number removed from daily report.");
