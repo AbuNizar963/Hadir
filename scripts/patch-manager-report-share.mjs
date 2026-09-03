@@ -28,30 +28,25 @@ if (!source.includes('const sharePdf = async')) {
 }
 
 const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf} data-hadir-share="true"><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : "مشاركة PDF"}</Button>';
-const printButton = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
-const dailyActions = `<>{printButton}${shareButton}</>`;
+const csvButton = '<Button variant="outline" onClick={exportCsv} disabled={!summaries.length}><FileText className="ml-2 h-4 w-4" />CSV</Button>';
+const dailyCsvReplacement = `{mode === "daily" ? ${shareButton} : ${csvButton}}`;
 
-// Match the exact existing daily print JSX anchor without crossing into another control.
-const dailyPrintConditional = '{mode === "daily" && <Button variant="outline" onClick={printReport} disabled={!summaries.length}><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>}';
-
-// Extract the actual rendered daily fragment. The closing sequence is exactly </>}.
-const getDailyFragment = () => source.match(/\{mode === "daily" && <>[\s\S]*?<\/\>\}/)?.[0] || "";
-let dailyFragment = getDailyFragment();
-const fragmentHasBothControls = dailyFragment.includes('data-hadir-share="true"') && dailyFragment.includes('onClick={sharePdf}') && dailyFragment.includes("مشاركة PDF") && dailyFragment.includes('data-hadir-print="true"') && dailyFragment.includes('onClick={printReport}') && dailyFragment.includes("طباعة الخدمة");
-
-if (!fragmentHasBothControls) {
-  if (!source.includes(dailyPrintConditional)) {
-    throw new Error("ManagerReports share patch: exact daily print JSX anchor not found; refusing unsafe replacement.");
+// Replace only the existing CSV action. Daily reports get PDF sharing in its place;
+// monthly and annual reports keep their existing CSV export unchanged.
+if (!source.includes(dailyCsvReplacement)) {
+  if (!source.includes(csvButton)) {
+    throw new Error("ManagerReports share patch: exact CSV JSX anchor not found; refusing unsafe replacement.");
   }
-  source = source.replace(dailyPrintConditional, `{mode === "daily" && ${dailyActions}}`);
+  source = source.replace(csvButton, dailyCsvReplacement);
 }
 
-dailyFragment = getDailyFragment();
+const getDailyFragment = () => source.match(/\{mode === "daily" && <>[\s\S]*?<\/\>\}/)?.[0] || "";
+const dailyFragment = getDailyFragment();
 const hasRenderedShareControl = dailyFragment.includes('data-hadir-share="true"') && dailyFragment.includes('onClick={sharePdf}') && dailyFragment.includes("مشاركة PDF");
-const hasRenderedPrintControl = dailyFragment.includes('data-hadir-print="true"') && dailyFragment.includes('onClick={printReport}') && dailyFragment.includes("طباعة الخدمة");
+const hasRenderedPrintControl = dailyFragment.includes('onClick={printReport}') && dailyFragment.includes("طباعة الخدمة");
 if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !hasRenderedShareControl || !hasRenderedPrintControl) {
   throw new Error(`ManagerReports share patch: PDF sharing and print buttons were not both applied completely (share=${hasRenderedShareControl}, print=${hasRenderedPrintControl}).`);
 }
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports share patch: daily report keeps print and PDF sharing side by side.");
+console.log("ManagerReports share patch: daily CSV replaced by PDF sharing; monthly and annual CSV preserved.");
