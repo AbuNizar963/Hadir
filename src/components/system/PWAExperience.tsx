@@ -160,7 +160,6 @@ export default function PWAExperience() {
       pendingBuildVersionRef.current = buildVersion;
 
       const swUrl = new URL("sw.js", baseUrl);
-      swUrl.searchParams.set("v", buildVersion);
       const registration = await navigator.serviceWorker.register(swUrl.toString(), { scope: baseUrl.pathname, updateViaCache: "none" });
 
       const applyWaitingWorker = (worker: ServiceWorker | null) => {
@@ -170,22 +169,6 @@ export default function PWAExperience() {
       };
 
       if (applyWaitingWorker(registration.waiting)) return;
-
-      const activeWorkerIsTarget = (worker: ServiceWorker | null) => {
-        if (!worker) return false;
-        try {
-          return new URL(worker.scriptURL).searchParams.get("v") === buildVersion;
-        } catch {
-          return worker.scriptURL.includes(`v=${encodeURIComponent(buildVersion)}`);
-        }
-      };
-
-      if (activeWorkerIsTarget(registration.active)) {
-        try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, buildVersion); } catch {}
-        setUpdating(false);
-        window.location.reload();
-        return;
-      }
 
       const installedWorkerPromise = new Promise<ServiceWorker | null>(resolve => {
         let settled = false;
@@ -221,13 +204,6 @@ export default function PWAExperience() {
       const installedWorker = await installedWorkerPromise;
       if (installedWorker) {
         installedWorker.postMessage({ type: "SKIP_WAITING" });
-        return;
-      }
-
-      if (activeWorkerIsTarget(registration.active)) {
-        try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, buildVersion); } catch {}
-        setUpdating(false);
-        window.location.reload();
         return;
       }
 
