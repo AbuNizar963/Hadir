@@ -5,8 +5,8 @@
  */
 
 @page {
-  size: A4 landscape;
-  margin: 5mm;
+  size: A4 portrait;
+  margin: 6mm;
 }
 
 @media print {
@@ -49,6 +49,8 @@
     contain: none !important;
     box-shadow: none !important;
     font-family: Cairo, Arial, sans-serif !important;
+    background: #fff !important;
+    color: #111827 !important;
   }
 
   .service-report > div:nth-child(2),
@@ -95,6 +97,13 @@
     font-family: Cairo, Arial, sans-serif !important;
   }
 
+  /* The live screen uses Tailwind's black border utility for contrast. For a
+     printed/exported business report use a neutral rule instead of a heavy
+     black frame. */
+  .service-report [class*="border-black"] {
+    border-color: #cbd5e1 !important;
+  }
+
   .service-report table {
     display: table !important;
     width: 100% !important;
@@ -104,8 +113,8 @@
     border-collapse: collapse !important;
     border-spacing: 0 !important;
     overflow: visible !important;
-    /* Let Chromium size each column from its content instead of giving a
-       one-character serial/status cell an unnecessarily large fixed box. */
+    /* Let Chromium size columns from their content rather than distributing
+       a large fixed width to a one-character serial/status cell. */
     table-layout: auto !important;
     direction: rtl !important;
     break-before: auto !important;
@@ -116,12 +125,16 @@
     page-break-inside: auto !important;
   }
 
+  .service-report col:first-child {
+    width: auto !important;
+  }
+
   .service-report thead {
-    display: table-header-group !important;
+    display: table-header-group;
   }
 
   .service-report tbody {
-    display: table-row-group !important;
+    display: table-row-group;
   }
 
   .service-report tr {
@@ -133,7 +146,7 @@
 
   .service-report th,
   .service-report td {
-    padding: 1.2mm 1.25mm !important;
+    padding: 1.15mm 1.2mm !important;
     line-height: 1.25 !important;
     vertical-align: middle !important;
     text-align: center !important;
@@ -147,48 +160,53 @@
     font-size: 16px !important;
     font-weight: 800 !important;
     white-space: nowrap !important;
+    color: #334155 !important;
   }
 
-  /* Compact columns whose values do not need a wide box. Longer text columns
-     remain flexible and wrap naturally to keep the whole table in the page. */
+  /* Serial numbers should occupy only the space they need. The remaining
+     width goes to names, specialties and notes where it improves legibility. */
   .service-report th:first-child,
   .service-report td:first-child {
-    width: 1% !important;
-    min-width: 10mm !important;
+    width: 8mm !important;
+    min-width: 8mm !important;
+    max-width: 8mm !important;
     white-space: nowrap !important;
   }
 
+  /* Time/status fragments are compact, while the notes cell remains flexible
+     so its text can use the available A4 width. */
   .service-report td:nth-child(4),
-  .service-report td:nth-child(5),
-  .service-report td:nth-child(6),
-  .service-report th:nth-child(4),
-  .service-report th:nth-child(5),
-  .service-report th:nth-child(6) {
-    white-space: nowrap !important;
+  .service-report th:nth-child(4) {
+    white-space: normal !important;
   }
 
   .service-report > div:first-child {
-    padding: 2mm 0 !important;
+    padding: 2mm 0 3mm !important;
     margin: 0 0 2mm !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
     text-align: center !important;
+    border-bottom: 1px solid #cbd5e1 !important;
   }
 
   .service-report > div:first-child h1 {
-    font-size: 16px !important;
-    line-height: 1.25 !important;
+    font-size: 20px !important;
+    line-height: 1.3 !important;
     text-align: center !important;
+    color: #111827 !important;
   }
 
   .service-report > div:first-child img {
-    max-height: 13mm !important;
-    max-width: 42mm !important;
+    width: 31mm !important;
+    height: 31mm !important;
+    max-height: 31mm !important;
+    max-width: 31mm !important;
+    object-fit: contain !important;
   }
 
   .service-report img {
-    max-height: 13mm !important;
-    max-width: 42mm !important;
+    max-height: 31mm !important;
+    max-width: 31mm !important;
     width: auto !important;
     height: auto !important;
     object-fit: contain !important;
@@ -209,9 +227,8 @@
     page-break-inside: avoid !important;
   }
 
-  /* Keep each status colour in the PDF. The old generic .rounded-full rule
-     forced every status pill to black, which destroyed the report's visual
-     status legend and made the PDF hard to scan on a phone. */
+  /* Keep each status colour in the PDF. The generic rounded pill must not
+     turn every status into the same colour. */
   .service-report .rounded-full {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
