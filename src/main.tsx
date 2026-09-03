@@ -45,7 +45,18 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
       // itself contains the exact build fingerprint, and updateViaCache:none
       // forces the browser to revalidate that script instead of relying on a
       // cached worker response.
-      const registration = await navigator.serviceWorker.register(swUrl.toString(), { scope, updateViaCache: "none" });
+      let registration: ServiceWorkerRegistration;
+      try {
+        registration = await navigator.serviceWorker.register(swUrl.toString(), { scope, updateViaCache: "none" });
+      } catch (error) {
+        // Recover from a previously registered, invalid Service Worker without
+        // touching localStorage, IndexedDB, cookies, or the authenticated session.
+        const existing = await navigator.serviceWorker.getRegistration(scope).catch(() => undefined);
+        if (!existing) throw error;
+        const removed = await existing.unregister();
+        if (!removed) throw error;
+        registration = await navigator.serviceWorker.register(swUrl.toString(), { scope, updateViaCache: "none" });
+      }
       const notifyUpdateAvailable = () => {
         window.dispatchEvent(new CustomEvent("hadir:sw-update-available"));
       };
