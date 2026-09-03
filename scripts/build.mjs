@@ -10,8 +10,6 @@ function run(command, args) {
   return true;
 }
 
-// Cloudflare Pages can be configured to skip its automatic dependency install.
-// Keep the build self-sufficient without reinstalling when dependencies already exist.
 if (!existsSync(vitePackage)) {
   const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
   if (bun.status === 0 && !bun.error) {
@@ -21,15 +19,10 @@ if (!existsSync(vitePackage)) {
   }
 }
 
-// Repair the generated report patch before it is executed. This keeps the
-// historical patch chain buildable without changing attendance data.
 run("node", ["scripts/repair-manager-report-patch.mjs"]);
 run("node", ["scripts/patch-manager-reports-final.mjs"]);
 run("node", ["scripts/patch-manager-reports-final2.mjs"]);
-// Apply the production-time daily report snapshot fix after the historical
-// report patches, so report generation always reads the latest D1 state.
 run("node", ["scripts/patch-manager-reports-live.mjs"]);
-// Keep the report header focused on company branding and the selected day.
 run("node", ["scripts/patch-manager-report-header.mjs"]);
 
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -46,12 +39,20 @@ if (bun.status === 0 && !bun.error) {
   run("npm", ["run", "build"]);
 }
 
-// Version the project favicon and manifest URLs in the emitted production files
-// using the exact build commit. The source files remain unchanged, so there is
-// still one source of truth for the icon. Versioning the manifest URL itself is
-// important for installed PWAs: it gives the browser a new manifest resource
-// identity on every deployment, while the manifest's stable `id` keeps the
-// installation attached to the same app.
+// Production invariant: the generated report bundle must contain the new
+// company-branded daily header and must not contain the legacy owner/assistant
+// labels. This prevents a stale/incorrect build from being deployed silently.
+const scan = spawnSync("grep", ["-RIl", "خدمة الدوام ليوم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+if (scan.status !== 0 || !scan.stdout?.trim()) {
+  throw new Error("Production build validation failed: branded daily report header was not found in dist.");
+}
+const legacy = spawnSync("grep", ["-RIl", "رئيس القسم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+const legacyAssistant = spawnSync("grep", ["-RIl", "معاون رئيس القسم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+if (legacy.status === 0 || legacyAssistant.status === 0) {
+  throw new Error("Production build validation failed: legacy department owner/assistant header is still present in dist.");
+}
+console.log("Production report header verified: company logo/name + selected weekday/date; legacy owner/assistant header absent.");
+
 const faviconVersion = encodeURIComponent(commitSha);
 const emittedFiles = ["index.html", "manifest.webmanifest", "sw.js"];
 for (const fileName of emittedFiles) {
@@ -67,9 +68,6 @@ for (const fileName of emittedFiles) {
   }
 }
 
-// Vite copies public/sw.js verbatim. Inject the exact build commit into the
-// emitted worker so every production deployment produces a genuinely new
-// Service Worker, even when only application source files changed.
 const serviceWorkerUrl = new URL("../dist/sw.js", import.meta.url);
 if (existsSync(serviceWorkerUrl)) {
   const serviceWorker = readFileSync(serviceWorkerUrl, "utf8");
@@ -82,9 +80,6 @@ if (existsSync(serviceWorkerUrl)) {
   }
 }
 
-// Emit a deployment fingerprint from the actual commit used by the builder.
-// Cloudflare Pages exposes CF_PAGES_COMMIT_SHA for Git-integrated builds;
-// GitHub Actions exposes GITHUB_SHA for its own verification build.
 mkdirSync(new URL("../dist/", import.meta.url), { recursive: true });
 writeFileSync(
   new URL("../dist/build-version.json", import.meta.url),
