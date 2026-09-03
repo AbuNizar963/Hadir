@@ -41,6 +41,25 @@ if (bun.status === 0 && !bun.error) {
   run("npm", ["run", "build"]);
 }
 
+// Version the project favicon URL in the emitted production files using the
+// exact build commit. The file itself remains public/favicon.svg, so there is
+// still one source of truth; only its URL changes between deployments. This
+// gives browsers and installed PWAs a fresh icon resource whenever the build
+// changes, avoiding stale launcher/service-worker icon URLs.
+const faviconVersion = encodeURIComponent(commitSha);
+const emittedFiles = ["index.html", "manifest.webmanifest", "sw.js"];
+for (const fileName of emittedFiles) {
+  const fileUrl = new URL(`../dist/${fileName}`, import.meta.url);
+  if (!existsSync(fileUrl)) continue;
+  const content = readFileSync(fileUrl, "utf8");
+  const versioned = content
+    .replaceAll("./favicon.svg", `./favicon.svg?v=${faviconVersion}`)
+    .replaceAll("/favicon.svg", `/favicon.svg?v=${faviconVersion}`);
+  if (versioned !== content) {
+    writeFileSync(fileUrl, versioned, "utf8");
+  }
+}
+
 // Vite copies public/sw.js verbatim. Inject the exact build commit into the
 // emitted worker so every production deployment produces a genuinely new
 // Service Worker, even when only application source files changed.
