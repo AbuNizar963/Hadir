@@ -1,5 +1,6 @@
 name: Deploy Hadir Frontend
 
+# Production deployment trigger: keep frontend deploy verification active for every main release.
 on:
   workflow_dispatch:
   push:
