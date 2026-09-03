@@ -4,7 +4,8 @@ const BASE=new URL("./",self.registration.scope).pathname;
 const APP_SHELL=[
   new URL("./",self.registration.scope).href,
   new URL("./manifest.webmanifest",self.registration.scope).href,
-  new URL("./favicon.svg",self.registration.scope).href
+  new URL("./favicon.svg",self.registration.scope).href,
+  new URL("./pwa-icon.svg",self.registration.scope).href
 ];
 
 self.addEventListener("install",event=>{

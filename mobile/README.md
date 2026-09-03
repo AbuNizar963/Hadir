@@ -1,18 +1,40 @@
-# Hadir mobile roadmap
+# Hadir Android
 
-The web app is prepared as a PWA and keeps business logic in shared TypeScript modules. The recommended future native shell is Capacitor so the same React application can target Android and iOS without duplicating attendance logic.
+Hadir remains a web-first PWA. The Android package in `mobile/android` is a separate Trusted Web Activity (TWA) shell, so the existing React frontend, Worker API, D1 database, authentication, notifications, Gemini integration, and service worker remain unchanged.
 
-## Native preparation
-- Keep authentication, attendance, schedules, workforce APIs and realtime in `src/lib` and Worker APIs.
-- Keep camera/QR, geolocation, notifications and secure storage behind small adapters so Capacitor plugins can replace browser APIs later.
-- Do not put secrets in the mobile bundle; use the Worker as the trusted API boundary.
-- Required native capabilities: camera, precise location, notifications, secure storage, background sync (where platform policy permits), and deep links.
+## Why this exists
 
-## Integration preparation
-The frontend exposes a provider-neutral integration event contract in `src/lib/integrations.ts`. Webhook consumers can be connected to n8n, Make, Zapier, Power Automate, custom systems, or a GitHub Actions bridge without coupling attendance code to a vendor.
+Chrome-generated WebAPKs are controlled by Chrome's Android WebAPK runtime. The Android package in this directory is built as a real Android application instead, with an explicit `targetSdk 36` for Android 16. This avoids tying Hadir's distributable APK to Chrome's WebAPK target SDK.
 
-## Suggested native commands when the project adopts Capacitor
-`npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios`
-then `npx cap init`, `npx cap add android`, `npx cap add ios`, and `npx cap sync`.
+## Architecture
 
-The repository intentionally does not add native binaries yet; this keeps the current web deployment stable while making the migration path explicit.
+- **Web application:** existing Vite/React PWA; no business logic is duplicated.
+- **Android shell:** Trusted Web Activity backed by `android-browser-helper`.
+- **Production origin:** `https://hadir-9rq.pages.dev/`.
+- **Android package ID:** `com.hadir.attendance`.
+- **Minimum Android:** API 23.
+- **Target Android:** API 36.
+
+## Build
+
+The workflow `.github/workflows/build-android-twa.yml` is manual by design. It does not run as part of the existing frontend/API deployment workflows and therefore cannot change the current web deployment accidentally.
+
+The workflow:
+
+1. Installs Android 16 SDK / Build Tools.
+2. Builds the native TWA shell.
+3. Signs the APK with a temporary CI key for validation/testing.
+4. Verifies the resulting APK has `targetSdkVersion=36`.
+5. Publishes the installable APK as a GitHub Actions artifact.
+
+The temporary CI signing key is intentionally not suitable for production updates. Before public distribution or Play Store publishing, use a permanent signing key stored in GitHub Secrets and publish its SHA-256 certificate fingerprint in the production Digital Asset Links file.
+
+## Digital Asset Links
+
+A production TWA should expose `/.well-known/assetlinks.json` from the same HTTPS origin. The file must contain the final Android package ID and the SHA-256 fingerprint of the certificate that signs the distributed application. Do not commit a private signing key or private key password.
+
+Until the permanent signing fingerprint is configured on the production domain, the native APK can still be used for target-SDK validation, but TWA domain verification may fall back from the trusted fullscreen experience.
+
+## Important
+
+Do not replace the existing PWA with this Android shell. The shell is an additional distribution channel. The current web application and its deployment remain the source of truth for Hadir's application behavior.
