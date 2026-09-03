@@ -22,6 +22,15 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source_ref }}
+          fetch-depth: 1
+
+      - name: Verify Android project files
+        shell: bash
+        run: |
+          test -f mobile/android/settings.gradle || { echo "Missing mobile/android/settings.gradle"; exit 1; }
+          test -f mobile/android/build.gradle || { echo "Missing mobile/android/build.gradle"; exit 1; }
+          test -f mobile/android/app/build.gradle || { echo "Missing mobile/android/app/build.gradle"; exit 1; }
+          echo "Android TWA source is present at commit $(git rev-parse HEAD)"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -58,11 +67,22 @@ jobs:
           echo "Using apksigner: $APKSIGNER"
           "$APKSIGNER" --version
 
-      - name: Set up Gradle 8.11.1
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: '8.11.1'
-          cache-disabled: true
+      - name: Install Gradle 8.11.1
+        shell: bash
+        run: |
+          GRADLE_VERSION="8.11.1"
+          GRADLE_HOME="$RUNNER_TEMP/gradle-$GRADLE_VERSION"
+          GRADLE_ZIP="$RUNNER_TEMP/gradle-$GRADLE_VERSION-bin.zip"
+          curl --fail --silent --show-error --location \
+            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+            --output "$GRADLE_ZIP"
+          rm -rf "$GRADLE_HOME"
+          mkdir -p "$GRADLE_HOME"
+          unzip -q "$GRADLE_ZIP" -d "$RUNNER_TEMP"
+          test -x "$RUNNER_TEMP/gradle-${GRADLE_VERSION}/bin/gradle"
+          echo "GRADLE_HOME=$RUNNER_TEMP/gradle-${GRADLE_VERSION}" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/gradle-${GRADLE_VERSION}/bin/gradle" --version
 
       - name: Validate production signing configuration
         shell: bash
