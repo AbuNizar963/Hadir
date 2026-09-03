@@ -144,6 +144,13 @@ export default {
     const o = origin(req, env);
     const url = new URL(req.url);
     if (url.pathname.replace(/\/$/, "") === "/api/reports/daily/pdf") {
+      if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: {
+        "access-control-allow-origin": o,
+        "access-control-allow-credentials": "true",
+        "access-control-allow-headers": "content-type, authorization, x-device-id",
+        "access-control-allow-methods": "POST,OPTIONS",
+        "cache-control": "no-store",
+      }});
       const a = await actor(req, env);
       if (!a) return json({ error: "غير مصرح" }, 401, o);
       return generateDailyReportPdf(req, env, o);
