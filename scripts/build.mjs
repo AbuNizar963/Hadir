@@ -11,7 +11,7 @@ function run(command, args) {
 }
 
 if (!existsSync(vitePackage)) {
-  const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
+  const bun = spawnSync("bun", ["--version"], { stdio: "ignore" });
   if (bun.status === 0 && !bun.error) {
     run("bun", ["install", "--frozen-lockfile"]);
   } else {
@@ -42,15 +42,12 @@ if (bun.status === 0 && !bun.error) {
 }
 
 // Production invariants: the generated report bundle must contain the branded
-// daily report and the direct PDF-share action. This prevents a stale or
-// partially patched report UI from being deployed silently.
+// daily report and the direct PDF-share implementation. Validate stable code
+// markers because localized UI text may be minified/encoded by Vite/Rollup.
 const scan = spawnSync("grep", ["-RIl", "خدمة الدوام ليوم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (scan.status !== 0 || !scan.stdout?.trim()) {
   throw new Error("Production build validation failed: branded daily report header was not found in dist.");
 }
-// Vite/Rollup may encode or minify localized UI strings in the emitted bundle.
-// Validate the actual share implementation through stable code markers instead
-// of requiring the Arabic button label to survive minification verbatim.
 const shareMarkers = ["navigator.share", "html2canvas", "sharingPdf"];
 const shareScan = spawnSync("grep", ["-RIlE", shareMarkers.join("|"), "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (shareScan.status !== 0 || !shareScan.stdout?.trim()) {
@@ -91,4 +88,8 @@ if (existsSync(serviceWorkerUrl)) {
 }
 
 mkdirSync(new URL("../dist/", import.meta.url), { recursive: true });
-writeFileSync("
+writeFileSync(
+  new URL("../dist/build-version.json", import.meta.url),
+  `${JSON.stringify({ commitSha, branch, deploymentUrl }, null, 2)}\n`,
+  "utf8",
+);
