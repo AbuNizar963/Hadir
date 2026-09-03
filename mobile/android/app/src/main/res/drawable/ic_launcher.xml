@@ -5,6 +5,12 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
+        android:fillColor="#0B0F14"
+        android:strokeColor="#22C58A"
+        android:strokeAlpha="0.35"
+        android:strokeWidth="1.2"
+        android:pathData="M28,8h52a20,20 0,0 1,20 20v52a20,20 0,0 1,-20 20h-52a20,20 0,0 1,-20 -20v-52a20,20 0,0 1,20 -20z" />
+    <path
         android:fillColor="#00000000"
         android:strokeColor="#22C58A"
         android:strokeWidth="2.4"
