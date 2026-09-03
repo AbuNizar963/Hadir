@@ -40,19 +40,23 @@ if (bun.status === 0 && !bun.error) {
   run("npm", ["run", "build"]);
 }
 
-// Production invariant: the generated report bundle must contain the new
-// company-branded daily header and must not contain the legacy owner/assistant
-// labels. This prevents a stale/incorrect build from being deployed silently.
+// Production invariants: the generated report bundle must contain the branded
+// daily report and the direct PDF-share action. This prevents a stale or
+// partially patched report UI from being deployed silently.
 const scan = spawnSync("grep", ["-RIl", "خدمة الدوام ليوم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (scan.status !== 0 || !scan.stdout?.trim()) {
   throw new Error("Production build validation failed: branded daily report header was not found in dist.");
+}
+const shareScan = spawnSync("grep", ["-RIl", "مشاركة PDF", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+if (shareScan.status !== 0 || !shareScan.stdout?.trim()) {
+  throw new Error("Production build validation failed: direct daily PDF sharing action was not found in dist.");
 }
 const legacy = spawnSync("grep", ["-RIl", "رئيس القسم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const legacyAssistant = spawnSync("grep", ["-RIl", "معاون رئيس القسم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 if (legacy.status === 0 || legacyAssistant.status === 0) {
   throw new Error("Production build validation failed: legacy department owner/assistant header is still present in dist.");
 }
-console.log("Production report header verified: company logo/name + selected weekday/date; legacy owner/assistant header absent.");
+console.log("Production report header and direct PDF sharing verified; legacy owner/assistant header absent.");
 
 const faviconVersion = encodeURIComponent(commitSha);
 const emittedFiles = ["index.html", "manifest.webmanifest", "sw.js"];
