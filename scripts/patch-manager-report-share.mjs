@@ -31,28 +31,25 @@ const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!sum
 const printButton = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
 const dailyActions = `<>{printButton}${shareButton}</>`;
 
-// Earlier report patches can change whitespace or add attributes to the print
-// button. Match its semantic JSX instead of one exact attribute ordering.
-const printButtonPattern = /<Button\b[^>]*onClick=\{printReport\}[^>]*>[\s\S]*?<Printer\b[^>]*\/>\s*طباعة الخدمة\s*<\/Button>/;
-const shareButtonPattern = /<Button\b[^>]*onClick=\{sharePdf\}[^>]*>[\s\S]*?<Share2\b[^>]*\/>[\s\S]*?مشاركة PDF[\s\S]*?<\/Button>/;
+// Only match the real rendered daily conditional. Starting at the JSX
+// condition prevents the pattern from matching the helper strings above.
+const dailyPrintConditional = /\{mode === "daily" && <Button\b[\s\S]*?onClick=\{printReport\}[\s\S]*?<Printer\b[^>]*\/>\s*طباعة الخدمة\s*<\/Button>\}/;
+const dailyShareConditional = /\{mode === "daily" && <Button\b[\s\S]*?onClick=\{sharePdf\}[\s\S]*?<Share2\b[^>]*\/>[\s\S]*?مشاركة PDF[\s\S]*?<\/Button>\}/;
 
-if (!shareButtonPattern.test(source)) {
-  if (source.includes('data-hadir-print="true"')) {
-    // The patch is being re-run on an already modified source; append share
-    // beside the existing marked print control without duplicating print.
-    source = source.replace(/(<Button\b[^>]*data-hadir-print="true"[^>]*>[\s\S]*?<\/Button>)/, `$1${shareButton}`);
-  } else if (printButtonPattern.test(source)) {
-    source = source.replace(printButtonPattern, dailyActions);
-  } else {
-    throw new Error("ManagerReports share patch: daily print action anchor not found; refusing unsafe replacement.");
-  }
+if (dailyShareConditional.test(source)) {
+  // Already correct: do not duplicate either control.
+} else if (dailyPrintConditional.test(source)) {
+  source = source.replace(dailyPrintConditional, `{mode === "daily" && ${dailyActions}}`);
+} else {
+  throw new Error("ManagerReports share patch: actual daily print JSX anchor not found; refusing unsafe replacement.");
 }
 
-const hasRenderedShareControl = source.includes('onClick={sharePdf}') && source.includes('<Share2') && source.includes('data-hadir-share="true"') && source.includes('مشاركة PDF');
-const hasRenderedPrintControl = source.includes('onClick={printReport}') && source.includes('<Printer') && source.includes('data-hadir-print="true"') && source.includes('طباعة الخدمة');
+const renderedActions = source.match(/actions=\{<div className="flex flex-wrap gap-2">[\s\S]*?<\/div>\}/)?.[0] || "";
+const hasRenderedShareControl = dailyShareConditional.test(source) && renderedActions.includes('data-hadir-share="true"');
+const hasRenderedPrintControl = renderedActions.includes('data-hadir-print="true"') && renderedActions.includes('onClick={printReport}') && renderedActions.includes('طباعة الخدمة');
 if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !hasRenderedShareControl || !hasRenderedPrintControl) {
   throw new Error(`ManagerReports share patch: PDF sharing and print buttons were not both applied completely (share=${hasRenderedShareControl}, print=${hasRenderedPrintControl}).`);
 }
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports share patch: daily report keeps print and injects PDF sharing beside it.");
+console.log("ManagerReports share patch: daily report keeps print and PDF sharing side by side.");
