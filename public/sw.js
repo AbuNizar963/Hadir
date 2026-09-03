@@ -7,12 +7,14 @@ const APP_SHELL=[
   new URL("./favicon.svg?v=2",self.registration.scope).href
 ];
 
-self.addEventListener("install",event=>event.waitUntil(
-  caches.open(CACHE)
-    .then(cache=>Promise.all(APP_SHELL.map(url=>cache.add(url).catch(()=>undefined))))
-    .then(()=>self.clients.matchAll({type:"window",includeUncontrolled:true}))
-    .then(clients=>clients.forEach(client=>client.postMessage({type:"HADIR_SW_UPDATE_AVAILABLE"})))
-));
+self.addEventListener("install",event=>{
+  event.waitUntil((async()=>{
+    const cache=await caches.open(CACHE);
+    await Promise.all(APP_SHELL.map(url=>cache.add(url).catch(()=>undefined)));
+    const clients=await self.clients.matchAll({type:"window",includeUncontrolled:true});
+    clients.forEach(client=>client.postMessage({type:"HADIR_SW_UPDATE_AVAILABLE"}));
+  })());
+});
 
 self.addEventListener("activate",event=>event.waitUntil(
   caches.keys()
