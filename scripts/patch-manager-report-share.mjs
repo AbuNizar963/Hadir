@@ -31,14 +31,11 @@ const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!sum
 const printButton = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
 const dailyActions = `<>{printButton}${shareButton}</>`;
 
-// Only match the real rendered daily conditional. Keep the print match inside
-// a single Button so a later share button cannot make the print check succeed.
+// Match only the actual daily print conditional and never cross a Button boundary.
 const dailyPrintConditional = /\{mode === "daily" && <Button\b(?:(?!<\/Button>\})[\s\S])*?onClick=\{printReport\}[\s\S]*?<Printer\b[^>]*\/>\s*طباعة الخدمة\s*<\/Button>\}/;
 
-// Validate the controls only inside the actual daily JSX fragment. Do not
-// scan helper strings above, and do not let one sibling button satisfy the
-// other button's validation.
-const getDailyFragment = () => source.match(/\{mode === "daily" && <>[\s\S]*?<\/\>}\}/)?.[0] || "";
+// Extract the actual rendered daily fragment. The closing sequence is exactly </>}.
+const getDailyFragment = () => source.match(/\{mode === "daily" && <>[\s\S]*?<\/>\}/)?.[0] || "";
 let dailyFragment = getDailyFragment();
 const fragmentHasBothControls = dailyFragment.includes('data-hadir-share="true"') && dailyFragment.includes('onClick={sharePdf}') && dailyFragment.includes("مشاركة PDF") && dailyFragment.includes('data-hadir-print="true"') && dailyFragment.includes('onClick={printReport}') && dailyFragment.includes("طباعة الخدمة");
 
