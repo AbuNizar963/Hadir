@@ -39,7 +39,7 @@ if (!source.includes(dailyCsvReplacement)) {
 
 const hasRenderedShareControl = source.includes('data-hadir-share="true"') && source.includes('onClick={sharePdf}') && source.includes("مشاركة PDF الآن") && source.includes('mode === "daily" ?');
 const hasRenderedPrintControl = source.includes('onClick={printReport}') && source.includes("طباعة الخدمة");
-if (!source.includes('from "@/lib/professionalPdf"') || !source.includes('const sharePdf = async') || !source.includes('readyPdf') || !source.includes('sharingPdf') || !source.includes('data:image/png') || !source.includes('/api/company/logo') || !source.includes('تفقد الحضور والغياب ليوم') || !hasRenderedShareControl || !hasRenderedPrintControl) {
+if (!source.includes('from "@/lib/professionalPdf"') || !source.includes('const sharePdf = async') || !source.includes('readyPdf') || !source.includes('sharingPdf') || !source.includes('canvas.toDataURL("image/png")') || !source.includes('/api/company/logo') || !source.includes('تفقد الحضور والغياب ليوم') || !hasRenderedShareControl || !hasRenderedPrintControl) {
   throw new Error(`ManagerReports share patch: PDF sharing, PNG embedded logo, filename and print buttons were not all applied completely (share=${hasRenderedShareControl}, print=${hasRenderedPrintControl}).`);
 }
 
