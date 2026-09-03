@@ -41,24 +41,10 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
       const swUrl = new URL("sw.js", baseUrl);
       const scope = baseUrl.pathname;
 
-      // Tie the Service Worker script URL to the deployed build fingerprint.
-      // This gives the browser a new script URL for every deployment and
-      // avoids reusing an older CDN/browser-cached worker script.
-      try {
-        const versionUrl = new URL("build-version.json", baseUrl);
-        versionUrl.searchParams.set("check", String(Date.now()));
-        const response = await fetch(versionUrl.toString(), { cache: "no-store", credentials: "same-origin" });
-        if (response.ok) {
-          const data = await response.json().catch(() => null) as { commitSha?: unknown } | null;
-          if (typeof data?.commitSha === "string" && data.commitSha.trim()) {
-            swUrl.searchParams.set("v", data.commitSha.trim());
-          }
-        }
-      } catch {
-        // Registration continues with the stable worker URL if the fingerprint
-        // cannot be read. A failed fingerprint request must never block the app.
-      }
-
+      // Keep the Service Worker at its canonical URL. The deployed worker
+      // itself contains the exact build fingerprint, and updateViaCache:none
+      // forces the browser to revalidate that script instead of relying on a
+      // cached worker response.
       const registration = await navigator.serviceWorker.register(swUrl.toString(), { scope, updateViaCache: "none" });
       const notifyUpdateAvailable = () => {
         window.dispatchEvent(new CustomEvent("hadir:sw-update-available"));
