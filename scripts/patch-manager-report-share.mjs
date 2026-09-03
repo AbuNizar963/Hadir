@@ -30,19 +30,28 @@ if (!source.includes('const sharePdf = async')) {
 const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf}><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : "مشاركة PDF"}</Button>';
 const printButton = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
 
-// Normalize the daily action area in one place. This deliberately does not
-// replace the print action with the PDF action: both controls are required.
-const dailyActionsPattern = /\{mode === "daily" && <Button variant="outline" onClick=\{printReport\} disabled=\{!summaries\.length\}(?:[^>]*)><Printer className="ml-2 h-4 w-4" \/>طباعة الخدمة<\/Button>\}/;
-if (dailyActionsPattern.test(source)) {
-  source = source.replace(dailyActionsPattern, `{mode === "daily" && <>{printButton}${shareButton}</>}`);
-} else if (!source.includes("مشاركة PDF") || !source.includes('data-hadir-print="true"')) {
-  // Handle a previous partially-applied share patch, but only when the two
-  // known controls are present together; never silently remove print.
-  const printOnlyPattern = /<Button variant="outline" onClick=\{printReport\} disabled=\{!summaries\.length\}(?:[^>]*)><Printer className="ml-2 h-4 w-4" \/>طباعة الخدمة<\/Button>/;
-  if (printOnlyPattern.test(source)) {
-    source = source.replace(printOnlyPattern, `${printButton}${shareButton}`);
-  } else {
+// The print button can be changed by earlier report patches, so match it by
+// semantic props/text rather than by one exact formatting shape. Never replace
+// the print control with the share control; the two controls must coexist.
+const printButtonPattern = /<Button\b(?=[^>]*onClick=\{printReport\})(?=[^>]*disabled=\{!summaries\.length\})[^>]*>\s*<Printer\b[^>]*\/>\s*طباعة الخدمة\s*<\/Button>/s;
+const hasShareButton = source.includes("مشاركة PDF");
+const hasPrintMarker = source.includes('data-hadir-print="true"');
+
+if (!hasShareButton) {
+  if (!printButtonPattern.test(source)) {
     throw new Error("ManagerReports share patch: daily print action anchor not found; refusing to replace or remove the print button.");
+  }
+  source = source.replace(printButtonPattern, printButton + shareButton);
+} else if (!hasPrintMarker) {
+  // If a previous partial build already injected sharing, add/mark print next
+  // to it without removing the sharing action.
+  const sharePattern = /<Button\b(?=[^>]*onClick=\{sharePdf\})[^>]*>\s*<Share2\b[^>]*\/>\s*(?:\{sharingPdf \? "جاري تجهيز PDF…" : )?"?مشاركة PDF"?\s*<\/Button>/s;
+  if (printButtonPattern.test(source)) {
+    source = source.replace(printButtonPattern, printButton);
+  } else if (sharePattern.test(source)) {
+    source = source.replace(sharePattern, printButton + shareButton);
+  } else {
+    throw new Error("ManagerReports share patch: existing PDF share found but print action anchor is missing; refusing unsafe replacement.");
   }
 }
 
