@@ -23,10 +23,20 @@ const newExcel = `  const exportExcel = async () => {\n    let reportSummaries =
 if (!oldExcel.test(source)) throw new Error("ManagerReports: Excel export anchor not found.");
 source = source.replace(oldExcel, newExcel);
 
+const attendancePriorityDetails = '    if (dailyStatus && serverStatus) st = serverStatus === "late" && !cout ? "open" : serverStatus;';
+const attendancePriorityDetailsReplacement = '    if (dailyStatus && serverStatus && !cin) st = serverStatus;';
+if (!source.includes(attendancePriorityDetails)) throw new Error("ManagerReports: daily status priority anchor not found.");
+source = source.replace(attendancePriorityDetails, attendancePriorityDetailsReplacement);
+
+const attendancePrioritySummary = '    if (serverStatus === "not_started") continue;\n    if (serverStatus === "off") { off++; continue; }\n    if (serverStatus === "leave") { leave++; continue; }\n    if (serverStatus === "permission") { permission++; continue; }\n    if (serverStatus === "absent") { absent++; continue; }';
+const attendancePrioritySummaryReplacement = '    if (serverStatus === "not_started" && !cin) continue;\n    if (serverStatus === "off" && !cin) { off++; continue; }\n    if (serverStatus === "leave" && !cin) { leave++; continue; }\n    if (serverStatus === "permission" && !cin) { permission++; continue; }\n    if (serverStatus === "absent" && !cin) { absent++; continue; }';
+if (!source.includes(attendancePrioritySummary)) throw new Error("ManagerReports: summary status priority anchor not found.");
+source = source.replace(attendancePrioritySummary, attendancePrioritySummaryReplacement);
+
 const oldPrint = '  const printReport = () => window.print();';
 const newPrint = '  const printReport = async () => { if (mode !== "daily") { window.print(); return; } const fresh = await refreshDailyReportSnapshot(); if (!fresh) return; window.requestAnimationFrame(() => window.print()); };';
 if (!source.includes(oldPrint)) throw new Error("ManagerReports: print anchor not found.");
 source = source.replace(oldPrint, newPrint);
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports live patch: daily reports now refresh D1 snapshot at generation time.");
+console.log("ManagerReports live patch: daily reports now refresh D1 snapshot at generation time and checked-in employees always take attendance precedence.");
