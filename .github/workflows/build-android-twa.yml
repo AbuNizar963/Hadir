@@ -2,6 +2,9 @@ name: Build Hadir Android TWA
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/android-webapk-warning
 
 permissions:
   contents: read
