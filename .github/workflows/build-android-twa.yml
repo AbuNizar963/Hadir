@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - fix/android-webapk-warning
+      - fix/android-webapp-warning
 
 permissions:
   contents: read
@@ -34,6 +34,24 @@ jobs:
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Locate Android signing tools
+        shell: bash
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$SDK_ROOT" || { echo "Android SDK root is not set"; exit 1; }
+          test -d "$SDK_ROOT" || { echo "Android SDK root does not exist: $SDK_ROOT"; exit 1; }
+
+          APKSIGNER="$SDK_ROOT/build-tools/36.0.0/apksigner"
+          if [ ! -x "$APKSIGNER" ]; then
+            APKSIGNER="$(find "$SDK_ROOT/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner -perm -111 | sort -V | tail -n 1)"
+          fi
+          test -n "$APKSIGNER" || { echo "apksigner was not found under $SDK_ROOT/build-tools"; exit 1; }
+          test -x "$APKSIGNER" || { echo "apksigner is not executable: $APKSIGNER"; exit 1; }
+
+          echo "APKSIGNER=$APKSIGNER" >> "$GITHUB_ENV"
+          echo "Using apksigner: $APKSIGNER"
+          "$APKSIGNER" --version
 
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v6
@@ -67,14 +85,15 @@ jobs:
         env:
           STORE_PASSWORD: ${{ github.run_id }}-HadirStore
         run: |
-          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" sign \
+          test -x "$APKSIGNER" || { echo "apksigner is unavailable: $APKSIGNER"; exit 1; }
+          "$APKSIGNER" sign \
             --ks hadir-release.keystore \
             --ks-key-alias hadir \
             --ks-pass env:STORE_PASSWORD \
             --key-pass env:STORE_PASSWORD \
             --out app-release-signed.apk \
             app/build/outputs/apk/release/app-release-unsigned.apk
-          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --verbose app-release-signed.apk
+          "$APKSIGNER" verify --verbose app-release-signed.apk
 
       - name: Verify target SDK is Android 16 / API 36
         shell: bash
