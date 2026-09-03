@@ -49,15 +49,21 @@ function resolveNotificationUrl(value){
   }catch{return fallback;}
 }
 
-self.addEventListener("push",event=>event.waitUntil((async()=>{
-  let data={};
-  try{data=event.data?event.data.json():{}}catch{data={body:event.data?.text()||"لديك إشعار جديد في Hadir"};}
-  const title=String(data.title||"إشعار جديد");
-  const body=String(data.body||data.message||"لديك إشعار جديد في Hadir");
-  const url=resolveNotificationUrl(data.url||data.path||"/");
-  const icon=new URL("./favicon.svg?v=2",self.registration.scope).href;
-  await self.registration.showNotification(title,{body,icon,badge:icon,dir:"rtl",lang:"ar",tag:String(data.tag||`hadir-${data.type||"notification"}`),renotify:true,data:{url,type:String(data.type||"info"),notificationId:String(data.notificationId||data.id||"")}});
-})());
+self.addEventListener("push",event=>{
+  event.waitUntil((async()=>{
+    let data={};
+    try{
+      data=event.data?event.data.json():{};
+    }catch{
+      data={body:event.data?.text()||"لديك إشعار جديد في Hadir"};
+    }
+    const title=String(data.title||"إشعار جديد");
+    const body=String(data.body||data.message||"لديك إشعار جديد في Hadir");
+    const url=resolveNotificationUrl(data.url||data.path||"/");
+    const icon=new URL("./favicon.svg?v=2",self.registration.scope).href;
+    await self.registration.showNotification(title,{body,icon,badge:icon,dir:"rtl",lang:"ar",tag:String(data.tag||`hadir-${data.type||"notification"}`),renotify:true,data:{url,type:String(data.type||"info"),notificationId:String(data.notificationId||data.id||"")}});
+  })());
+});
 
 self.addEventListener("notificationclick",event=>{
   event.notification.close();
