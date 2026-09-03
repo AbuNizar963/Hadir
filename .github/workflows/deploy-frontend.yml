@@ -92,6 +92,13 @@ jobs:
               json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
               encoding="utf-8",
           )
+
+          verified = json.loads(manifest_path.read_text(encoding="utf-8"))
+          icons = verified.get("icons") or []
+          assert any(icon.get("src") == f"/pwa-icon-192.png{query}" for icon in icons), verified
+          assert any(icon.get("src") == f"/pwa-icon-512.png{query}" for icon in icons), verified
+          assert all(icon.get("type") == "image/png" for icon in icons), verified
+          print("Local production bundle verified with versioned PNG PWA icons.")
           PY
 
       - name: Validate frontend deployment credentials
@@ -146,7 +153,8 @@ jobs:
           set -euo pipefail
           npx wrangler@4 pages deploy dist \
             --project-name "$PROJECT_NAME" \
-            --branch main \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-message "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}" \
             --commit-dirty=true
 
       - name: Verify exact production build
@@ -191,9 +199,11 @@ jobs:
 
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           manifest=json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
+          expected=os.environ["GITHUB_SHA"]
 
           assert manifest.get("id")=="/", manifest
           assert manifest.get("start_url")=="/", manifest
@@ -202,8 +212,8 @@ jobs:
           assert manifest.get("prefer_related_applications") is False, manifest
           icons = manifest.get("icons")
           assert isinstance(icons, list) and len(icons) >= 2, manifest
-          assert any(icon.get("src", "").startswith("/pwa-icon-192.png?hadir_icon=") for icon in icons), manifest
-          assert any(icon.get("src", "").startswith("/pwa-icon-512.png?hadir_icon=") for icon in icons), manifest
+          assert any(icon.get("src") == f"/pwa-icon-192.png?hadir_icon={expected}" for icon in icons), manifest
+          assert any(icon.get("src") == f"/pwa-icon-512.png?hadir_icon={expected}" for icon in icons), manifest
           assert all(icon.get("type") == "image/png" for icon in icons), manifest
           print("Production PWA manifest verified with versioned PNG icons.")
           PY
