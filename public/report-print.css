@@ -104,7 +104,9 @@
     border-collapse: collapse !important;
     border-spacing: 0 !important;
     overflow: visible !important;
-    table-layout: fixed !important;
+    /* Let Chromium size each column from its content instead of giving a
+       one-character serial/status cell an unnecessarily large fixed box. */
+    table-layout: auto !important;
     direction: rtl !important;
     break-before: auto !important;
     break-after: auto !important;
@@ -131,18 +133,38 @@
 
   .service-report th,
   .service-report td {
-    padding: 1.35mm 1.5mm !important;
-    line-height: 1.2 !important;
+    padding: 1.2mm 1.25mm !important;
+    line-height: 1.25 !important;
     vertical-align: middle !important;
+    text-align: center !important;
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: normal !important;
-    font-size: 11px !important;
+    font-size: 14px !important;
   }
 
   .service-report th {
-    font-size: 11.5px !important;
+    font-size: 16px !important;
     font-weight: 800 !important;
+    white-space: nowrap !important;
+  }
+
+  /* Compact columns whose values do not need a wide box. Longer text columns
+     remain flexible and wrap naturally to keep the whole table in the page. */
+  .service-report th:first-child,
+  .service-report td:first-child {
+    width: 1% !important;
+    min-width: 10mm !important;
+    white-space: nowrap !important;
+  }
+
+  .service-report td:nth-child(4),
+  .service-report td:nth-child(5),
+  .service-report td:nth-child(6),
+  .service-report th:nth-child(4),
+  .service-report th:nth-child(5),
+  .service-report th:nth-child(6) {
+    white-space: nowrap !important;
   }
 
   .service-report > div:first-child {
@@ -150,11 +172,13 @@
     margin: 0 0 2mm !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+    text-align: center !important;
   }
 
   .service-report > div:first-child h1 {
-    font-size: 17px !important;
+    font-size: 16px !important;
     line-height: 1.25 !important;
+    text-align: center !important;
   }
 
   .service-report > div:first-child img {
