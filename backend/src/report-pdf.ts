@@ -39,7 +39,7 @@ export async function generateDailyReportPdf(req: Request, env: BrowserEnv, resp
       waitForSelector: { selector: ".service-report", visible: true, timeout: 60000 },
       pdfOptions: {
         format: "a4",
-        landscape: true,
+        landscape: false,
         printBackground: true,
         preferCSSPageSize: true,
         tagged: true,
