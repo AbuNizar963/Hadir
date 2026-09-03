@@ -31,17 +31,17 @@ const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!sum
 const printButton = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
 const dailyActions = `<>{printButton}${shareButton}</>`;
 
-// Match only the actual daily print conditional and never cross a Button boundary.
-const dailyPrintConditional = /\{mode === "daily" && <Button\b(?:(?!<\/Button>\})[\s\S])*?onClick=\{printReport\}[\s\S]*?<Printer\b[^>]*\/>\s*طباعة الخدمة\s*<\/Button>\}/;
+// Match the exact existing daily print JSX anchor without crossing into another control.
+const dailyPrintConditional = '{mode === "daily" && <Button variant="outline" onClick={printReport} disabled={!summaries.length}><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>}';
 
 // Extract the actual rendered daily fragment. The closing sequence is exactly </>}.
-const getDailyFragment = () => source.match(/\{mode === "daily" && <>[\s\S]*?<\/>\}/)?.[0] || "";
+const getDailyFragment = () => source.match(/\{mode === "daily" && <>[\s\S]*?<\/\>\}/)?.[0] || "";
 let dailyFragment = getDailyFragment();
 const fragmentHasBothControls = dailyFragment.includes('data-hadir-share="true"') && dailyFragment.includes('onClick={sharePdf}') && dailyFragment.includes("مشاركة PDF") && dailyFragment.includes('data-hadir-print="true"') && dailyFragment.includes('onClick={printReport}') && dailyFragment.includes("طباعة الخدمة");
 
 if (!fragmentHasBothControls) {
-  if (!dailyPrintConditional.test(source)) {
-    throw new Error("ManagerReports share patch: actual daily print JSX anchor not found; refusing unsafe replacement.");
+  if (!source.includes(dailyPrintConditional)) {
+    throw new Error("ManagerReports share patch: exact daily print JSX anchor not found; refusing unsafe replacement.");
   }
   source = source.replace(dailyPrintConditional, `{mode === "daily" && ${dailyActions}}`);
 }
