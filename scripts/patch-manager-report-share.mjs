@@ -8,17 +8,17 @@ const shareImport = 'import { FileSpreadsheet, FileText, Database, Loader2, Chev
 if (source.includes(iconImport)) source = source.replace(iconImport, shareImport);
 else if (!source.includes("Share2")) throw new Error("ManagerReports share patch: lucide import anchor not found.");
 
-const backendImport = 'import { getBackendAudit, getBackendEmployees, getBackendRequests } from "@/lib/backend";';
 const pdfImport = 'import { generateProfessionalReportPdf } from "@/lib/professionalPdf";';
 if (!source.includes(pdfImport)) {
-  if (!source.includes(backendImport)) throw new Error("ManagerReports share patch: backend import anchor not found.");
-  source = source.replace(backendImport, `${backendImport}\n${pdfImport}`);
+  const backendImportMatch = source.match(/^import .*getBackendAudit.*$/m);
+  if (!backendImportMatch) throw new Error("ManagerReports share patch: backend import anchor not found.");
+  source = source.replace(backendImportMatch[0], `${backendImportMatch[0]}\n${pdfImport}`);
 }
 
 if (!source.includes("sharingPdf")) {
-  const modeState = '  const [mode, setMode] = useState<Mode>("monthly"), [date, setDate] = useState(new Date().toISOString().slice(0, 10)), [month, setMonth] = useState(new Date().toISOString().slice(0, 7)), [year, setYear] = useState(String(new Date().getFullYear()));';
-  if (!source.includes(modeState)) throw new Error("ManagerReports share patch: mode state anchor not found.");
-  source = source.replace(modeState, `${modeState}\n  const [sharingPdf, setSharingPdf] = useState(false);`);
+  const modeStateMatch = source.match(/^  const \[mode, setMode\] = useState<Mode>\("monthly"\).*$/m);
+  if (!modeStateMatch) throw new Error("ManagerReports share patch: mode state anchor not found.");
+  source = source.replace(modeStateMatch[0], `${modeStateMatch[0]}\n  const [sharingPdf, setSharingPdf] = useState(false);`);
 }
 
 if (!source.includes('const sharePdf = async')) {
@@ -33,9 +33,7 @@ const csvButton = '<Button variant="outline" onClick={exportCsv} disabled={!summ
 const dailyCsvReplacement = `{mode === "daily" ? ${shareButton} : ${csvButton}}`;
 
 if (!source.includes(dailyCsvReplacement)) {
-  if (!source.includes(csvButton)) {
-    throw new Error("ManagerReports share patch: exact CSV JSX anchor not found; refusing unsafe replacement.");
-  }
+  if (!source.includes(csvButton)) throw new Error("ManagerReports share patch: exact CSV JSX anchor not found; refusing unsafe replacement.");
   source = source.replace(csvButton, dailyCsvReplacement);
 }
 
