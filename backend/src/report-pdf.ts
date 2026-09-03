@@ -1,9 +1,6 @@
 const MAX_HTML_BYTES = 12 * 1024 * 1024;
 const MAX_CSS_BYTES = 8 * 1024 * 1024;
 
-// The PDF renderer runs in Cloudflare Browser Run. Resolve the current logo
-// inside the Worker from D1 + R2, then embed the bytes into the HTML. This
-// avoids browser cookies, CORS, stale URLs, and external-image timing issues.
 type BrowserEnv = { BROWSER?: BrowserRun; DB: D1Database; PROFILE_IMAGES?: R2Bucket };
 
 type PdfPayload = {
@@ -20,31 +17,43 @@ const cors = (origin: string) => ({
 });
 
 async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<string> {
-  if (!env.PROFILE_IMAGES || !html.includes('alt="شعار الشركة"')) return html;
+  const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
+  const logoMatch = html.match(logoTagPattern);
+  if (!logoMatch) return html;
+  if (!env.PROFILE_IMAGES) throw new Error("R2 binding PROFILE_IMAGES غير موجود أثناء تجهيز PDF");
 
   const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1")
     .bind("brandLogoR2Key")
     .first<{ value: string }>();
   const key = String(row?.value || "").trim();
-  if (!key) return html;
+  if (!key) throw new Error("لم يتم العثور على مفتاح شعار الشركة في R2");
 
   const object = await env.PROFILE_IMAGES.get(key);
-  if (!object) return html;
+  if (!object) throw new Error("لم يتم العثور على شعار الشركة في R2");
 
   const bytes = new Uint8Array(await object.arrayBuffer());
-  if (!bytes.length) return html;
+  if (!bytes.length) throw new Error("ملف شعار الشركة في R2 فارغ");
 
   let binary = "";
   const chunkSize = 0x8000;
   for (let offset = 0; offset < bytes.length; offset += chunkSize) {
     binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
   }
-  const dataUrl = `data:image/webp;base64,${btoa(binary)}`;
+  const contentType = String(object.httpMetadata?.contentType || "image/webp").toLowerCase();
+  const dataUrl = `data:${contentType};base64,${btoa(binary)}`;
 
-  // Only replace the source of the company-logo image. The rest of the report
-  // remains byte-for-byte unchanged before Chromium renders it.
-  return html.replace(/(<img\b[^>]*alt=["']شعار الشركة["'][^>]*\bsrc=["'])([^"']*)(["'])/i, `$1${dataUrl}$3`)
-    .replace(/(<img\b[^>]*\bsrc=["'])([^"']*)(["'][^>]*alt=["']شعار الشركة["'])/i, `$1${dataUrl}$3`);
+  // Replace the entire source/alt portion of the actual company-logo tag.
+  // The generated document therefore contains the R2 bytes directly and has
+  // no network dependency when Chromium renders the PDF.
+  const originalTag = logoMatch[0];
+  const embeddedTag = originalTag
+    .replace(/\bsrc=["'][^"']*["']/i, `src="${dataUrl}"`)
+    .replace(/\balt=["']شعار الشركة["']/i, 'alt=""');
+  if (embeddedTag === originalTag || !embeddedTag.includes(dataUrl)) {
+    throw new Error("تعذر تضمين شعار الشركة من R2 داخل مستند PDF");
+  }
+
+  return html.replace(originalTag, embeddedTag);
 }
 
 export async function generateDailyReportPdf(req: Request, env: BrowserEnv, responseOrigin: string): Promise<Response> {
