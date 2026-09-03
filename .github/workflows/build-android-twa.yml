@@ -48,11 +48,13 @@ jobs:
       - name: Create temporary signing key for this build
         shell: bash
         working-directory: mobile/android
+        env:
+          STORE_PASSWORD: ${{ github.run_id }}-HadirStore
         run: |
           keytool -genkeypair \
             -keystore hadir-release.keystore \
-            -storepass "${{ github.run_id }}-HadirStore" \
-            -keypass "${{ github.run_id }}-HadirKey" \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$STORE_PASSWORD" \
             -alias hadir \
             -keyalg RSA \
             -keysize 2048 \
@@ -64,32 +66,33 @@ jobs:
         working-directory: mobile/android
         env:
           STORE_PASSWORD: ${{ github.run_id }}-HadirStore
-          KEY_PASSWORD: ${{ github.run_id }}-HadirKey
         run: |
-          apksigner sign \
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" sign \
             --ks hadir-release.keystore \
             --ks-key-alias hadir \
             --ks-pass env:STORE_PASSWORD \
-            --key-pass env:KEY_PASSWORD \
+            --key-pass env:STORE_PASSWORD \
             --out app-release-signed.apk \
             app/build/outputs/apk/release/app-release-unsigned.apk
-          apksigner verify --verbose app-release-signed.apk
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --verbose app-release-signed.apk
 
       - name: Verify target SDK is Android 16 / API 36
         shell: bash
         working-directory: mobile/android
         run: |
-          TARGET_SDK="$(apkanalyzer manifest target-sdk app-release-signed.apk)"
+          TARGET_SDK="$(command -v apkanalyzer >/dev/null 2>&1 && apkanalyzer manifest target-sdk app-release-signed.apk || "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer" manifest target-sdk app-release-signed.apk)"
           echo "Hadir APK targetSdkVersion=$TARGET_SDK"
           test "$TARGET_SDK" = "36"
 
       - name: Print signing fingerprint
         shell: bash
         working-directory: mobile/android
+        env:
+          STORE_PASSWORD: ${{ github.run_id }}-HadirStore
         run: |
           keytool -list -v \
             -keystore hadir-release.keystore \
-            -storepass "${{ github.run_id }}-HadirStore" \
+            -storepass "$STORE_PASSWORD" \
             -alias hadir | grep -E "SHA256:|Alias name:"
 
       - name: Upload installable APK
