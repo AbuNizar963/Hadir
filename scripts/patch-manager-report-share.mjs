@@ -44,9 +44,12 @@ if (dailyShareConditional.test(source)) {
   throw new Error("ManagerReports share patch: actual daily print JSX anchor not found; refusing unsafe replacement.");
 }
 
-const renderedActions = source.match(/actions=\{<div className="flex flex-wrap gap-2">[\s\S]*?<\/div>\}/)?.[0] || "";
-const hasRenderedShareControl = dailyShareConditional.test(source) && renderedActions.includes('data-hadir-share="true"');
-const hasRenderedPrintControl = renderedActions.includes('data-hadir-print="true"') && renderedActions.includes('onClick={printReport}') && renderedActions.includes('طباعة الخدمة');
+// Validate the controls only inside the actual daily JSX fragment. Do not
+// scan the helper strings above, and do not assume the outer action div has
+// no nested </div> elements.
+const dailyFragment = source.match(/\{mode === "daily" && <>[\s\S]*?<\/\>\}/)?.[0] || "";
+const hasRenderedShareControl = dailyFragment.includes('data-hadir-share="true"') && dailyFragment.includes('onClick={sharePdf}') && dailyFragment.includes("مشاركة PDF");
+const hasRenderedPrintControl = dailyFragment.includes('data-hadir-print="true"') && dailyFragment.includes('onClick={printReport}') && dailyFragment.includes("طباعة الخدمة");
 if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !hasRenderedShareControl || !hasRenderedPrintControl) {
   throw new Error(`ManagerReports share patch: PDF sharing and print buttons were not both applied completely (share=${hasRenderedShareControl}, print=${hasRenderedPrintControl}).`);
 }
