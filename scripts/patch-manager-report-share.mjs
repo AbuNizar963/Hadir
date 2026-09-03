@@ -27,36 +27,31 @@ if (!source.includes('const sharePdf = async')) {
   source = source.replace(titleAnchor, `${shareFunction}${titleAnchor}`);
 }
 
-const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf}><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : "مشاركة PDF"}</Button>';
+const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf} data-hadir-share="true"><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : "مشاركة PDF"}</Button>';
 const printButton = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
 const dailyActions = `<>{printButton}${shareButton}</>`;
 
-// Detect the actual rendered share control, not the text inside sharePdf().
-// The previous check only searched for "مشاركة PDF", which also exists inside
-// the share function and therefore incorrectly concluded that the button was
-// already present. That caused the build to restore print while skipping share.
-const shareButtonPattern = /<Button\b(?=[^>]*onClick=\{sharePdf\})(?=[^>]*disabled=\{!summaries\.length \|\| sharingPdf\})[^>]*>\s*<Share2\b[^>]*\/>\s*\{sharingPdf \? "جاري تجهيز PDF…" : "مشاركة PDF"\}\s*<\/Button>/s;
-const printButtonPattern = /<Button\b(?=[^>]*onClick=\{printReport\})(?=[^>]*disabled=\{!summaries\.length\})[^>]*>\s*<Printer\b[^>]*\/>\s*طباعة الخدمة\s*<\/Button>/s;
+// Earlier report patches can change whitespace or add attributes to the print
+// button. Match its semantic JSX instead of one exact attribute ordering.
+const printButtonPattern = /<Button\b[^>]*onClick=\{printReport\}[^>]*>[\s\S]*?<Printer\b[^>]*\/>\s*طباعة الخدمة\s*<\/Button>/;
+const shareButtonPattern = /<Button\b[^>]*onClick=\{sharePdf\}[^>]*>[\s\S]*?<Share2\b[^>]*\/>[\s\S]*?مشاركة PDF[\s\S]*?<\/Button>/;
 
-const hasShareButton = shareButtonPattern.test(source);
-const hasPrintButton = source.includes('data-hadir-print="true"');
-
-if (!hasShareButton) {
-  if (!printButtonPattern.test(source)) {
+if (!shareButtonPattern.test(source)) {
+  if (source.includes('data-hadir-print="true"')) {
+    // The patch is being re-run on an already modified source; append share
+    // beside the existing marked print control without duplicating print.
+    source = source.replace(/(<Button\b[^>]*data-hadir-print="true"[^>]*>[\s\S]*?<\/Button>)/, `$1${shareButton}`);
+  } else if (printButtonPattern.test(source)) {
+    source = source.replace(printButtonPattern, dailyActions);
+  } else {
     throw new Error("ManagerReports share patch: daily print action anchor not found; refusing unsafe replacement.");
   }
-  source = source.replace(printButtonPattern, dailyActions);
-} else if (!hasPrintButton) {
-  source = source.replace(shareButtonPattern, dailyActions);
 }
 
-// Validate the actual injected JSX controls using stable markers. Avoid a
-// brittle full-control regex here because the upstream report patches may
-// legitimately adjust JSX whitespace or attributes without changing behavior.
-const hasRenderedShareControl = source.includes('onClick={sharePdf}') && source.includes('<Share2') && source.includes('مشاركة PDF');
+const hasRenderedShareControl = source.includes('onClick={sharePdf}') && source.includes('<Share2') && source.includes('data-hadir-share="true"') && source.includes('مشاركة PDF');
 const hasRenderedPrintControl = source.includes('onClick={printReport}') && source.includes('<Printer') && source.includes('data-hadir-print="true"') && source.includes('طباعة الخدمة');
 if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !hasRenderedShareControl || !hasRenderedPrintControl) {
-  throw new Error("ManagerReports share patch: PDF sharing and print buttons were not both applied completely.");
+  throw new Error(`ManagerReports share patch: PDF sharing and print buttons were not both applied completely (share=${hasRenderedShareControl}, print=${hasRenderedPrintControl}).`);
 }
 
 writeFileSync(file, source, "utf8");
