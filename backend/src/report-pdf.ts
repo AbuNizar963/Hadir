@@ -16,17 +16,50 @@ const cors = (origin: string) => ({
   "access-control-allow-methods": "POST,OPTIONS",
 });
 
+async function resolveCompanyLogoKey(env: BrowserEnv): Promise<string> {
+  const rows = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN (?,?)")
+    .bind("brandLogoR2Key", "brandLogo")
+    .all<{ key: string; value: string }>();
+  const settings = new Map((rows.results || []).map((row) => [String(row.key), String(row.value || "").trim()]));
+
+  const storedKey = settings.get("brandLogoR2Key") || "";
+  if (storedKey) {
+    const current = await env.PROFILE_IMAGES!.head(storedKey);
+    if (current) return storedKey;
+  }
+
+  // Older production data may already have the R2-backed /api/company/logo URL
+  // saved in brandLogo while brandLogoR2Key was never written. That URL carries
+  // the exact immutable R2 object key in ?v=..., so recover and persist it.
+  const configuredUrl = settings.get("brandLogo") || "";
+  if (configuredUrl) {
+    try {
+      const parsed = new URL(configuredUrl);
+      const candidate = String(parsed.searchParams.get("v") || "").trim();
+      if (candidate) {
+        const recovered = await env.PROFILE_IMAGES!.head(candidate);
+        if (recovered) {
+          await env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+            .bind("brandLogoR2Key", candidate)
+            .run();
+          return candidate;
+        }
+      }
+    } catch {
+      // Ignore malformed legacy URL and report the real storage problem below.
+    }
+  }
+
+  if (storedKey) throw new Error("مفتاح شعار الشركة موجود في الإعدادات لكن ملف الشعار غير موجود في R2");
+  throw new Error("لم يتم العثور على شعار الشركة في R2 أو على مفتاح R2 محفوظ في الإعدادات");
+}
+
 async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<string> {
   if (!env.PROFILE_IMAGES) throw new Error("R2 binding PROFILE_IMAGES غير موجود أثناء تجهيز PDF");
 
-  const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1")
-    .bind("brandLogoR2Key")
-    .first<{ value: string }>();
-  const key = String(row?.value || "").trim();
-  if (!key) throw new Error("لم يتم العثور على مفتاح شعار الشركة في R2");
-
+  const key = await resolveCompanyLogoKey(env);
   const object = await env.PROFILE_IMAGES.get(key);
-  if (!object) throw new Error("لم يتم العثور على شعار الشركة في R2");
+  if (!object) throw new Error("لم يتم العثور على شعار الشركة في R2 بعد استعادة مفتاحه");
 
   const bytes = new Uint8Array(await object.arrayBuffer());
   if (!bytes.length) throw new Error("ملف شعار الشركة في R2 فارغ");
