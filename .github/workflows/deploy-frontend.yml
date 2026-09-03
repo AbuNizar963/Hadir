@@ -52,6 +52,48 @@ jobs:
           VITE_BASE_PATH: /
         run: bun run build
 
+      - name: Generate production PWA raster icons from favicon.svg
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin
+          test -s public/favicon.svg
+          test -d dist
+          rsvg-convert -w 192 -h 192 -o dist/pwa-icon-192.png public/favicon.svg
+          rsvg-convert -w 512 -h 512 -o dist/pwa-icon-512.png public/favicon.svg
+          test -s dist/pwa-icon-192.png
+          test -s dist/pwa-icon-512.png
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          manifest_path = Path("dist/manifest.webmanifest")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          version = os.environ["GITHUB_SHA"]
+          query = f"?hadir_icon={version}"
+          manifest["icons"] = [
+              {
+                  "src": f"/pwa-icon-192.png{query}",
+                  "sizes": "192x192",
+                  "type": "image/png",
+                  "purpose": "any",
+              },
+              {
+                  "src": f"/pwa-icon-512.png{query}",
+                  "sizes": "512x512",
+                  "type": "image/png",
+                  "purpose": "any",
+              },
+          ]
+          manifest_path.write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
       - name: Validate frontend deployment credentials
         shell: bash
         run: |
@@ -158,9 +200,21 @@ jobs:
           assert manifest.get("scope")=="/", manifest
           assert manifest.get("display")=="standalone", manifest
           assert manifest.get("prefer_related_applications") is False, manifest
-          assert isinstance(manifest.get("icons"), list) and len(manifest["icons"]) >= 2, manifest
-          print("Production PWA manifest verified.")
+          icons = manifest.get("icons")
+          assert isinstance(icons, list) and len(icons) >= 2, manifest
+          assert any(icon.get("src", "").startswith("/pwa-icon-192.png?hadir_icon=") for icon in icons), manifest
+          assert any(icon.get("src", "").startswith("/pwa-icon-512.png?hadir_icon=") for icon in icons), manifest
+          assert all(icon.get("type") == "image/png" for icon in icons), manifest
+          print("Production PWA manifest verified with versioned PNG icons.")
           PY
+
+          for icon in pwa-icon-192.png pwa-icon-512.png; do
+            curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
+              -H 'Cache-Control: no-cache, no-store' \
+              "$PAGES_PRODUCTION_URL/$icon?hadir_ci=$GITHUB_SHA" \
+              -o "/tmp/$icon"
+            test -s "/tmp/$icon"
+          done
 
           for attempt in $(seq 1 36); do
             if curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
