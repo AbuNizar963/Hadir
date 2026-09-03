@@ -40,8 +40,6 @@ export default function PWAExperience() {
     const twa = isAndroidTwa();
 
     const shouldShowUpdate = () => {
-      // Native Android TWA updates with the APK/web content flow, not the browser PWA prompt.
-      // The PWA update prompt remains enabled for an actually installed standalone PWA.
       if (twa || !isStandalone()) return;
       try {
         if (!cancelled && sessionStorage.getItem(UPDATE_DISMISSED_KEY) !== "1") setUpdateVisible(true);
@@ -164,9 +162,24 @@ export default function PWAExperience() {
       const swUrl = new URL("sw.js", baseUrl);
       const registration = await navigator.serviceWorker.register(swUrl.toString(), { scope: baseUrl.pathname, updateViaCache: "none" });
 
+      const reloadAfterActivation = async (worker: ServiceWorker) => {
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < 15000) {
+          if (navigator.serviceWorker.controller === worker || registration.active === worker) {
+            try { localStorage.setItem(UPDATE_BUILD_VERSION_KEY, buildVersion); } catch {}
+            window.location.reload();
+            return;
+          }
+          await new Promise(resolve => window.setTimeout(resolve, 150));
+        }
+        setUpdating(false);
+        setUpdateError("تم تثبيت Service Worker الجديد لكن لم يكتمل تفعيل النسخة الجديدة تلقائيًا. أغلق التطبيق وافتحه مرة واحدة لإكمال التحديث.");
+      };
+
       const applyWaitingWorker = (worker: ServiceWorker | null) => {
         if (!worker) return false;
         worker.postMessage({ type: "SKIP_WAITING" });
+        void reloadAfterActivation(worker);
         return true;
       };
 
@@ -206,6 +219,7 @@ export default function PWAExperience() {
       const installedWorker = await installedWorkerPromise;
       if (installedWorker) {
         installedWorker.postMessage({ type: "SKIP_WAITING" });
+        void reloadAfterActivation(installedWorker);
         return;
       }
 
