@@ -2,10 +2,13 @@
 <resources>
     <style name="HadirAppTheme" parent="@android:style/Theme.Translucent.NoTitleBar">
         <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">#0B0F14</item>
         <item name="android:statusBarColor">#0B0F14</item>
         <item name="android:navigationBarColor">#0B0F14</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
-        <item name="android:windowNoTitle">true</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
     </style>
 </resources>
