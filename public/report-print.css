@@ -1,12 +1,12 @@
-/* Hadir · print-first A4 pagination
- * Dedicated print layer for the daily service report.
- * It intentionally removes screen layout constraints (grid/flex/overflow)
- * so Chromium can paginate the report as normal block/table content.
+/* Hadir · print-first A4 report layout
+ * The PDF action intentionally uses the browser print engine. Keeping the
+ * report as real HTML/table content gives Chromium/Safari proper Arabic RTL
+ * shaping, selectable text, table headers and natural page pagination.
  */
 
 @page {
-  size: A4 portrait;
-  margin: 6mm;
+  size: A4 landscape;
+  margin: 5mm;
 }
 
 @media print {
@@ -20,15 +20,24 @@
     overflow: visible !important;
   }
 
+  html,
+  body {
+    direction: rtl !important;
+  }
+
   body {
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
+    font-family: Cairo, Arial, sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .service-report {
     display: block !important;
     position: static !important;
+    direction: rtl !important;
     width: 100% !important;
     max-width: none !important;
     min-height: 0 !important;
@@ -39,10 +48,11 @@
     transform: none !important;
     contain: none !important;
     box-shadow: none !important;
+    font-family: Cairo, Arial, sans-serif !important;
   }
 
-  /* The screen report is built from nested grid rows. Grid/flex pagination is
-     intentionally disabled for print; normal block flow fills every page. */
+  /* Remove screen grid/flex constraints. Print should use normal document
+     flow so the browser decides page breaks instead of a canvas slicer. */
   .service-report > div:nth-child(2),
   .service-report > div:nth-child(2) > .grid,
   .service-report > div:nth-child(2) > .grid > div {
@@ -71,7 +81,7 @@
   }
 
   .service-report > div:nth-child(2) > .grid > div {
-    margin: 0 0 4mm !important;
+    margin: 0 0 2.5mm !important;
     padding: 0 !important;
     break-before: auto !important;
     break-after: auto !important;
@@ -81,11 +91,10 @@
     page-break-inside: auto !important;
   }
 
-  /* Critical: overflow:hidden makes some boxes monolithic to the print engine
-     and can leave the rest of an A4 page unused. */
   .service-report * {
     overflow: visible !important;
     box-sizing: border-box !important;
+    font-family: Cairo, Arial, sans-serif !important;
   }
 
   .service-report table {
@@ -97,6 +106,8 @@
     border-collapse: collapse !important;
     border-spacing: 0 !important;
     overflow: visible !important;
+    table-layout: fixed !important;
+    direction: rtl !important;
     break-before: auto !important;
     break-after: auto !important;
     break-inside: auto !important;
@@ -122,23 +133,32 @@
 
   .service-report th,
   .service-report td {
-    padding: 1.5mm 1.8mm !important;
-    line-height: 1.25 !important;
+    padding: 1mm 1.25mm !important;
+    line-height: 1.15 !important;
     vertical-align: middle !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+    font-size: 9px !important;
+  }
+
+  .service-report th {
+    font-weight: 700 !important;
   }
 
   .service-report > div:first-child {
-    padding: 3mm 0 !important;
-    margin: 0 0 3mm !important;
+    padding: 2mm 0 !important;
+    margin: 0 0 2mm !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
 
   .service-report img {
-    max-height: 12mm !important;
-    max-width: 45mm !important;
+    max-height: 11mm !important;
+    max-width: 38mm !important;
     width: auto !important;
     height: auto !important;
+    object-fit: contain !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
@@ -150,8 +170,8 @@
   }
 
   .service-report > div:nth-child(2) > .mt-4 {
-    margin-top: 2mm !important;
-    padding-top: 2mm !important;
+    margin-top: 1.5mm !important;
+    padding-top: 1.5mm !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
