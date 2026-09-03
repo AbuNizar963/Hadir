@@ -15,9 +15,9 @@ if (!source.includes('from "html2canvas"')) {
 }
 
 if (!source.includes("sharingPdf")) {
-  const stateEnd = '  const [loading, setLoading] = useState(true), [error, setError] = useState<string | null>(null), [expanded, setExpanded] = useState<string | null>(null);';
-  if (!source.includes(stateEnd)) throw new Error("ManagerReports share patch: state anchor not found.");
-  source = source.replace(stateEnd, `${stateEnd}\n  const [sharingPdf, setSharingPdf] = useState(false);`);
+  const modeState = '  const [mode, setMode] = useState<Mode>("monthly"), [date, setDate] = useState(new Date().toISOString().slice(0, 10)), [month, setMonth] = useState(new Date().toISOString().slice(0, 7)), [year, setYear] = useState(String(new Date().getFullYear()));';
+  if (!source.includes(modeState)) throw new Error("ManagerReports share patch: mode state anchor not found.");
+  source = source.replace(modeState, `${modeState}\n  const [sharingPdf, setSharingPdf] = useState(false);`);
 }
 
 if (!source.includes('const sharePdf = async')) {
