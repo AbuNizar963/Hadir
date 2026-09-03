@@ -29,6 +29,7 @@ if (!source.includes('const sharePdf = async')) {
 
 const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf}><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : "مشاركة PDF"}</Button>';
 const printButton = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
+const dailyActions = `<>{printButton}${shareButton}</>`;
 
 // Detect the actual rendered share control, not the text inside sharePdf().
 // The previous check only searched for "مشاركة PDF", which also exists inside
@@ -46,11 +47,11 @@ if (!hasShareButton) {
   }
   // Replace only the print control with both controls, preserving the original
   // print action and placing PDF sharing immediately beside it.
-  source = source.replace(printButtonPattern, printButton + shareButton);
+  source = source.replace(printButtonPattern, dailyActions);
 } else if (!hasPrintButton) {
   // A partial previous build may contain share without the print marker.
   // Restore print immediately beside the existing share control.
-  source = source.replace(shareButtonPattern, printButton + shareButton);
+  source = source.replace(shareButtonPattern, dailyActions);
 }
 
 if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !shareButtonPattern.test(source) || !source.includes("مشاركة PDF") || !source.includes("طباعة الخدمة") || !source.includes('data-hadir-print="true"')) {
