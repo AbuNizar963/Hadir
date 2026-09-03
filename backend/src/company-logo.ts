@@ -93,8 +93,6 @@ export async function handleCompanyLogoRequest(
     if (file.type !== LOGO_CONTENT_TYPE) return json({ error: "يجب أن يكون الشعار بصيغة WebP" }, 415, origin);
     if (file.size <= 0 || file.size > MAX_LOGO_BYTES) return json({ error: "حجم الشعار يجب أن يكون أقل من 100 كيلوبايت" }, 413, origin);
 
-    const previous = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_KEY_SETTING).first<{ value: string }>();
-    const previousKey = String(previous?.value || "").trim();
     const key = `company/logo-${crypto.randomUUID()}.webp`;
     const publicUrl = logoUrl(req, key);
     await env.PROFILE_IMAGES.put(key, file.stream(), {
@@ -113,7 +111,10 @@ export async function handleCompanyLogoRequest(
       return json({ error: "تعذر حفظ شعار الشركة" }, 500, origin);
     }
 
-    if (previousKey && previousKey !== key && previousKey.startsWith("company/logo-")) await env.PROFILE_IMAGES.delete(previousKey).catch(() => undefined);
+    // Do not delete the previous R2 object. Existing reports/pages can still
+    // reference an older immutable URL; removing it makes the logo disappear
+    // later when that cached document is refreshed. The D1 R2 key remains the
+    // source of truth for the current logo.
     return json({ ok: true, url: publicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
   }
 
