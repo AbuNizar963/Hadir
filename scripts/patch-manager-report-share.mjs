@@ -29,18 +29,18 @@ if (!source.includes('const sharePdf = async')) {
 
 const printButtonPattern = /<Button variant="outline" onClick=\{printReport\} disabled=\{!summaries\.length\}><Printer className="ml-2 h-4 w-4" \/>طباعة الخدمة<\/Button>/;
 const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf}><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : "مشاركة PDF"}</Button>';
-const dailyActionsAnchor = '<Button variant="outline" onClick={printReport} disabled={!summaries.length}><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
+const dailyActionsAnchor = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
 if (!source.includes("مشاركة PDF")) {
   if (!printButtonPattern.test(source)) throw new Error("ManagerReports share patch: daily print button anchor not found.");
   source = source.replace(printButtonPattern, `${dailyActionsAnchor}${shareButton}`);
 } else {
   // Keep the original print action and ensure PDF sharing sits beside it.
-  source = source.replace(/<Button variant="outline" onClick=\{printReport\} disabled=\{!summaries\.length\}><Printer className="ml-2 h-4 w-4" \/>طباعة الخدمة<\/Button><Button variant="outline" onClick=\{sharePdf\}[^]*?<\/Button>/, `${dailyActionsAnchor}${shareButton}`);
+  source = source.replace(/<Button variant="outline" onClick=\{printReport\} disabled=\{!summaries\.length\}(?: aria-label="طباعة التقرير اليومي" data-hadir-print="true")?><Printer className="ml-2 h-4 w-4" \/>طباعة الخدمة<\/Button><Button variant="outline" onClick=\{sharePdf\}[^]*?<\/Button>/, `${dailyActionsAnchor}${shareButton}`);
 }
 
-if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !source.includes("مشاركة PDF") || !source.includes("طباعة الخدمة")) {
+if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !source.includes("مشاركة PDF") || !source.includes("طباعة الخدمة") || !source.includes('data-hadir-print="true"')) {
   throw new Error("ManagerReports share patch: PDF sharing/print actions were not applied completely.");
 }
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports share patch: daily report keeps print and adds direct PDF sharing beside it.");
+console.log("ManagerReports share patch: daily report keeps an explicit print action and adds direct PDF sharing beside it.");
