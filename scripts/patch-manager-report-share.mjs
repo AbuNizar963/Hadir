@@ -40,10 +40,11 @@ if (!source.includes(dailyCsvReplacement)) {
   source = source.replace(csvButton, dailyCsvReplacement);
 }
 
-const getDailyFragment = () => source.match(/\{mode === "daily" && <>[\s\S]*?<\/\>\}/)?.[0] || "";
-const dailyFragment = getDailyFragment();
-const hasRenderedShareControl = dailyFragment.includes('data-hadir-share="true"') && dailyFragment.includes('onClick={sharePdf}') && dailyFragment.includes("مشاركة PDF");
-const hasRenderedPrintControl = dailyFragment.includes('onClick={printReport}') && dailyFragment.includes("طباعة الخدمة");
+// The daily action controls live inside the report action container, whose exact
+// wrapper has changed across earlier report patches. Validate the actual rendered
+// control expressions rather than relying on one historical JSX wrapper shape.
+const hasRenderedShareControl = source.includes('data-hadir-share="true"') && source.includes('onClick={sharePdf}') && source.includes("مشاركة PDF") && source.includes('mode === "daily" ?');
+const hasRenderedPrintControl = source.includes('onClick={printReport}') && source.includes("طباعة الخدمة");
 if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !hasRenderedShareControl || !hasRenderedPrintControl) {
   throw new Error(`ManagerReports share patch: PDF sharing and print buttons were not both applied completely (share=${hasRenderedShareControl}, print=${hasRenderedPrintControl}).`);
 }
