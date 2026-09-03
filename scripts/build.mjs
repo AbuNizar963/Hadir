@@ -44,7 +44,7 @@ if (bun.status === 0 && !bun.error) {
 // Production invariants: the generated report bundle must contain the branded
 // daily report and the direct PDF-share implementation. Validate stable code
 // markers because localized UI text may be minified/encoded by Vite/Rollup.
-const scan = spawnSync("grep", ["-RIl", "خدمة الدوام ليوم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+const scan = spawnSync("grep", ["-RIl", "سجل الحضور والغياب ليوم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (scan.status !== 0 || !scan.stdout?.trim()) {
   throw new Error("Production build validation failed: branded daily report header was not found in dist.");
 }
