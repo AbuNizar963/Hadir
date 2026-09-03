@@ -2,6 +2,12 @@ name: Build Hadir Android Release
 
 on:
   workflow_dispatch:
+    inputs:
+      source_ref:
+        description: 'Git ref containing the Android TWA project to build'
+        required: true
+        default: 'fix/android-webapk-warning'
+        type: string
 
 permissions:
   contents: read
@@ -12,8 +18,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout source ref
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
