@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - fix/android-webapp-warning
+      - fix/android-webapk-warning
 
 permissions:
   contents: read
