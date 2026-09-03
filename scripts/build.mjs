@@ -41,11 +41,12 @@ if (bun.status === 0 && !bun.error) {
   run("npm", ["run", "build"]);
 }
 
-// Version the project favicon URL in the emitted production files using the
-// exact build commit. The file itself remains public/favicon.svg, so there is
-// still one source of truth; only its URL changes between deployments. This
-// gives browsers and installed PWAs a fresh icon resource whenever the build
-// changes, avoiding stale launcher/service-worker icon URLs.
+// Version the project favicon and manifest URLs in the emitted production files
+// using the exact build commit. The source files remain unchanged, so there is
+// still one source of truth for the icon. Versioning the manifest URL itself is
+// important for installed PWAs: it gives the browser a new manifest resource
+// identity on every deployment, while the manifest's stable `id` keeps the
+// installation attached to the same app.
 const faviconVersion = encodeURIComponent(commitSha);
 const emittedFiles = ["index.html", "manifest.webmanifest", "sw.js"];
 for (const fileName of emittedFiles) {
@@ -53,6 +54,7 @@ for (const fileName of emittedFiles) {
   if (!existsSync(fileUrl)) continue;
   const content = readFileSync(fileUrl, "utf8");
   const versioned = content
+    .replaceAll("./manifest.webmanifest", `./manifest.webmanifest?v=${faviconVersion}`)
     .replaceAll("./favicon.svg", `./favicon.svg?v=${faviconVersion}`)
     .replaceAll("/favicon.svg", `/favicon.svg?v=${faviconVersion}`);
   if (versioned !== content) {
