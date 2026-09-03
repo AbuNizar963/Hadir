@@ -19,7 +19,9 @@ export async function generateProfessionalReportPdf(html: string, css: string, f
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({})) as { error?: unknown; detail?: unknown };
-      throw new Error(typeof data.error === "string" ? data.error : `فشل إنشاء ملف PDF (${response.status})`);
+      const errorText = typeof data.error === "string" ? data.error : `فشل إنشاء ملف PDF (${response.status})`;
+      const detailText = typeof data.detail === "string" && data.detail.trim() ? `: ${data.detail.trim()}` : "";
+      throw new Error(`${errorText}${detailText}`);
     }
     const blob = await response.blob();
     if (!blob.size || blob.type && !blob.type.toLowerCase().includes("pdf")) throw new Error("الخادم أعاد ملف PDF غير صالح.");
