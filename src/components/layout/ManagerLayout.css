@@ -49,20 +49,7 @@
 }
 
 .manager-shell .manager-page-header {
-  position: relative;
   border-bottom-color: hsl(var(--border) / 0.72);
-}
-
-.manager-shell .manager-page-header::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 0;
-  top: 0;
-  width: 72px;
-  height: 3px;
-  border-radius: 999px;
-  background: hsl(var(--primary));
-  box-shadow: 0 0 22px hsl(var(--primary) / 0.35);
 }
 
 .manager-shell .manager-content > * {
