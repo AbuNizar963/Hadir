@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.hadir.attendance",
+      "sha256_cert_fingerprints": [
+        "B6:FD:CF:4A:7D:B7:E6:0D:9C:3A:90:AA:6B:98:5E:96:5C:F1:F5:C0:9A:E6:03:D6:75:AB:6C:1E:3C:C2:AF:A4"
+      ]
+    }
+  }
+]
