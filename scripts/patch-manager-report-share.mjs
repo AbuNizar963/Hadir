@@ -27,15 +27,23 @@ if (!source.includes('const sharePdf = async')) {
   source = source.replace(titleAnchor, `${shareFunction}${titleAnchor}`);
 }
 
-const printButtonPattern = /<Button variant="outline" onClick=\{printReport\} disabled=\{!summaries\.length\}><Printer className="ml-2 h-4 w-4" \/>طباعة الخدمة<\/Button>/;
 const shareButton = '<Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf}><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : "مشاركة PDF"}</Button>';
-const dailyActionsAnchor = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
-if (!source.includes("مشاركة PDF")) {
-  if (!printButtonPattern.test(source)) throw new Error("ManagerReports share patch: daily print button anchor not found.");
-  source = source.replace(printButtonPattern, `${dailyActionsAnchor}${shareButton}`);
-} else {
-  // Keep the original print action and ensure PDF sharing sits beside it.
-  source = source.replace(/<Button variant="outline" onClick=\{printReport\} disabled=\{!summaries\.length\}(?: aria-label="طباعة التقرير اليومي" data-hadir-print="true")?><Printer className="ml-2 h-4 w-4" \/>طباعة الخدمة<\/Button><Button variant="outline" onClick=\{sharePdf\}[^]*?<\/Button>/, `${dailyActionsAnchor}${shareButton}`);
+const printButton = '<Button variant="outline" onClick={printReport} disabled={!summaries.length} aria-label="طباعة التقرير اليومي" data-hadir-print="true"><Printer className="ml-2 h-4 w-4" />طباعة الخدمة</Button>';
+
+// Normalize the daily action area in one place. This deliberately does not
+// replace the print action with the PDF action: both controls are required.
+const dailyActionsPattern = /\{mode === "daily" && <Button variant="outline" onClick=\{printReport\} disabled=\{!summaries\.length\}(?:[^>]*)><Printer className="ml-2 h-4 w-4" \/>طباعة الخدمة<\/Button>\}/;
+if (dailyActionsPattern.test(source)) {
+  source = source.replace(dailyActionsPattern, `{mode === "daily" && <>{printButton}${shareButton}</>}`);
+} else if (!source.includes("مشاركة PDF") || !source.includes('data-hadir-print="true"')) {
+  // Handle a previous partially-applied share patch, but only when the two
+  // known controls are present together; never silently remove print.
+  const printOnlyPattern = /<Button variant="outline" onClick=\{printReport\} disabled=\{!summaries\.length\}(?:[^>]*)><Printer className="ml-2 h-4 w-4" \/>طباعة الخدمة<\/Button>/;
+  if (printOnlyPattern.test(source)) {
+    source = source.replace(printOnlyPattern, `${printButton}${shareButton}`);
+  } else {
+    throw new Error("ManagerReports share patch: daily print action anchor not found; refusing to replace or remove the print button.");
+  }
 }
 
 if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') || !source.includes('const sharePdf = async') || !source.includes('sharingPdf') || !source.includes("مشاركة PDF") || !source.includes("طباعة الخدمة") || !source.includes('data-hadir-print="true"')) {
@@ -43,4 +51,4 @@ if (!source.includes('from "html2canvas"') || !source.includes('from "jspdf"') |
 }
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports share patch: daily report keeps an explicit print action and adds direct PDF sharing beside it.");
+console.log("ManagerReports share patch: daily report preserves print and adds direct PDF sharing beside it.");
