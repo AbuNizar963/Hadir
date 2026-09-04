@@ -11,11 +11,11 @@ if (!source.includes(arrowAttendance) || !source.includes(arrowCheckout)) {
 }
 source = source.replace(
   arrowAttendance,
-  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/12 grid place-items-center text-primary mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</div>',
+  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/12 flex items-center justify-center text-primary mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">↓</div>',
 );
 source = source.replace(
   arrowCheckout,
-  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-accent/12 grid place-items-center text-accent mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">→</div>',
+  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-accent/12 flex items-center justify-center text-accent mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">↑</div>',
 );
 
 const requestArrow = '<span className="text-accent text-xl">←</span>';
@@ -24,7 +24,7 @@ if (!source.includes(requestArrow)) {
 }
 source = source.replace(
   requestArrow,
-  '<span className="text-accent text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</span>',
+  '<span className="inline-flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-2xl bg-accent/12 items-center justify-center text-accent text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</span>',
 );
 
 const infoAnchor = source.indexOf("معلومات الدوام");
@@ -59,10 +59,13 @@ for (const required of ["period", "time", "status", "location", "device"]) {
   if (!byKind.has(required)) fail(`could not locate the existing ${required} row`);
 }
 
-// Match the rotation card to the same visual language as the existing Row cards.
-const shiftTypeCard = '<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px]"><div className="text-xs text-muted-foreground">نوع الدوام</div><div className="font-black mt-1">{isRotation?"تناوبي":"إداري"}</div></div>';
-const ordered = [shiftTypeCard, byKind.get("period"), byKind.get("time"), byKind.get("status"), byKind.get("location"), byKind.get("device")].filter(Boolean);
+// Use the period card's exact existing markup as the visual template for rotation.
+const periodRow = byKind.get("period");
+const shiftTypeCard = periodRow
+  .replace('label="الفترة"', 'label="نوع الدوام"')
+  .replace(/value=\{[^}]*\}/, 'value={isRotation?"تناوبي":"إداري"}');
+const ordered = [shiftTypeCard, periodRow, byKind.get("time"), byKind.get("status"), byKind.get("location"), byKind.get("device")].filter(Boolean);
 
 source = source.slice(0, gridStart) + gridOpen + ordered.join("") + source.slice(gridEnd);
 writeFileSync(file, source, "utf8");
-console.log("EmployeeHome shift-info patch: restored previous interface and made rotation card match the existing shift-info card design.");
+console.log("EmployeeHome shift-info patch: centered arrows inside their icons and matched the rotation card exactly to the period card template.");
