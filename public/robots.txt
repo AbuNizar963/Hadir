@@ -12,3 +12,5 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+# HADIR settings navigation deployment marker
