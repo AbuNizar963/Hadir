@@ -4,66 +4,28 @@ const file = new URL("../src/pages/EmployeeHome.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 const fail = (message) => { throw new Error(`EmployeeHome shift-info patch: ${message}; refusing unsafe replacement.`); };
 
-// Patch only the existing action cards. Do not replace the EmployeeHome source wholesale.
-const patchActionArrow = (linkPath, arrow, toneClass) => {
-  const linkStart = source.indexOf(`<Link to="${linkPath}"`);
-  if (linkStart < 0) fail(`action link anchor not found: ${linkPath}`);
-  const linkEnd = source.indexOf("</Link>", linkStart);
-  if (linkEnd < 0) fail(`action link closing boundary not found: ${linkPath}`);
-  const block = source.slice(linkStart, linkEnd);
-  const arrowPattern = /<(?:div|span)\b[^>]*>\s*[←→↓↑]\s*<\/(?:div|span)>/;
-  if (!arrowPattern.test(block)) fail(`existing arrow anchor not found inside ${linkPath}`);
-  const replacement = `<div className="absolute ${linkPath.endsWith("check-in") ? "left-4" : "right-4"} top-1/2 -translate-y-1/2 h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-${toneClass}/12 flex items-center justify-center ${toneClass} text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">${arrow}</div>`;
-  const nextBlock = block.replace(arrowPattern, replacement);
-  source = source.slice(0, linkStart) + nextBlock + source.slice(linkEnd);
-};
-
-patchActionArrow("/employee/scan/check-in", "↓", "accent");
-patchActionArrow("/employee/scan/check-out", "↓", "primary");
-
-const requestAnchor = /<span className="text-accent text-[^"]+">[←→↓↑]<\/span>/;
-const requestStart = source.indexOf("طلب استئذان أو إجازة");
-if (requestStart < 0) fail("leave/permission request heading not found");
-const requestCardStart = source.lastIndexOf("<button", requestStart);
-const requestCardEnd = source.indexOf("</button>", requestStart);
-if (requestCardStart < 0 || requestCardEnd < 0) fail("leave/permission request card boundary not found");
-const requestBlock = source.slice(requestCardStart, requestCardEnd);
-if (!requestAnchor.test(requestBlock)) fail("leave/permission request arrow anchor not found");
-source = source.slice(0, requestCardStart) + requestBlock.replace(
-  requestAnchor,
-  '<span className="inline-flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-2xl bg-accent/12 items-center justify-center text-accent text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</span>',
-) + source.slice(requestCardEnd);
-
-// Use one exact visual template for all six shift-information cards.
-const cardTemplate = (valueExpression) => `<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px] flex flex-col justify-start"><div className="font-black text-sm leading-6">${valueExpression ? "نوع الدوام" : ""}</div><div className="font-normal text-sm leading-6 mt-1 break-words">${valueExpression || "{value}"}</div></div>`;
-
-const rowSignature = "function Row({label,value}:{label:string;value:string})";
-const rowStart = source.indexOf(rowSignature);
-if (rowStart < 0) fail("shift information Row component not found");
-const rowBodyOpen = source.indexOf("{", rowStart + rowSignature.length);
-if (rowBodyOpen < 0) fail("shift information Row body not found");
-let depth = 0;
-let quote = null;
-let escaped = false;
-let rowEnd = -1;
-for (let i = rowBodyOpen; i < source.length; i += 1) {
-  const ch = source[i];
-  if (quote) {
-    if (escaped) escaped = false;
-    else if (ch === "\\") escaped = true;
-    else if (ch === quote) quote = null;
-    continue;
-  }
-  if (ch === '"' || ch === "'" || ch === "`") { quote = ch; continue; }
-  if (ch === "{") depth += 1;
-  else if (ch === "}") {
-    depth -= 1;
-    if (depth === 0) { rowEnd = i + 1; break; }
-  }
+const arrowAttendance = '<div className="h-10 w-10 rounded-xl bg-primary/12 grid place-items-center text-primary mb-3 text-xl font-black" aria-hidden="true">↓</div>';
+const arrowCheckout = '<div className="h-10 w-10 rounded-xl bg-accent/12 grid place-items-center text-accent mb-3 text-xl font-black" aria-hidden="true">↑</div>';
+if (!source.includes(arrowAttendance) || !source.includes(arrowCheckout)) {
+  fail("attendance/check-out arrow anchors not found in the current EmployeeHome markup");
 }
-if (rowEnd < 0) fail("could not safely determine the end of the Row component");
-const standardizedRow = 'function Row({label,value}:{label:string;value:string}){return <div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px] flex flex-col justify-start"><div className="font-black text-sm leading-6">{label}</div><div className="font-normal text-sm leading-6 mt-1 break-words">{value}</div></div>}';
-source = source.slice(0, rowStart) + standardizedRow + source.slice(rowEnd);
+source = source.replace(
+  arrowAttendance,
+  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/12 grid place-items-center text-primary mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</div>',
+);
+source = source.replace(
+  arrowCheckout,
+  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-accent/12 grid place-items-center text-accent mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">→</div>',
+);
+
+const requestArrow = '<span className="text-accent text-xl">←</span>';
+if (!source.includes(requestArrow)) {
+  fail("leave/permission request arrow anchor not found in the current EmployeeHome markup");
+}
+source = source.replace(
+  requestArrow,
+  '<span className="text-accent text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</span>',
+);
 
 const infoAnchor = source.indexOf("معلومات الدوام");
 if (infoAnchor < 0) fail("shift information heading not found");
@@ -97,9 +59,10 @@ for (const required of ["period", "time", "status", "location", "device"]) {
   if (!byKind.has(required)) fail(`could not locate the existing ${required} row`);
 }
 
-// Rotation card uses the exact same markup template as every Row card.
-const shiftTypeCard = '<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px] flex flex-col justify-start"><div className="font-black text-sm leading-6">نوع الدوام</div><div className="font-normal text-sm leading-6 mt-1 break-words">{isRotation?"تناوبي":"إداري"}</div></div>';
+// Match the rotation card to the same visual language as the existing Row cards.
+const shiftTypeCard = '<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px]"><div className="text-xs text-muted-foreground">نوع الدوام</div><div className="font-black mt-1">{isRotation?"تناوبي":"إداري"}</div></div>';
 const ordered = [shiftTypeCard, byKind.get("period"), byKind.get("time"), byKind.get("status"), byKind.get("location"), byKind.get("device")].filter(Boolean);
+
 source = source.slice(0, gridStart) + gridOpen + ordered.join("") + source.slice(gridEnd);
 writeFileSync(file, source, "utf8");
-console.log("EmployeeHome shift-info patch: green/blue attendance arrows point down and are vertically centered; request arrow is centered in its icon; rotation card exactly matches all shift-info cards.");
+console.log("EmployeeHome shift-info patch: restored previous interface and made rotation card match the existing shift-info card design.");
