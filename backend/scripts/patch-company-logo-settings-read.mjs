@@ -55,7 +55,7 @@ if (!source.includes("readCompanySettings(env, req)")) {
 if (!source.includes("settings.brandLogo = logoUrl.toString();")) {
   throw new Error("Company logo settings read patch: R2 ETag URL anchor not found; refusing unsafe replacement.");
 }
-if (!source.includes("candidateKeys = Array.from(new Set([\"company/logo-current.webp\", configuredKey]")) && !source.includes("const candidateKeys = Array.from(new Set([\"company/logo-current.webp\", configuredKey]")) ) {
+if (!source.includes("const candidateKeys = Array.from(new Set([\"company/logo-current.webp\", configuredKey]")) {
   throw new Error("Company logo settings read patch: canonical R2 key preference anchor not found; refusing unsafe replacement.");
 }
 
