@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Eye, Sunrise, Sunset } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { currentSession } from "@/lib/auth";
 
 type Tab = "rain" | "wind" | "humidity";
