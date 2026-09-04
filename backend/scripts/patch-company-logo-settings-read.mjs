@@ -16,19 +16,23 @@ const oldReturn = `  return { ...settings, adminAccounts: admins.results || [], 
 
 async function saveCompanySettings(req: Request, env: Env, origin: string) {`;
 const newReturn = [
-  `  // D1 stores the R2 pointer, but the R2 object itself is authoritative for the`,
-  `  // current logo. Resolve its ETag here so a browser never receives a stale`,
-  `  // cacheable URL after a logo replacement (including after a D1 outage).`,
+  `  // R2 is authoritative for the current company logo. Prefer the canonical`,
+  `  // current key even if D1 still points at a legacy key (for example after a`,
+  `  // temporary D1 write-limit). This guarantees a reload cannot resurrect an`,
+  `  // older logo while the verified current object already exists in R2.`,
   `  if (request && env.PROFILE_IMAGES) {`,
   `    try {`,
   `      const logoKeyRow = await env.DB.prepare("SELECT value FROM settings WHERE key='brandLogoR2Key' LIMIT 1").first<{ value: string }>();`,
-  `      const configuredKey = String(logoKeyRow?.value || "").trim() || "company/logo-current.webp";`,
-  `      const object = await env.PROFILE_IMAGES.head(configuredKey);`,
-  `      if (object) {`,
+  `      const configuredKey = String(logoKeyRow?.value || "").trim();`,
+  `      const candidateKeys = Array.from(new Set(["company/logo-current.webp", configuredKey].filter(Boolean)));`,
+  `      for (const key of candidateKeys) {`,
+  `        const object = await env.PROFILE_IMAGES.head(key);`,
+  `        if (!object) continue;`,
   `        const logoUrl = new URL(request.url);`,
   `        logoUrl.pathname = "/api/company/logo";`,
   `        logoUrl.search = "?v=" + encodeURIComponent(object.etag);`,
   `        settings.brandLogo = logoUrl.toString();`,
+  `        break;`,
   `      }`,
   `    } catch {`,
   `      // Keep the D1 value if R2 metadata cannot be read during this request.`,
@@ -51,6 +55,9 @@ if (!source.includes("readCompanySettings(env, req)")) {
 if (!source.includes("settings.brandLogo = logoUrl.toString();")) {
   throw new Error("Company logo settings read patch: R2 ETag URL anchor not found; refusing unsafe replacement.");
 }
+if (!source.includes("candidateKeys = Array.from(new Set([\"company/logo-current.webp\", configuredKey]")) && !source.includes("const candidateKeys = Array.from(new Set([\"company/logo-current.webp\", configuredKey]")) ) {
+  throw new Error("Company logo settings read patch: canonical R2 key preference anchor not found; refusing unsafe replacement.");
+}
 
 writeFileSync(file, source, "utf8");
-console.log("Company logo settings read patch: /api/settings now resolves the current R2 ETag into brandLogo.");
+console.log("Company logo settings read patch: /api/settings now resolves the canonical current R2 logo first and versions it by ETag.");
