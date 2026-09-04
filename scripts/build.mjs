@@ -107,3 +107,5 @@ writeFileSync(
   `${JSON.stringify({ commitSha, branch, deploymentUrl }, null, 2)}\n`,
   "utf8",
 );
+
+run("node", ["scripts/verify-production-build.mjs"]);
