@@ -43,6 +43,7 @@ export default function CompanySpecialtiesPanel() {
   const [value, setValue] = useState("");
   const [brandName, setBrandName] = useState("");
   const [brandLogo, setBrandLogo] = useState<string | null>(null);
+  const [pendingLogo, setPendingLogo] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -92,17 +93,27 @@ export default function CompanySpecialtiesPanel() {
   async function handleLogo(file: File | undefined) {
     if (!file || saving || !hydrated) return;
     if (!file.type.startsWith("image/")) { setMessage("يرجى اختيار ملف صورة صالح."); return; }
-    setSaving(true); setMessage(null);
+    setMessage(null);
     try {
       const raw = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("تعذر قراءة الصورة")); reader.onerror = () => reject(new Error("تعذر قراءة الصورة")); reader.readAsDataURL(file); });
       const compressed = await compressProfileImageDataUrl(raw, { maxWidth: 768, maxHeight: 768, quality: 0.84, type: "image/webp", maxBytes: 100 * 1024 });
-      await uploadCompanyLogo(compressed);
+      setPendingLogo(compressed);
+      setMessage("تم تجهيز الشعار. اضغط «حفظ الشعار» لرفعه وحفظه مركزيًا.");
+    } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر تجهيز الشعار"); }
+  }
+
+  async function saveLogo() {
+    if (!pendingLogo || saving || !hydrated) return;
+    setSaving(true); setMessage(null);
+    try {
+      await uploadCompanyLogo(pendingLogo);
       const remote = await getBackendSettings();
       applyRemoteSettings(remote);
       setBrandName(remote.brandName || "");
       setBrandLogo(remote.brandLogo || null);
+      setPendingLogo(null);
       setMessage("تم حفظ الشعار في R2 وربطه بسجل الهوية في D1.");
-    } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر تجهيز الشعار"); }
+    } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر حفظ الشعار"); }
     finally { setSaving(false); }
   }
 
@@ -115,6 +126,7 @@ export default function CompanySpecialtiesPanel() {
       applyRemoteSettings(remote);
       setBrandName(remote.brandName || "");
       setBrandLogo(remote.brandLogo || null);
+      setPendingLogo(null);
       setMessage("تم حذف الشعار من R2 وD1.");
     } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر إزالة الشعار"); }
     finally { setSaving(false); }
@@ -126,6 +138,8 @@ export default function CompanySpecialtiesPanel() {
   }
 
   const add = () => { const v = value.trim(); if (v && !items.includes(v)) { void persist({ specialties: [...items, v] }); setValue(""); } };
+
+  const displayedLogo = pendingLogo || brandLogo;
 
   return (
     <details className="hud-card group overflow-hidden border-primary/20 bg-gradient-to-br from-card via-card to-primary/5 shadow-lg shadow-primary/5" open>
@@ -147,9 +161,9 @@ export default function CompanySpecialtiesPanel() {
           <div className="space-y-4">
             <label className="block text-xs font-bold text-muted-foreground">اسم الشركة / الجهة<input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void persist({ brandName: brandName.trim() }); } }} maxLength={120} className="input mt-2 h-11 w-full rounded-xl" placeholder="مثال: شركة أو مؤسسة" /></label>
             <button type="button" disabled={saving || !hydrated || !brandName.trim()} onClick={() => void persist({ brandName: brandName.trim() })} className="btn-primary inline-flex items-center gap-2 rounded-xl px-4"><Check className="h-4 w-4" />حفظ اسم الجهة</button>
-            <div className="rounded-2xl border border-border/70 bg-background/50 p-4"><div className="flex flex-col gap-4 sm:flex-row sm:items-center"><div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-background shadow-inner">{brandLogo ? <img src={brandLogo} alt={brandName.trim() || "شعار الشركة"} className="h-full w-full object-contain p-2" /> : <ImagePlus className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />}</div><div className="min-w-0 flex-1"><div className="text-sm font-black">الشعار الرسمي</div><div className="mt-1 text-[11px] leading-5 text-muted-foreground">يُضغط محليًا إلى WebP بحجم آمن ثم يُرفع إلى R2، ويُحفظ مرجع العرض في D1.</div><div className="mt-3 flex flex-wrap gap-2"><label className={`btn-secondary inline-flex items-center gap-2 rounded-xl ${saving || !hydrated ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}><ImagePlus className="h-4 w-4" />{brandLogo ? "تغيير الشعار" : "رفع الشعار"}<input type="file" accept="image/*" className="sr-only" disabled={saving || !hydrated} onChange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ""; void handleLogo(f); }} /></label>{brandLogo && <button type="button" disabled={saving || !hydrated} onClick={() => void removeLogo()} className="btn-secondary inline-flex items-center gap-2 rounded-xl text-destructive"><Trash2 className="h-4 w-4" />إزالة</button>}</div></div></div></div>
+            <div className="rounded-2xl border border-border/70 bg-background/50 p-4"><div className="flex flex-col gap-4 sm:flex-row sm:items-center"><div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-background shadow-inner">{displayedLogo ? <img src={displayedLogo} alt={brandName.trim() || "شعار الشركة"} className="h-full w-full object-contain p-2" /> : <ImagePlus className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />}</div><div className="min-w-0 flex-1"><div className="text-sm font-black">الشعار الرسمي</div><div className="mt-1 text-[11px] leading-5 text-muted-foreground">يُضغط محليًا إلى WebP بحجم آمن، ثم يُحفظ عند الضغط على «حفظ الشعار» في R2 ويُحفظ مرجع العرض في D1.</div><div className="mt-3 flex flex-wrap gap-2"><label className={`btn-secondary inline-flex items-center gap-2 rounded-xl ${saving || !hydrated ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}><ImagePlus className="h-4 w-4" />{brandLogo ? "تغيير الشعار" : "اختيار الشعار"}<input type="file" accept="image/*" className="sr-only" disabled={saving || !hydrated} onChange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ""; void handleLogo(f); }} /></label><button type="button" disabled={saving || !hydrated || !pendingLogo} onClick={() => void saveLogo()} className="btn-primary inline-flex items-center gap-2 rounded-xl disabled:opacity-50"><Check className="h-4 w-4" />حفظ الشعار</button>{brandLogo && <button type="button" disabled={saving || !hydrated} onClick={() => void removeLogo()} className="btn-secondary inline-flex items-center gap-2 rounded-xl text-destructive"><Trash2 className="h-4 w-4" />إزالة</button>}</div></div></div></div>
           </div>
-          <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4"><div className="text-xs font-black text-primary">حالة الهوية</div><div className="mt-3 space-y-3 text-xs"><div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">اسم الجهة</span><span className="font-bold">{brandName.trim() ? "مضبوط" : "غير مضبوط"}</span></div><div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">الشعار</span><span className="font-bold">{brandLogo ? "مرتبط بـ R2" : "غير مضاف"}</span></div><div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">التخزين</span><span className="font-bold">D1 + R2</span></div></div></div>
+          <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4"><div className="text-xs font-black text-primary">حالة الهوية</div><div className="mt-3 space-y-3 text-xs"><div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">اسم الجهة</span><span className="font-bold">{brandName.trim() ? "مضبوط" : "غير مضبوط"}</span></div><div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">الشعار</span><span className="font-bold">{pendingLogo ? "جاهز للحفظ" : brandLogo ? "مرتبط بـ R2" : "غير مضاف"}</span></div><div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">التخزين</span><span className="font-bold">D1 + R2</span></div></div></div>
         </div>
         <div className="mt-5 border-t border-border/60 pt-5"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h3 className="text-sm font-black">تخصصات العمل</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">تُستخدم عند إضافة الموظفين وفي التقارير.</p><div className="mt-3 flex gap-2"><input type="text" value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} placeholder="إضافة تخصص جديد" className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary" /><button type="button" disabled={saving || !hydrated || !value.trim() || items.includes(value.trim())} onClick={add} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-50"><Plus className="h-4 w-4" />إضافة</button></div><div className="mt-3 grid gap-2">{items.length === 0 ? <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">لا توجد تخصصات مضافة بعد.</div> : items.map((item, index) => <div key={item} className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/50 px-3 py-2"><GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/50" /><span className="min-w-0 flex-1 truncate text-sm font-bold">{index + 1}. {item}</span><button type="button" disabled={saving || !hydrated || index === 0} onClick={() => void moveSpecialty(index, -1)} className="rounded-lg border border-border p-1.5 text-muted-foreground disabled:opacity-30" aria-label="رفع التخصص">↑</button><button type="button" disabled={saving || !hydrated || index === items.length - 1} onClick={() => void moveSpecialty(index, 1)} className="rounded-lg border border-border p-1.5 text-muted-foreground disabled:opacity-30" aria-label="خفض التخصص">↓</button><button type="button" disabled={saving || !hydrated} onClick={() => void persist({ specialties: items.filter((_, i) => i !== index) })} className="rounded-lg border border-border p-1.5 text-destructive disabled:opacity-30" aria-label="حذف التخصص"><Trash2 className="h-4 w-4" /></button></div>)}</div></div></div></div>
       </div>
