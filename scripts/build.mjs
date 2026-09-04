@@ -25,6 +25,7 @@ run("node", ["scripts/patch-manager-reports-final2.mjs"]);
 run("node", ["scripts/patch-manager-reports-live.mjs"]);
 run("node", ["scripts/patch-manager-report-header.mjs"]);
 run("node", ["scripts/patch-manager-report-share.mjs"]);
+run("node", ["scripts/patch-manager-report-filename.mjs"]);
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
 
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -53,8 +54,8 @@ const shareScan = spawnSync("grep", ["-RIlE", shareMarkers.join("|"), "dist"], {
 if (shareScan.status !== 0 || !shareScan.stdout?.trim()) {
   throw new Error("Production build validation failed: direct daily PDF sharing action was not found in dist.");
 }
-const legacy = spawnSync("grep", ["-RIl", "رئيس القسم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-const legacyAssistant = spawnSync("grep", ["-RIl", "معاون رئيس القسم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+const legacy = spawnSync("grep", ["-RIl", "رئيس القسم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+const legacyAssistant = spawnSync("grep", ["-RIl", "معاون رئيس القسم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (legacy.status === 0 || legacyAssistant.status === 0) {
   throw new Error("Production build validation failed: legacy department owner/assistant header is still present in dist.");
 }
