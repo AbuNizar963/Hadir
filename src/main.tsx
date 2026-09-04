@@ -11,6 +11,8 @@ import "./mobile-layout-width.css";
 import "./pull-to-refresh.css";
 import "./rotation-form.css";
 import "./employee-name.css";
+import "./styles/settings-compact.css";
+import "./styles/workforce-card-polish.css";
 import { seedIfEmpty } from "@/lib/storage";
 import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnostics";
 import { startRealtimeSync } from "@/lib/realtime";
