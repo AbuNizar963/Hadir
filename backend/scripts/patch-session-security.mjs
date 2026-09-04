@@ -60,4 +60,23 @@ const gatewayBearerFirst = 'return req.headers.get("authorization")?.replace(/^B
 gatewaySource = replaceOnce(gatewayPath, gatewaySource, gatewayCookieFirst, gatewayBearerFirst, "production gateway bearer precedence");
 writeFileSync(gatewayPath, gatewaySource, "utf8");
 
-console.log("Session security patch applied: 6-month idle timeout + 1-year absolute lifetime + revoked-session guard + bearer-token precedence over stale cookies.");
+const workforcePath = new URL("../src/workforce.ts", import.meta.url);
+let workforceSource = readFileSync(workforcePath, "utf8");
+if (!workforceSource.includes('import { sendUserPush } from "./push";')) {
+  workforceSource = 'import { sendUserPush } from "./push";\n' + workforceSource;
+}
+const workforceEnvOld = 'type Env={DB:D1Database;PROFILE_IMAGES?:R2Bucket};';
+const workforceEnvNew = 'type Env={DB:D1Database;PROFILE_IMAGES?:R2Bucket;VAPID_PUBLIC_KEY?:string;VAPID_PRIVATE_KEY?:string;VAPID_SUBJECT?:string};';
+if (workforceSource.includes(workforceEnvOld)) workforceSource = workforceSource.replace(workforceEnvOld, workforceEnvNew);
+else if (!workforceSource.includes('VAPID_PUBLIC_KEY?:string')) throw new Error("Workforce push patch: Env anchor not found");
+const workforceNotifyOld = 'async function notify(db:D1Database,u:string,t:string,b:string,severity="info",type="system"){await db.prepare("INSERT INTO notifications(id,recipient_id,title,body,severity,type,created_at) VALUES(?,?,?,?,?,?,?)").bind(id(),u,t,b,severity,type,now()).run();}';
+const workforceNotifyNew = 'let workforcePushEnv:{VAPID_PUBLIC_KEY?:string;VAPID_PRIVATE_KEY?:string;VAPID_SUBJECT?:string}|null=null;\nasync function notify(db:D1Database,u:string,t:string,b:string,severity="info",type="system"){const recipient=String(u||"").trim();if(!recipient)throw new Error("NOTIFICATION_RECIPIENT_REQUIRED");const createdAt=now();await db.prepare("INSERT INTO notifications(id,recipient_id,title,body,severity,type,created_at) VALUES(?,?,?,?,?,?,?)").bind(id(),recipient,t,b,severity,type,createdAt).run();const subscriptions=await db.prepare("SELECT id,endpoint,p256dh,auth FROM push_subscriptions WHERE user_id=?").bind(recipient).all<any>();const url=type==="device-rebind"?"/manager/requests":type==="violation"?"/manager/audit":"/manager/requests";for(const subscription of subscriptions.results||[]){try{const result=await sendUserPush(workforcePushEnv||{}, {endpoint:String(subscription.endpoint),keys:{p256dh:String(subscription.p256dh),auth:String(subscription.auth)}},{title:t,body:b,url,type,tag:`hadir-${type}`});if(result.status===404||result.status===410)await db.prepare("DELETE FROM push_subscriptions WHERE id=?").bind(subscription.id).run().catch(()=>undefined);}catch{}}}';
+if (workforceSource.includes(workforceNotifyOld)) workforceSource = workforceSource.replace(workforceNotifyOld, workforceNotifyNew);
+else if (!workforceSource.includes('SELECT id,endpoint,p256dh,auth FROM push_subscriptions WHERE user_id=?')) throw new Error("Workforce push patch: notify anchor not found");
+const workforceHandlerOld = 'export async function handleWorkforce(req:Request,env:Env,actor:Actor|null,pathname:string){await ensureWorkforceSchema(env.DB);';
+const workforceHandlerNew = 'export async function handleWorkforce(req:Request,env:Env,actor:Actor|null,pathname:string){workforcePushEnv=env;await ensureWorkforceSchema(env.DB);';
+if (workforceSource.includes(workforceHandlerOld)) workforceSource = workforceSource.replace(workforceHandlerOld, workforceHandlerNew);
+else if (!workforceSource.includes('workforcePushEnv=env;')) throw new Error("Workforce push patch: handler anchor not found");
+writeFileSync(workforcePath, workforceSource, "utf8");
+
+console.log("Session + workforce notification patch applied: secure session lifetime, bearer-token precedence, and Web Push delivery for workforce events.");
