@@ -100,6 +100,13 @@ export async function handleCompanyLogoRequest(
       customMetadata: { purpose: "company-logo", uploadedBy: resolvedActor?.id || "unknown" },
     });
 
+    const storedObject = await env.PROFILE_IMAGES.head(key);
+    if (!storedObject) {
+      await env.PROFILE_IMAGES.delete(key).catch(() => undefined);
+      console.error("company logo R2 persistence verification failed", key);
+      return json({ error: "تعذر التحقق من حفظ شعار الشركة في R2" }, 502, origin);
+    }
+
     try {
       await env.DB.batch([
         env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_KEY_SETTING, key),
