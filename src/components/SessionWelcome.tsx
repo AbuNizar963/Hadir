@@ -41,22 +41,15 @@ export default function SessionWelcome() {
     return () => window.clearTimeout(id);
   }, [sessionLoginAt]);
 
-  if (!session) return null;
+  if (!session || !show) return null;
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[2px] transition-opacity duration-300 ${
-        show ? "opacity-100" : "pointer-events-none opacity-0"
-      }`}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-background/35 px-4 backdrop-blur-[2px] transition-opacity duration-300"
       dir="rtl"
       aria-live="polite"
-      aria-hidden={!show}
     >
-      <div
-        className={`w-full max-w-md transform rounded-3xl border-2 border-emerald-500/70 bg-card p-7 text-center shadow-2xl shadow-emerald-500/10 transition-all duration-300 sm:p-8 ${
-          show ? "translate-y-0 scale-100" : "translate-y-3 scale-95"
-        }`}
-      >
+      <div className="w-full max-w-md transform rounded-3xl border-2 border-emerald-500/70 bg-card p-7 text-center shadow-2xl shadow-emerald-500/10 transition-all duration-300 sm:p-8">
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-3xl text-emerald-600 dark:text-emerald-400">
           ✓
         </div>
