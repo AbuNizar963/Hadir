@@ -6,6 +6,7 @@ const MAX_LOGO_BYTES = 100 * 1024;
 const LOGO_CONTENT_TYPE = "image/webp";
 const LOGO_KEY_SETTING = "brandLogoR2Key";
 const LOGO_URL_SETTING = "brandLogo";
+const LOGO_BACKUP_SETTING = "brandLogoDataUrl";
 const SESSION_COOKIE = "hadir_session";
 
 function json(data: unknown, status: number, origin: string): Response {
@@ -57,6 +58,21 @@ async function authenticatedActor(req: Request, env: Env): Promise<Actor | null>
   }
 }
 
+function dataUrlFromBytes(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
+  }
+  return `data:${LOGO_CONTENT_TYPE};base64,${btoa(binary)}`;
+}
+
+async function readStoredLogoBackup(env: Env): Promise<string | null> {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_BACKUP_SETTING).first<{ value: string }>();
+  const value = String(row?.value || "").trim();
+  return value.startsWith(`data:${LOGO_CONTENT_TYPE};base64,`) && value.length <= 140000 ? value : null;
+}
+
 export async function handleCompanyLogoRequest(
   req: Request,
   env: Env,
@@ -95,7 +111,11 @@ export async function handleCompanyLogoRequest(
 
     const key = `company/logo-${crypto.randomUUID()}.webp`;
     const publicUrl = logoUrl(req, key);
-    await env.PROFILE_IMAGES.put(key, file.stream(), {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const backupDataUrl = dataUrlFromBytes(bytes);
+    if (backupDataUrl.length > 140000) return json({ error: "حجم الشعار بعد التجهيز أكبر من الحد المسموح" }, 413, origin);
+
+    await env.PROFILE_IMAGES.put(key, bytes, {
       httpMetadata: { contentType: LOGO_CONTENT_TYPE, cacheControl: "public, max-age=31536000, immutable" },
       customMetadata: { purpose: "company-logo", uploadedBy: resolvedActor?.id || "unknown" },
     });
@@ -111,6 +131,7 @@ export async function handleCompanyLogoRequest(
       await env.DB.batch([
         env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_KEY_SETTING, key),
         env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_URL_SETTING, publicUrl),
+        env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_BACKUP_SETTING, backupDataUrl),
       ]);
     } catch (error) {
       await env.PROFILE_IMAGES.delete(key).catch(() => undefined);
@@ -121,7 +142,8 @@ export async function handleCompanyLogoRequest(
     // Do not delete the previous R2 object. Existing reports/pages can still
     // reference an older immutable URL; removing it makes the logo disappear
     // later when that cached document is refreshed. The D1 R2 key remains the
-    // source of truth for the current logo.
+    // source of truth for the current logo, with a D1 data-URL backup for PDF
+    // generation when R2 is temporarily unavailable.
     return json({ ok: true, url: publicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
   }
 
@@ -132,6 +154,7 @@ export async function handleCompanyLogoRequest(
     await env.DB.batch([
       env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_KEY_SETTING),
       env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_URL_SETTING),
+      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_BACKUP_SETTING),
     ]);
     return json({ ok: true }, 200, origin);
   }
