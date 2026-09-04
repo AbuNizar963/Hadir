@@ -35,6 +35,7 @@ run("node", ["scripts/normalize-manager-settings-locations-anchor.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-dedicated.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-fixes.mjs"]);
 run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
+run("node", ["scripts/patch-manager-settings-telegram-screen.mjs"]);
 run("node", ["scripts/patch-manager-dashboard-dedicated-status.mjs"]);
 run("node", ["scripts/patch-manager-menu-autoclose-on-scroll.mjs"]);
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
