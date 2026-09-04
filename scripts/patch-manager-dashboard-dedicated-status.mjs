@@ -104,7 +104,7 @@ source = source.replace(statusStyleAnchor, 'tone === "rest" ? "border-sky-500/30
 
 const shortcutComponentAnchor = 'function StatusShortcut({ label, value, icon, tone, onClick, active }: { label: string; value: number; icon: ReactNode; tone: Tone; onClick: () => void; active: boolean }) {';
 if (!source.includes(shortcutComponentAnchor)) fail("status shortcut component anchor not found");
-const permissionIcon = `function PermissionIcon() {\n  return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">\n    <path d="M19.2 9.6c0-4.5-3.1-7.6-7.1-7.6C7.8 2 4.5 4.9 4.5 9.3c0 2.5 1.2 4.1 2.4 5.6 1.1 1.3 1.9 2.4 1.9 4.1 0 1.7 1.3 3 3 3 1.6 0 2.8-.9 3.3-2.4.4-1.2.7-1.8 1.5-2.7.9-1 2.6-2.4 2.6-7.3Z"/>\n    <path d="M13.9 8.8c0-1.7-1-2.9-2.5-2.9-1.6 0-2.7 1.2-2.7 3 0 1.1.5 1.9 1.2 2.6 0 .8-.3 1.3-.9 1.7"/>\n  </svg>;\n}\n\n`;
+const permissionIcon = `function PermissionIcon() {\n  return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">\n    <path d="M19.2 9.6c0-4.5-3.1-7.6-7.1-7.6C7.8 2 4.5 4.9 4.5 9.3c0 2.5 1.2 4.1 2.4 5.6 1.1 1.3 1.9 2.4 1.9 4.1 0 1.7 1.3 3 3 3 1.6 0 2.8-.9 3.3-2.4.4-1.2.7-1.8 1.5-2.7.9-1 2.6-2.4 2.6-7.3Z"/>\n    <path d="M13.9 8.8c0-1.7-1-2.9-2.5-2.9-1.6 0-2.7 1.2-2.7 3 0 1.1.5 1.9 1.2 2.6 1.2 1.1 1.2 2.4 1.2 2.4 0 .8-.3 1.3-.9 1.7"/>\n  </svg>;\n}\n\n`;
 source = source.replace(shortcutComponentAnchor, permissionIcon + shortcutComponentAnchor);
 
 writeFileSync(file, source, "utf8");
