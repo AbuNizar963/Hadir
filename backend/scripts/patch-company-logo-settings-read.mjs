@@ -15,28 +15,30 @@ const oldReturn = `  return { ...settings, adminAccounts: admins.results || [], 
 }
 
 async function saveCompanySettings(req: Request, env: Env, origin: string) {`;
-const newReturn = `  // D1 stores the R2 pointer, but the R2 object itself is authoritative for the
-  // current logo. Resolve its ETag here so a browser never receives a stale
-  // cacheable URL after a logo replacement (including after a D1 outage).
-  if (request && env.PROFILE_IMAGES) {
-    try {
-      const logoKeyRow = await env.DB.prepare("SELECT value FROM settings WHERE key='brandLogoR2Key' LIMIT 1").first<{ value: string }>();
-      const configuredKey = String(logoKeyRow?.value || "").trim() || "company/logo-current.webp";
-      const object = await env.PROFILE_IMAGES.head(configuredKey);
-      if (object) {
-        const logoUrl = new URL(request.url);
-        logoUrl.pathname = "/api/company/logo";
-        logoUrl.search = `?v=${encodeURIComponent(object.etag)}`;
-        settings.brandLogo = logoUrl.toString();
-      }
-    } catch {
-      // Keep the D1 value if R2 metadata cannot be read during this request.
-    }
-  }
-  return { ...settings, adminAccounts: admins.results || [], locations: locations.results || [] };
-}
-
-async function saveCompanySettings(req: Request, env: Env, origin: string) {`;
+const newReturn = [
+  `  // D1 stores the R2 pointer, but the R2 object itself is authoritative for the`,
+  `  // current logo. Resolve its ETag here so a browser never receives a stale`,
+  `  // cacheable URL after a logo replacement (including after a D1 outage).`,
+  `  if (request && env.PROFILE_IMAGES) {`,
+  `    try {`,
+  `      const logoKeyRow = await env.DB.prepare("SELECT value FROM settings WHERE key='brandLogoR2Key' LIMIT 1").first<{ value: string }>();`,
+  `      const configuredKey = String(logoKeyRow?.value || "").trim() || "company/logo-current.webp";`,
+  `      const object = await env.PROFILE_IMAGES.head(configuredKey);`,
+  `      if (object) {`,
+  `        const logoUrl = new URL(request.url);`,
+  `        logoUrl.pathname = "/api/company/logo";`,
+  `        logoUrl.search = "?v=" + encodeURIComponent(object.etag);`,
+  `        settings.brandLogo = logoUrl.toString();`,
+  `      }`,
+  `    } catch {`,
+  `      // Keep the D1 value if R2 metadata cannot be read during this request.`,
+  `    }`,
+  `  }`,
+  `  return { ...settings, adminAccounts: admins.results || [], locations: locations.results || [] };`,
+  `}`,
+  ``,
+  `async function saveCompanySettings(req: Request, env: Env, origin: string) {`,
+].join("\n");
 if (source.includes(oldReturn)) source = source.replace(oldReturn, newReturn);
 
 const oldGet = `  if (req.method === "GET") return json(await readCompanySettings(env), 200, origin);`;
