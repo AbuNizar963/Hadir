@@ -8,7 +8,10 @@ async function inlineCompanyLogo(html: string): Promise<string> {
   const logo = document.querySelector<HTMLImageElement>('img[alt="شعار الشركة"]');
   if (!logo || !logo.src || logo.src.startsWith("data:image/")) return html;
   try {
-    const response = await fetch(logo.src, { credentials: "include", cache: "no-store" });
+    // Prefer an already-rendered browser cache entry. This is important when
+    // the current Settings logo is visible in the report/print view but the
+    // legacy R2 pointer is temporarily unavailable to a fresh request.
+    const response = await fetch(logo.currentSrc || logo.src, { credentials: "include", cache: "force-cache" });
     if (!response.ok) return html;
     const blob = await response.blob();
     if (!blob.size || !blob.type.startsWith("image/")) return html;
