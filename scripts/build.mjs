@@ -26,7 +26,7 @@ run("node", ["scripts/patch-manager-reports-live.mjs"]);
 run("node", ["scripts/patch-manager-report-header.mjs"]);
 run("node", ["scripts/patch-manager-report-share.mjs"]);
 run("node", ["scripts/patch-manager-report-filename.mjs"]);
-run("node", ["scripts/patch-manager-reports-historical.mjs"]);
+run("node", ["scripts/patch-manager-reports-historical-v2.mjs"]);
 run("node", ["scripts/patch-manager-settings-ui.mjs"]);
 run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-ui.mjs"]);
