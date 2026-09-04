@@ -8,9 +8,6 @@ async function inlineCompanyLogo(html: string): Promise<string> {
   const logo = document.querySelector<HTMLImageElement>('img[alt="شعار الشركة"]');
   if (!logo || !logo.src || logo.src.startsWith("data:image/")) return html;
   try {
-    // Prefer an already-rendered browser cache entry. This is important when
-    // the current Settings logo is visible in the report/print view but the
-    // legacy R2 pointer is temporarily unavailable to a fresh request.
     const response = await fetch(logo.currentSrc || logo.src, { credentials: "include", cache: "force-cache" });
     if (!response.ok) return html;
     const blob = await response.blob();
@@ -59,4 +56,9 @@ export async function generateProfessionalReportPdf(html: string, css: string, f
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+export function pdfBlobToFile(blob: Blob, filename: string): File {
+  const safeName = String(filename || "hadir-daily-report.pdf").trim() || "hadir-daily-report.pdf";
+  return new File([blob], safeName, { type: "application/pdf", lastModified: Date.now() });
 }
