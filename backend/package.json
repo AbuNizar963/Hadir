@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "check": "node scripts/patch-pdf-filename-metadata.mjs && node scripts/patch-company-logo-cache-version.mjs && wrangler deploy --dry-run",
+    "check": "node scripts/patch-pdf-filename-metadata.mjs && node scripts/patch-company-logo-cache-version.mjs && node scripts/patch-company-logo-settings-read.mjs && wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
     "migrate": "wrangler d1 migrations apply Hadir --remote"
   },
