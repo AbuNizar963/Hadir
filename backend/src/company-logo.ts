@@ -71,12 +71,10 @@ export async function handleCompanyLogoRequest(
   if (!env.PROFILE_IMAGES) return json({ error: "R2 binding PROFILE_IMAGES غير موجود" }, 503, origin);
 
   if (req.method === "GET") {
-    const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_KEY_SETTING).first<{ value: string }>();
-    const configuredKey = String(row?.value || "").trim();
-    const keys = configuredKey && configuredKey !== CURRENT_LOGO_KEY ? [configuredKey, CURRENT_LOGO_KEY] : [CURRENT_LOGO_KEY];
-    for (const key of keys) {
-      const object = await env.PROFILE_IMAGES.get(key);
-      if (!object) continue;
+    // R2 is authoritative. Never use the D1 pointer to choose the current logo,
+    // because a legacy/stale D1 value can otherwise resurrect the old image.
+    const object = await env.PROFILE_IMAGES.get(CURRENT_LOGO_KEY);
+    if (object) {
       const headers = new Headers({ "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "cache-control": "no-store" });
       object.writeHttpMetadata(headers);
       headers.set("content-type", LOGO_CONTENT_TYPE);
@@ -115,19 +113,22 @@ export async function handleCompanyLogoRequest(
       return json({ error: "تعذر التحقق من حفظ شعار الشركة في R2" }, 502, origin);
     }
 
+    const encodedVersion = encodeURIComponent(storedObject.httpEtag);
+    const versionedPublicUrl = logoUrl(req, encodedVersion);
+
     try {
       await env.DB.batch([
         env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_KEY_SETTING, key),
-        env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_URL_SETTING, publicUrl),
+        env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_URL_SETTING, versionedPublicUrl),
       ]);
     } catch (error) {
       // R2 is already the authoritative store and the object was verified.
       // Never delete it because D1 may be temporarily read-only after its limit.
       console.error("company logo settings update failed; preserving R2 object", key, error);
-      return json({ ok: true, r2Saved: true, settingsUpdated: false, url: publicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE, warning: "تم حفظ ملف الشعار نفسه في R2، لكن تعذر تحديث إعدادات D1 مؤقتًا" }, 200, origin);
+      return json({ ok: true, r2Saved: true, settingsUpdated: false, url: versionedPublicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE, warning: "تم حفظ ملف الشعار نفسه في R2، لكن تعذر تحديث إعدادات D1 مؤقتًا" }, 200, origin);
     }
 
-    return json({ ok: true, r2Saved: true, settingsUpdated: true, url: publicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
+    return json({ ok: true, r2Saved: true, settingsUpdated: true, url: versionedPublicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
   }
 
   if (req.method === "DELETE") {
