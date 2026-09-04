@@ -27,6 +27,7 @@ run("node", ["scripts/patch-manager-report-header.mjs"]);
 run("node", ["scripts/patch-manager-report-share.mjs"]);
 run("node", ["scripts/patch-manager-report-filename.mjs"]);
 run("node", ["scripts/patch-manager-reports-historical-v2.mjs"]);
+run("node", ["scripts/patch-manager-reports-damascus-date.mjs"]);
 run("node", ["scripts/patch-manager-settings-ui.mjs"]);
 run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-ui.mjs"]);
@@ -45,7 +46,7 @@ const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || g
 const branch = process.env.CF_PAGES_BRANCH || process.env.GITHUB_REF_NAME || "unknown";
 const deploymentUrl = process.env.CF_PAGES_URL || "";
 
-const bun = spawnSync("bun", ["--version"], { stdio: "ignore", shell: false });
+const bun = spawnSync("bun", ["--version"], { stdio: "ignore" });
 if (bun.status === 0 && !bun.error) {
   if (!run("bun", ["run", "vite", "build"])) {
     run("npm", ["run", "build"]);
