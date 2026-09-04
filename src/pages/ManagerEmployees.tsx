@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { CalendarPlus, FileClock, Star, LogIn, LogOut, Footprints, Pencil, Trash2, Smartphone, RotateCcw } from "lucide-react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import SmartEmployeeImport from "@/components/employees/SmartEmployeeImport";
+import { toast } from "@/components/system/ToastProvider";
 import {
   backendEnabled,
   createBackendEmployee,
@@ -272,7 +273,8 @@ export default function ManagerEmployees() {
       const created = await createBackendEscapeEvent({ employeeId: e.id, status, reason });
       setEscapeEvents((prev) => [created.event, ...prev.filter((x) => x.employeeId !== e.id)]);
       await load(false);
-    } catch (err) { setError(err instanceof Error ? err.message : `تعذر ${verb}.`); }
+      toast.success(status === "escaped" ? "تم تسجيل هروب الموظف" : "تم تسجيل عودة الموظف");
+    } catch (err) { const message = err instanceof Error ? err.message : `تعذر ${verb}.`; setError(message); toast.error(verb, message); }
   };
 
   const openAdminEmployeeRequest = (e: Employee, type: "permission" | "leave") => {
@@ -288,8 +290,8 @@ export default function ManagerEmployees() {
   const createAdminEmployeeRequest = async () => {
     if (!requestDialog || !canManage || requestDialog.employee.status !== "active") return;
     const label = requestDialog.type === "permission" ? "استئذان" : "إجازة";
-    if (!requestStartDate || !requestEndDate) return setError(`حدد تاريخ بداية ونهاية ${label}.`);
-    if (requestEndDate < requestStartDate) return setError("تاريخ النهاية يجب أن يكون مساويًا أو بعد تاريخ البداية.");
+    if (!requestStartDate || !requestEndDate) { const message = `حدد تاريخ بداية ونهاية ${label}.`; setError(message); toast.warning(message); return; }
+    if (requestEndDate < requestStartDate) { const message = "تاريخ النهاية يجب أن يكون مساويًا أو بعد تاريخ البداية."; setError(message); toast.warning(message); return; }
     setRequestSaving(true);
     setError(null);
     try {
@@ -301,7 +303,8 @@ export default function ManagerEmployees() {
       setRequestDialog(null);
       setRequestReason("");
       await load(false);
-    } catch (err) { setError(err instanceof Error ? err.message : `تعذر تسجيل ${label}.`); }
+      toast.success(`تم تسجيل ${label} بنجاح`);
+    } catch (err) { const message = err instanceof Error ? err.message : `تعذر تسجيل ${label}.`; setError(message); toast.error(`تعذر تسجيل ${label}`, message); }
     finally { setRequestSaving(false); }
   };
 
@@ -315,9 +318,9 @@ export default function ManagerEmployees() {
 
   const submit = async () => {
     const name = form.name.trim(); const jobNumber = form.jobNumber.trim(); const pin = form.pin.trim();
-    if (!name || !jobNumber) return setError("اسم الموظف والرقم الوظيفي مطلوبان.");
-    if (!editingId && pin.length < 4) return setError("رمز PIN يجب أن يتكون من 4 أحرف/أرقام على الأقل.");
-    if (form.scheduleType === "ADMIN" && !form.workDays.length) return setError("اختر يوم دوام واحدًا على الأقل.");
+    if (!name || !jobNumber) { const message = "اسم الموظف والرقم الوظيفي مطلوبان."; setError(message); toast.warning(message); return; }
+    if (!editingId && pin.length < 4) { const message = "رمز PIN يجب أن يتكون من 4 أحرف/أرقام على الأقل."; setError(message); toast.warning(message); return; }
+    if (form.scheduleType === "ADMIN" && !form.workDays.length) { const message = "اختر يوم دوام واحدًا على الأقل."; setError(message); toast.warning(message); return; }
     setSaving(true); setError(null);
     try {
       const grace = form.grace.trim() === "" ? 0 : Math.max(0, Number(form.grace) || 0);
@@ -358,20 +361,21 @@ export default function ManagerEmployees() {
         saveEmployees([employee, ...employees]);
       }
       setForm(emptyForm); setEditingId(null); setShowForm(false); await load(false);
-    } catch (err) { setError(err instanceof Error ? err.message : "تعذر حفظ الموظف."); }
+      toast.success(editingId ? "تم تحديث الموظف بنجاح" : "تم إضافة الموظف بنجاح");
+    } catch (err) { const message = err instanceof Error ? err.message : "تعذر حفظ الموظف."; setError(message); toast.error(editingId ? "تعذر تحديث الموظف" : "تعذر إضافة الموظف", message); }
     finally { setSaving(false); }
   };
 
   const edit = (e: Employee) => { setEditingId(e.id); setForm(formFrom(e)); setShowForm(true); setError(null); };
   const remove = async (e: Employee) => {
     if (!confirm(`حذف الموظف «${e.name}»؟`)) return;
-    try { if (backendEnabled) await deleteBackendEmployee(e.id); else saveEmployees(employees.filter((x) => x.id !== e.id)); await load(false); }
-    catch (err) { setError(err instanceof Error ? err.message : "تعذر حذف الموظف."); }
+    try { if (backendEnabled) await deleteBackendEmployee(e.id); else saveEmployees(employees.filter((x) => x.id !== e.id)); await load(false); toast.success("تم حذف الموظف بنجاح"); }
+    catch (err) { const message = err instanceof Error ? err.message : "تعذر حذف الموظف."; setError(message); toast.error("تعذر حذف الموظف", message); }
   };
   const resetDevice = async (e: Employee) => {
     if (!confirm(`إلغاء ربط جهاز «${e.name}»؟`)) return;
-    try { if (backendEnabled) await resetBackendEmployeeDevice(e.id); else saveEmployees(employees.map((x) => x.id === e.id ? { ...x, deviceId: null, deviceLabel: null } : x)); await load(false); }
-    catch (err) { setError(err instanceof Error ? err.message : "تعذر إلغاء ربط الجهاز."); }
+    try { if (backendEnabled) await resetBackendEmployeeDevice(e.id); else saveEmployees(employees.map((x) => x.id === e.id ? { ...x, deviceId: null, deviceLabel: null } : x)); await load(false); toast.success("تم إلغاء ربط جهاز الموظف"); }
+    catch (err) { const message = err instanceof Error ? err.message : "تعذر إلغاء ربط الجهاز."; setError(message); toast.error("تعذر إلغاء ربط الجهاز", message); }
   };
   const directCheckout = async (e: Employee) => {
     if (e.status !== "active" || !isOwner) return;
@@ -383,7 +387,8 @@ export default function ManagerEmployees() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر تسجيل الانصراف المباشر.");
       await load(false);
-    } catch (err) { setError(err instanceof Error ? err.message : "تعذر تسجيل الانصراف المباشر."); }
+      toast.success("تم تسجيل الانصراف المباشر");
+    } catch (err) { const message = err instanceof Error ? err.message : "تعذر تسجيل الانصراف المباشر."; setError(message); toast.error("تعذر تسجيل الانصراف المباشر", message); }
   };
   const updateWorkforce = async (e: Employee, patch: { isVip?: boolean; autoCheckIn?: boolean; autoCheckOut?: boolean }) => {
     if (!isOwner) return;
@@ -394,7 +399,8 @@ export default function ManagerEmployees() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ إعدادات Workforce.");
       await load(false);
-    } catch (err) { setError(err instanceof Error ? err.message : "تعذر حفظ إعدادات Workforce."); await load(false); }
+      toast.success("تم حفظ إعدادات Workforce");
+    } catch (err) { const message = err instanceof Error ? err.message : "تعذر حفظ إعدادات Workforce."; setError(message); toast.error("تعذر حفظ إعدادات Workforce", message); await load(false); }
   };
   const direct = async (e: Employee) => {
     if (e.status !== "active" || !isOwner) return;
@@ -406,7 +412,8 @@ export default function ManagerEmployees() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر تسجيل الحضور المباشر.");
       await load(false);
-    } catch (err) { setError(err instanceof Error ? err.message : "تعذر تسجيل الحضور المباشر."); }
+      toast.success("تم تسجيل الحضور المباشر");
+    } catch (err) { const message = err instanceof Error ? err.message : "تعذر تسجيل الحضور المباشر."; setError(message); toast.error("تعذر تسجيل الحضور المباشر", message); }
   };
 
   const filtered = useMemo(() => {
