@@ -17,12 +17,24 @@ type Env = {
 
 let leaveSchemaReady: Promise<void> | null = null;
 
-function origin(request: Request, env: Env) {
-  const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
-  const configured = [String(env.APP_ORIGIN || ""), String(env.APP_ORIGINS || "")]
+function configuredOrigins(env: Env) {
+  return [String(env.APP_ORIGIN || ""), String(env.APP_ORIGINS || "")]
     .flatMap((value) => value.split(","))
     .map((value) => value.trim().replace(/\/$/, ""))
     .filter(Boolean);
+}
+
+function isAllowedOrigin(request: Request, env: Env) {
+  const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
+  if (!requestOrigin) return true;
+  const configured = configuredOrigins(env);
+  if (configured.includes(requestOrigin)) return true;
+  return !configured.length && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin);
+}
+
+function origin(request: Request, env: Env) {
+  const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
+  const configured = configuredOrigins(env);
   if (requestOrigin && configured.includes(requestOrigin)) return requestOrigin;
   if (!configured.length && requestOrigin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin)) return requestOrigin;
   return configured[0] || "*";
@@ -52,6 +64,11 @@ export { HadirRealtime };
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
+    if (requestOrigin && !isAllowedOrigin(request, env)) {
+      return dailyError("مصدر الطلب غير مسموح به.", request, env, 403);
+    }
+
     const response = await handleDeviceRebind(request, env, origin(request, env));
     if (response) return response;
 
