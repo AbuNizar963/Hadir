@@ -4,19 +4,26 @@ const file = new URL("../src/pages/EmployeeHome.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 const fail = (message) => { throw new Error(`EmployeeHome shift-info patch: ${message}; refusing unsafe replacement.`); };
 
-const arrowAttendance = '<div className="text-xl font-black" aria-hidden="true">↓</div>';
-const arrowCheckout = '<div className="text-xl font-black" aria-hidden="true">↑</div>';
+const arrowAttendance = '<div className="h-10 w-10 rounded-xl bg-primary/12 grid place-items-center text-primary mb-3 text-xl font-black" aria-hidden="true">↓</div>';
+const arrowCheckout = '<div className="h-10 w-10 rounded-xl bg-accent/12 grid place-items-center text-accent mb-3 text-xl font-black" aria-hidden="true">↑</div>';
 if (!source.includes(arrowAttendance) || !source.includes(arrowCheckout)) {
-  fail("attendance/check-out arrow anchors not found");
+  fail("attendance/check-out arrow anchors not found in the current EmployeeHome markup");
 }
-source = source.replace(arrowAttendance, '<div className="text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">→</div>');
-source = source.replace(arrowCheckout, '<div className="text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</div>');
+source = source.replace(
+  arrowAttendance,
+  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/12 grid place-items-center text-primary mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">→</div>',
+);
+source = source.replace(
+  arrowCheckout,
+  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-accent/12 grid place-items-center text-accent mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</div>',
+);
 
 const infoAnchor = source.indexOf("معلومات الدوام");
 if (infoAnchor < 0) fail("shift information heading not found");
-const gridOpen = '<div className="grid grid-cols-2 gap-3">';
-const gridStart = source.indexOf(gridOpen, infoAnchor);
-if (gridStart < 0) fail("shift information grid not found");
+const gridMatch = source.slice(infoAnchor).match(/<div className="grid grid-cols-2 gap-[23] text-xs">/);
+if (!gridMatch || gridMatch.index == null) fail("shift information grid not found");
+const gridStart = infoAnchor + gridMatch.index;
+const gridOpen = gridMatch[0];
 const openEnd = gridStart + gridOpen.length;
 
 let depth = 1;
