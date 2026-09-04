@@ -56,34 +56,34 @@ async function restoreEmployeeSession(): Promise<RestoreResult> {
 
 export default function ProtectedEmployee({ children }: Props) {
   const [session, setCurrentSession] = useState(() => currentSession());
-  const [checking, setChecking] = useState(!session);
+  const [checking, setChecking] = useState(true);
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    if (session) {
-      setChecking(false);
-      return () => { cancelled = true; };
-    }
-
     void restoreEmployeeSession().then((result) => {
       if (cancelled) return;
       if (result === "restored") {
         setCurrentSession(currentSession());
         setOffline(false);
-      } else if (result === "offline") {
+      } else if (result === "unauthorized" || result === "missing") {
+        localStorage.removeItem(EMPLOYEE_TOKEN_KEY);
+        setSession(null);
+        setCurrentSession(null);
+        setOffline(false);
+      } else {
         // Never convert a temporary Cloudflare/network outage into a logout.
-        // The token remains stored and the next navigation retries restoration.
+        // If a local session exists, keep the employee UI available until the server can be reached.
         setOffline(true);
       }
       setChecking(false);
     });
 
     return () => { cancelled = true; };
-  }, [session]);
+  }, []);
 
   if (checking) {
-    return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6">جاري استعادة جلسة الموظف…</div>;
+    return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6">جاري التحقق من جلسة الموظف…</div>;
   }
 
   if (!session) {
