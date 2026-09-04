@@ -4,31 +4,32 @@ const file = new URL("../src/pages/EmployeeHome.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 const fail = (message) => { throw new Error(`EmployeeHome shift-info patch: ${message}; refusing unsafe replacement.`); };
 
-const arrowAttendance = '<div className="h-10 w-10 rounded-xl bg-primary/12 grid place-items-center text-primary mb-3 text-xl font-black" aria-hidden="true">↓</div>';
-const arrowCheckout = '<div className="h-10 w-10 rounded-xl bg-accent/12 grid place-items-center text-accent mb-3 text-xl font-black" aria-hidden="true">↑</div>';
+const arrowAttendance = '<div className="mx-auto h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-primary/12 grid place-items-center text-primary mb-3 text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</div>';
+const arrowCheckout = '<div className="mx-auto h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-accent/12 grid place-items-center text-accent mb-3 text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">→</div>';
 if (!source.includes(arrowAttendance) || !source.includes(arrowCheckout)) {
   fail("attendance/check-out arrow anchors not found in the current EmployeeHome markup");
 }
 source = source.replace(
   arrowAttendance,
-  '<div className="mx-auto h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-primary/12 grid place-items-center text-primary mb-3 text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</div>',
+  '<div className="flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-primary/12 items-center justify-center text-primary text-5xl sm:text-6xl font-black leading-none mb-3 mr-auto" aria-hidden="true">←</div>',
 );
 source = source.replace(
   arrowCheckout,
-  '<div className="mx-auto h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-accent/12 grid place-items-center text-accent mb-3 text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">→</div>',
+  '<div className="flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-accent/12 items-center justify-center text-accent text-5xl sm:text-6xl font-black leading-none mb-3 mr-auto" aria-hidden="true">→</div>',
 );
 
-const requestArrow = '<span className="text-accent text-xl">←</span>';
+const requestArrow = '<span className="mx-auto inline-flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-accent/12 items-center justify-center text-accent text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</span>';
 if (!source.includes(requestArrow)) {
   fail("leave/permission request arrow anchor not found in the current EmployeeHome markup");
 }
 source = source.replace(
   requestArrow,
-  '<span className="mx-auto inline-flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-accent/12 items-center justify-center text-accent text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</span>',
+  '<span className="ml-auto inline-flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-accent/12 items-center justify-center text-accent text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</span>',
 );
 
-// Standardize the reusable shift-information Row itself so all six cards share
-// exactly the same geometry, typography, spacing, and background treatment.
+// Keep all six shift-information cards identical while aligning every label
+// on the same top line and keeping the displayed details at the same baseline.
+// Labels are intentionally bold; values/details remain regular weight.
 const rowSignature = "function Row({label,value}:{label:string;value:string})";
 const rowStart = source.indexOf(rowSignature);
 if (rowStart < 0) fail("shift information Row component not found");
@@ -54,7 +55,7 @@ for (let i = rowBodyOpen; i < source.length; i += 1) {
   }
 }
 if (rowEnd < 0) fail("could not safely determine the end of the Row component");
-const standardizedRow = 'function Row({label,value}:{label:string;value:string}){return <div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px] flex flex-col justify-center"><div className="text-xs text-muted-foreground leading-5">{label}</div><div className="font-black text-sm leading-6 mt-1 break-words">{value}</div></div>}';
+const standardizedRow = 'function Row({label,value}:{label:string;value:string}){return <div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px] flex flex-col justify-start"><div className="font-black text-sm leading-6">{label}</div><div className="font-normal text-sm leading-6 mt-1 break-words">{value}</div></div>}';
 source = source.slice(0, rowStart) + standardizedRow + source.slice(rowEnd);
 
 const infoAnchor = source.indexOf("معلومات الدوام");
@@ -89,9 +90,9 @@ for (const required of ["period", "time", "status", "location", "device"]) {
   if (!byKind.has(required)) fail(`could not locate the existing ${required} row`);
 }
 
-const shiftTypeCard = '<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px] flex flex-col justify-center"><div className="text-xs text-muted-foreground leading-5">نوع الدوام</div><div className="font-black text-sm leading-6 mt-1 break-words">{isRotation?"تناوبي":"إداري"}</div></div>';
+const shiftTypeCard = '<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px] flex flex-col justify-start"><div className="font-black text-sm leading-6">نوع الدوام</div><div className="font-normal text-sm leading-6 mt-1 break-words">{isRotation?"تناوبي":"إداري"}</div></div>';
 const ordered = [shiftTypeCard, byKind.get("period"), byKind.get("time"), byKind.get("status"), byKind.get("location"), byKind.get("device")].filter(Boolean);
 
 source = source.slice(0, gridStart) + gridOpen + ordered.join("") + source.slice(gridEnd);
 writeFileSync(file, source, "utf8");
-console.log("EmployeeHome shift-info patch: unified all six shift cards and centered the request arrow inside a matching icon.");
+console.log("EmployeeHome shift-info patch: aligned bold labels, regular details, and repositioned attendance arrows at the card edge with vertical centering.");
