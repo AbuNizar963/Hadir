@@ -1,5 +1,6 @@
 const MAX_HTML_BYTES = 12 * 1024 * 1024;
 const MAX_CSS_BYTES = 8 * 1024 * 1024;
+const MAX_LOGO_BACKUP_LENGTH = 140000;
 
 type BrowserEnv = { BROWSER?: BrowserRun; DB: D1Database; PROFILE_IMAGES?: R2Bucket };
 
@@ -54,6 +55,15 @@ async function resolveCompanyLogoKey(env: BrowserEnv): Promise<string> {
   throw new Error("لم يتم العثور على شعار الشركة في R2 أو على مفتاح R2 محفوظ في الإعدادات");
 }
 
+async function getCompanyLogoBackup(env: BrowserEnv): Promise<string | null> {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1")
+    .bind("brandLogoDataUrl")
+    .first<{ value: string }>();
+  const value = String(row?.value || "").trim();
+  if (!value || value.length > MAX_LOGO_BACKUP_LENGTH) return null;
+  return /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/i.test(value) ? value : null;
+}
+
 function hasEmbeddedCompanyLogo(html: string): boolean {
   return /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*\bsrc=["']data:image\//i.test(html)
     || /<img\b[^>]*\bsrc=["']data:image\/[^"']+["'][^>]*\balt=["']شعار الشركة["']/i.test(html);
@@ -66,6 +76,19 @@ async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<s
   // temporarily missing. R2 remains the authoritative storage for future
   // uploads and the fallback when the client did not inline the image.
   if (hasEmbeddedCompanyLogo(html)) return html;
+
+  // Since the logo is now backed up in D1 at save time, a PDF never needs to
+  // fail merely because an older R2 object was lost. This is the durable PDF
+  // path; R2 remains the primary binary store for the application.
+  const backup = await getCompanyLogoBackup(env);
+  if (backup) {
+    const logoMarkup = `<img src="${backup}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
+    const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
+    if (logoTagPattern.test(html)) return html.replace(logoTagPattern, logoMarkup);
+    const serviceReportPattern = /(<[^>]+class=["'][^"']*\bservice-report\b[^"']*["'][^>]*>)/i;
+    if (!serviceReportPattern.test(html)) throw new Error("لم يتم العثور على حاوية التقرير لإضافة شعار الشركة");
+    return html.replace(serviceReportPattern, `$1<div class="pdf-company-logo" dir="rtl">${logoMarkup}</div>`);
+  }
 
   if (!env.PROFILE_IMAGES) throw new Error("R2 binding PROFILE_IMAGES غير موجود أثناء تجهيز PDF");
 
