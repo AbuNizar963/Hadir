@@ -39,9 +39,9 @@ if (!source.includes(dailyCsvReplacement)) {
 
 const hasRenderedShareControl = source.includes('data-hadir-share="true"') && source.includes('onClick={sharePdf}') && source.includes("مشاركة PDF الآن") && source.includes('mode === "daily" ?');
 const hasRenderedPrintControl = source.includes('onClick={printReport}') && source.includes("طباعة الخدمة");
-if (!source.includes('from "@/lib/professionalPdf"') || !source.includes('const sharePdf = async') || !source.includes('readyPdf') || !source.includes('sharingPdf') || !source.includes('سجل الحضور والغياب ليوم') || !hasRenderedShareControl || !hasRenderedPrintControl) {
+if (!source.includes('from "@/lib/professionalPdf"') || !source.includes('const sharePdf = async') || !source.includes('readyPdf') || !source.includes('sharingPdf') || !source.includes('سجل الحضور والغياب - ليوم') || !hasRenderedShareControl || !hasRenderedPrintControl) {
   throw new Error(`ManagerReports share patch: PDF sharing, R2 logo pipeline, filename and print buttons were not all applied completely (share=${hasRenderedShareControl}, print=${hasRenderedPrintControl}).`);
 }
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports share patch: daily PDF is shared as a File with the agreed filename; native share payload contains files only so Android targets cannot replace the file name with the share title; monthly and annual CSV preserved.");
+console.log("ManagerReports share patch: daily PDF is shared as a File with the requested Arabic filename; native share payload contains files only so Android targets cannot replace the file name with the share title; monthly and annual CSV preserved.");
