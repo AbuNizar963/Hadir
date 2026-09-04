@@ -18,10 +18,12 @@ if (!source.includes('import { useNavigate } from "react-router-dom";')) {
   source = source.slice(0, importPos + importAnchor.length) + 'import { useNavigate } from "react-router-dom";\n' + source.slice(importPos + importAnchor.length);
 }
 
-const managerAnchor = '  const manager = currentManager(); const isOwner = manager?.role === "owner" || manager?.accountId === "bootstrap";';
 if (!source.includes('const navigate = useNavigate();')) {
-  if (!source.includes(managerAnchor)) fail("manager state anchor not found");
-  source = source.replace(managerAnchor, managerAnchor + ' const navigate = useNavigate();');
+  const managerAnchor = '  const manager = currentManager();';
+  const managerPos = source.indexOf(managerAnchor);
+  if (managerPos < 0) fail("manager state anchor not found");
+  const insertPos = managerPos + managerAnchor.length;
+  source = source.slice(0, insertPos) + ' const navigate = useNavigate();' + source.slice(insertPos);
 }
 
 const heroStart = source.indexOf('      <section className="mb-4 overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">');
@@ -54,7 +56,7 @@ ${identityHero}
 source = source.slice(0, homeStart) + homeBlock + source.slice(homeEnd + '      </section> : <section className="space-y-4">'.length);
 
 const detailHeaderOld = `        <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card px-4 py-3 shadow-sm">
-          <button type="button" aria-label="العودة إلى أقسام الإعدادات" title="رجوع" onClick={() => setSettingsHome(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-muted"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button type="button" aria-label="العودة إلى أقسام الإعدادات" title="رجوع" onClick={() => setSettingsHome(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-muted"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6 6 6-6"/></svg></button>
           <div className="min-w-0 flex-1 text-right"><div className="text-[10px] font-black text-muted-foreground">الإعدادات</div><div className="truncate text-lg font-black">{tabs.find(tab => tab.id === activeTab)?.hint || "إعدادات القسم"}</div></div>
         </div>`;
 const detailHeaderAlt = `        <header className="sticky top-0 z-10 border-b border-border/50 bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
