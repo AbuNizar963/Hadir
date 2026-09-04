@@ -118,10 +118,19 @@ export default function ProtectedManager({ children }: { children: React.ReactNo
         } else {
           setState("employee");
         }
-      } catch {
+      } catch (error) {
         if (!alive) return;
-        // إذا كان هناك جلسة إدارية محلية سبق توثيقها، لا نحول انقطاعاً مؤقتاً في الشبكة
-        // إلى شاشة تحقق لا تنتهي. نسمح بالدخول، وستتعامل طلبات API مع حالة الاتصال نفسها.
+        // 401/403 من الخادم تعني أن الجلسة القديمة غير صالحة، وليست انقطاع شبكة.
+        // يجب حذفها وإجبار المستخدم على تسجيل دخول جديد بدل إبقاء لوحة الإدارة ظاهرياً.
+        if (error instanceof Error && error.message === "غير مصرح") {
+          localStorage.removeItem(ADMIN_TOKEN_KEY);
+          setManagerSession(null);
+          setState("unauthorized");
+          return;
+        }
+
+        // إذا كان الخادم متعذراً مؤقتاً فقط، نحتفظ بجلسة الإدارة المحلية حتى لا نحول
+        // انقطاع الشبكة المؤقت إلى تسجيل خروج.
         if (local?.role && ADMIN_ROLES.includes(local.role as AdminRole)) {
           setState("authorized");
         } else if (employeeSession || employeeToken) {
