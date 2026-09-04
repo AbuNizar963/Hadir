@@ -54,10 +54,8 @@ if (source.includes(detailHeaderOld)) {
   source = source.replace(detailHeaderRegex, detailHeaderAlt);
 }
 
-const closeAnchor = '      {error && ';
-const close = source.indexOf(closeAnchor);
-if (close < 0) fail("settings content close anchor not found");
-source = source.slice(0, close) + '        </div>\n      </section>}\n\n' + source.slice(close);
+// The earlier Telegram navigation patch already owns the conditional's closing tags.
+// Do not inject another </div></section>} here; doing so creates an invalid JSX tree.
 
 // Keep the existing specialty controls intact while removing their nested duplicate chrome.
 const host = '<div className="p-4 sm:p-6"><CompanySpecialtiesPanel /></div>';
