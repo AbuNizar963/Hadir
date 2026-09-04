@@ -1,6 +1,5 @@
 const MAX_HTML_BYTES = 12 * 1024 * 1024;
 const MAX_CSS_BYTES = 8 * 1024 * 1024;
-const MAX_LOGO_BACKUP_LENGTH = 140000;
 
 type BrowserEnv = { BROWSER?: BrowserRun; DB: D1Database; PROFILE_IMAGES?: R2Bucket };
 
@@ -17,6 +16,8 @@ const cors = (origin: string) => ({
   "access-control-allow-methods": "POST,OPTIONS",
 });
 
+const CURRENT_LOGO_KEY = "company/logo-current.webp";
+
 async function getCompanyLogoR2Keys(env: BrowserEnv): Promise<string[]> {
   const rows = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN (?,?)")
     .bind("brandLogoR2Key", "brandLogo")
@@ -27,7 +28,6 @@ async function getCompanyLogoR2Keys(env: BrowserEnv): Promise<string[]> {
   const storedKey = settings.get("brandLogoR2Key") || "";
   if (storedKey) candidates.push(storedKey);
 
-  // Legacy/current logo URLs contain the immutable R2 object key in ?v=....
   const configuredUrl = settings.get("brandLogo") || "";
   if (configuredUrl) {
     try {
@@ -35,34 +35,19 @@ async function getCompanyLogoR2Keys(env: BrowserEnv): Promise<string[]> {
       const candidate = String(parsed.searchParams.get("v") || "").trim();
       if (candidate && !candidates.includes(candidate)) candidates.push(candidate);
     } catch {
-      // Ignore malformed legacy URL; the stored R2 key is still attempted.
+      // Ignore malformed legacy URL.
     }
   }
 
+  // Every newly saved logo is written to this canonical R2 object. It is always
+  // tried after the configured key so the PDF can recover from an old/stale D1 key.
+  if (!candidates.includes(CURRENT_LOGO_KEY)) candidates.push(CURRENT_LOGO_KEY);
   return candidates;
-}
-
-async function getCompanyLogoBackup(env: BrowserEnv): Promise<string | null> {
-  const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1")
-    .bind("brandLogoDataUrl")
-    .first<{ value: string }>();
-  const value = String(row?.value || "").trim();
-  if (!value || value.length > MAX_LOGO_BACKUP_LENGTH) return null;
-  return /^data:image\/webp;base64,[A-Za-z0-9+/=]+$/i.test(value) ? value : null;
 }
 
 function hasEmbeddedCompanyLogo(html: string): boolean {
   return /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*\bsrc=["']data:image\//i.test(html)
     || /<img\b[^>]*\bsrc=["']data:image\/[^"']+["'][^>]*\balt=["']شعار الشركة["']/i.test(html);
-}
-
-function dataUrlToBytes(dataUrl: string): Uint8Array {
-  const match = /^data:([^;]+);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl);
-  if (!match) throw new Error("نسخة شعار الشركة الاحتياطية غير صالحة");
-  const binary = atob(match[2]);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
 }
 
 function bytesToDataUrl(bytes: Uint8Array, contentType: string): string {
@@ -74,31 +59,13 @@ function bytesToDataUrl(bytes: Uint8Array, contentType: string): string {
   return `data:${contentType};base64,${btoa(binary)}`;
 }
 
-async function repairLogoInR2FromBackup(env: BrowserEnv, keys: string[], backup: string): Promise<R2ObjectBody | null> {
-  if (!env.PROFILE_IMAGES || !keys.length) return null;
-  const bytes = dataUrlToBytes(backup);
-  if (!bytes.length) throw new Error("نسخة شعار الشركة الاحتياطية فارغة");
-
-  // Rehydrate the existing configured key directly in R2. This deliberately
-  // performs no D1 write, so the repair still works while the D1 free-tier
-  // write limit is exhausted. Keeping the same key also preserves all existing
-  // settings references and avoids creating another stale key.
-  const key = keys[0];
-  await env.PROFILE_IMAGES.put(key, bytes, {
-    httpMetadata: { contentType: "image/webp", cacheControl: "public, max-age=31536000, immutable" },
-    customMetadata: { purpose: "company-logo", repairedFor: "pdf" },
-  });
-  return await env.PROFILE_IMAGES.get(key);
-}
-
 async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<string> {
   // If the report page already embedded the current logo, keep that exact image.
   if (hasEmbeddedCompanyLogo(html)) return html;
-
   if (!env.PROFILE_IMAGES) throw new Error("R2 binding PROFILE_IMAGES غير موجود أثناء تجهيز PDF");
 
-  // R2 is the authoritative logo store. Read the current object directly from
-  // R2 before consulting any backup. No D1 write is performed in the PDF path.
+  // The PDF path reads the actual company-logo object from R2. It never writes
+  // to D1 and never reconstructs the logo from a D1 backup.
   const keys = await getCompanyLogoR2Keys(env);
   let object: R2ObjectBody | null = null;
   let objectKey = "";
@@ -111,35 +78,21 @@ async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<s
     }
   }
 
-  // If the configured R2 object disappeared but the durable backup remains,
-  // repair that exact R2 key first. From this point onward the report consumes
-  // the logo from R2, including after the current D1 write limit has reset.
-  if (!object) {
-    const backup = await getCompanyLogoBackup(env);
-    if (backup) {
-      object = await repairLogoInR2FromBackup(env, keys, backup);
-      objectKey = keys[0] || "repaired";
-    }
-  }
+  if (!object) throw new Error("ملف شعار الشركة غير موجود في R2");
 
-  if (object) {
-    const bytes = new Uint8Array(await object.arrayBuffer());
-    if (!bytes.length) throw new Error(`ملف شعار الشركة في R2 فارغ (${objectKey})`);
+  const bytes = new Uint8Array(await object.arrayBuffer());
+  if (!bytes.length) throw new Error(`ملف شعار الشركة في R2 فارغ (${objectKey})`);
 
-    const contentType = String(object.httpMetadata?.contentType || "image/webp").toLowerCase();
-    const dataUrl = bytesToDataUrl(bytes, contentType);
-    const logoMarkup = `<img src="${dataUrl}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
+  const contentType = String(object.httpMetadata?.contentType || "image/webp").toLowerCase();
+  const dataUrl = bytesToDataUrl(bytes, contentType);
+  const logoMarkup = `<img src="${dataUrl}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
 
-    const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
-    if (logoTagPattern.test(html)) return html.replace(logoTagPattern, logoMarkup);
+  const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
+  if (logoTagPattern.test(html)) return html.replace(logoTagPattern, logoMarkup);
 
-    const serviceReportPattern = /(<[^>]+class=["'][^"']*\bservice-report\b[^"']*["'][^>]*>)/i;
-    if (!serviceReportPattern.test(html)) throw new Error("لم يتم العثور على حاوية التقرير لإضافة شعار الشركة");
-    return html.replace(serviceReportPattern, `$1<div class="pdf-company-logo" dir="rtl">${logoMarkup}</div>`);
-  }
-
-  if (keys.length) throw new Error("مفتاح شعار الشركة موجود في الإعدادات لكن ملف الشعار غير موجود في R2 ولا توجد نسخة احتياطية قابلة للإصلاح");
-  throw new Error("لم يتم العثور على شعار الشركة في R2 أو على مفتاح R2 محفوظ في الإعدادات");
+  const serviceReportPattern = /(<[^>]+class=["'][^"']*\bservice-report\b[^"']*["'][^>]*>)/i;
+  if (!serviceReportPattern.test(html)) throw new Error("لم يتم العثور على حاوية التقرير لإضافة شعار الشركة");
+  return html.replace(serviceReportPattern, `$1<div class="pdf-company-logo" dir="rtl">${logoMarkup}</div>`);
 }
 
 export async function generateDailyReportPdf(req: Request, env: BrowserEnv, responseOrigin: string): Promise<Response> {
