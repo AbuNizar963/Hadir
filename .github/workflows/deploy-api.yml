@@ -66,6 +66,44 @@ jobs:
         working-directory: backend
         run: npx wrangler d1 migrations apply Hadir --remote
 
+      - name: Verify and repair auth session schema
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema="$(npx wrangler d1 execute Hadir --remote --json --command 'PRAGMA table_info("auth_sessions")')"
+          printf '%s\n' "$schema"
+          python - "$schema" <<'PY'
+          import json, subprocess, sys
+
+          raw = sys.argv[1]
+          data = json.loads(raw)
+          rows = []
+          for result in data if isinstance(data, list) else []:
+              rows.extend(result.get("results") or [])
+          columns = {str(row.get("name")) for row in rows}
+          if "revoked_at" not in columns:
+              print("auth_sessions.revoked_at is missing; adding the nullable compatibility column.")
+              subprocess.run([
+                  "npx", "wrangler", "d1", "execute", "Hadir", "--remote",
+                  "--command", "ALTER TABLE auth_sessions ADD COLUMN revoked_at TEXT;",
+              ], check=True)
+          else:
+              print("auth_sessions.revoked_at is present.")
+          PY
+          repaired="$(npx wrangler d1 execute Hadir --remote --json --command 'PRAGMA table_info("auth_sessions")')"
+          python - "$repaired" <<'PY'
+          import json, sys
+          data = json.loads(sys.argv[1])
+          rows = []
+          for result in data if isinstance(data, list) else []:
+              rows.extend(result.get("results") or [])
+          columns = {str(row.get("name")) for row in rows}
+          if "revoked_at" not in columns:
+              raise SystemExit("ERROR: auth_sessions.revoked_at is still missing after schema repair.")
+          print("auth_sessions schema is compatible with session security.")
+          PY
+
       - name: Prepare Worker secrets
         working-directory: backend
         shell: bash
