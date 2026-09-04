@@ -26,3 +26,27 @@ for (const target of targets) {
   writeFileSync(target.path, source, "utf8");
   console.log(`menu auto-close added: ${target.path.pathname}`);
 }
+
+// The Telegram/settings UI patch runs before this script. Patch its generated
+// ManagerSettings code here so a later D1 read can never resurrect a stale logo.
+const settingsFile = new URL("../src/pages/ManagerSettings.tsx", import.meta.url);
+let settingsSource = readFileSync(settingsFile, "utf8");
+
+const oldLoad = `const merged = { ...getSettings(), ...cloud, adminAccounts: Array.isArray(cloud.adminAccounts) ? cloud.adminAccounts : getSettings().adminAccounts } as Settings; saveSettings(merged); setS(merged); setLocLat(merged.workSiteLat); setLocLng(merged.workSiteLng); setLocRadius(merged.radiusMeters);`;
+const newLoad = `const merged = { ...getSettings(), ...cloud, adminAccounts: Array.isArray(cloud.adminAccounts) ? cloud.adminAccounts : getSettings().adminAccounts } as Settings;\n        // The current company logo is served directly from R2. Never let a stale\n        // D1 brandLogo value win after a full page reload.\n        try {\n          const logoApi = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\\/$/, "") + "/api/company/logo?v=" + Date.now();\n          const logoResponse = await fetch(logoApi, { method: "GET", cache: "no-store", credentials: "include" });\n          merged.brandLogo = logoResponse.ok ? logoApi : null;\n        } catch {\n          merged.brandLogo = null;\n        }\n        saveSettings(merged); setS(merged); setLocLat(merged.workSiteLat); setLocLng(merged.workSiteLng); setLocRadius(merged.radiusMeters);`;
+if (settingsSource.includes(oldLoad)) {
+  settingsSource = settingsSource.replace(oldLoad, newLoad);
+} else if (!settingsSource.includes("The current company logo is served directly from R2")) {
+  throw new Error("Settings logo reload patch: initial settings load anchor not found; refusing unsafe replacement.");
+}
+
+const oldDelete = `const remote = await getBackendSettings(); const merged = { ...getSettings(), ...remote } as Settings; saveSettings(merged); setS(merged); window.dispatchEvent(new Event("hadir:settings-changed")); toast.success("تمت إزالة شعار الشركة");`;
+const newDelete = `const immediate = { ...getSettings(), brandLogo: null } as Settings;\n      saveSettings(immediate);\n      setS(immediate);\n      window.dispatchEvent(new Event("hadir:settings-changed"));\n      toast.success("تمت إزالة شعار الشركة نهائيًا");`;
+if (settingsSource.includes(oldDelete)) {
+  settingsSource = settingsSource.replace(oldDelete, newDelete);
+} else if (!settingsSource.includes("تمت إزالة شعار الشركة نهائيًا")) {
+  throw new Error("Settings logo removal patch: delete refresh anchor not found; refusing unsafe replacement.");
+}
+
+writeFileSync(settingsFile, settingsSource, "utf8");
+console.log("ManagerSettings logo persistence patch: reload reads the current logo directly from R2 and successful removal clears the UI without rehydrating stale D1 logo state.");
