@@ -4,8 +4,8 @@ const path = new URL("../src/index.ts", import.meta.url);
 let source = readFileSync(path, "utf8");
 
 const constantsOld = 'const SESSION_COOKIE = "hadir_session";\nconst now=()=>new Date().toISOString(); const uid=()=>crypto.randomUUID();';
-const constantsNew = 'const SESSION_COOKIE = "hadir_session";\nconst SESSION_IDLE_TIMEOUT_MS = 12 * 60 * 60 * 1000;\nconst SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;\nconst now=()=>new Date().toISOString(); const uid=()=>crypto.randomUUID();';
-if (!source.includes(constantsOld) && !source.includes('const SESSION_IDLE_TIMEOUT_MS = 12 * 60 * 60 * 1000;')) {
+const constantsNew = 'const SESSION_COOKIE = "hadir_session";\nconst SESSION_IDLE_TIMEOUT_MS = 6 * 30 * 24 * 60 * 60 * 1000;\nconst SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;\nconst now=()=>new Date().toISOString(); const uid=()=>crypto.randomUUID();';
+if (!source.includes(constantsOld) && !source.includes('const SESSION_IDLE_TIMEOUT_MS = 6 * 30 * 24 * 60 * 60 * 1000;')) {
   if (!source.includes(constantsOld)) throw new Error("Session security patch: constants anchor not found");
   source = source.replace(constantsOld, constantsNew);
 }
@@ -31,4 +31,4 @@ const writeNew = 'UPDATE auth_sessions SET last_seen_at=? WHERE token_hash=? AND
 source = source.replaceAll(writeOld, writeNew);
 
 writeFileSync(path, source, "utf8");
-console.log("Session security patch applied: 12h idle timeout + 30d absolute lifetime + revoked-session guard.");
+console.log("Session security patch applied: 6-month idle timeout + 1-year absolute lifetime + revoked-session guard.");
