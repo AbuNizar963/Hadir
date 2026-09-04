@@ -32,6 +32,7 @@ run("node", ["scripts/patch-manager-settings-telegram-ui.mjs"]);
 run("node", ["scripts/normalize-manager-settings-locations-anchor.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-dedicated.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-fixes.mjs"]);
+// Work-site settings: keep the canonical main site, restore the legacy QR visual treatment, and place add-site directly after the site list.
 run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
 run("node", ["scripts/patch-manager-dashboard-dedicated-status.mjs"]);
 run("node", ["scripts/patch-manager-menu-autoclose-on-scroll.mjs"]);
