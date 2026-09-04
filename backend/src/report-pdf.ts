@@ -56,6 +56,41 @@ function hasEmbeddedCompanyLogo(html: string): boolean {
     || /<img\b[^>]*\bsrc=["']data:image\/[^"']+["'][^>]*\balt=["']شعار الشركة["']/i.test(html);
 }
 
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const match = /^data:([^;]+);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl);
+  if (!match) throw new Error("نسخة شعار الشركة الاحتياطية غير صالحة");
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function bytesToDataUrl(bytes: Uint8Array, contentType: string): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
+  }
+  return `data:${contentType};base64,${btoa(binary)}`;
+}
+
+async function repairLogoInR2FromBackup(env: BrowserEnv, keys: string[], backup: string): Promise<R2ObjectBody | null> {
+  if (!env.PROFILE_IMAGES || !keys.length) return null;
+  const bytes = dataUrlToBytes(backup);
+  if (!bytes.length) throw new Error("نسخة شعار الشركة الاحتياطية فارغة");
+
+  // Rehydrate the existing configured key directly in R2. This deliberately
+  // performs no D1 write, so the repair still works while the D1 free-tier
+  // write limit is exhausted. Keeping the same key also preserves all existing
+  // settings references and avoids creating another stale key.
+  const key = keys[0];
+  await env.PROFILE_IMAGES.put(key, bytes, {
+    httpMetadata: { contentType: "image/webp", cacheControl: "public, max-age=31536000, immutable" },
+    customMetadata: { purpose: "company-logo", repairedFor: "pdf" },
+  });
+  return await env.PROFILE_IMAGES.get(key);
+}
+
 async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<string> {
   // If the report page already embedded the current logo, keep that exact image.
   if (hasEmbeddedCompanyLogo(html)) return html;
@@ -76,17 +111,23 @@ async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<s
     }
   }
 
+  // If the configured R2 object disappeared but the durable backup remains,
+  // repair that exact R2 key first. From this point onward the report consumes
+  // the logo from R2, including after the current D1 write limit has reset.
+  if (!object) {
+    const backup = await getCompanyLogoBackup(env);
+    if (backup) {
+      object = await repairLogoInR2FromBackup(env, keys, backup);
+      objectKey = keys[0] || "repaired";
+    }
+  }
+
   if (object) {
     const bytes = new Uint8Array(await object.arrayBuffer());
     if (!bytes.length) throw new Error(`ملف شعار الشركة في R2 فارغ (${objectKey})`);
 
-    let binary = "";
-    const chunkSize = 0x8000;
-    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
-    }
     const contentType = String(object.httpMetadata?.contentType || "image/webp").toLowerCase();
-    const dataUrl = `data:${contentType};base64,${btoa(binary)}`;
+    const dataUrl = bytesToDataUrl(bytes, contentType);
     const logoMarkup = `<img src="${dataUrl}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
 
     const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
@@ -97,19 +138,7 @@ async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<s
     return html.replace(serviceReportPattern, `$1<div class="pdf-company-logo" dir="rtl">${logoMarkup}</div>`);
   }
 
-  // R2 object missing: use the durable D1 data-URL backup only as a fallback.
-  // This keeps PDF generation resilient without making D1 the primary logo store.
-  const backup = await getCompanyLogoBackup(env);
-  if (backup) {
-    const logoMarkup = `<img src="${backup}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
-    const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
-    if (logoTagPattern.test(html)) return html.replace(logoTagPattern, logoMarkup);
-    const serviceReportPattern = /(<[^>]+class=["'][^"']*\bservice-report\b[^"']*["'][^>]*>)/i;
-    if (!serviceReportPattern.test(html)) throw new Error("لم يتم العثور على حاوية التقرير لإضافة شعار الشركة");
-    return html.replace(serviceReportPattern, `$1<div class="pdf-company-logo" dir="rtl">${logoMarkup}</div>`);
-  }
-
-  if (keys.length) throw new Error("مفتاح شعار الشركة موجود في الإعدادات لكن ملف الشعار غير موجود في R2");
+  if (keys.length) throw new Error("مفتاح شعار الشركة موجود في الإعدادات لكن ملف الشعار غير موجود في R2 ولا توجد نسخة احتياطية قابلة للإصلاح");
   throw new Error("لم يتم العثور على شعار الشركة في R2 أو على مفتاح R2 محفوظ في الإعدادات");
 }
 
