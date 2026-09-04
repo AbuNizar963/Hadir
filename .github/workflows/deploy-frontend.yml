@@ -21,6 +21,13 @@ on:
       - "scripts/patch-manager-report-share.mjs"
       - "scripts/patch-employee-home-shift-info.mjs"
       - "scripts/patch-manager-dashboard-dedicated-status.mjs"
+      - "scripts/patch-manager-settings-ui.mjs"
+      - "scripts/fix-manager-settings-ui-qr.mjs"
+      - "scripts/patch-manager-settings-telegram-ui.mjs"
+      - "scripts/normalize-manager-settings-locations-anchor.mjs"
+      - "scripts/patch-manager-settings-locations-dedicated.mjs"
+      - "scripts/patch-manager-settings-locations-fixes.mjs"
+      - "scripts/patch-manager-settings-reset-placement.mjs"
       - ".github/workflows/deploy-frontend.yml"
 
 permissions:
