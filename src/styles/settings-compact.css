@@ -1,7 +1,8 @@
 /* HADIR · Settings compact disclosure layer
  * Visual-only: keeps every existing setting control and behavior intact.
  */
-.settings-tab-panel{display:flex;flex-direction:column;gap:10px}
+.settings-tab-panel.block{display:flex;flex-direction:column;gap:10px}
+.settings-tab-panel.hidden{display:none!important}
 [role="tablist"]{position:sticky!important;top:8px!important;z-index:30!important;border-radius:16px!important;padding:5px!important;background:hsl(var(--card)/.94)!important;backdrop-filter:blur(16px)!important;-webkit-backdrop-filter:blur(16px)!important;box-shadow:0 8px 28px hsl(222 40% 3%/.10)!important}
 [role="tablist"] button{min-height:42px!important;border-radius:12px!important;font-size:12px!important;font-weight:700!important;line-height:1.25!important}
 [role="tablist"] button[aria-selected="true"]{box-shadow:0 4px 14px hsl(var(--primary)/.20)!important}
@@ -41,5 +42,5 @@ button{touch-action:manipulation}
   .fixed.inset-x-0.bottom-0.z-50 .btn-danger{padding-inline:9px!important;font-size:10px!important}
 }
 @media(min-width:641px){
-  .settings-tab-panel{gap:12px}
+  .settings-tab-panel.block{gap:12px}
 }
