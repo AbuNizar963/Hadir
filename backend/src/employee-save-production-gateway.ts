@@ -28,9 +28,21 @@ const json = (data: unknown, status = 200, origin = "*") => new Response(JSON.st
   },
 });
 
+function configuredOrigins(env: Env) {
+  return String(env.APP_ORIGIN || env.APP_ORIGINS || "").split(",").map(v => v.trim().replace(/\/$/, "")).filter(Boolean);
+}
+
+function isAllowedOrigin(req: Request, env: Env) {
+  const incoming = String(req.headers.get("origin") || "").trim().replace(/\/$/, "");
+  if (!incoming) return true;
+  const configured = configuredOrigins(env);
+  if (configured.includes(incoming)) return true;
+  return !configured.length && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(incoming);
+}
+
 function origin(req: Request, env: Env) {
   const incoming = String(req.headers.get("origin") || "").trim().replace(/\/$/, "");
-  const configured = String(env.APP_ORIGIN || env.APP_ORIGINS || "").split(",").map(v => v.trim().replace(/\/$/, "")).filter(Boolean);
+  const configured = configuredOrigins(env);
   if (incoming && configured.includes(incoming)) return incoming;
   if (!configured.length && incoming && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(incoming)) return incoming;
   return configured[0] || "*";
@@ -144,6 +156,7 @@ export { HadirRealtime };
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     const o = origin(req, env);
+    if (!isAllowedOrigin(req, env)) return json({ error: "مصدر الطلب غير مسموح به." }, 403, o);
     const url = new URL(req.url);
     if (url.pathname.replace(/\/$/, "") === "/api/reports/daily/pdf") {
       if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: {
