@@ -45,13 +45,60 @@ const newBlock = `  async function saveLogo() {
     finally { setSaving(false); }
   }`;
 
-if (source.includes(newBlock)) {
-  console.log("Company logo refresh patch: already applied.");
+const oldRemoveBlock = `  async function removeLogo() {
+    if (saving || !hydrated) return;
+    setSaving(true); setMessage(null);
+    try {
+      await deleteCompanyLogo();
+      const remote = await getBackendSettings();
+      applyRemoteSettings(remote);
+      setBrandName(remote.brandName || "");
+      setBrandLogo(remote.brandLogo || null);
+      setPendingLogo(null);
+      setMessage("تم حذف الشعار من R2 وD1.");
+    } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر إزالة الشعار"); }
+    finally { setSaving(false); }
+  }`;
+
+const newRemoveBlock = `  async function removeLogo() {
+    if (saving || !hydrated) return;
+    setSaving(true); setMessage(null);
+    try {
+      // R2 deletion is authoritative. Clear the UI immediately after the
+      // successful DELETE and do not let a stale D1 response restore the old logo.
+      await deleteCompanyLogo();
+      setBrandLogo(null);
+      setPendingLogo(null);
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("hadir:settings-changed"));
+
+      try {
+        const remote = await getBackendSettings();
+        const refreshed = { ...remote, brandLogo: null } as Settings;
+        applyRemoteSettings(refreshed);
+        setBrandName(refreshed.brandName || "");
+        setBrandLogo(null);
+      } catch {
+        // R2 deletion already succeeded; keep the logo removed locally even
+        // if D1 is temporarily unavailable or still serving an older setting.
+      }
+      setMessage("تم حذف الشعار نهائيًا من R2 وتحديث الواجهة.");
+    } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر إزالة الشعار"); }
+    finally { setSaving(false); }
+  }`;
+
+if (source.includes(newBlock) && source.includes(newRemoveBlock)) {
+  console.log("Company logo refresh patch: upload and removal behavior already applied.");
   process.exit(0);
 }
-if (!source.includes(oldBlock)) {
+if (source.includes(oldBlock)) source = source.replace(oldBlock, newBlock);
+if (source.includes(oldRemoveBlock)) source = source.replace(oldRemoveBlock, newRemoveBlock);
+
+if (!source.includes(newBlock)) {
   throw new Error("Company logo refresh patch: saveLogo anchor not found; refusing unsafe replacement.");
 }
-source = source.replace(oldBlock, newBlock);
+if (!source.includes(newRemoveBlock)) {
+  throw new Error("Company logo refresh patch: removeLogo anchor not found; refusing unsafe replacement.");
+}
+
 writeFileSync(file, source, "utf8");
-console.log("Company logo refresh patch: the newly uploaded R2 URL is applied immediately and is never overwritten by a stale D1 response.");
+console.log("Company logo refresh patch: new R2 logo is applied immediately and removal clears the UI without allowing stale D1 data to restore it.");
