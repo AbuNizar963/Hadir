@@ -24,8 +24,7 @@ function origin(request: Request, env: Env) {
     .map((value) => value.trim().replace(/\/$/, ""))
     .filter(Boolean);
   if (requestOrigin && configured.includes(requestOrigin)) return requestOrigin;
-  if (requestOrigin && /^https:\/\/[^/]+\.pages\.dev$/i.test(requestOrigin)) return requestOrigin;
-  if (requestOrigin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin)) return requestOrigin;
+  if (!configured.length && requestOrigin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin)) return requestOrigin;
   return configured[0] || "*";
 }
 
