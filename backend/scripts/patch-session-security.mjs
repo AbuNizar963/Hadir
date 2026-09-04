@@ -9,9 +9,11 @@ const indexPath = new URL("../src/index.ts", import.meta.url);
 let indexSource = readFileSync(indexPath, "utf8");
 
 const constantsOld = 'const SESSION_COOKIE = "hadir_session";\nconst now=()=>new Date().toISOString(); const uid=()=>crypto.randomUUID();';
-const constantsNew = 'const SESSION_COOKIE = "hadir_session";\nconst SESSION_IDLE_TIMEOUT_MS = 6 * 30 * 24 * 60 * 60 * 1000;\nconst SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;\nconst now=()=>new Date().toISOString(); const uid=()=>crypto.randomUUID();';
+const constantsNew = 'const SESSION_COOKIE = "hadir_session";\nconst SESSION_IDLE_TIMEOUT_MS = 6 * 30 * 24 * 60 * 60 * 1000;\nconst SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;\nconst SESSION_TOUCH_INTERVAL_SECONDS = 15 * 60;\nconst now=()=>new Date().toISOString(); const uid=()=>crypto.randomUUID();';
 if (!indexSource.includes('const SESSION_IDLE_TIMEOUT_MS = 6 * 30 * 24 * 60 * 60 * 1000;')) {
   indexSource = replaceOnce(indexPath, indexSource, constantsOld, constantsNew, "constants");
+} else if (!indexSource.includes('const SESSION_TOUCH_INTERVAL_SECONDS = 15 * 60;')) {
+  indexSource = replaceOnce(indexPath, indexSource, 'const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;\n', 'const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;\nconst SESSION_TOUCH_INTERVAL_SECONDS = 15 * 60;\n', "touch interval constant");
 }
 
 const selectOld = 'SELECT user_id,user_type,role FROM auth_sessions WHERE token_hash=? LIMIT 1';
@@ -31,7 +33,7 @@ if (indexSource.includes(guardOld)) {
 }
 
 const writeOld = 'UPDATE auth_sessions SET last_seen_at=? WHERE token_hash=?';
-const writeNew = 'UPDATE auth_sessions SET last_seen_at=? WHERE token_hash=? AND revoked_at IS NULL';
+const writeNew = 'UPDATE auth_sessions SET last_seen_at=? WHERE token_hash=? AND revoked_at IS NULL AND (last_seen_at IS NULL OR last_seen_at <= datetime(\'now\', \'-15 minutes\'))';
 indexSource = indexSource.replaceAll(writeOld, writeNew);
 
 const bearerFirst = 'req.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||getCookie(req,SESSION_COOKIE)';
@@ -79,4 +81,4 @@ if (workforceSource.includes(workforceHandlerOld)) workforceSource = workforceSo
 else if (!workforceSource.includes('workforcePushEnv=env;')) throw new Error("Workforce push patch: handler anchor not found");
 writeFileSync(workforcePath, workforceSource, "utf8");
 
-console.log("Session + workforce notification patch applied: secure session lifetime, bearer-token precedence, and Web Push delivery for workforce events.");
+console.log("Session + workforce notification patch applied: secure session lifetime, bearer-token precedence, reduced D1 session write amplification, and Web Push delivery for workforce events.");
