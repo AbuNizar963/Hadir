@@ -17,42 +17,29 @@ const cors = (origin: string) => ({
   "access-control-allow-methods": "POST,OPTIONS",
 });
 
-async function resolveCompanyLogoKey(env: BrowserEnv): Promise<string> {
+async function getCompanyLogoR2Keys(env: BrowserEnv): Promise<string[]> {
   const rows = await env.DB.prepare("SELECT key,value FROM settings WHERE key IN (?,?)")
     .bind("brandLogoR2Key", "brandLogo")
     .all<{ key: string; value: string }>();
   const settings = new Map((rows.results || []).map((row) => [String(row.key), String(row.value || "").trim()]));
+  const candidates: string[] = [];
 
   const storedKey = settings.get("brandLogoR2Key") || "";
-  if (storedKey) {
-    const current = await env.PROFILE_IMAGES!.head(storedKey);
-    if (current) return storedKey;
-  }
+  if (storedKey) candidates.push(storedKey);
 
-  // Older production data may already have the R2-backed /api/company/logo URL
-  // saved in brandLogo while brandLogoR2Key was never written. That URL carries
-  // the exact immutable R2 object key in ?v=..., so recover and persist it.
+  // Legacy/current logo URLs contain the immutable R2 object key in ?v=....
   const configuredUrl = settings.get("brandLogo") || "";
   if (configuredUrl) {
     try {
       const parsed = new URL(configuredUrl);
       const candidate = String(parsed.searchParams.get("v") || "").trim();
-      if (candidate) {
-        const recovered = await env.PROFILE_IMAGES!.head(candidate);
-        if (recovered) {
-          await env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-            .bind("brandLogoR2Key", candidate)
-            .run();
-          return candidate;
-        }
-      }
+      if (candidate && !candidates.includes(candidate)) candidates.push(candidate);
     } catch {
-      // Ignore malformed legacy URL and report the real storage problem below.
+      // Ignore malformed legacy URL; the stored R2 key is still attempted.
     }
   }
 
-  if (storedKey) throw new Error("مفتاح شعار الشركة موجود في الإعدادات لكن ملف الشعار غير موجود في R2");
-  throw new Error("لم يتم العثور على شعار الشركة في R2 أو على مفتاح R2 محفوظ في الإعدادات");
+  return candidates;
 }
 
 async function getCompanyLogoBackup(env: BrowserEnv): Promise<string | null> {
@@ -70,16 +57,48 @@ function hasEmbeddedCompanyLogo(html: string): boolean {
 }
 
 async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<string> {
-  // The report page already renders the current Settings logo. The browser
-  // client inlines that exact image before calling this endpoint, so PDF
-  // generation can use the same current logo even if an old R2 pointer is
-  // temporarily missing. R2 remains the authoritative storage for future
-  // uploads and the fallback when the client did not inline the image.
+  // If the report page already embedded the current logo, keep that exact image.
   if (hasEmbeddedCompanyLogo(html)) return html;
 
-  // Since the logo is now backed up in D1 at save time, a PDF never needs to
-  // fail merely because an older R2 object was lost. This is the durable PDF
-  // path; R2 remains the primary binary store for the application.
+  if (!env.PROFILE_IMAGES) throw new Error("R2 binding PROFILE_IMAGES غير موجود أثناء تجهيز PDF");
+
+  // R2 is the authoritative logo store. Read the current object directly from
+  // R2 before consulting any backup. No D1 write is performed in the PDF path.
+  const keys = await getCompanyLogoR2Keys(env);
+  let object: R2ObjectBody | null = null;
+  let objectKey = "";
+  for (const key of keys) {
+    const candidate = await env.PROFILE_IMAGES.get(key);
+    if (candidate) {
+      object = candidate;
+      objectKey = key;
+      break;
+    }
+  }
+
+  if (object) {
+    const bytes = new Uint8Array(await object.arrayBuffer());
+    if (!bytes.length) throw new Error(`ملف شعار الشركة في R2 فارغ (${objectKey})`);
+
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
+    }
+    const contentType = String(object.httpMetadata?.contentType || "image/webp").toLowerCase();
+    const dataUrl = `data:${contentType};base64,${btoa(binary)}`;
+    const logoMarkup = `<img src="${dataUrl}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
+
+    const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
+    if (logoTagPattern.test(html)) return html.replace(logoTagPattern, logoMarkup);
+
+    const serviceReportPattern = /(<[^>]+class=["'][^"']*\bservice-report\b[^"']*["'][^>]*>)/i;
+    if (!serviceReportPattern.test(html)) throw new Error("لم يتم العثور على حاوية التقرير لإضافة شعار الشركة");
+    return html.replace(serviceReportPattern, `$1<div class="pdf-company-logo" dir="rtl">${logoMarkup}</div>`);
+  }
+
+  // R2 object missing: use the durable D1 data-URL backup only as a fallback.
+  // This keeps PDF generation resilient without making D1 the primary logo store.
   const backup = await getCompanyLogoBackup(env);
   if (backup) {
     const logoMarkup = `<img src="${backup}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
@@ -90,30 +109,8 @@ async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<s
     return html.replace(serviceReportPattern, `$1<div class="pdf-company-logo" dir="rtl">${logoMarkup}</div>`);
   }
 
-  if (!env.PROFILE_IMAGES) throw new Error("R2 binding PROFILE_IMAGES غير موجود أثناء تجهيز PDF");
-
-  const key = await resolveCompanyLogoKey(env);
-  const object = await env.PROFILE_IMAGES.get(key);
-  if (!object) throw new Error("لم يتم العثور على شعار الشركة في R2 بعد استعادة مفتاحه");
-
-  const bytes = new Uint8Array(await object.arrayBuffer());
-  if (!bytes.length) throw new Error("ملف شعار الشركة في R2 فارغ");
-
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
-  }
-  const contentType = String(object.httpMetadata?.contentType || "image/webp").toLowerCase();
-  const dataUrl = `data:${contentType};base64,${btoa(binary)}`;
-  const logoMarkup = `<img src="${dataUrl}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
-
-  const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
-  if (logoTagPattern.test(html)) return html.replace(logoTagPattern, logoMarkup);
-
-  const serviceReportPattern = /(<[^>]+class=["'][^"']*\bservice-report\b[^"']*["'][^>]*>)/i;
-  if (!serviceReportPattern.test(html)) throw new Error("لم يتم العثور على حاوية التقرير لإضافة شعار الشركة");
-  return html.replace(serviceReportPattern, `$1<div class="pdf-company-logo" dir="rtl">${logoMarkup}</div>`);
+  if (keys.length) throw new Error("مفتاح شعار الشركة موجود في الإعدادات لكن ملف الشعار غير موجود في R2");
+  throw new Error("لم يتم العثور على شعار الشركة في R2 أو على مفتاح R2 محفوظ في الإعدادات");
 }
 
 export async function generateDailyReportPdf(req: Request, env: BrowserEnv, responseOrigin: string): Promise<Response> {
