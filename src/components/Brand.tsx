@@ -1,17 +1,13 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { getSettings } from "@/lib/storage";
+
+const APP_NAME = "حاضر";
 
 export default function Brand({ className }: { className?: string }) {
-  const [name, setName] = useState<string>(
-    () => getSettings().brandName || "حاضِر"
-  );
+  const [name, setName] = useState<string>(APP_NAME);
 
   useEffect(() => {
-    const sync = () => {
-      const s = getSettings();
-      setName(s.brandName || "حاضِر");
-    };
+    const sync = () => setName(APP_NAME);
     window.addEventListener("hadir:settings-changed", sync);
     window.addEventListener("storage", sync);
     return () => {
