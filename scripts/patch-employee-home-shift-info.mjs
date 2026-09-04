@@ -11,11 +11,20 @@ if (!source.includes(arrowAttendance) || !source.includes(arrowCheckout)) {
 }
 source = source.replace(
   arrowAttendance,
-  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/12 grid place-items-center text-primary mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">→</div>',
+  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/12 grid place-items-center text-primary mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</div>',
 );
 source = source.replace(
   arrowCheckout,
-  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-accent/12 grid place-items-center text-accent mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</div>',
+  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-accent/12 grid place-items-center text-accent mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">→</div>',
+);
+
+const requestArrow = '<span className="text-accent text-xl">←</span>';
+if (!source.includes(requestArrow)) {
+  fail("leave/permission request arrow anchor not found in the current EmployeeHome markup");
+}
+source = source.replace(
+  requestArrow,
+  '<span className="text-accent text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</span>',
 );
 
 const infoAnchor = source.indexOf("معلومات الدوام");
@@ -50,9 +59,9 @@ for (const required of ["period", "time", "status", "location", "device"]) {
   if (!byKind.has(required)) fail(`could not locate the existing ${required} row`);
 }
 
-const shiftTypeCard = '<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px]"><div className="flex items-start justify-between gap-3"><div><div className="text-xs text-muted-foreground">نوع الدوام</div><div className="font-black mt-1">{isRotation?"تناوبي":"إداري"}</div></div><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 7h10"/><path d="M7 12h6"/><path d="M7 17h10"/><path d="M17 10l3 2-3 2"/></svg></span></div></div>';
+const shiftTypeCard = '<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px]"><div className="text-xs text-muted-foreground">نوع الدوام</div><div className="font-black mt-1">{isRotation?"تناوبي":"إداري"}</div></div>';
 const ordered = [shiftTypeCard, byKind.get("period"), byKind.get("time"), byKind.get("status"), byKind.get("location"), byKind.get("device")].filter(Boolean);
 
 source = source.slice(0, gridStart) + gridOpen + ordered.join("") + source.slice(gridEnd);
 writeFileSync(file, source, "utf8");
-console.log("EmployeeHome shift-info patch: enlarged horizontal attendance arrows and reordered shift information with shift-type indicator.");
+console.log("EmployeeHome shift-info patch: enlarged inward attendance arrows, matched request arrow size, and removed the shift-type SVG icon.");
