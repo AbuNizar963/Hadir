@@ -32,13 +32,7 @@ if (source.includes('{(s.locations || []).length + 1} مواقع مسجلة')) {
 
 const qrStart = source.indexOf('          <div data-hadir-qr-settings');
 const addStart = source.indexOf('          <button type="button" className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary/30');
-if (qrStart < 0 || addStart < 0 || addStart <= qrStart) {
-  if (source.includes('data-hadir-qr-settings') && source.includes('border-dashed border-primary/30')) {
-    fail("QR/add-site block order is unexpected; refusing unsafe rewrite");
-  }
-  fail("QR or add-site block anchor not found");
-}
-
+if (addStart < 0) fail("add-site button anchor not found");
 const addEnd = source.indexOf('</button>', addStart);
 if (addEnd < 0) fail("add-site button closing anchor not found");
 const addBlock = source.slice(addStart, addEnd + '</button>'.length);
@@ -62,6 +56,15 @@ const qrBlock = String.raw`          <div data-hadir-qr-settings className="over
           </div>
 `;
 
-source = source.slice(0, qrStart) + addBlock + '\n' + qrBlock + source.slice(addEnd + '</button>'.length);
+if (qrStart < 0) {
+  source = source.slice(0, addStart) + addBlock + '\n' + qrBlock + source.slice(addEnd + '</button>'.length);
+} else if (qrStart < addStart) {
+  source = source.slice(0, qrStart) + addBlock + '\n' + qrBlock + source.slice(addEnd + '</button>'.length);
+} else if (addStart < qrStart) {
+  // Already in the requested order; keep the existing rendered block untouched.
+} else {
+  fail("QR/add-site block positions are ambiguous; refusing unsafe rewrite");
+}
+
 writeFileSync(file, source, "utf8");
 console.log("ManagerSettings locations fixes: canonical main site shown once, restored previous QR visual design, and moved add-site action directly below the last work site.");
