@@ -33,6 +33,7 @@ run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
 run("node", ["scripts/patch-manager-dashboard-dedicated-status.mjs"]);
 run("node", ["scripts/patch-manager-menu-autoclose-on-scroll.mjs"]);
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
+run("node", ["scripts/patch-employee-home-shift-info.mjs"]);
 
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || gitSha.stdout?.trim() || "unknown";
