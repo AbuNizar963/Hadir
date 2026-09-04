@@ -1,0 +1,12 @@
+import { readFileSync, writeFileSync } from "node:fs";
+
+const file = new URL("../src/pages/EmployeeCenter.tsx", import.meta.url);
+const source = readFileSync(file, "utf8");
+const oldBlock = `      try {\n        const [profile, a, r] = await Promise.all([getBackendEmployeeProfile(), getBackendAttendance(2000), getBackendRequests()]);\n        if (!alive) return;\n        setEmployee(profile);\n        setAttendance((a || []).filter((x: any) => x.employeeId === session.employeeId));\n        setRequests((r || []).filter((x: any) => x.employeeId === session.employeeId));\n        setAvatarUrl(await loadAvatarDataUrl(profile.id || session.employeeId || ""));\n      } catch (e) { if (alive) setError(e instanceof Error ? e.message : "تعذر تحميل مركز الموظف"); }`;
+const newBlock = `      try {\n        // Load the profile independently: attendance/requests must never hide a valid employee session.\n        const profile = await getBackendEmployeeProfile();\n        if (!alive) return;\n        setEmployee(profile);\n        setError("");\n        void loadAvatarDataUrl(profile.id || session.employeeId || "").then((url) => { if (alive) setAvatarUrl(url); });\n\n        const [attendanceResult, requestsResult] = await Promise.allSettled([\n          getBackendAttendance(2000),\n          getBackendRequests(),\n        ]);\n        if (!alive) return;\n        if (attendanceResult.status === "fulfilled") {\n          setAttendance((attendanceResult.value || []).filter((x: any) => x.employeeId === session.employeeId));\n        }\n        if (requestsResult.status === "fulfilled") {\n          setRequests((requestsResult.value || []).filter((x: any) => x.employeeId === session.employeeId));\n        }\n        const secondaryErrors = [attendanceResult, requestsResult].filter((result) => result.status === "rejected");\n        if (secondaryErrors.length) {\n          console.warn("HADIR employee secondary data load failed", secondaryErrors);\n        }\n      } catch (e) {\n        if (alive) setError(e instanceof Error ? e.message : "تعذر تحميل مركز الموظف");\n      }`;
+if (!source.includes(oldBlock)) {
+  if (source.includes("Promise.allSettled([\n          getBackendAttendance(2000),")) process.exit(0);
+  throw new Error("EmployeeCenter loading block was not found; refusing to modify the file.");
+}
+writeFileSync(file, source.replace(oldBlock, newBlock), "utf8");
+console.log("EmployeeCenter loading isolation patch applied.");
