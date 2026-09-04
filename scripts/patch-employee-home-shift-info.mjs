@@ -24,8 +24,38 @@ if (!source.includes(requestArrow)) {
 }
 source = source.replace(
   requestArrow,
-  '<span className="text-accent text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</span>',
+  '<span className="mx-auto inline-flex h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-accent/12 items-center justify-center text-accent text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</span>',
 );
+
+// Standardize the reusable shift-information Row itself so all six cards share
+// exactly the same geometry, typography, spacing, and background treatment.
+const rowSignature = "function Row({label,value}:{label:string;value:string})";
+const rowStart = source.indexOf(rowSignature);
+if (rowStart < 0) fail("shift information Row component not found");
+const rowBodyOpen = source.indexOf("{", rowStart + rowSignature.length);
+if (rowBodyOpen < 0) fail("shift information Row body not found");
+let depth = 0;
+let quote = null;
+let escaped = false;
+let rowEnd = -1;
+for (let i = rowBodyOpen; i < source.length; i += 1) {
+  const ch = source[i];
+  if (quote) {
+    if (escaped) escaped = false;
+    else if (ch === "\\") escaped = true;
+    else if (ch === quote) quote = null;
+    continue;
+  }
+  if (ch === '"' || ch === "'" || ch === "`") { quote = ch; continue; }
+  if (ch === "{") depth += 1;
+  else if (ch === "}") {
+    depth -= 1;
+    if (depth === 0) { rowEnd = i + 1; break; }
+  }
+}
+if (rowEnd < 0) fail("could not safely determine the end of the Row component");
+const standardizedRow = 'function Row({label,value}:{label:string;value:string}){return <div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px] flex flex-col justify-center"><div className="text-xs text-muted-foreground leading-5">{label}</div><div className="font-black text-sm leading-6 mt-1 break-words">{value}</div></div>}';
+source = source.slice(0, rowStart) + standardizedRow + source.slice(rowEnd);
 
 const infoAnchor = source.indexOf("معلومات الدوام");
 if (infoAnchor < 0) fail("shift information heading not found");
@@ -59,9 +89,9 @@ for (const required of ["period", "time", "status", "location", "device"]) {
   if (!byKind.has(required)) fail(`could not locate the existing ${required} row`);
 }
 
-const shiftTypeCard = '<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px]"><div className="text-xs text-muted-foreground">نوع الدوام</div><div className="font-black mt-1">{isRotation?"تناوبي":"إداري"}</div></div>';
+const shiftTypeCard = '<div className="rounded-2xl border border-border/60 bg-background/30 p-3.5 min-h-[92px] flex flex-col justify-center"><div className="text-xs text-muted-foreground leading-5">نوع الدوام</div><div className="font-black text-sm leading-6 mt-1 break-words">{isRotation?"تناوبي":"إداري"}</div></div>';
 const ordered = [shiftTypeCard, byKind.get("period"), byKind.get("time"), byKind.get("status"), byKind.get("location"), byKind.get("device")].filter(Boolean);
 
 source = source.slice(0, gridStart) + gridOpen + ordered.join("") + source.slice(gridEnd);
 writeFileSync(file, source, "utf8");
-console.log("EmployeeHome shift-info patch: centered and strengthened attendance arrows, enlarged request arrow, and preserved the existing shift-info card design.");
+console.log("EmployeeHome shift-info patch: unified all six shift cards and centered the request arrow inside a matching icon.");
