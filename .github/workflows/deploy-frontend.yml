@@ -24,6 +24,7 @@ on:
       - "scripts/patch-manager-settings-ui.mjs"
       - "scripts/fix-manager-settings-ui-qr.mjs"
       - "scripts/patch-manager-settings-telegram-ui.mjs"
+      - "scripts/patch-manager-settings-telegram-screen.mjs"
       - "scripts/normalize-manager-settings-locations-anchor.mjs"
       - "scripts/patch-manager-settings-locations-dedicated.mjs"
       - "scripts/patch-manager-settings-locations-fixes.mjs"
