@@ -31,7 +31,9 @@ const json = (data: unknown, status = 200, origin = "*") => new Response(JSON.st
 function origin(req: Request, env: Env) {
   const incoming = String(req.headers.get("origin") || "").trim().replace(/\/$/, "");
   const configured = String(env.APP_ORIGIN || env.APP_ORIGINS || "").split(",").map(v => v.trim().replace(/\/$/, "")).filter(Boolean);
-  return incoming && (!configured.length || configured.includes(incoming) || /^https:\/\/[^/]+\.pages\.dev$/i.test(incoming)) ? incoming : (configured[0] || "*");
+  if (incoming && configured.includes(incoming)) return incoming;
+  if (!configured.length && incoming && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(incoming)) return incoming;
+  return configured[0] || "*";
 }
 
 function token(req: Request) {
