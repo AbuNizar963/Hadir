@@ -134,16 +134,14 @@ export async function handleCompanyLogoRequest(
         env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_BACKUP_SETTING, backupDataUrl),
       ]);
     } catch (error) {
-      await env.PROFILE_IMAGES.delete(key).catch(() => undefined);
-      console.error("company logo settings update failed", error);
-      return json({ error: "تعذر حفظ شعار الشركة" }, 500, origin);
+      // Never delete a successfully persisted logo from R2 because a D1 write
+      // failed. This is especially important when the D1 free-tier write limit
+      // is exhausted: the original file must remain available in R2 so it can
+      // be linked by the next successful settings save.
+      console.error("company logo settings update failed; preserving R2 object", key, error);
+      return json({ error: "تم رفع الشعار إلى R2 لكن تعذر تحديث إعدادات D1. لم يتم حذف ملف الشعار من R2." }, 503, origin);
     }
 
-    // Do not delete the previous R2 object. Existing reports/pages can still
-    // reference an older immutable URL; removing it makes the logo disappear
-    // later when that cached document is refreshed. The D1 R2 key remains the
-    // source of truth for the current logo, with a D1 data-URL backup for PDF
-    // generation when R2 is temporarily unavailable.
     return json({ ok: true, url: publicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
   }
 
