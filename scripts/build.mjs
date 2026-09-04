@@ -31,6 +31,7 @@ run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-ui.mjs"]);
 run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
 run("node", ["scripts/patch-manager-dashboard-dedicated-status.mjs"]);
+run("node", ["scripts/patch-manager-menu-autoclose-on-scroll.mjs"]);
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
 
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
