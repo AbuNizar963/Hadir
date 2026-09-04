@@ -29,6 +29,7 @@ run("node", ["scripts/patch-manager-report-filename.mjs"]);
 run("node", ["scripts/patch-manager-settings-ui.mjs"]);
 run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-ui.mjs"]);
+run("node", ["scripts/normalize-manager-settings-locations-anchor.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-dedicated.mjs"]);
 run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
 run("node", ["scripts/patch-manager-dashboard-dedicated-status.mjs"]);
