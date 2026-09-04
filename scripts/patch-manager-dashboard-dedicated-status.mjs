@@ -34,6 +34,9 @@ const employeeBlock = source.slice(employeeSectionIndex, employeeEndIndex + '   
 const loadAnchor = '          getBackendEscapeEvents(undefined, 2000),';
 if (!source.includes(loadAnchor)) fail("escape events load anchor not found");
 source = source.replace(loadAnchor, `${loadAnchor}\n          getBackendRequests("admin"),`);
+const destructureAnchor = 'const [result, escapes] = await Promise.all([';
+if (!source.includes(destructureAnchor)) fail("dashboard load destructuring anchor not found");
+source = source.replace(destructureAnchor, 'const [result, escapes, requests] = await Promise.all([');
 const setEscapeAnchor = '        setEscapeEvents(Array.isArray(escapes) ? escapes.map((item) => ({ employeeId: String(item.employeeId), status: item.status })) : []);';
 if (!source.includes(setEscapeAnchor)) fail("escape events state anchor not found");
 source = source.replace(setEscapeAnchor, `${setEscapeAnchor}\n        setPermissionRequests(Array.isArray(requests) ? requests : []);`);
