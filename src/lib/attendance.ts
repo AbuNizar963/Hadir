@@ -1,5 +1,6 @@
 import { addAttendance, findEmployeeByJobNumber, getAttendance, getEmployees, getSettings, saveEmployees } from "@/lib/storage";
 import { createBackendAttendance, getBackendAttendance, getBackendEmployeeLocation, getBackendEmployeeProfile, getBackendSettings, getBackendRequests, backendEnabled } from "@/lib/backend";
+import { currentSession } from "@/lib/auth";
 import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
 import { haversineMeters, isValidGeoPosition, isLikelyMockedPosition, type GeoPosition } from "@/lib/geo";
 import type { AttendanceRecord, Employee } from "@/types";
@@ -27,7 +28,7 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
   if(backendEnabled){try{const cloud=await getBackendSettings();settings={...settings,...cloud,adminAccounts:Array.isArray(cloud.adminAccounts)?cloud.adminAccounts:settings.adminAccounts};}catch(error){console.warn("تعذر تحميل إعدادات الحضور من Cloudflare D1:",error);}}
 
   let employee: Employee | null = null;
-  if(backendEnabled){try{employee=await getBackendEmployeeProfile();if(String(employee.jobNumber).trim()!==String(args.jobNumber).trim())return{ok:false,reason:"جلسة الموظف لا تطابق الرقم الوظيفي الحالي. يرجى تسجيل الدخول مرة أخرى."};}catch(error){return{ok:false,reason:error instanceof Error?error.message:"تعذر التحقق من جلسة الموظف"};}}
+  if(backendEnabled){try{const session=currentSession();employee=await getBackendEmployeeProfile();if(!session||String(session.employeeId).trim()!==String(employee.id).trim())return{ok:false,reason:"جلسة الموظف لا تطابق الحساب الحالي. يرجى تسجيل الدخول مرة أخرى."};}catch(error){return{ok:false,reason:error instanceof Error?error.message:"تعذر التحقق من جلسة الموظف"};}}
   else employee=findEmployeeByJobNumber(args.jobNumber);
 
   if(!employee)return{ok:false,reason:"الموظف غير موجود"};
@@ -85,7 +86,6 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
   if(args.type==="check-out"&&end){
     const diff=Math.round((end.getTime()-now.getTime())/60000);
     if(diff>0){
-      // Early checkout is forbidden for employees unless a manager/owner has approved a checkout request.
       let approvedEarlyCheckout=false;
       if(backendEnabled){
         try{
