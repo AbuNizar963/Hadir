@@ -54,7 +54,19 @@ async function resolveCompanyLogoKey(env: BrowserEnv): Promise<string> {
   throw new Error("لم يتم العثور على شعار الشركة في R2 أو على مفتاح R2 محفوظ في الإعدادات");
 }
 
+function hasEmbeddedCompanyLogo(html: string): boolean {
+  return /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*\bsrc=["']data:image\//i.test(html)
+    || /<img\b[^>]*\bsrc=["']data:image\/[^"']+["'][^>]*\balt=["']شعار الشركة["']/i.test(html);
+}
+
 async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<string> {
+  // The report page already renders the current Settings logo. The browser
+  // client inlines that exact image before calling this endpoint, so PDF
+  // generation can use the same current logo even if an old R2 pointer is
+  // temporarily missing. R2 remains the authoritative storage for future
+  // uploads and the fallback when the client did not inline the image.
+  if (hasEmbeddedCompanyLogo(html)) return html;
+
   if (!env.PROFILE_IMAGES) throw new Error("R2 binding PROFILE_IMAGES غير موجود أثناء تجهيز PDF");
 
   const key = await resolveCompanyLogoKey(env);
@@ -73,11 +85,6 @@ async function embedCurrentCompanyLogo(html: string, env: BrowserEnv): Promise<s
   const dataUrl = `data:${contentType};base64,${btoa(binary)}`;
   const logoMarkup = `<img src="${dataUrl}" alt="" style="width:31mm;height:31mm;max-width:31mm;max-height:31mm;object-fit:contain;display:block;margin:0 auto 8px auto;" />`;
 
-  // The UI header conditionally renders its logo from settings.brandLogo. A
-  // production PDF must not depend on that client-side URL being present.
-  // Always inject the current R2 object into the report itself. If an image
-  // placeholder already exists, replace it; otherwise add one at the top of
-  // the .service-report element.
   const logoTagPattern = /<img\b[^>]*\balt=["']شعار الشركة["'][^>]*>/i;
   if (logoTagPattern.test(html)) return html.replace(logoTagPattern, logoMarkup);
 
