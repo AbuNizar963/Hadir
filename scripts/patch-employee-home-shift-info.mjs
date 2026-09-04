@@ -11,11 +11,11 @@ if (!source.includes(arrowAttendance) || !source.includes(arrowCheckout)) {
 }
 source = source.replace(
   arrowAttendance,
-  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-primary/12 grid place-items-center text-primary mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</div>',
+  '<div className="mx-auto h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-primary/12 grid place-items-center text-primary mb-3 text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</div>',
 );
 source = source.replace(
   arrowCheckout,
-  '<div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-accent/12 grid place-items-center text-accent mb-3 text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">→</div>',
+  '<div className="mx-auto h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem] rounded-2xl bg-accent/12 grid place-items-center text-accent mb-3 text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">→</div>',
 );
 
 const requestArrow = '<span className="text-accent text-xl">←</span>';
@@ -24,7 +24,7 @@ if (!source.includes(requestArrow)) {
 }
 source = source.replace(
   requestArrow,
-  '<span className="text-accent text-4xl sm:text-5xl font-black leading-none" aria-hidden="true">←</span>',
+  '<span className="text-accent text-5xl sm:text-6xl font-black leading-none" aria-hidden="true">←</span>',
 );
 
 const infoAnchor = source.indexOf("معلومات الدوام");
@@ -64,4 +64,4 @@ const ordered = [shiftTypeCard, byKind.get("period"), byKind.get("time"), byKind
 
 source = source.slice(0, gridStart) + gridOpen + ordered.join("") + source.slice(gridEnd);
 writeFileSync(file, source, "utf8");
-console.log("EmployeeHome shift-info patch: enlarged inward attendance arrows, matched request arrow size, and removed the shift-type SVG icon.");
+console.log("EmployeeHome shift-info patch: centered and strengthened attendance arrows, enlarged request arrow, and preserved the existing shift-info card design.");
