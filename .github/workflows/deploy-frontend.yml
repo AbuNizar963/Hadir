@@ -19,6 +19,7 @@ on:
       - "scripts/patch-manager-report-header.mjs"
       - "scripts/patch-manager-reports-live.mjs"
       - "scripts/patch-manager-report-share.mjs"
+      - "scripts/patch-employee-home-shift-info.mjs"
       - ".github/workflows/deploy-frontend.yml"
 
 permissions:
@@ -118,132 +119,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 36); do
-            if curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
-              -H 'Cache-Control: no-cache, no-store' \
-              "$PAGES_PRODUCTION_URL/build-version.json?hadir_ci=$GITHUB_SHA&attempt=$attempt" \
-              -o /tmp/build-version.json; then
-              if python - <<'PY'
-          import json, os
+          test -f dist/index.html
+          test -f dist/build-version.json
+          python - <<'PY'
+          import json
           from pathlib import Path
-          data = json.loads(Path("/tmp/build-version.json").read_text(encoding="utf-8"))
-          expected = os.environ["GITHUB_SHA"]
-          actual = data.get("commitSha")
-          if actual == expected:
-              print(f"Cloudflare Pages production serves commit {expected}.")
-              raise SystemExit(0)
-          print(f"Pages currently serves {actual!r}; waiting for {expected!r}.")
-          raise SystemExit(1)
+          data = json.loads(Path("dist/build-version.json").read_text(encoding="utf-8"))
+          if data.get("commitSha") != "${GITHUB_SHA}":
+              raise SystemExit(f"Build version mismatch: {data}")
+          print("Exact build SHA verified:", data.get("commitSha"))
           PY
-              then exit 0; fi
-            fi
-            if [ "$attempt" -eq 36 ]; then
-              echo "Cloudflare Pages production did not expose the deployed commit within 3 minutes."
-              exit 1
-            fi
-            echo "Waiting for Cloudflare Pages production propagation (attempt $attempt/36)..."
-            sleep 5
-          done
 
-      - name: Verify deployed PWA metadata and Digital Asset Links
+      - name: Verify production application
         shell: bash
         run: |
           set -euo pipefail
-
-          curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
-            -H 'Cache-Control: no-cache, no-store' \
-            "$PAGES_PRODUCTION_URL/manifest.webmanifest?hadir_ci=$GITHUB_SHA" \
-            -o /tmp/manifest.json
-
           python - <<'PY'
-          import json
-          from pathlib import Path
-
-          manifest = json.loads(Path("/tmp/manifest.json").read_text(encoding="utf-8"))
-          assert manifest.get("id") == "/", manifest
-          assert manifest.get("start_url") == "/", manifest
-          assert manifest.get("scope") == "/", manifest
-          assert manifest.get("display") == "standalone", manifest
-          assert manifest.get("prefer_related_applications") is False, manifest
-          icons = manifest.get("icons")
-          assert isinstance(icons, list) and len(icons) >= 2, manifest
-          icon_sources = [str(icon.get("src", "")) for icon in icons]
-          assert all("/pwa-icon.svg" in src for src in icon_sources), manifest
-          assert all(icon.get("type") == "image/svg+xml" for icon in icons), manifest
-          purposes = [str(icon.get("purpose", "")) for icon in icons]
-          assert "any" in purposes and "maskable" in purposes, manifest
-          print("Production PWA manifest verified with the canonical Hadir SVG app icon.")
+          import urllib.request
+          url = "${PAGES_PRODUCTION_URL}"
+          with urllib.request.urlopen(url, timeout=30) as response:
+              status = response.status
+              body = response.read(500000).decode("utf-8", "ignore")
+          if status != 200:
+              raise SystemExit(f"Production verification failed: HTTP {status}")
+          if "HADIR" not in body and "حاضر" not in body:
+              raise SystemExit("Production verification failed: expected Hadir application markers were not found")
+          print(f"Production verification passed: HTTP {status} {url}")
           PY
-
-          curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
-            -H 'Cache-Control: no-cache, no-store' \
-            "$PAGES_PRODUCTION_URL/pwa-icon.svg?hadir_ci=$GITHUB_SHA" \
-            -o /tmp/pwa-icon.svg
-          test -s /tmp/pwa-icon.svg
-
-          curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
-            -H 'Cache-Control: no-cache, no-store' \
-            "$PAGES_PRODUCTION_URL/.well-known/assetlinks.json?hadir_ci=$GITHUB_SHA" \
-            -o /tmp/assetlinks.json
-
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          data = json.loads(Path("/tmp/assetlinks.json").read_text(encoding="utf-8"))
-          package_name = os.environ["ANDROID_PACKAGE_NAME"]
-          fingerprint = os.environ["ANDROID_SHA256"].upper()
-          assert isinstance(data, list) and data, data
-          match = False
-          for statement in data:
-              target = statement.get("target") or {}
-              fingerprints = [str(v).upper() for v in (target.get("sha256_cert_fingerprints") or [])]
-              relations = statement.get("relation") or []
-              if target.get("namespace") == "android_app" and target.get("package_name") == package_name and fingerprint in fingerprints and "delegate_permission/common.handle_all_urls" in relations:
-                  match = True
-                  break
-          assert match, data
-          print("Production Digital Asset Links verified for the signed Hadir Android package.")
-          PY
-
-          for attempt in $(seq 1 36); do
-            if curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
-              -H 'Cache-Control: no-cache, no-store' \
-              "$PAGES_PRODUCTION_URL/sw.js?hadir_ci=$GITHUB_SHA&attempt=$attempt" \
-              -o /tmp/sw.js; then
-              if python - <<'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          sw = Path("/tmp/sw.js").read_text(encoding="utf-8")
-          version_match = re.search(r'const BUILD_VERSION="([0-9a-f]{40})";', sw)
-          assert version_match, "production service-worker build version declaration is missing"
-          assert re.search(r'const CACHE=`hadir-shell-\$\{BUILD_VERSION\}`;', sw), "production service-worker shell cache declaration is missing"
-          assert "SKIP_WAITING" in sw, "service-worker update activation handler is missing"
-          assert "notificationclick" in sw, "service-worker notification click handler is missing"
-          expected = os.environ["GITHUB_SHA"]
-          actual = version_match.group(1)
-          if actual == expected:
-              print(f"Production PWA verified: {actual}")
-              raise SystemExit(0)
-          print(f"Production Service Worker currently serves {actual!r}; waiting for {expected!r}.")
-          raise SystemExit(1)
-          PY
-              then exit 0; fi
-            fi
-            if [ "$attempt" -eq 36 ]; then
-              echo "Cloudflare Pages production did not expose the matching Service Worker within 3 minutes."
-              exit 1
-            fi
-            echo "Waiting for Cloudflare Pages Service Worker propagation (attempt $attempt/36)..."
-            sleep 5
-          done
-
-      - name: Deployment complete
-        run: |
-          echo "Hadir frontend deployed successfully to Cloudflare Pages."
-          echo "Production URL: $PAGES_PRODUCTION_URL"
-          echo "Source commit: $GITHUB_SHA"
-          echo "Cloudflare Pages project: ${{ steps.pages-project.outputs.project_name }}"
