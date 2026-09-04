@@ -11,25 +11,15 @@ const typeAnchor = 'import ManagerLayout from "@/components/layout/ManagerLayout
 if (!source.includes(typeAnchor)) fail("ManagerLayout import anchor not found");
 source = source.replace(typeAnchor, `${typeAnchor}\nimport type { EmployeeRequest } from "@/types";`);
 
+const filterTypeAnchor = 'type Filter = "all" | "present" | "absent" | "late" | "rest" | "leave" | "escaped";';
+const toneTypeAnchor = 'type Tone = "all" | "present" | "absent" | "late" | "rest" | "leave" | "escaped";';
+if (!source.includes(filterTypeAnchor) || !source.includes(toneTypeAnchor)) fail("filter/tone type anchors not found");
+source = source.replace(filterTypeAnchor, 'type Filter = "all" | "present" | "absent" | "late" | "rest" | "leave" | "permission" | "escaped";');
+source = source.replace(toneTypeAnchor, 'type Tone = "all" | "present" | "absent" | "late" | "rest" | "leave" | "permission" | "escaped";');
+
 const stateAnchor = 'const [filter, setFilter] = useState<Filter>("all");';
 if (!source.includes(stateAnchor)) fail("filter state anchor not found");
 source = source.replace(stateAnchor, `${stateAnchor}\n  const [dashboardHome, setDashboardHome] = useState(true);\n  const [permissionRequests, setPermissionRequests] = useState<EmployeeRequest[]>([]);`);
-
-const statusSectionStart = '      <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4" aria-label="حالات الدوام">';
-const employeeSectionStart = '      <section className="hud-card p-5">';
-const statusSectionIndex = source.indexOf(statusSectionStart);
-const employeeSectionIndex = source.indexOf(employeeSectionStart, statusSectionIndex);
-if (statusSectionIndex < 0 || employeeSectionIndex < 0) fail("dashboard status/employee section anchors not found");
-
-const statusSectionEnd = '      </section>\n\n';
-const statusEndIndex = source.indexOf(statusSectionEnd, statusSectionIndex);
-if (statusEndIndex < 0 || statusEndIndex > employeeSectionIndex) fail("dashboard status section end not found");
-
-const statusBlock = source.slice(statusSectionIndex, statusEndIndex + statusSectionEnd.length);
-const employeeEndMarker = '      </section>\n    </ManagerLayout>';
-const employeeEndIndex = source.indexOf(employeeEndMarker, employeeSectionIndex);
-if (employeeEndIndex < 0) fail("dashboard employee section end not found");
-const employeeBlock = source.slice(employeeSectionIndex, employeeEndIndex + '      </section>'.length);
 
 const loadAnchor = '          getBackendEscapeEvents(undefined, 2000),';
 if (!source.includes(loadAnchor)) fail("escape events load anchor not found");
@@ -54,15 +44,26 @@ const dependencyAnchor = '[currentRows, search, filter, presentIds, absentIds, l
 if (!source.includes(dependencyAnchor)) fail("filtered rows dependency anchor not found");
 source = source.replace(dependencyAnchor, '[currentRows, search, filter, presentIds, absentIds, lateIds, restIds, leaveIds, permissionIds, escapedIds]);');
 
-const filterTypeAnchor = 'type Filter = "all" | "present" | "absent" | "late" | "rest" | "leave" | "escaped";';
-const toneTypeAnchor = 'type Tone = "all" | "present" | "absent" | "late" | "rest" | "leave" | "escaped";';
-if (!source.includes(filterTypeAnchor) || !source.includes(toneTypeAnchor)) fail("filter/tone type anchors not found");
-source = source.replace(filterTypeAnchor, 'type Filter = "all" | "present" | "absent" | "late" | "rest" | "leave" | "permission" | "escaped";');
-source = source.replace(toneTypeAnchor, 'type Tone = "all" | "present" | "absent" | "late" | "rest" | "leave" | "permission" | "escaped";');
-
 const filtersAnchor = '["late", "المتأخرون"], ["rest", "المستريحون"], ["leave", "الإجازات"], ["escaped", "الهاربون"],';
 if (!source.includes(filtersAnchor)) fail("filters list anchor not found");
 source = source.replace(filtersAnchor, '["late", "المتأخرون"], ["rest", "المستريحون"], ["leave", "الإجازات"], ["permission", "المستأذنون"], ["escaped", "الهاربون"],');
+
+// Compute section offsets only after every insertion/replacement before the sections.
+const statusSectionStart = '      <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4" aria-label="حالات الدوام">';
+const employeeSectionStart = '      <section className="hud-card p-5">';
+const statusSectionIndex = source.indexOf(statusSectionStart);
+const employeeSectionIndex = source.indexOf(employeeSectionStart, statusSectionIndex);
+if (statusSectionIndex < 0 || employeeSectionIndex < 0) fail("dashboard status/employee section anchors not found");
+
+const statusSectionEnd = '      </section>\n\n';
+const statusEndIndex = source.indexOf(statusSectionEnd, statusSectionIndex);
+if (statusEndIndex < 0 || statusEndIndex > employeeSectionIndex) fail("dashboard status section end not found");
+const statusBlock = source.slice(statusSectionIndex, statusEndIndex + statusSectionEnd.length);
+
+const employeeEndMarker = '      </section>\n    </ManagerLayout>';
+const employeeEndIndex = source.indexOf(employeeEndMarker, employeeSectionIndex);
+if (employeeEndIndex < 0) fail("dashboard employee section end not found");
+const employeeBlock = source.slice(employeeSectionIndex, employeeEndIndex + '      </section>'.length);
 
 const updatedStatusBlock = statusBlock
   .replaceAll('onClick={() => setFilter("all")}', 'onClick={() => { setFilter("all"); setDashboardHome(false); }}')
@@ -82,7 +83,6 @@ const detailHeader = `      {!dashboardHome ? <section className="hud-card mb-5 
 
 const homeStatusBlock = `{dashboardHome ? ${finalStatusBlock} : null}\n\n`;
 const detailEmployeeBlock = `{!dashboardHome ? ${employeeBlock.replaceAll('escaped={escapedIds.has(row.employeeId)}', 'escaped={escapedIds.has(row.employeeId)} permission={permissionIds.has(row.employeeId)}')} : null}`;
-
 source = source.slice(0, statusSectionIndex) + homeStatusBlock + detailHeader + detailEmployeeBlock + source.slice(employeeEndIndex + '      </section>'.length);
 
 const employeeRowSignature = 'const EmployeeRow = memo(function EmployeeRow({ row, escaped }: { row: DailyStatusRow; escaped: boolean }) {';
