@@ -2,6 +2,10 @@ name: Build Hadir Android WebView
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'mobile/android-webview/**'
+      - '.github/workflows/build-android-webview.yml'
 
 permissions:
   contents: read
