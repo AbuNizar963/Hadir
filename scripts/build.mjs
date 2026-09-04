@@ -34,12 +34,12 @@ run("node", ["scripts/patch-manager-settings-telegram-ui.mjs"]);
 run("node", ["scripts/normalize-manager-settings-locations-anchor.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-dedicated.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-fixes.mjs"]);
-// Work-site settings: canonical main site + restored QR visual treatment + add-site action placement.
 run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
 run("node", ["scripts/patch-manager-dashboard-dedicated-status.mjs"]);
 run("node", ["scripts/patch-manager-menu-autoclose-on-scroll.mjs"]);
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
 run("node", ["scripts/patch-employee-home-shift-info.mjs"]);
+run("node", ["scripts/patch-qibla-page.mjs"]);
 
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || gitSha.stdout?.trim() || "unknown";
@@ -55,9 +55,6 @@ if (bun.status === 0 && !bun.error) {
   run("npm", ["run", "build"]);
 }
 
-// Production invariants: the generated report bundle must contain the branded
-// daily report and the direct PDF-share implementation. Validate stable code
-// markers because localized UI text may be minified/encoded by Vite/Rollup.
 const scan = spawnSync("grep", ["-RIl", "سجل الحضور والغياب ليوم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (scan.status !== 0 || !scan.stdout?.trim()) {
   throw new Error("Production build validation failed: branded daily report header was not found in dist.");
