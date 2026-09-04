@@ -12,8 +12,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      # All HADIR Cloudflare deployments use one account-scoped token.
-      # The token must have the required permissions for D1, Workers, R2 and Pages.
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -35,6 +33,10 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm install --package-lock=false
+
+      - name: Apply session security patch
+        working-directory: backend
+        run: node scripts/patch-session-security.mjs
 
       - name: Validate Worker bundle
         working-directory: backend
@@ -101,7 +103,7 @@ jobs:
           printf '%s\n' "$secrets"
           printf '%s\n' "$secrets" | grep -q 'GEMINI_API_KEY' || {
             echo 'GEMINI_API_KEY is not configured on the deployed Cloudflare Worker.'
-            echo 'Add GEMINI_API_KEY in Cloudflare Workers & Pages > hadir-api > Settings > Variables and Secrets > Secrets, then redeploy.'
+            echo 'Add GEMINI_API_KEY in Cloudflare Workers & Pages > Settings > Variables and Secrets > Secrets, then redeploy.'
             exit 1
           }
 
