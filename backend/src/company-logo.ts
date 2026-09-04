@@ -7,6 +7,7 @@ const LOGO_CONTENT_TYPE = "image/webp";
 const LOGO_KEY_SETTING = "brandLogoR2Key";
 const LOGO_URL_SETTING = "brandLogo";
 const LOGO_BACKUP_SETTING = "brandLogoDataUrl";
+const CURRENT_LOGO_KEY = "company/logo-current.webp";
 const SESSION_COOKIE = "hadir_session";
 
 function json(data: unknown, status: number, origin: string): Response {
@@ -58,21 +59,6 @@ async function authenticatedActor(req: Request, env: Env): Promise<Actor | null>
   }
 }
 
-function dataUrlFromBytes(bytes: Uint8Array): string {
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)));
-  }
-  return `data:${LOGO_CONTENT_TYPE};base64,${btoa(binary)}`;
-}
-
-async function readStoredLogoBackup(env: Env): Promise<string | null> {
-  const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_BACKUP_SETTING).first<{ value: string }>();
-  const value = String(row?.value || "").trim();
-  return value.startsWith(`data:${LOGO_CONTENT_TYPE};base64,`) && value.length <= 140000 ? value : null;
-}
-
 export async function handleCompanyLogoRequest(
   req: Request,
   env: Env,
@@ -86,15 +72,18 @@ export async function handleCompanyLogoRequest(
 
   if (req.method === "GET") {
     const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_KEY_SETTING).first<{ value: string }>();
-    const key = String(row?.value || "").trim();
-    if (!key) return new Response(null, { status: 404, headers: { "access-control-allow-origin": origin, "cache-control": "no-store" } });
-    const object = await env.PROFILE_IMAGES.get(key);
-    if (!object) return new Response(null, { status: 404, headers: { "access-control-allow-origin": origin, "cache-control": "no-store" } });
-    const headers = new Headers({ "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "cache-control": "no-store" });
-    object.writeHttpMetadata(headers);
-    headers.set("content-type", LOGO_CONTENT_TYPE);
-    headers.set("etag", object.httpEtag);
-    return new Response(object.body, { status: 200, headers });
+    const configuredKey = String(row?.value || "").trim();
+    const keys = configuredKey && configuredKey !== CURRENT_LOGO_KEY ? [configuredKey, CURRENT_LOGO_KEY] : [CURRENT_LOGO_KEY];
+    for (const key of keys) {
+      const object = await env.PROFILE_IMAGES.get(key);
+      if (!object) continue;
+      const headers = new Headers({ "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "cache-control": "no-store" });
+      object.writeHttpMetadata(headers);
+      headers.set("content-type", LOGO_CONTENT_TYPE);
+      headers.set("etag", object.httpEtag);
+      return new Response(object.body, { status: 200, headers });
+    }
+    return new Response(null, { status: 404, headers: { "access-control-allow-origin": origin, "cache-control": "no-store" } });
   }
 
   const resolvedActor = actor || await authenticatedActor(req, env);
@@ -109,20 +98,19 @@ export async function handleCompanyLogoRequest(
     if (file.type !== LOGO_CONTENT_TYPE) return json({ error: "يجب أن يكون الشعار بصيغة WebP" }, 415, origin);
     if (file.size <= 0 || file.size > MAX_LOGO_BYTES) return json({ error: "حجم الشعار يجب أن يكون أقل من 100 كيلوبايت" }, 413, origin);
 
-    const key = `company/logo-${crypto.randomUUID()}.webp`;
+    // One durable canonical R2 object is used for the current company logo.
+    // This prevents a D1 write-limit from orphaning the image after upload.
+    const key = CURRENT_LOGO_KEY;
     const publicUrl = logoUrl(req, key);
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const backupDataUrl = dataUrlFromBytes(bytes);
-    if (backupDataUrl.length > 140000) return json({ error: "حجم الشعار بعد التجهيز أكبر من الحد المسموح" }, 413, origin);
 
     await env.PROFILE_IMAGES.put(key, bytes, {
-      httpMetadata: { contentType: LOGO_CONTENT_TYPE, cacheControl: "public, max-age=31536000, immutable" },
+      httpMetadata: { contentType: LOGO_CONTENT_TYPE, cacheControl: "public, max-age=31536000" },
       customMetadata: { purpose: "company-logo", uploadedBy: resolvedActor?.id || "unknown" },
     });
 
     const storedObject = await env.PROFILE_IMAGES.head(key);
     if (!storedObject) {
-      await env.PROFILE_IMAGES.delete(key).catch(() => undefined);
       console.error("company logo R2 persistence verification failed", key);
       return json({ error: "تعذر التحقق من حفظ شعار الشركة في R2" }, 502, origin);
     }
@@ -131,24 +119,22 @@ export async function handleCompanyLogoRequest(
       await env.DB.batch([
         env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_KEY_SETTING, key),
         env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_URL_SETTING, publicUrl),
-        env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_BACKUP_SETTING, backupDataUrl),
       ]);
     } catch (error) {
-      // Never delete a successfully persisted logo from R2 because a D1 write
-      // failed. This is especially important when the D1 free-tier write limit
-      // is exhausted: the original file must remain available in R2 so it can
-      // be linked by the next successful settings save.
+      // R2 is already the authoritative store and the object was verified.
+      // Never delete it because D1 may be temporarily read-only after its limit.
       console.error("company logo settings update failed; preserving R2 object", key, error);
-      return json({ error: "تم رفع الشعار إلى R2 لكن تعذر تحديث إعدادات D1. لم يتم حذف ملف الشعار من R2." }, 503, origin);
+      return json({ ok: true, r2Saved: true, settingsUpdated: false, url: publicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE, warning: "تم حفظ ملف الشعار نفسه في R2، لكن تعذر تحديث إعدادات D1 مؤقتًا" }, 200, origin);
     }
 
-    return json({ ok: true, url: publicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
+    return json({ ok: true, r2Saved: true, settingsUpdated: true, url: publicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
   }
 
   if (req.method === "DELETE") {
     const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_KEY_SETTING).first<{ value: string }>();
     const key = String(row?.value || "").trim();
     if (key) await env.PROFILE_IMAGES.delete(key).catch(() => undefined);
+    if (key !== CURRENT_LOGO_KEY) await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY).catch(() => undefined);
     await env.DB.batch([
       env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_KEY_SETTING),
       env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_URL_SETTING),
