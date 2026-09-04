@@ -34,7 +34,7 @@ export async function getDailyStatus(day: string): Promise<DailyStatusResponse> 
     response = await fetch(`${API_URL}/api/manager/daily-status?date=${encodeURIComponent(day)}`, {
       method: "GET",
       headers,
-      credentials: "include",
+      credentials: "omit",
       cache: "no-store",
       mode: "cors",
     });
