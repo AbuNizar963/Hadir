@@ -28,6 +28,9 @@ const newGetBlock = `    // R2 is authoritative for the current logo. Always try
 
 if (source.includes("const keys = Array.from(new Set([CURRENT_LOGO_KEY, configuredKey].filter(Boolean)));")) {
   console.log("Company logo cache-version patch: GET already prefers canonical R2 key.");
+} else if (source.includes("const object = await env.PROFILE_IMAGES.get(CURRENT_LOGO_KEY);")) {
+  // A newer implementation already made R2 canonical and no GET patch is needed.
+  console.log("Company logo cache-version patch: GET already reads the canonical R2 object directly.");
 } else {
   if (!source.includes(oldGetBlock)) {
     throw new Error("Company logo cache-version patch: GET logo-key anchor not found; refusing unsafe replacement.");
@@ -36,4 +39,4 @@ if (source.includes("const keys = Array.from(new Set([CURRENT_LOGO_KEY, configur
 }
 
 writeFileSync(file, source, "utf8");
-console.log("Company logo cache-version patch: upload URLs are ETag-versioned and GET prefers the canonical current R2 object.");
+console.log("Company logo cache-version patch: upload URLs are ETag-versioned and GET uses the canonical current R2 object.");
