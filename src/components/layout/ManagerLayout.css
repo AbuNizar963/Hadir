@@ -11,8 +11,9 @@
 .manager-shell .manager-nav a { min-height: 58px; border: 1px solid transparent; position: relative; }
 .manager-shell .manager-nav a[aria-current="page"] { background: linear-gradient(180deg, hsl(var(--primary) / 0.16), hsl(var(--primary) / 0.075)); border-color: hsl(var(--primary) / 0.28); box-shadow: 0 7px 18px hsl(var(--primary) / 0.08); }
 .manager-shell .manager-page-header { border-bottom-color: hsl(var(--border) / 0.72); }
+/* Do not transform the page container: fixed child workspaces must remain viewport-anchored. */
 .manager-shell .manager-content > * { animation: hadir-manager-enter .28s ease-out both; }
-@keyframes hadir-manager-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes hadir-manager-enter { from { opacity: 0; } to { opacity: 1; } }
 
 /* The header height is measured by ManagerLayout; no guessed mobile/desktop offset. */
 .manager-shell .manager-utility-menu { top: var(--hadir-manager-topbar-h, var(--manager-topbar-h)); max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h))); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; animation: hadir-overlay-down .16s ease-out both; box-shadow: 0 18px 42px hsl(var(--foreground) / 0.16); }
