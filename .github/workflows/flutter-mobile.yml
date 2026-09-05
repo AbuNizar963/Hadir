@@ -42,10 +42,34 @@ jobs:
           test -f app/build/outputs/apk/debug/app-debug.apk
           mkdir -p ../build/app/outputs/flutter-apk
           cp app/build/outputs/apk/debug/app-debug.apk ../build/app/outputs/flutter-apk/app-debug.apk
+      - name: Prepare ephemeral release signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/ci-release.keystore \
+            -storepass changeit \
+            -keypass changeit \
+            -alias hadir-ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -dname "CN=HADIR CI, OU=Build, O=HADIR, L=NA, ST=NA, C=US"
+      - name: Build Android release AAB
+        env:
+          HADIR_RELEASE_KEYSTORE: android/ci-release.keystore
+          HADIR_RELEASE_STORE_PASSWORD: changeit
+          HADIR_RELEASE_KEY_ALIAS: hadir-ci
+          HADIR_RELEASE_KEY_PASSWORD: changeit
+        run: |
+          flutter build appbundle --release
+          test -f build/app/outputs/bundle/release/app-release.aab
       - uses: actions/upload-artifact@v4
         with:
           name: hadir-android-debug
           path: mobile/flutter/build/app/outputs/flutter-apk/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hadir-android-release-aab
+          path: mobile/flutter/build/app/outputs/bundle/release/app-release.aab
 
   ios:
     runs-on: macos-latest
