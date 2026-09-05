@@ -1,4 +1,5 @@
 import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
+import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
 
 type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string };
 
@@ -23,17 +24,15 @@ export async function handleProfessionalAttendanceReport(req: Request, env: Env,
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS(origin) });
   if (req.method !== "GET") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
-  if (!actor || !["owner", "manager", "supervisor"].includes(String(actor.role))) {
-    return json({ error: "غير مصرح" }, 403, origin);
-  }
+  if (!actor || !["owner", "manager", "supervisor"].includes(String(actor.role))) return json({ error: "غير مصرح" }, 403, origin);
 
   const from = String(url.searchParams.get("from") || "").trim();
   const to = String(url.searchParams.get("to") || "").trim();
   const employeeId = String(url.searchParams.get("employeeId") || "").trim() || undefined;
-
   if (!DAY_RE.test(from) || !DAY_RE.test(to)) return json({ error: "الفترة الزمنية غير صالحة" }, 400, origin);
 
   try {
+    await ensureProfessionalAttendanceFacts(env, from, to, actor, employeeId);
     const report = await buildProfessionalAttendanceReport(env, from, to, employeeId);
     return json(report, 200, origin);
   } catch (error) {
