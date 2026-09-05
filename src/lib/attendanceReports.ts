@@ -4,7 +4,8 @@ export type AttendanceReportRow = {
   attendanceDay: string;
   employeeId: string;
   employeeName: string;
-  jobNumber: string;
+  jobNumber: string | null;
+  locationId: string | null;
   status: string;
   scheduleType: string;
   scheduledStart: string | null;
@@ -19,11 +20,13 @@ export type AttendanceReportRow = {
   open: boolean;
   exceptionCode: string | null;
   attendanceEventIds: string[];
-  attendanceEventCount: number;
-  attendanceEvents: Array<Record<string, unknown>>;
+  requestIds: string[];
+  auditIds: string[];
   calculationSource: string;
   calculationVersion: string;
+  historicalDataQuality: "exact" | "reconstructed" | "incomplete" | string;
   timezone: string;
+  computedAt: string;
 };
 
 export type AttendanceReport = {
@@ -47,10 +50,9 @@ export type AttendanceReport = {
     notStarted: number;
     invalid: number;
     open: number;
-    missingCheckIn: number;
-    missingCheckOut: number;
     workedMinutes: number;
     expectedMinutes: number;
+    workVarianceMinutes: number;
     lateMinutes: number;
     earlyLeaveMinutes: number;
     overtimeMinutes: number;
@@ -67,49 +69,59 @@ export type AttendanceReport = {
       permission: number;
       rest: number;
       open: number;
-      lateMinutes: number;
       workedMinutes: number;
       expectedMinutes: number;
+      lateMinutes: number;
+      earlyLeaveMinutes: number;
       overtimeMinutes: number;
     }>;
     employeeSummaries: Array<{
       employeeId: string;
       employeeName: string;
-      jobNumber: string;
+      jobNumber: string | null;
       days: number;
       present: number;
       late: number;
       absent: number;
       leave: number;
       permission: number;
+      rest: number;
       open: number;
+      workedMinutes: number;
+      expectedMinutes: number;
       lateMinutes: number;
       earlyLeaveMinutes: number;
       overtimeMinutes: number;
-      workedMinutes: number;
-      expectedMinutes: number;
     }>;
     exceptions: Array<{
       attendanceDay: string;
       employeeId: string;
       employeeName: string;
-      jobNumber: string;
+      jobNumber: string | null;
       code: string;
       status: string;
       minutes: number;
       attendanceEventIds: string[];
+      requestIds: string[];
+      auditIds: string[];
     }>;
     exceptionCounts: Record<string, number>;
   };
   rows: AttendanceReportRow[];
+  dataQuality: {
+    byStatus: Record<string, number>;
+    complete: boolean;
+  };
   integrity: {
     sourceOfTruth: string;
-    derivedStatus: string;
+    rawSource: string;
     noRawAttendanceMutation: boolean;
     periodScoped: boolean;
     maxDays: number;
     drillDownAvailable: boolean;
-    rawEventIdsIncluded: boolean;
+    sourceEventIdsIncluded: boolean;
+    requestIdsIncluded: boolean;
+    auditIdsIncluded: boolean;
   };
 };
 
@@ -127,7 +139,7 @@ export async function getAttendanceReport(from: string, to: string, employeeId?:
   const headers = new Headers({ "content-type": "application/json" });
   const authToken = token();
   if (authToken) headers.set("authorization", `Bearer ${authToken}`);
-  const response = await fetch(`${apiUrl}/api/reports/attendance?${params.toString()}`, {
+  const response = await fetch(`${apiUrl}/api/reports/professional-attendance?${params.toString()}`, {
     method: "GET",
     headers,
     credentials: "include",
