@@ -32,6 +32,7 @@ on:
       - "scripts/patch-global-attendance-schedule-filter.mjs"
       - "scripts/patch-global-attendance-print-report.mjs"
       - "scripts/patch-global-attendance-print-layout.mjs"
+      - "scripts/patch-global-attendance-print-qr.mjs"
       - ".github/workflows/deploy-frontend.yml"
 
 permissions:
