@@ -1,6 +1,8 @@
 import base, { HadirRealtime } from "./automation-entry";
 import { handleDeviceRebind } from "./device-rebind-api";
 import { handleDailyStatus } from "./daily-status-api";
+import { handleProfessionalAttendanceReport } from "./professional-attendance-report-api";
+import { handleReportArchive } from "./report-archive";
 import { handleCompanyLogoRequest } from "./company-logo";
 import { runAutomaticVip } from "./automatic-vip";
 
@@ -76,7 +78,17 @@ export default {
     if (logoResponse) return logoResponse;
 
     const url = new URL(request.url);
-    if (url.pathname.replace(/\/$/, "") === "/api/manager/daily-status") {
+    const normalizedPath = url.pathname.replace(/\/$/, "");
+    if (normalizedPath.startsWith("/api/reports/archive")) {
+      const actorProbe = new URL(request.url);
+      actorProbe.pathname = "/api/me";
+      actorProbe.search = "";
+      const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
+      const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
+      return handleReportArchive(request, env, actor, origin(request, env));
+    }
+
+    if (normalizedPath === "/api/manager/daily-status" || normalizedPath === "/api/reports/attendance" || normalizedPath === "/api/reports/professional-attendance") {
       const cors = dailyCors(request, env);
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
 
@@ -108,13 +120,17 @@ export default {
         actorProbe.search = "";
         const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
         const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
-        const result = await handleDailyStatus(request, env, actor);
+        const result = normalizedPath === "/api/manager/daily-status"
+          ? await handleDailyStatus(request, env, actor)
+          : normalizedPath === "/api/reports/professional-attendance"
+            ? await handleProfessionalAttendanceReport(request, env, actor)
+            : await handleProfessionalAttendanceReport(request, env, actor);
         const headers = new Headers(result.headers);
         for (const [key, value] of Object.entries(cors)) headers.set(key, value);
         return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
       } catch (error) {
-        console.error("daily-status failed", error);
-        return dailyError("تعذر قراءة حالة الدوام من D1. تم تسجيل الخطأ في Worker Logs.", request, env);
+        console.error(`${normalizedPath} failed`, error);
+        return dailyError("تعذر قراءة بيانات التقرير من D1. تم تسجيل الخطأ في Worker Logs.", request, env);
       }
     }
 

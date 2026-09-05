@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { NavLink, useNavigate, Link } from "react-router-dom";
-import { BarChart3, Bell, Bot, CheckCheck, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, Menu, Monitor, Moon, Palette, Settings, Sun, Trash2, Users, Wrench, X, CloudSun, Compass } from "lucide-react";
+import { Archive, BarChart3, Bell, Bot, CheckCheck, ClipboardCheck, ClipboardList, LayoutDashboard, LogOut, Menu, Monitor, Moon, Palette, Settings, Sun, Trash2, Users, Wrench, X, CloudSun, Compass } from "lucide-react";
 import Brand from "@/components/Brand";
 import SessionWelcome from "@/components/SessionWelcome";
 import "./ManagerLayout.css";
@@ -20,6 +20,7 @@ const NAV = [
   { to: "/manager/employees", label: "الموظفون", icon: Users, editRoles: ["owner", "manager", "supervisor"] },
   { to: "/manager/audit", label: "سجل التدقيق", icon: ClipboardCheck, editRoles: ["owner", "manager", "supervisor"] },
   { to: "/manager/reports", label: "التقارير", icon: BarChart3, editRoles: ["owner", "manager"] },
+  { to: "/manager/report-archive", label: "أرشيف التقارير", icon: Archive, editRoles: ["owner", "manager"] },
   { to: "/manager/settings", label: "الإعدادات", icon: Settings, editRoles: ["owner"] },
 ];
 
