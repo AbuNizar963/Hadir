@@ -20,17 +20,13 @@ if (source.includes(settingsAnchor)) {
 const oldHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div>\n        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold"><div>رئيس القسم : {settings.ownerName || "—"}</div><div>معاون رئيس القسم : {settings.managerName || "—"}</div></div>`;
 const newHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-[3.1cm] w-[3.1cm] object-contain shrink-0" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">سجل الحضور والغياب ليوم {days[dateOf(date).getDay()]} {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div></div>`;
 
-if (!source.includes(oldHeaderBlock)) throw new Error("ManagerReports: exact daily report header block not found.");
-source = source.replace(oldHeaderBlock, newHeaderBlock);
+if (!source.includes(oldHeaderBlock) && !source.includes(newHeaderBlock)) throw new Error("ManagerReports: daily report header block not found.");
+if (source.includes(oldHeaderBlock)) source = source.replace(oldHeaderBlock, newHeaderBlock);
 
 const oldEmployeeCell = `<td className="p-2 border-l border-black/20 font-bold break-words">{row.employee.name}<div className="font-normal text-[10px] mt-0.5">{row.employee.jobNumber}</div></td>`;
 const newEmployeeCell = `<td className="p-2 border-l border-black/20 font-bold break-words">{row.employee.name}</td>`;
-if (!source.includes(oldEmployeeCell)) throw new Error("ManagerReports: daily employee self-number cell not found.");
-source = source.replace(oldEmployeeCell, newEmployeeCell);
+if (source.includes(oldEmployeeCell)) source = source.replace(oldEmployeeCell, newEmployeeCell);
 
-// Keep the daily report strictly limited to employees whose schedule says they
-// work on the selected date. Find the whole declaration rather than depending
-// on one exact generated line from an earlier patch.
 const dailyRowsStart = 'const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(';
 const dailyRowsIndex = source.indexOf(dailyRowsStart);
 if (dailyRowsIndex === -1) throw new Error("ManagerReports: daily service rows declaration not found.");
@@ -47,15 +43,72 @@ if (!firstArg.includes('.filter(s => getEmployeeWorkPeriod(s.employee, dateOf(da
   source = source.slice(0, dailyRowsArgsStart) + `${firstArg}.filter(s => getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay)${restArgs}` + source.slice(dailyRowsEnd);
 }
 
+const sectionStart = '<section className="service-report bg-white text-black rounded-none border shadow-sm print:border-0 print:shadow-none" dir="rtl">';
+const wrappedSectionStart = '<section className="service-report bg-white text-black rounded-none border shadow-sm print:border-0 print:shadow-none" dir="rtl"><div className="print:hidden">';
+if (source.includes(sectionStart) && !source.includes(wrappedSectionStart)) source = source.replace(sectionStart, wrappedSectionStart);
+if (!source.includes(wrappedSectionStart)) throw new Error("ManagerReports: daily service report section anchor not found.");
+
+const printBlock = `<div className="daily-print-report" dir="rtl">
+        <header className="daily-print-header">
+          {settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="daily-print-logo" />}
+          <div className="daily-print-company">{settings.brandName || "HADIR"}</div>
+          <div className="daily-print-title">سجل الحضور والانصراف ليوم {days[dateOf(date).getDay()]} {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div>
+        </header>
+        <table className="daily-print-table">
+          <colgroup><col className="daily-print-no" /><col className="daily-print-specialty" /><col className="daily-print-name" /><col className="daily-print-status" /><col className="daily-print-time" /><col className="daily-print-time" /><col className="daily-print-note" /></colgroup>
+          <thead><tr><th>ت</th><th>الاختصاص</th><th>اسم الموظف</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ملاحظات</th></tr></thead>
+          <tbody>{dailyServiceRows.map((row, i) => <tr key={row.employee.id}>
+            <td className="daily-print-center">{i + 1}</td>
+            <td>{specialtyOf(row.employee)}</td>
+            <td className="daily-print-name-cell">{row.employee.name}</td>
+            <td className="daily-print-center"><span className={\`daily-print-status ${cls[row.status]}\`}>{labels[row.status]}</span></td>
+            <td className="daily-print-center">{row.checkIn}</td>
+            <td className="daily-print-center">{row.checkOut}</td>
+            <td>{row.note || "—"}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>`;
+const dailySectionEnd = '</div>\n    </section> : <div className="hud-card';
+if (source.includes(dailySectionEnd) && !source.includes('className="daily-print-report"')) {
+  source = source.replace(dailySectionEnd, `</div>${printBlock}\n    </section> : <div className="hud-card`);
+}
+if (!source.includes('className="daily-print-report"')) throw new Error("ManagerReports: dedicated daily print report was not inserted.");
+
 const oldPageCss = "@page { size: A4 landscape; margin: 5mm 6mm; }";
-const newPageCss = "@page { size: A4 portrait; margin: 6mm; }";
-if (!source.includes(oldPageCss)) throw new Error("ManagerReports: inline print page rule not found.");
-source = source.replace(oldPageCss, newPageCss);
+const newPageCss = "@page { size: A4 portrait; margin: 8mm 7mm; }";
+if (!source.includes(oldPageCss) && !source.includes(newPageCss)) throw new Error("ManagerReports: inline print page rule not found.");
+if (source.includes(oldPageCss)) source = source.replace(oldPageCss, newPageCss);
 
 const oldLogoCss = ".service-report img { max-height: 10mm !important; }";
 const newLogoCss = ".service-report img { width: 31mm !important; height: 31mm !important; max-width: 31mm !important; max-height: 31mm !important; object-fit: contain !important; }";
-if (!source.includes(oldLogoCss)) throw new Error("ManagerReports: inline logo print rule not found.");
-source = source.replace(oldLogoCss, newLogoCss);
+if (source.includes(oldLogoCss)) source = source.replace(oldLogoCss, newLogoCss);
+
+const oldPrintCssMarker = '.service-report .bg-slate-100 { background: #f1f5f9 !important;';
+const printCss = `.daily-print-report { display: none; }
+.daily-print-status { display: inline-block; border-radius: 999px; padding: 1.2mm 3mm; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.daily-print-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.daily-print-table th, .daily-print-table td { border: 0.25mm solid #111; padding: 2mm 1.5mm; vertical-align: middle; overflow-wrap: anywhere; }
+.daily-print-table th { font-weight: 900; background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.daily-print-center { text-align: center; }
+.daily-print-name-cell { font-weight: 800; }
+.daily-print-no { width: 6%; }
+.daily-print-specialty { width: 17%; }
+.daily-print-name { width: 20%; }
+.daily-print-status { width: 13%; }
+.daily-print-time { width: 10%; }
+.daily-print-note { width: 24%; }
+`;
+if (!source.includes('daily-print-table {')) {
+  if (!source.includes(oldPrintCssMarker)) throw new Error("ManagerReports: print CSS insertion anchor not found.");
+  source = source.replace(oldPrintCssMarker, printCss + oldPrintCssMarker);
+}
+
+const printMediaOld = ' .service-report { position: static !important; width: 100% !important; max-width: none !important; min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; display: block !important; }';
+const printMediaNew = ' .service-report { position: static !important; width: 100% !important; max-width: none !important; min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; display: block !important; } .service-report > .print\\:hidden { display: none !important; } .daily-print-report { display: block !important; width: 100% !important; font-size: 9pt !important; color: #000 !important; } .daily-print-header { text-align: center; padding: 0 0 6mm; border-bottom: 0.5mm solid #111; margin-bottom: 5mm; break-inside: avoid; page-break-inside: avoid; } .daily-print-logo { display: block; width: 31mm !important; height: 31mm !important; max-width: 31mm !important; max-height: 31mm !important; object-fit: contain !important; margin: 0 auto 2mm; } .daily-print-company { font-size: 18pt; font-weight: 900; margin-bottom: 2mm; } .daily-print-title { font-size: 12pt; font-weight: 900; } .daily-print-table thead { display: table-header-group !important; } .daily-print-table tbody { display: table-row-group !important; } .daily-print-table tr { break-inside: avoid !important; page-break-inside: avoid !important; } .daily-print-table td, .daily-print-table th { line-height: 1.35 !important; } .daily-print-status.bg-emerald-500\\/15 { background: #d1fae5 !important; color: #047857 !important; } .daily-print-status.bg-amber-500\\/15 { background: #fef3c7 !important; color: #b45309 !important; } .daily-print-status.bg-red-500\\/15 { background: #fee2e2 !important; color: #b91c1c !important; } .daily-print-status.bg-orange-500\\/15 { background: #ffedd5 !important; color: #c2410c !important; } .daily-print-status.bg-yellow-500\\/15 { background: #fef9c3 !important; color: #a16207 !important; } .daily-print-status.bg-sky-500\\/15 { background: #e0f2fe !important; color: #0369a1 !important; } .daily-print-status.bg-violet-500\\/15 { background: #ede9fe !important; color: #6d28d9 !important; }';
+if (!source.includes('.daily-print-report { display: block !important;')) {
+  if (!source.includes(printMediaOld)) throw new Error("ManagerReports: print media layout anchor not found.");
+  source = source.replace(printMediaOld, printMediaNew);
+}
 
 if (!source.includes('const [reportSettings, setReportSettings]')) throw new Error("ManagerReports: settings hydration was not applied.");
 if (!source.includes('getBackendSettings')) throw new Error("ManagerReports: backend settings hydration import was not applied.");
@@ -63,8 +116,9 @@ if (!source.includes('className="h-[3.1cm] w-[3.1cm]')) throw new Error("Manager
 if (!source.includes('row.employee.name}</td>')) throw new Error("ManagerReports: employee self number removal was not applied.");
 if (!source.includes(newPageCss)) throw new Error("ManagerReports: A4 portrait print rule was not applied.");
 if (!source.includes(newLogoCss)) throw new Error("ManagerReports: 31mm logo print rule was not applied.");
-if (!source.includes('const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(')) throw new Error("ManagerReports: daily service rows declaration was not found after patch.");
 if (!source.includes('getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay')) throw new Error("ManagerReports: daily scheduled-employee filter was not applied.");
+if (!source.includes('className="daily-print-report"')) throw new Error("ManagerReports: dedicated print report was not applied.");
+if (!source.includes('سجل الحضور والانصراف ليوم')) throw new Error("ManagerReports: daily print title was not applied.");
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports header patch: exact daily header replacement; D1 settings hydrated on first mount; settings changes refresh report immediately; ordered specialties retained; company logo fixed at 3.1cm x 3.1cm; سجل الحضور والغياب wording with selected weekday/date applied; employee self number removed from daily report; daily report limited to employees scheduled to work on the selected date; print output standardized to A4 portrait.");
+console.log("ManagerReports print patch: dedicated A4 daily report using owner settings logo/company name, attendance title/date, color-coded statuses, repeated table header, and multi-page-safe table layout.");
