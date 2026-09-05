@@ -22,7 +22,7 @@ const json = (data: unknown, status: number, origin: string) => new Response(JSO
   headers: { ...cors(origin), "content-type": "application/json; charset=utf-8" },
 });
 
-function canArchive(role: Role) { return role === "owner" || role === "manager"; }
+function canArchive(role: Role) { return role === "owner"; }
 
 function safeFilename(value: string, fallback: string) {
   const clean = value.replace(/[^\w\-.\u0600-\u06ff ]/g, "_").slice(0, 140).trim();
