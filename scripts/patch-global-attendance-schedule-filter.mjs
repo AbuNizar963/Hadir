@@ -3,6 +3,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 const file = new URL("../src/pages/GlobalAttendanceReports.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 
+const defaultDateOld = 'const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);';
+const defaultDateNew = 'const [from, setFrom] = useState(today);';
+if (!source.includes(defaultDateOld) && !source.includes(defaultDateNew)) throw new Error("GlobalAttendanceReports: default from-date anchor not found.");
+if (source.includes(defaultDateOld)) source = source.replace(defaultDateOld, defaultDateNew);
+
 const old = 'try { setReport(await getProfessionalAttendanceReport(from, to, employeeId || undefined)); }';
 const replacement = `try {
       const nextReport = await getProfessionalAttendanceReport(from, to, employeeId || undefined);
@@ -27,6 +32,7 @@ if (!source.includes(old)) throw new Error("GlobalAttendanceReports: report load
 source = source.replace(old, replacement);
 
 if (!source.includes('REST/NOT_STARTED/INVALID')) throw new Error("GlobalAttendanceReports: daily schedule filter was not applied.");
+if (!source.includes(defaultDateNew)) throw new Error("GlobalAttendanceReports: default date was not applied.");
 
 writeFileSync(file, source, "utf8");
-console.log("GlobalAttendanceReports patch: daily date filter now removes REST/NOT_STARTED/INVALID employees from the selected-day report.");
+console.log("GlobalAttendanceReports patch: default date is today and daily date filter removes REST/NOT_STARTED/INVALID employees.");
