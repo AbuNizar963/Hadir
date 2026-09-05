@@ -38,18 +38,12 @@
   box-shadow: 0 -10px 30px hsl(var(--foreground) / 0.08);
   scrollbar-gutter: stable;
 }
-.manager-shell .settings-detail-screen > header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.manager-shell .settings-detail-screen .settings-detail-content {
-  min-height: 100%;
-  padding-bottom: max(7rem, calc(3rem + env(safe-area-inset-bottom)));
-}
+.manager-shell .settings-detail-screen > header { position: sticky; top: 0; z-index: 10; }
+.manager-shell .settings-detail-screen .settings-detail-content { min-height: 100%; padding-bottom: max(7rem, calc(3rem + env(safe-area-inset-bottom))); }
 
 /* Employee editor follows the same geometry: drawer on desktop, full-width workspace on mobile. */
-.manager-shell .manager-employee-editor {
+.manager-shell .manager-employee-editor,
+.manager-shell [class~="fixed"][class~="top-[138px]"][class~="bottom-0"][class~="right-0"][class~="z-[70]"] {
   position: fixed !important;
   top: var(--hadir-manager-topbar-h, var(--manager-topbar-h)) !important;
   bottom: 0 !important;
@@ -79,14 +73,16 @@
   .manager-shell .manager-utility-menu { width: 100vw; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h))); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
   .manager-shell .manager-utility-menu > div { padding-top: 8px; padding-bottom: 8px; }
   .manager-shell .settings-detail-screen { top: var(--hadir-manager-topbar-h, var(--manager-topbar-h)) !important; }
-  .manager-shell .settings-detail-screen .settings-detail-content { padding-bottom: max(7rem, calc(3rem + env(safe-area-inset-bottom)); }
-  .manager-shell .manager-employee-editor { inset-inline: 0 !important; width: 100vw !important; max-width: none !important; border-radius: 0 !important; border-inline: 0 !important; top: var(--hadir-manager-topbar-h, var(--manager-topbar-h)) !important; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h))) !important; padding-bottom: env(safe-area-inset-bottom); }
+  .manager-shell .settings-detail-screen .settings-detail-content { padding-bottom: max(7rem, calc(3rem + env(safe-area-inset-bottom))); }
+  .manager-shell .manager-employee-editor,
+  .manager-shell [class~="fixed"][class~="top-[138px]"][class~="bottom-0"][class~="right-0"][class~="z-[70]"] { inset-inline: 0 !important; width: 100vw !important; max-width: none !important; border-radius: 0 !important; border-inline: 0 !important; top: var(--hadir-manager-topbar-h, var(--manager-topbar-h)) !important; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h))) !important; padding-bottom: env(safe-area-inset-bottom); }
   .manager-shell .manager-notification-overlay { padding-top: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 8px) !important; }
   .manager-shell .manager-notification-panel { width: min(30rem, calc(100vw - 20px)) !important; max-width: calc(100vw - 20px) !important; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h)) - 18px) !important; margin-top: 0 !important; border-radius: 16px !important; }
   .manager-shell > .fixed.inset-0.z-\\[90\\] { padding: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 8px) 10px max(10px, env(safe-area-inset-bottom)) !important; }
 }
 @media (min-width: 768px) {
-  .manager-shell .manager-employee-editor { width: min(42rem, 92vw) !important; }
+  .manager-shell .manager-employee-editor,
+  .manager-shell [class~="fixed"][class~="top-[138px]"][class~="bottom-0"][class~="right-0"][class~="z-[70]"] { width: min(42rem, 92vw) !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   .manager-shell .manager-tool:hover::after { transform: none; }
