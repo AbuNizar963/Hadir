@@ -1,0 +1,120 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../core/api.dart';
+import '../core/session.dart';
+
+const _adminBrand = Color(0xFF0B6B5A);
+const _adminInk = Color(0xFF17322C);
+const _adminMuted = Color(0xFF70817B);
+
+class AdminHomePage extends StatefulWidget {
+  const AdminHomePage({super.key});
+
+  @override
+  State<AdminHomePage> createState() => _AdminHomePageState();
+}
+
+class _AdminHomePageState extends State<AdminHomePage> {
+  final _session = HadirSession();
+  String name = 'الإدارة';
+  String role = 'admin';
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final token = await _session.adminToken();
+      final me = await HadirApi(token: token).me();
+      final user = me['user'];
+      if (user is Map) {
+        name = '${user['name'] ?? 'الإدارة'}';
+        role = '${user['role'] ?? 'admin'}';
+      }
+    } catch (_) {
+      if (mounted && await _session.adminToken() == null) context.go('/login');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> _logout() async {
+    final token = await _session.adminToken();
+    await HadirApi(token: token).logout();
+    await _session.clearAdmin();
+    if (mounted) context.go('/login');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('لوحة الإدارة', style: TextStyle(fontWeight: FontWeight.w800, color: _adminInk)),
+        actions: [
+          IconButton(onPressed: _logout, tooltip: 'تسجيل الخروج', icon: const Icon(Icons.logout_rounded)),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: _adminBrand,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: const [BoxShadow(blurRadius: 22, offset: Offset(0, 10))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 34),
+                  const SizedBox(height: 14),
+                  Text(loading ? 'جارٍ تحميل الحساب...' : 'مرحبًا، $name', style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 5),
+                  Text('صلاحية الحساب: $role', style: TextStyle(color: Colors.white.withValues(alpha: .82))),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text('إدارة حاضر', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _adminInk)),
+            const SizedBox(height: 10),
+            const _AdminFeature(icon: Icons.groups_rounded, title: 'الموظفون', subtitle: 'إدارة بيانات الموظفين والحسابات'),
+            const _AdminFeature(icon: Icons.fact_check_rounded, title: 'الحضور والانصراف', subtitle: 'مراجعة سجلات الحضور اليومية'),
+            const _AdminFeature(icon: Icons.event_note_rounded, title: 'الطلبات', subtitle: 'متابعة الإجازات والأذونات'),
+            const _AdminFeature(icon: Icons.admin_panel_settings_rounded, title: 'حسابات الإدارة', subtitle: 'إدارة المدراء والمشرفين'),
+            const SizedBox(height: 18),
+            Text('تم تسجيل الدخول بحساب إداري مستقل عن حساب الموظف.', textAlign: TextAlign.center, style: const TextStyle(color: _adminMuted, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminFeature extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _AdminFeature({required this.icon, required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: CircleAvatar(backgroundColor: const Color(0xFFEAF4F0), foregroundColor: _adminBrand, child: Icon(icon)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: _adminInk)),
+        subtitle: Text(subtitle),
+      ),
+    );
+  }
+}
