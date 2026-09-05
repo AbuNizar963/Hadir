@@ -23,7 +23,24 @@ jobs:
         with:
           channel: stable
           cache: true
+      - run: flutter create --no-pub --platforms=android,ios .
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
       - run: flutter build apk --debug
+
+  ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile/flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter create --no-pub --platforms=ios .
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter build ios --no-codesign
