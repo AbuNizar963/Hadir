@@ -1,5 +1,6 @@
 import base, { HadirRealtime } from "./device-rebind-gateway";
 import { generateDailyReportPdf } from "./report-pdf";
+import { handleReportArchive } from "./report-archive";
 
 type Env = {
   DB: D1Database;
@@ -9,6 +10,7 @@ type Env = {
   JWT_SECRET?: string;
   OWNER_RECOVERY_CODE?: string;
   PROFILE_IMAGES?: R2Bucket;
+  REPORT_ARCHIVE?: R2Bucket;
   BROWSER?: BrowserRun;
 };
 
@@ -169,6 +171,10 @@ export default {
       const a = await actor(req, env);
       if (!a) return json({ error: "غير مصرح" }, 401, o);
       return generateDailyReportPdf(req, env, o);
+    }
+    if (url.pathname.replace(/\/$/, "").startsWith("/api/reports/archive")) {
+      const a = await actor(req, env);
+      return handleReportArchive(req, env, a, o);
     }
     const match = url.pathname.match(/^\/api\/employees\/([^/]+)$/);
     if (match && req.method === "PATCH") {
