@@ -13,7 +13,7 @@ const cors = (origin: string) => ({
   "access-control-allow-origin": origin,
   "access-control-allow-credentials": "true",
   "access-control-allow-headers": "content-type, authorization, x-device-id",
-  "access-control-allow-methods": "GET,POST,OPTIONS",
+  "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
   "cache-control": "no-store",
 });
 
@@ -65,6 +65,14 @@ export async function handleReportArchive(req: Request, env: Env, actor: Actor |
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 25)));
     const rows = await env.DB.prepare("SELECT report_id,report_type,period_from,period_to,employee_id,generated_at,generated_by,generated_by_name,report_version,data_snapshot_hash,status,file_name,file_size,mime_type,file_sha256,created_at,locked_at,locked_by,revision FROM report_archives ORDER BY created_at DESC LIMIT ?").bind(limit).all();
     return json({ ok: true, reports: rows.results || [] }, 200, origin);
+  }
+
+  if (req.method === "DELETE" && suffix) {
+    const row = await env.DB.prepare("SELECT report_id,file_key FROM report_archives WHERE report_id=? LIMIT 1").bind(suffix).first<any>();
+    if (!row) return json({ error: "التقرير المؤرشف غير موجود" }, 404, origin);
+    await env.PROFILE_IMAGES.delete(String(row.file_key));
+    await env.DB.prepare("DELETE FROM report_archives WHERE report_id=?").bind(suffix).run();
+    return json({ ok: true, reportId: suffix }, 200, origin);
   }
 
   if (req.method !== "POST" || suffix) return json({ error: "الطريقة غير مدعومة" }, 405, origin);
