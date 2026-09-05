@@ -32,12 +32,19 @@ class _AdminHomePageState extends State<AdminHomePage> {
       final token = await _session.adminToken();
       final me = await HadirApi(token: token).me();
       final user = me['user'];
-      if (user is Map) {
-        name = '${user['name'] ?? 'الإدارة'}';
-        role = '${user['role'] ?? 'admin'}';
+      if (user is Map && mounted) {
+        setState(() {
+          name = '${user['name'] ?? 'الإدارة'}';
+          role = '${user['role'] ?? 'admin'}';
+        });
       }
     } catch (_) {
-      if (mounted && await _session.adminToken() == null) context.go('/login');
+      final token = await _session.adminToken();
+      if (!mounted) return;
+      if (token == null) {
+        context.go('/login');
+        return;
+      }
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -47,13 +54,19 @@ class _AdminHomePageState extends State<AdminHomePage> {
     final token = await _session.adminToken();
     await HadirApi(token: token).logout();
     await _session.clearAdmin();
-    if (mounted) context.go('/login');
+    if (!mounted) return;
+    context.go('/login');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('لوحة الإدارة', style: TextStyle(fontWeight: FontWeight.w800, color: _adminInk)), actions: [IconButton(onPressed: _logout, tooltip: 'تسجيل الخروج', icon: const Icon(Icons.logout_rounded))]),
+      appBar: AppBar(
+        title: const Text('لوحة الإدارة', style: TextStyle(fontWeight: FontWeight.w800, color: _adminInk)),
+        actions: [
+          IconButton(onPressed: _logout, tooltip: 'تسجيل الخروج', icon: const Icon(Icons.logout_rounded)),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -62,14 +75,24 @@ class _AdminHomePageState extends State<AdminHomePage> {
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: _adminBrand, borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(blurRadius: 22, offset: Offset(0, 10))]),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 34),
-                const SizedBox(height: 14),
-                Text(loading ? 'جارٍ تحميل الحساب...' : 'مرحبًا، $name', style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 5),
-                Text('صلاحية الحساب: $role', style: TextStyle(color: Colors.white.withValues(alpha: .82))),
-              ]),
+              decoration: BoxDecoration(
+                color: _adminBrand,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: const [BoxShadow(blurRadius: 22, offset: Offset(0, 10))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 34),
+                  const SizedBox(height: 14),
+                  Text(
+                    loading ? 'جارٍ تحميل الحساب...' : 'مرحبًا، $name',
+                    style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 5),
+                  Text('صلاحية الحساب: $role', style: TextStyle(color: Colors.white.withValues(alpha: .82))),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
             const Text('إدارة حاضر', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _adminInk)),
@@ -81,7 +104,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             _AdminFeature(icon: Icons.admin_panel_settings_rounded, title: 'حسابات الإدارة', subtitle: 'إدارة المدراء والمشرفين والصلاحيات', onTap: () => context.push('/admin/manage')),
             _AdminFeature(icon: Icons.settings_rounded, title: 'إعدادات النظام', subtitle: 'عرض إعدادات المؤسسة ومكونات نظام حاضر', onTap: () => context.push('/admin/manage')),
             const SizedBox(height: 18),
-            Text('تم تسجيل الدخول بحساب إداري مستقل عن حساب الموظف.', textAlign: TextAlign.center, style: const TextStyle(color: _adminMuted, fontSize: 12)),
+            const Text('تم تسجيل الدخول بحساب إداري مستقل عن حساب الموظف.', textAlign: TextAlign.center, style: TextStyle(color: _adminMuted, fontSize: 12)),
           ],
         ),
       ),
@@ -98,5 +121,20 @@ class _AdminFeature extends StatelessWidget {
   const _AdminFeature({required this.icon, required this.title, required this.subtitle, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 10), child: ListTile(onTap: onTap, leading: CircleAvatar(backgroundColor: const Color(0xFFEAF4F0), foregroundColor: _adminBrand, child: Icon(icon)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: _adminInk)), subtitle: Text(subtitle), trailing: const Icon(Icons.chevron_left_rounded)));
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        onTap: onTap,
+        leading: CircleAvatar(
+          backgroundColor: const Color(0xFFEAF4F0),
+          foregroundColor: _adminBrand,
+          child: Icon(icon),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: _adminInk)),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_left_rounded),
+      ),
+    );
+  }
 }
