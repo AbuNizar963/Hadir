@@ -57,6 +57,8 @@ export default function ReportArchive() {
   const saveExcel = async () => {
     const currentReport = report || await build();
     if (!currentReport) return;
+    const reportEmployeeId = currentReport.filters.employeeId || undefined;
+    const reportType = reportEmployeeId ? "attendance_employee" : currentReport.days === 1 ? "attendance_daily" : "attendance_period";
     setSaving(true); setError(null); setMessage(null);
     try {
       const hash = await snapshotHash(currentReport);
@@ -72,7 +74,7 @@ export default function ReportArchive() {
           { label: "إجازة", value: currentReport.summary.leave }, { label: "استئذان", value: currentReport.summary.permission }, { label: "راحة", value: currentReport.summary.rest },
         ].filter((x) => x.value > 0),
         absenceRows: currentReport.rows.filter((x) => x.status === "ABSENT").map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, date: x.attendanceDay, day: x.attendanceDay, status: "غياب", checkIn: "—", checkOut: "—", worked: "—", late: 0, early: 0, detail: x.exceptionCode || "" })),
-        onBlob: (blob) => { archivePromise = archiveReportFile({ file: blob, fileName: `Hadir-${currentReport.from}-${currentReport.to}-professional-attendance.xlsx`, reportType: employeeId ? "attendance_employee" : currentReport.days === 1 ? "attendance_daily" : "attendance_period", periodFrom: currentReport.from, periodTo: currentReport.to, employeeId: employeeId || undefined, generatedAt: currentReport.generatedAt, reportVersion: currentReport.reportVersion, dataSnapshotHash: hash }); },
+        onBlob: (blob) => { archivePromise = archiveReportFile({ file: blob, fileName: `Hadir-${currentReport.from}-${currentReport.to}-professional-attendance.xlsx`, reportType, periodFrom: currentReport.from, periodTo: currentReport.to, employeeId: reportEmployeeId, generatedAt: currentReport.generatedAt, reportVersion: currentReport.reportVersion, dataSnapshotHash: hash }); },
       });
       if (!archivePromise) throw new Error("تعذر إنشاء ملف Excel للأرشفة");
       await archivePromise;
@@ -85,6 +87,8 @@ export default function ReportArchive() {
   const saveCsv = async () => {
     const currentReport = report || await build();
     if (!currentReport) return;
+    const reportEmployeeId = currentReport.filters.employeeId || undefined;
+    const reportType = reportEmployeeId ? "attendance_employee" : currentReport.days === 1 ? "attendance_daily" : "attendance_period";
     setSaving(true); setError(null); setMessage(null);
     try {
       const hash = await snapshotHash(currentReport);
@@ -95,7 +99,7 @@ export default function ReportArchive() {
       const escape = (v: unknown) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
       const blob = new Blob(["\uFEFF" + csv.map((row) => row.map(escape).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
       downloadCSV(`HADIR-attendance-${currentReport.from}-${currentReport.to}.csv`, csv[0], currentReport.rows.map((x) => [x.attendanceDay, x.employeeName, x.jobNumber || "", labels[x.status] || x.status, x.checkInAt || "", x.checkOutAt || "", fmt(x.workedMinutes || 0), x.lateMinutes, x.earlyLeaveMinutes, x.overtimeMinutes, x.exceptionCode || ""]));
-      await archiveReportFile({ file: blob, fileName: `Hadir-${currentReport.from}-${currentReport.to}-professional-attendance.csv`, reportType: employeeId ? "attendance_employee" : currentReport.days === 1 ? "attendance_daily" : "attendance_period", periodFrom: currentReport.from, periodTo: currentReport.to, employeeId: employeeId || undefined, generatedAt: currentReport.generatedAt, reportVersion: currentReport.reportVersion, dataSnapshotHash: hash });
+      await archiveReportFile({ file: blob, fileName: `Hadir-${currentReport.from}-${currentReport.to}-professional-attendance.csv`, reportType, periodFrom: currentReport.from, periodTo: currentReport.to, employeeId: reportEmployeeId, generatedAt: currentReport.generatedAt, reportVersion: currentReport.reportVersion, dataSnapshotHash: hash });
       setMessage("تم حفظ نسخة CSV الرسمية في أرشيف R2 بنجاح.");
       await refreshArchives();
     } catch (e) { setError(e instanceof Error ? e.message : "تعذر حفظ ملف CSV"); }
