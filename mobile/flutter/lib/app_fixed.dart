@@ -44,7 +44,8 @@ class _LoginPageState extends State<LoginPage> {
     setState(() { busy = true; error = null; });
     try {
       final deviceId = await _session.deviceId();
-      final r = await HadirApi().login(user.text, pass.text, deviceId: deviceId, deviceLabel: '${_session.platformLabel} · حاضر');
+      final fingerprint = await _session.deviceFingerprint();
+      final r = await HadirApi().login(user.text, pass.text, deviceId: deviceId, deviceLabel: _session.platformLabel, fingerprint: fingerprint);
       if (r['kind'] != 'employee' || r['token'] == null) throw Exception('هذا الحساب ليس حساب موظف.');
       await _session.saveToken(r['token'].toString());
       if (mounted) context.go('/home');
