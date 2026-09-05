@@ -61,7 +61,7 @@ const printBlock = `<div className="daily-print-report" dir="rtl">
             <td className="daily-print-center">{i + 1}</td>
             <td>{specialtyOf(row.employee)}</td>
             <td className="daily-print-name-cell">{row.employee.name}</td>
-            <td className="daily-print-center"><span className={"daily-print-status " + cls[row.status]}>{labels[row.status]}</span></td>
+            <td className="daily-print-center"><span className={"daily-print-status " + String(row.status)}>{labels[row.status]}</span></td>
             <td className="daily-print-center">{row.checkIn}</td>
             <td className="daily-print-center">{row.checkOut}</td>
             <td>{row.note || "—"}</td>
