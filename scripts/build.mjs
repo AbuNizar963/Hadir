@@ -25,6 +25,7 @@ run("node", ["scripts/patch-manager-reports-final2.mjs"]);
 run("node", ["scripts/patch-manager-reports-live.mjs"]);
 run("node", ["scripts/patch-manager-report-header.mjs"]);
 run("node", ["scripts/patch-global-attendance-schedule-filter.mjs"]);
+run("node", ["scripts/patch-global-attendance-print-report.mjs"]);
 run("node", ["scripts/patch-report-archive-delete.mjs"]);
 run("node", ["scripts/patch-manager-report-share.mjs"]);
 run("node", ["scripts/patch-manager-report-filename.mjs"]);
