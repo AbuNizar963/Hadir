@@ -6,6 +6,7 @@ import 'core/session.dart';
 import 'pages/admin_home_page.dart';
 import 'pages/admin_login_page.dart';
 import 'pages/admin_management_page.dart';
+import 'pages/employee_center_page.dart';
 import 'pages/modern_home_page.dart';
 import 'pages/requests_page.dart';
 import 'pages/notifications_page.dart';
@@ -35,6 +36,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin', builder: (_, __) => const AdminHomePage()),
     GoRoute(path: '/admin/manage', builder: (_, __) => const AdminManagementPage()),
     GoRoute(path: '/home', builder: (_, __) => const ModernHomePage()),
+    GoRoute(path: '/center', builder: (_, __) => const EmployeeCenterPage()),
     GoRoute(path: '/attendance', builder: (_, s) => AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in')),
     GoRoute(path: '/history', builder: (_, __) => const HistoryPage()),
     GoRoute(path: '/requests', builder: (_, __) => const RequestsPage()),
