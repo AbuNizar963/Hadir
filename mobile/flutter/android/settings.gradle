@@ -24,3 +24,14 @@ plugins {
 
 rootProject.name = "hadir"
 include ":app"
+
+// Flutter's engine artifacts are generated locally by the Flutter SDK and are
+// not published to Maven Central/Google Maven. Keep this repository available
+// to Gradle dependency resolution for Flutter embedding and native artifacts.
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("${flutterSdkPath}/bin/cache/artifacts/engine") }
+    }
+}
