@@ -25,15 +25,19 @@ jobs:
           channel: stable
           cache: true
       - run: flutter --version
+      - name: Generate Android project files when incomplete
+        run: |
+          if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            flutter create --platforms=android --project-name hadir .
+          fi
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
-      - name: Ensure Android platform project
-        run: |
-          if [ ! -f android/gradlew ]; then
-            flutter create --platforms=android --project-name hadir .
-          fi
       - run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hadir-android-debug
+          path: mobile/flutter/build/app/outputs/flutter-apk/app-debug.apk
 
   ios:
     runs-on: macos-latest
@@ -48,12 +52,12 @@ jobs:
           channel: stable
           cache: true
       - run: flutter --version
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
-      - name: Ensure iOS platform project
+      - name: Generate iOS project files when incomplete
         run: |
           if [ ! -d ios/Runner.xcodeproj ]; then
             flutter create --platforms=ios --project-name hadir .
           fi
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
       - run: flutter build ios --no-codesign
