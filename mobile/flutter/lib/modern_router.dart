@@ -10,6 +10,7 @@ import 'pages/modern_home_page.dart';
 import 'pages/requests_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/profile_page.dart';
+import 'pages/services_page.dart';
 
 final _modernSession = HadirSession();
 
@@ -39,6 +40,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/requests', builder: (_, __) => const RequestsPage()),
     GoRoute(path: '/notifications', builder: (_, __) => const NotificationsPage()),
     GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
+    GoRoute(path: '/services', builder: (_, __) => const ServicesPage()),
   ],
 );
 
@@ -57,13 +59,7 @@ class LoginEntryPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    width: 82,
-                    height: 82,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(color: const Color(0xFF0B6B5A), borderRadius: BorderRadius.circular(26)),
-                    child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 44),
-                  ),
+                  Container(width: 82, height: 82, alignment: Alignment.center, decoration: BoxDecoration(color: const Color(0xFF0B6B5A), borderRadius: BorderRadius.circular(26)), child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 44)),
                   const SizedBox(height: 24),
                   const Text('حاضر', textAlign: TextAlign.center, style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, color: Color(0xFF17322C))),
                   const SizedBox(height: 8),
