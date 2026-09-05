@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hadir/main.dart';
 
@@ -8,5 +9,6 @@ void main() {
 
     expect(find.byType(HadirApp), findsOneWidget);
     expect(find.byType(MaterialApp), findsOneWidget);
+    expect(find.byType(MaterialApp).first.evaluate().isNotEmpty, isTrue);
   });
 }
