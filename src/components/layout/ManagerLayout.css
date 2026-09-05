@@ -55,6 +55,8 @@
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   box-shadow: -18px 0 45px hsl(var(--foreground) / 0.18);
+  /* Fixed overlays are also children of .space-y-* containers; cancel their flow gap. */
+  margin: 0 !important;
 }
 
 /* Notifications sit below navigation while the navigation itself remains usable. */
@@ -76,7 +78,7 @@
   .manager-shell .settings-detail-screen { top: var(--hadir-manager-topbar-h, var(--manager-topbar-h)) !important; }
   .manager-shell .settings-detail-screen .settings-detail-content { padding-bottom: max(7rem, calc(3rem + env(safe-area-inset-bottom))); }
   .manager-shell .manager-employee-editor,
-  .manager-shell [class~="fixed"][class~="top-[138px]"][class~="bottom-0"][class~="right-0"][class~="z-[70]"] { inset-inline: 0 !important; width: 100vw !important; max-width: none !important; border-radius: 0 !important; border-inline: 0 !important; top: var(--hadir-manager-topbar-h, var(--manager-topbar-h)) !important; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h))) !important; padding-bottom: env(safe-area-inset-bottom); }
+  .manager-shell [class~="fixed"][class~="top-[138px]"][class~="bottom-0"][class~="right-0"][class~="z-[70]"] { inset-inline: 0 !important; width: 100vw !important; max-width: none !important; border-radius: 0 !important; border-inline: 0 !important; top: var(--hadir-manager-topbar-h, var(--manager-topbar-h)) !important; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h))) !important; padding-bottom: env(safe-area-inset-bottom); margin: 0 !important; }
   .manager-shell .manager-notification-overlay { padding-top: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 8px) !important; }
   .manager-shell .manager-notification-panel { width: min(30rem, calc(100vw - 20px)) !important; max-width: calc(100vw - 20px) !important; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h)) - 18px) !important; margin-top: 0 !important; border-radius: 16px !important; }
   .manager-shell > .fixed[class~="inset-0"][class~="z-[90]"] { padding: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 8px) 10px max(10px, env(safe-area-inset-bottom)) !important; }
