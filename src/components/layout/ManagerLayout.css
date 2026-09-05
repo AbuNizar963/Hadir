@@ -1,149 +1,46 @@
-/* HADIR manager shell — presentation-only layer. Navigation, auth, notifications and routes remain unchanged. */
+/* HADIR manager shell — unified navigation and overlay presentation layer. */
 .manager-shell {
   --manager-topbar-h: 138px;
   background: radial-gradient(circle at 100% 0%, hsl(var(--primary) / 0.055), transparent 34rem), radial-gradient(circle at 0% 18%, hsl(var(--primary) / 0.035), transparent 28rem), hsl(var(--background));
 }
-.manager-shell > .manager-topbar {
-  box-shadow: 0 10px 30px hsl(var(--foreground) / 0.045);
-  isolation: isolate;
-}
+.manager-shell > .manager-topbar { box-shadow: 0 10px 30px hsl(var(--foreground) / 0.045); isolation: isolate; }
 .manager-shell .manager-brand-row { min-height: 82px; }
-.manager-shell .manager-tool {
-  position: relative;
-  overflow: hidden;
-  border-radius: 14px;
-  background: linear-gradient(180deg, hsl(var(--background) / 0.94), hsl(var(--card) / 0.78));
-  box-shadow: 0 1px 0 hsl(var(--foreground) / 0.04), inset 0 1px 0 hsl(var(--background) / 0.5);
-}
-.manager-shell .manager-tool::after {
-  content: "";
-  position: absolute;
-  inset: auto 12px 0;
-  height: 2px;
-  border-radius: 999px;
-  background: hsl(var(--primary) / 0.18);
-  transform: scaleX(0);
-  transform-origin: center;
-  transition: transform .2s ease;
-}
+.manager-shell .manager-tool { position: relative; overflow: hidden; border-radius: 14px; background: linear-gradient(180deg, hsl(var(--background) / 0.94), hsl(var(--card) / 0.78)); box-shadow: 0 1px 0 hsl(var(--foreground) / 0.04), inset 0 1px 0 hsl(var(--background) / 0.5); }
+.manager-shell .manager-tool::after { content: ""; position: absolute; inset: auto 12px 0; height: 2px; border-radius: 999px; background: hsl(var(--primary) / 0.18); transform: scaleX(0); transform-origin: center; transition: transform .2s ease; }
 .manager-shell .manager-tool:hover::after { transform: scaleX(1); }
-.manager-shell .manager-nav a {
-  min-height: 58px;
-  border: 1px solid transparent;
-  position: relative;
-}
-.manager-shell .manager-nav a[aria-current="page"] {
-  background: linear-gradient(180deg, hsl(var(--primary) / 0.16), hsl(var(--primary) / 0.075));
-  border-color: hsl(var(--primary) / 0.28);
-  box-shadow: 0 7px 18px hsl(var(--primary) / 0.08);
-}
+.manager-shell .manager-nav a { min-height: 58px; border: 1px solid transparent; position: relative; }
+.manager-shell .manager-nav a[aria-current="page"] { background: linear-gradient(180deg, hsl(var(--primary) / 0.16), hsl(var(--primary) / 0.075)); border-color: hsl(var(--primary) / 0.28); box-shadow: 0 7px 18px hsl(var(--primary) / 0.08); }
 .manager-shell .manager-page-header { border-bottom-color: hsl(var(--border) / 0.72); }
 .manager-shell .manager-content > * { animation: hadir-manager-enter .28s ease-out both; }
 @keyframes hadir-manager-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-/* One predictable overlay system for menus, sheets and record editors. */
-.manager-shell > .sticky.top-\\[138px\\] {
-  position: fixed !important;
-  inset-inline: 0 !important;
-  top: var(--manager-topbar-h) !important;
-  z-index: 70 !important;
-  max-height: calc(100dvh - var(--manager-topbar-h)) !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-  border-top: 1px solid hsl(var(--border) / 0.55);
-  box-shadow: 0 18px 42px hsl(var(--foreground) / 0.16);
-  animation: hadir-overlay-down .16s ease-out both;
-}
+/* The header height is measured by ManagerLayout; no guessed mobile/desktop offset. */
+.manager-shell .manager-utility-menu { top: var(--hadir-manager-topbar-h, var(--manager-topbar-h)); max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h))); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; animation: hadir-overlay-down .16s ease-out both; box-shadow: 0 18px 42px hsl(var(--foreground) / 0.16); }
+.manager-shell .manager-utility-menu > div { min-height: 52px; }
+.manager-shell .manager-utility-menu button { min-height: 42px; }
 
-/* Employee edit sheet: below global navigation, never behind/through the bars. */
-.manager-shell .fixed.inset-y-0.right-0.z-\\[70\\] {
-  top: var(--manager-topbar-h) !important;
-  bottom: 0 !important;
-  max-height: calc(100dvh - var(--manager-topbar-h)) !important;
-  border-radius: 20px 0 0 0 !important;
-  box-shadow: -18px 0 45px hsl(var(--foreground) / 0.18), 0 -10px 35px hsl(var(--foreground) / 0.06);
-  overscroll-behavior: contain;
-}
+/* Notifications sit below navigation while the navigation itself remains usable. */
+.manager-shell .manager-notification-overlay { z-index: 50 !important; padding-top: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 12px) !important; padding-right: max(12px, env(safe-area-inset-right)); padding-left: max(12px, env(safe-area-inset-left)); pointer-events: none; }
+.manager-shell .manager-notification-panel { pointer-events: auto; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h)) - 24px) !important; overscroll-behavior: contain; box-shadow: 0 24px 70px hsl(var(--foreground) / 0.28); animation: hadir-overlay-down .18s ease-out both; }
 
-/* Settings/detail screens that already use the standardized top offset. */
-.manager-shell .settings-detail-screen {
-  top: var(--manager-topbar-h) !important;
-  bottom: 0 !important;
-  max-height: calc(100dvh - var(--manager-topbar-h)) !important;
-  overscroll-behavior: contain;
-  box-shadow: 0 -10px 30px hsl(var(--foreground) / 0.06);
-}
-
-/* Notification dialog: its scrim owns the viewport; the card starts below app navigation. */
-.manager-shell > .fixed.inset-0.z-\\[100\\] {
-  z-index: 100 !important;
-  padding-top: calc(var(--manager-topbar-h) + 12px) !important;
-  align-items: flex-start !important;
-}
-.manager-shell > .fixed.inset-0.z-\\[100\\] > div {
-  max-height: calc(100dvh - var(--manager-topbar-h) - 24px) !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-  border-radius: 18px;
-  box-shadow: 0 24px 70px hsl(var(--foreground) / 0.28);
-}
-
-/* Consistent surfaces and touch targets for transient menus. */
-.manager-shell .manager-topbar [role="menu"],
-.manager-shell .manager-topbar .absolute.z-50 {
-  max-height: min(70dvh, 30rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-.manager-shell button,
-.manager-shell a { -webkit-tap-highlight-color: transparent; }
-
-@keyframes hadir-overlay-down {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+.manager-shell > .fixed.inset-0.z-\\[90\\] { z-index: 90 !important; padding-top: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 12px) !important; }
+.manager-shell > .fixed.inset-0.z-\\[90\\] > div { max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h)) - 24px) !important; overflow-y: auto !important; overscroll-behavior: contain; }
+.manager-shell [data-slot="sheet-content"], .manager-shell [role="dialog"][data-state="open"] { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.manager-shell button, .manager-shell a { -webkit-tap-highlight-color: transparent; }
+@keyframes hadir-overlay-down { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 767px) {
   .manager-shell { --manager-topbar-h: 124px; }
   .manager-shell .manager-brand-row { min-height: 72px; }
   .manager-shell .manager-nav a { min-width: 82px; min-height: 54px; }
-
-  .manager-shell > .sticky.top-\\[138px\\] {
-    width: 100vw !important;
-    max-height: calc(100dvh - var(--manager-topbar-h)) !important;
-    padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
-  }
-
-  .manager-shell .fixed.inset-y-0.right-0.z-\\[70\\] {
-    inset-inline: 0 !important;
-    width: 100vw !important;
-    max-width: none !important;
-    border-radius: 0 !important;
-    border-left: 0 !important;
-    top: var(--manager-topbar-h) !important;
-    max-height: calc(100dvh - var(--manager-topbar-h)) !important;
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .manager-shell > .fixed.inset-0.z-\\[100\\] {
-    padding: calc(var(--manager-topbar-h) + 8px) 10px max(10px, env(safe-area-inset-bottom)) !important;
-  }
-  .manager-shell > .fixed.inset-0.z-\\[100\\] > div {
-    width: min(100%, 30rem) !important;
-    max-height: calc(100dvh - var(--manager-topbar-h) - 18px) !important;
-  }
+  .manager-shell .manager-utility-menu { width: 100vw; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h))); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  .manager-shell .manager-utility-menu > div { padding-top: 8px; padding-bottom: 8px; }
+  .manager-shell .manager-notification-overlay { padding-top: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 8px) !important; }
+  .manager-shell .manager-notification-panel { width: min(30rem, calc(100vw - 20px)) !important; max-width: calc(100vw - 20px) !important; max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h)) - 18px) !important; margin-top: 0 !important; border-radius: 16px !important; }
+  .manager-shell > .fixed.inset-0.z-\\[90\\] { padding: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 8px) 10px max(10px, env(safe-area-inset-bottom)) !important; }
 }
-
-@media (min-width: 768px) {
-  /* Desktop retains context: record editing is a right-side sheet, not a full-screen takeover. */
-  .manager-shell .fixed.inset-y-0.right-0.z-\\[70\\] {
-    width: min(42rem, 92vw) !important;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .manager-shell .manager-tool:hover::after { transform: none; }
   .manager-shell .manager-content > * { animation: none; }
-  .manager-shell > .sticky.top-\\[138px\\] { animation: none; }
+  .manager-shell .manager-utility-menu, .manager-shell .manager-notification-panel { animation: none; }
 }
