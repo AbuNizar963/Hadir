@@ -5,6 +5,7 @@ import 'app_fixed.dart';
 import 'core/session.dart';
 import 'pages/admin_home_page.dart';
 import 'pages/admin_login_page.dart';
+import 'pages/admin_management_page.dart';
 import 'pages/modern_home_page.dart';
 import 'pages/requests_page.dart';
 import 'pages/notifications_page.dart';
@@ -18,12 +19,12 @@ GoRouter buildModernRouter() => GoRouter(
     final employeeToken = await _modernSession.token();
     final adminToken = await _modernSession.adminToken();
     final location = state.matchedLocation;
-    final publicLocations = {'/login', '/employee-login', '/admin-login'};
+    const publicLocations = {'/login', '/employee-login', '/admin-login'};
     if (employeeToken == null && adminToken == null && !publicLocations.contains(location)) return '/login';
     if (adminToken != null && publicLocations.contains(location)) return '/admin';
     if (employeeToken != null && publicLocations.contains(location)) return '/home';
-    if (adminToken == null && location == '/admin') return '/admin-login';
-    if (employeeToken == null && location != '/admin' && location != '/admin-login' && location != '/login') return '/login';
+    if (adminToken == null && (location == '/admin' || location == '/admin/manage')) return '/admin-login';
+    if (employeeToken == null && location != '/admin' && location != '/admin/manage' && location != '/admin-login' && location != '/login') return '/login';
     return null;
   },
   routes: [
@@ -31,6 +32,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/employee-login', builder: (_, __) => const LoginPage()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
     GoRoute(path: '/admin', builder: (_, __) => const AdminHomePage()),
+    GoRoute(path: '/admin/manage', builder: (_, __) => const AdminManagementPage()),
     GoRoute(path: '/home', builder: (_, __) => const ModernHomePage()),
     GoRoute(path: '/attendance', builder: (_, s) => AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in')),
     GoRoute(path: '/history', builder: (_, __) => const HistoryPage()),
@@ -67,17 +69,9 @@ class LoginEntryPage extends StatelessWidget {
                   const SizedBox(height: 8),
                   const Text('اختر نوع الدخول', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF70817B), fontSize: 15)),
                   const SizedBox(height: 30),
-                  FilledButton.icon(
-                    onPressed: () => context.go('/employee-login'),
-                    icon: const Icon(Icons.badge_outlined),
-                    label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('دخول الموظفين')),
-                  ),
+                  FilledButton.icon(onPressed: () => context.go('/employee-login'), icon: const Icon(Icons.badge_outlined), label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('دخول الموظفين'))),
                   const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () => context.go('/admin-login'),
-                    icon: const Icon(Icons.admin_panel_settings_outlined),
-                    label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('دخول الإدارة')),
-                  ),
+                  OutlinedButton.icon(onPressed: () => context.go('/admin-login'), icon: const Icon(Icons.admin_panel_settings_outlined), label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('دخول الإدارة'))),
                   const SizedBox(height: 22),
                   const Text('حساب الإدارة منفصل تمامًا عن حساب الموظف.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF70817B), fontSize: 12)),
                 ],
