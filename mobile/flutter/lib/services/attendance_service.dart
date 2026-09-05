@@ -62,7 +62,6 @@ class AttendanceService {
     final profile = await api.employeeProfile();
     final employee = Map<String, dynamic>.from(profile['employee'] is Map ? profile['employee'] : profile);
     await api.createAttendance({
-      'id': 'flutter-${DateTime.now().microsecondsSinceEpoch}',
       'employeeId': employee['id'], 'jobNumber': employee['jobNumber'] ?? employee['job_number'],
       'employeeName': employee['name'], 'type': type, 'timestamp': DateTime.now().toUtc().toIso8601String(),
       'lat': position.latitude, 'lng': position.longitude, 'distanceMeters': distance,
