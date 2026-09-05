@@ -55,7 +55,7 @@ jobs:
             -dname "CN=HADIR CI, OU=Build, O=HADIR, L=NA, ST=NA, C=US"
       - name: Build Android release AAB
         env:
-          HADIR_RELEASE_KEYSTORE: android/ci-release.keystore
+          HADIR_RELEASE_KEYSTORE: ../ci-release.keystore
           HADIR_RELEASE_STORE_PASSWORD: changeit
           HADIR_RELEASE_KEY_ALIAS: hadir-ci
           HADIR_RELEASE_KEY_PASSWORD: changeit
