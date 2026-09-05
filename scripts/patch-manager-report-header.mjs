@@ -29,6 +29,16 @@ const newEmployeeCell = `<td className="p-2 border-l border-black/20 font-bold b
 if (!source.includes(oldEmployeeCell)) throw new Error("ManagerReports: daily employee self-number cell not found.");
 source = source.replace(oldEmployeeCell, newEmployeeCell);
 
+// The daily service report is for today's scheduled workforce only: rotation employees
+// who are on duty and administrative employees whose configured workday includes the date.
+// Do not emit rotation rest days or administrative weekly-off days.
+if (!source.includes('const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries.filter')) {
+  const dailyRowsAnchor = 'const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries, dates, index, settings, requests, dailyStatusByDate) : [],';
+  if (!source.includes(dailyRowsAnchor)) throw new Error("ManagerReports: daily service rows anchor not found.");
+  const dailyRowsReplacement = 'const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries.filter(s => getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay), dates, index, settings, requests, dailyStatusByDate) : [],';
+  source = source.replace(dailyRowsAnchor, dailyRowsReplacement);
+}
+
 const oldPageCss = "@page { size: A4 landscape; margin: 5mm 6mm; }";
 const newPageCss = "@page { size: A4 portrait; margin: 6mm; }";
 if (!source.includes(oldPageCss)) throw new Error("ManagerReports: inline print page rule not found.");
@@ -45,6 +55,7 @@ if (!source.includes('className="h-[3.1cm] w-[3.1cm]')) throw new Error("Manager
 if (!source.includes('row.employee.name}</td>')) throw new Error("ManagerReports: employee self number removal was not applied.");
 if (!source.includes(newPageCss)) throw new Error("ManagerReports: A4 portrait print rule was not applied.");
 if (!source.includes(newLogoCss)) throw new Error("ManagerReports: 31mm logo print rule was not applied.");
+if (!source.includes('const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries.filter')) throw new Error("ManagerReports: daily scheduled-employee filter was not applied.");
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports header patch: exact daily header replacement; D1 settings hydrated on first mount; settings changes refresh report immediately; ordered specialties retained; company logo fixed at 3.1cm x 3.1cm; سجل الحضور والغياب wording with selected weekday/date applied; employee self number removed from daily report; print output standardized to A4 portrait.");
+console.log("ManagerReports header patch: exact daily header replacement; D1 settings hydrated on first mount; settings changes refresh report immediately; ordered specialties retained; company logo fixed at 3.1cm x 3.1cm; سجل الحضور والغياب wording with selected weekday/date applied; employee self number removed from daily report; daily report limited to employees scheduled to work on the selected date; print output standardized to A4 portrait.");
