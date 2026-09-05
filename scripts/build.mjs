@@ -50,6 +50,7 @@ run("node", ["scripts/patch-manager-employee-locations.mjs"]);
 run("node", ["scripts/patch-employee-home-shift-info.mjs"]);
 run("node", ["scripts/patch-qibla-page.mjs"]);
 run("node", ["scripts/patch-employee-center-loading.mjs"]);
+run("node", ["scripts/patch-manager-topbar-geometry.mjs"]);
 run("node", ["scripts/patch-manager-employee-edit-panel.mjs"]);
 
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -92,9 +93,7 @@ for (const fileName of emittedFiles) {
     .replaceAll("./manifest.webmanifest", `./manifest.webmanifest?v=${faviconVersion}`)
     .replaceAll("./favicon.svg", `./favicon.svg?v=${faviconVersion}`)
     .replaceAll("/favicon.svg", `/favicon.svg?v=${faviconVersion}`);
-  if (versioned !== content) {
-    writeFileSync(fileUrl, versioned, "utf8");
-  }
+  if (versioned !== content) writeFileSync(fileUrl, versioned, "utf8");
 }
 
 const serviceWorkerUrl = new URL("../dist/sw.js", import.meta.url);
@@ -104,16 +103,9 @@ if (existsSync(serviceWorkerUrl)) {
     '"__HADIR_BUILD_VERSION__"',
     JSON.stringify(commitSha),
   );
-  if (versionedServiceWorker !== serviceWorker) {
-    writeFileSync(serviceWorkerUrl, versionedServiceWorker, "utf8");
-  }
+  if (versionedServiceWorker !== serviceWorker) writeFileSync(serviceWorkerUrl, versionedServiceWorker, "utf8");
 }
 
 mkdirSync(new URL("../dist/", import.meta.url), { recursive: true });
-writeFileSync(
-  new URL("../dist/build-version.json", import.meta.url),
-  `${JSON.stringify({ commitSha, branch, deploymentUrl }, null, 2)}\n`,
-  "utf8",
-);
-
+writeFileSync(new URL("../dist/build-version.json", import.meta.url), `${JSON.stringify({ commitSha, branch, deploymentUrl }, null, 2)}\n`, "utf8");
 run("node", ["scripts/verify-production-build.mjs"]);
