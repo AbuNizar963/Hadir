@@ -4,13 +4,7 @@ class HadirApi {
   static const baseUrl = 'https://hadir-api.abunizar963.workers.dev';
   final Dio dio;
 
-  HadirApi({String? token}) : dio = Dio(BaseOptions(
-    baseUrl: baseUrl,
-    connectTimeout: const Duration(seconds: 20),
-    receiveTimeout: const Duration(seconds: 20),
-    sendTimeout: const Duration(seconds: 20),
-    headers: const {'Accept': 'application/json'},
-  )) {
+  HadirApi({String? token}) : dio = Dio(BaseOptions(baseUrl: baseUrl, connectTimeout: const Duration(seconds: 20), receiveTimeout: const Duration(seconds: 20), sendTimeout: const Duration(seconds: 20), headers: const {'Accept': 'application/json'})) {
     if (token != null && token.isNotEmpty) dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
@@ -33,6 +27,9 @@ class HadirApi {
   Future<Map<String, dynamic>> createAttendance(Map<String, dynamic> record) async => Map<String, dynamic>.from((await dio.post('/api/attendance', data: record)).data as Map);
   Future<List<dynamic>> requests() async => List<dynamic>.from((await dio.get('/api/requests')).data as List);
   Future<Map<String, dynamic>> createRequest({required String type, required String reason, String? startDate, String? endDate, String? employeeId}) async => Map<String, dynamic>.from((await dio.post('/api/requests', data: {'type': type, 'reason': reason, if (startDate != null) 'startDate': startDate, if (endDate != null) 'endDate': endDate, if (employeeId != null) 'employeeId': employeeId})).data as Map);
+  Future<List<dynamic>> notifications() async => List<dynamic>.from((await dio.get('/api/notifications')).data as List);
+  Future<void> markNotificationRead({String? id}) async { await dio.post('/api/notifications/read', data: {if (id != null) 'id': id}); }
+  Future<void> deleteNotification({String? id}) async { await dio.delete('/api/notifications', data: {if (id != null) 'id': id}); }
   Future<Map<String, dynamic>> confirmRequest(String id) async => Map<String, dynamic>.from((await dio.post('/api/requests/$id/confirm')).data as Map);
   Future<void> logout() async { try { await dio.post('/api/auth/logout', data: {}); } catch (_) {} }
 }
