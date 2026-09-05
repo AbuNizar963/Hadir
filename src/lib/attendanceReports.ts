@@ -118,6 +118,8 @@ function token(): string {
   return localStorage.getItem("hadir.api.token.admin") || "";
 }
 
+const apiUrl = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").trim().replace(/\/$/, "");
+
 export async function getAttendanceReport(from: string, to: string, employeeId?: string): Promise<AttendanceReport> {
   if (!backendEnabled) throw new Error("نظام التقارير الخلفي غير مفعّل.");
   const params = new URLSearchParams({ from, to });
@@ -125,7 +127,7 @@ export async function getAttendanceReport(from: string, to: string, employeeId?:
   const headers = new Headers({ "content-type": "application/json" });
   const authToken = token();
   if (authToken) headers.set("authorization", `Bearer ${authToken}`);
-  const response = await fetch(`https://hadir-api.abunizar963.workers.dev/api/reports/attendance?${params.toString()}`, {
+  const response = await fetch(`${apiUrl}/api/reports/attendance?${params.toString()}`, {
     method: "GET",
     headers,
     credentials: "include",
