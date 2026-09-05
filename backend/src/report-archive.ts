@@ -22,7 +22,8 @@ const json = (data: unknown, status: number, origin: string) => new Response(JSO
   headers: { ...cors(origin), "content-type": "application/json; charset=utf-8" },
 });
 
-function canArchive(role: Role) { return role === "owner"; }
+function canArchive(role: Role) { return role === "owner" || role === "manager"; }
+function canDeleteArchive(role: Role) { return role === "owner"; }
 
 function safeFilename(value: string, fallback: string) {
   const clean = value.replace(/[^\w\-.\u0600-\u06ff ]/g, "_").slice(0, 140).trim();
@@ -68,6 +69,7 @@ export async function handleReportArchive(req: Request, env: Env, actor: Actor |
   }
 
   if (req.method === "DELETE" && suffix) {
+    if (!canDeleteArchive(actor.role)) return json({ error: "حذف التقارير المؤرشفة متاح للمالك فقط" }, 403, origin);
     const row = await env.DB.prepare("SELECT report_id,file_key FROM report_archives WHERE report_id=? LIMIT 1").bind(suffix).first<any>();
     if (!row) return json({ error: "التقرير المؤرشف غير موجود" }, 404, origin);
     await env.PROFILE_IMAGES.delete(String(row.file_key));
