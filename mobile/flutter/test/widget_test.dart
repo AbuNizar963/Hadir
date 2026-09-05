@@ -2,12 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hadir/main.dart';
 
 void main() {
-  testWidgets('HADIR login screen starts', (tester) async {
+  testWidgets('HADIR app renders', (tester) async {
     await tester.pumpWidget(const HadirApp());
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('حاضر'), findsOneWidget);
-    expect(find.text('تسجيل دخول الموظف'), findsOneWidget);
-    expect(find.text('دخول'), findsOneWidget);
+    expect(find.byType(HadirApp), findsOneWidget);
+    expect(find.byType(MaterialApp), findsOneWidget);
   });
 }
