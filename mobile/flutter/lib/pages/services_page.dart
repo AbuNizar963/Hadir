@@ -148,7 +148,7 @@ class _ServicesPageState extends State<ServicesPage> {
       ...messages.map((message) => Align(alignment: Alignment.centerRight, child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(18)), child: Text(message, style: const TextStyle(height: 1.5))))),
     ])),
     SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [
-      Expanded(child: TextField(controller: question, minLines: 1, maxLines: 4, decoration: const InputDecoration(hintText: 'اكتب سؤالك…', border: OutlineInputBorder())),),
+      Expanded(child: TextField(controller: question, minLines: 1, maxLines: 4, decoration: const InputDecoration(hintText: 'اكتب سؤالك…', border: OutlineInputBorder()))),
       const SizedBox(width: 8),
       IconButton.filled(onPressed: aiBusy ? null : _askAi, icon: const Icon(Icons.send_rounded)),
     ])),
