@@ -14,10 +14,7 @@
   "ai": { "binding": "AI" },
   "browser": { "binding": "BROWSER" },
   "d1_databases": [{ "binding": "DB", "database_name": "Hadir", "database_id": "c9a96776-fcaa-4ae0-befa-b8c5a9345ebe", "migrations_dir": "migrations" }],
-  "r2_buckets": [
-    { "binding": "PROFILE_IMAGES", "bucket_name": "hadir-profile-images" },
-    { "binding": "REPORT_ARCHIVE", "bucket_name": "hadir-report-archive" }
-  ],
+  "r2_buckets": [{ "binding": "PROFILE_IMAGES", "bucket_name": "hadir-profile-images" }],
   "durable_objects": { "bindings": [{ "name": "REALTIME", "class_name": "HadirRealtime" }] },
   "migrations": [{ "tag": "v1-realtime", "new_sqlite_classes": ["HadirRealtime"] }],
   "triggers": { "crons": ["*/5 * * * *"] },
