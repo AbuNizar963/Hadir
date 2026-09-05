@@ -1,0 +1,44 @@
+import { readFileSync, writeFileSync } from "node:fs";
+
+const file = new URL("../src/pages/GlobalAttendanceReports.tsx", import.meta.url);
+let source = readFileSync(file, "utf8");
+
+if (!source.includes('import { getEmployees } from "@/lib/storage";')) throw new Error("GlobalAttendanceReports print: storage import anchor not found.");
+source = source.replace('import { getEmployees } from "@/lib/storage";', 'import { getEmployees, getSettings } from "@/lib/storage";');
+if (!source.includes('import { getBackendEmployees } from "@/lib/backend";')) throw new Error("GlobalAttendanceReports print: backend import anchor not found.");
+source = source.replace('import { getBackendEmployees } from "@/lib/backend";', 'import { getBackendEmployees, getBackendSettings } from "@/lib/backend";');
+
+const stateAnchor = '  const [detailError, setDetailError] = useState<string | null>(null);';
+const stateReplacement = `${stateAnchor}\n  const [reportSettings, setReportSettings] = useState(() => getSettings());`;
+if (!source.includes('const [reportSettings, setReportSettings]')) {
+  if (!source.includes(stateAnchor)) throw new Error("GlobalAttendanceReports print: state anchor not found.");
+  source = source.replace(stateAnchor, stateReplacement);
+}
+
+const effectAnchor = '  useEffect(() => { let alive = true; getBackendEmployees().then((rows) => { if (alive && Array.isArray(rows)) setEmployees(rows); }).catch(() => undefined); return () => { alive = false; }; }, []);';
+const effectReplacement = `${effectAnchor}\n  useEffect(() => { let alive = true; getBackendSettings().then((remote) => { if (alive && remote) setReportSettings(current => ({ ...current, ...remote })); }).catch(() => undefined); return () => { alive = false; }; }, []);`;
+if (!source.includes('getBackendSettings().then((remote)')) {
+  if (!source.includes(effectAnchor)) throw new Error("GlobalAttendanceReports print: employees effect anchor not found.");
+  source = source.replace(effectAnchor, effectReplacement);
+}
+
+const printAnchor = '  const exportCsv = () => {';
+const printFunction = `  const printDailyReport = () => { if (!report || report.days !== 1) { window.print(); return; } window.requestAnimationFrame(() => window.print()); };\n\n`;
+if (!source.includes('const printDailyReport =')) {
+  if (!source.includes(printAnchor)) throw new Error("GlobalAttendanceReports print: export CSV anchor not found.");
+  source = source.replace(printAnchor, printFunction + printAnchor);
+}
+
+const oldPrintButton = '<Button disabled={!report} onClick={() => window.print()}><FileText className="ml-2 h-4 w-4" />{report?.days === 1 ? "طباعة الخدمة / PDF" : "PDF / طباعة"}</Button>';
+const newPrintButton = '<Button disabled={!report} onClick={printDailyReport}><FileText className="ml-2 h-4 w-4" />{report?.days === 1 ? "طباعة الخدمة / PDF" : "PDF / طباعة"}</Button>';
+if (source.includes(oldPrintButton)) source = source.replace(oldPrintButton, newPrintButton);
+
+if (!source.includes('className="global-attendance-print"')) {
+  const rootAnchor = '    <div dir="rtl" className="space-y-5 pb-10">';
+  if (!source.includes(rootAnchor)) throw new Error("GlobalAttendanceReports print: root anchor not found.");
+  const printBlock = `    <style>{\`\n      @page { size: A4 portrait; margin: 8mm 7mm; }\n      @media print {\n        body * { visibility: hidden !important; }\n        .global-attendance-print, .global-attendance-print * { visibility: visible !important; }\n        .global-attendance-print { display: block !important; position: absolute !important; inset: 0 !important; width: 100% !important; background: #fff !important; color: #000 !important; padding: 0 !important; margin: 0 !important; }\n        .global-attendance-print-header { text-align: center; margin-bottom: 7mm; break-inside: avoid; page-break-inside: avoid; }\n        .global-attendance-print-logo { display: block; width: 31mm !important; height: 31mm !important; max-width: 31mm !important; max-height: 31mm !important; object-fit: contain !important; margin: 0 auto 2mm; }\n        .global-attendance-print-company { font-size: 18pt; font-weight: 900; margin-bottom: 2mm; }\n        .global-attendance-print-title { font-size: 13pt; font-weight: 900; padding-bottom: 4mm; border-bottom: 0.5mm solid #111; }\n        .global-attendance-print-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }\n        .global-attendance-print-table th, .global-attendance-print-table td { border: 0.25mm solid #111; padding: 2mm 1.5mm; vertical-align: middle; overflow-wrap: anywhere; }\n        .global-attendance-print-table th { font-weight: 900; background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n        .global-attendance-print-table thead { display: table-header-group !important; }\n        .global-attendance-print-table tr { break-inside: avoid !important; page-break-inside: avoid !important; }\n        .global-attendance-print-center { text-align: center; }\n        .global-attendance-print-status { display: inline-block; border-radius: 999px; padding: 1.2mm 3mm; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n        .global-attendance-print-status-present { background: #d1fae5 !important; color: #047857 !important; }\n        .global-attendance-print-status-late { background: #fef3c7 !important; color: #b45309 !important; }\n        .global-attendance-print-status-absent { background: #fee2e2 !important; color: #b91c1c !important; }\n        .global-attendance-print-status-leave { background: #ede9fe !important; color: #6d28d9 !important; }\n        .global-attendance-print-status-permission { background: #e0f2fe !important; color: #0369a1 !important; }\n      }\n    \`}</style>\n    {report?.days === 1 && <div className="global-attendance-print" dir="rtl">\n      <header className="global-attendance-print-header">\n        {reportSettings.brandLogo && <img src={reportSettings.brandLogo} alt="شعار الشركة" className="global-attendance-print-logo" />}\n        <div className="global-attendance-print-company">{reportSettings.brandName || "HADIR"}</div>\n        <div className="global-attendance-print-title">سجل الحضور والانصراف ليوم {(() => { const d = new Date(`${report.from}T12:00:00`); return `${["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][d.getDay()]} ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; })()}</div>\n      </header>\n      <table className="global-attendance-print-table">\n        <colgroup><col style={{ width: "6%" }} /><col style={{ width: "17%" }} /><col style={{ width: "22%" }} /><col style={{ width: "13%" }} /><col style={{ width: "10%" }} /><col style={{ width: "10%" }} /><col style={{ width: "22%" }} /></colgroup>\n        <thead><tr><th>ت</th><th>الاختصاص</th><th>اسم الموظف</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ملاحظات</th></tr></thead>\n        <tbody>{rows.map((r, i) => { const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : ""; return <tr key={`${r.attendanceDay}-${r.employeeId}`}>\n          <td className="global-attendance-print-center">{i + 1}</td>\n          <td>{employees.find((e) => String(e.id) === String(r.employeeId))?.specialties?.[0] || "غير محدد"}</td>\n          <td><strong>{r.employeeName}</strong></td>\n          <td className="global-attendance-print-center"><span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{labels[r.status] || r.status}</span></td>\n          <td className="global-attendance-print-center">{r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString("ar", { timeZone: "Asia/Damascus", hour: "2-digit", minute: "2-digit" }) : "—"}</td>\n          <td className="global-attendance-print-center">{r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString("ar", { timeZone: "Asia/Damascus", hour: "2-digit", minute: "2-digit" }) : "—"}</td>\n          <td>{r.exceptionCode || "—"}</td>\n        </tr>; })}</tbody>\n      </table>\n    </div>}\n`;
+  source = source.replace(rootAnchor, rootAnchor + "\n" + printBlock);
+}
+
+writeFileSync(file, source, "utf8");
+console.log("GlobalAttendanceReports print patch: dedicated A4 daily report with owner-configured logo/name, selected date title, color-coded statuses, and multi-page table layout.");
