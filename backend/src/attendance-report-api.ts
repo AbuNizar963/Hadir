@@ -158,9 +158,61 @@ export async function handleAttendanceReport(req: Request, env: Env, actor: any)
     const punctualityDenominator = summary.present + summary.late;
     const punctualityRate = punctualityDenominator ? Number((summary.present / punctualityDenominator * 100).toFixed(2)) : 0;
 
+    const dailySeries = Array.from(new Set(rows.map((row) => row.attendanceDay))).sort().map((day) => {
+      const dayRows = rows.filter((row) => row.attendanceDay === day);
+      const count = (status: string) => dayRows.filter((row) => row.status === status).length;
+      return {
+        attendanceDay: day,
+        present: count("PRESENT"),
+        late: count("LATE"),
+        absent: count("ABSENT"),
+        leave: count("LEAVE"),
+        permission: count("PERMISSION"),
+        rest: count("REST"),
+        open: dayRows.filter((row) => row.open).length,
+        lateMinutes: dayRows.reduce((sum, row) => sum + row.lateMinutes, 0),
+        workedMinutes: dayRows.reduce((sum, row) => sum + (row.workedMinutes || 0), 0),
+        expectedMinutes: dayRows.reduce((sum, row) => sum + (row.expectedMinutes || 0), 0),
+        overtimeMinutes: dayRows.reduce((sum, row) => sum + row.overtimeMinutes, 0),
+      };
+    });
+
+    const employeeSummaries = Array.from(seenEmployees).map((id) => {
+      const employeeRows = rows.filter((row) => row.employeeId === id);
+      const first = employeeRows[0];
+      return {
+        employeeId: id,
+        employeeName: first?.employeeName || "",
+        jobNumber: first?.jobNumber || "",
+        days: employeeRows.length,
+        present: employeeRows.filter((row) => row.status === "PRESENT").length,
+        late: employeeRows.filter((row) => row.status === "LATE").length,
+        absent: employeeRows.filter((row) => row.status === "ABSENT").length,
+        leave: employeeRows.filter((row) => row.status === "LEAVE").length,
+        permission: employeeRows.filter((row) => row.status === "PERMISSION").length,
+        open: employeeRows.filter((row) => row.open).length,
+        lateMinutes: employeeRows.reduce((sum, row) => sum + row.lateMinutes, 0),
+        earlyLeaveMinutes: employeeRows.reduce((sum, row) => sum + row.earlyLeaveMinutes, 0),
+        overtimeMinutes: employeeRows.reduce((sum, row) => sum + row.overtimeMinutes, 0),
+        workedMinutes: employeeRows.reduce((sum, row) => sum + (row.workedMinutes || 0), 0),
+        expectedMinutes: employeeRows.reduce((sum, row) => sum + (row.expectedMinutes || 0), 0),
+      };
+    }).sort((a, b) => String(a.employeeName).localeCompare(String(b.employeeName), "ar"));
+
+    const exceptions = rows.filter((row) => Boolean(row.exceptionCode)).map((row) => ({
+      attendanceDay: row.attendanceDay,
+      employeeId: row.employeeId,
+      employeeName: row.employeeName,
+      jobNumber: row.jobNumber,
+      code: row.exceptionCode,
+      status: row.status,
+      minutes: row.lateMinutes || row.earlyLeaveMinutes || row.overtimeMinutes || 0,
+      attendanceEventIds: row.attendanceEventIds,
+    }));
+
     return json({
       ok: true,
-      reportVersion: "1.0",
+      reportVersion: "1.1",
       generatedAt: new Date().toISOString(),
       timezone: TZ,
       from,
@@ -168,6 +220,12 @@ export async function handleAttendanceReport(req: Request, env: Env, actor: any)
       days: dayCount,
       filters: { employeeId: employeeId || null },
       summary: { ...summary, attendanceRate, punctualityRate },
+      analytics: {
+        dailySeries,
+        employeeSummaries,
+        exceptions,
+        exceptionCounts: exceptions.reduce<Record<string, number>>((acc, item) => { acc[item.code] = (acc[item.code] || 0) + 1; return acc; }, {}),
+      },
       rows,
       integrity: {
         sourceOfTruth: "attendance",
@@ -176,6 +234,7 @@ export async function handleAttendanceReport(req: Request, env: Env, actor: any)
         periodScoped: true,
         maxDays: MAX_DAYS,
         drillDownAvailable: true,
+        rawEventIdsIncluded: true,
       },
     }, 200, origin);
   } catch (error) {
