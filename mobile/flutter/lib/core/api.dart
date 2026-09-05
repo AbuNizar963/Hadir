@@ -22,6 +22,7 @@ class HadirApi {
   Future<Map<String, dynamic>> adminLogin(String username, String password) async => Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password})).data as Map);
   Future<Map<String, dynamic>> me() async => Map<String, dynamic>.from((await dio.get('/api/me')).data as Map);
   Future<Map<String, dynamic>> employeeProfile() async => Map<String, dynamic>.from((await dio.get('/api/employee/profile')).data as Map);
+  Future<Map<String, dynamic>> employeeDeviceStatus() async => Map<String, dynamic>.from((await dio.get('/api/device/status')).data as Map);
   Future<List<dynamic>> locations() async => List<dynamic>.from((await dio.get('/api/locations')).data as List);
   Future<dynamic> attendance({int limit = 500}) async => List<dynamic>.from((await dio.get('/api/attendance', queryParameters: {'limit': limit.clamp(1, 2000)})).data as List);
   Future<Map<String, dynamic>> createChallenge({required String type, required double lat, required double lng, required String qrCode, required String deviceId}) async => Map<String, dynamic>.from((await dio.post('/api/attendance/challenge', data: {'type': type, 'lat': lat, 'lng': lng, 'qrCode': qrCode, 'deviceId': deviceId})).data as Map);
