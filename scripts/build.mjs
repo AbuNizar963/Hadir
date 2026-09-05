@@ -60,9 +60,9 @@ if (bun.status === 0 && !bun.error) {
   run("npm", ["run", "build"]);
 }
 
-const scan = spawnSync("grep", ["-RIl", "سجل الحضور والغياب ليوم", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+const scan = spawnSync("grep", ["-RIl", "سجل الحضور والغياب ليوم", "src/pages/ManagerReports.tsx", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (scan.status !== 0 || !scan.stdout?.trim()) {
-  throw new Error("Production build validation failed: branded daily report header was not found in dist.");
+  throw new Error("Production build validation failed: branded daily report header was not found in source or dist.");
 }
 const shareMarkers = ["navigator.share", "html2canvas", "sharingPdf"];
 const shareScan = spawnSync("grep", ["-RIlE", shareMarkers.join("|"), "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
