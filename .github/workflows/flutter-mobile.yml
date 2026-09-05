@@ -28,6 +28,11 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Ensure Android platform project
+        run: |
+          if [ ! -f android/gradlew ]; then
+            flutter create --platforms=android --project-name hadir .
+          fi
       - run: flutter build apk --debug
 
   ios:
@@ -46,4 +51,9 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Ensure iOS platform project
+        run: |
+          if [ ! -d ios/Runner.xcodeproj ]; then
+            flutter create --platforms=ios --project-name hadir .
+          fi
       - run: flutter build ios --no-codesign
