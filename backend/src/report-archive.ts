@@ -1,6 +1,6 @@
 type Role = "owner" | "manager" | "supervisor" | "staff";
 type Actor = { id: string; name: string; role: Role };
-type Env = { DB: D1Database; REPORT_ARCHIVE?: R2Bucket };
+type Env = { DB: D1Database; PROFILE_IMAGES?: R2Bucket };
 
 const MAX_ARCHIVE_BYTES = 25 * 1024 * 1024;
 const ALLOWED_TYPES = new Map([
@@ -34,7 +34,7 @@ async function sha256Hex(bytes: ArrayBuffer) {
   return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function archiveKey(reportId: string, periodFrom: string, periodTo: string, type: string, extension: string) {
+function archiveKey(reportId: string, periodFrom: string, type: string, extension: string) {
   const year = periodFrom.slice(0, 4);
   const month = periodFrom.slice(5, 7);
   return `reports/${year}/${month}/${type}/${reportId}/attendance${extension}`;
@@ -46,7 +46,7 @@ export async function handleReportArchive(req: Request, env: Env, actor: Actor |
   const url = new URL(req.url);
   if (!url.pathname.replace(/\/$/, "").startsWith("/api/reports/archive")) return null;
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
-  if (!env.REPORT_ARCHIVE) return json({ error: "أرشيف التقارير غير مهيأ في بيئة الإنتاج" }, 503, origin);
+  if (!env.PROFILE_IMAGES) return json({ error: "أرشيف التقارير غير مهيأ في بيئة الإنتاج" }, 503, origin);
   if (!actor || !canArchive(actor.role)) return json({ error: "غير مصرح" }, 403, origin);
 
   const suffix = url.pathname.replace(/^\/api\/reports\/archive\/?/, "");
@@ -55,7 +55,7 @@ export async function handleReportArchive(req: Request, env: Env, actor: Actor |
     if (suffix) {
       const row = await env.DB.prepare("SELECT report_id,report_type,period_from,period_to,employee_id,generated_at,generated_by,generated_by_name,report_version,data_snapshot_hash,status,file_key,file_name,file_size,mime_type,file_sha256,created_at,locked_at,locked_by,revision FROM report_archives WHERE report_id=? LIMIT 1").bind(suffix).first<any>();
       if (!row) return json({ error: "التقرير المؤرشف غير موجود" }, 404, origin);
-      const object = await env.REPORT_ARCHIVE.get(String(row.file_key));
+      const object = await env.PROFILE_IMAGES.get(String(row.file_key));
       if (!object) return json({ error: "ملف التقرير غير موجود في الأرشيف" }, 404, origin);
       const headers = new Headers({ ...cors(origin), "content-type": String(row.mime_type), "content-disposition": `attachment; filename="${safeFilename(String(row.file_name), "hadir-report")}"`, "cache-control": "private, no-store" });
       headers.set("etag", object.httpEtag);
@@ -92,11 +92,11 @@ export async function handleReportArchive(req: Request, env: Env, actor: Actor |
   const fileName = safeFilename(String(form?.get("fileName") || `hadir-${periodFrom}-${periodTo}${extension}`), `hadir-report${extension}`);
   const bytes = await file.arrayBuffer();
   const fileSha256 = await sha256Hex(bytes);
-  const key = archiveKey(reportId, periodFrom, periodTo, reportType, extension);
+  const key = archiveKey(reportId, periodFrom, reportType, extension);
   const generatedAt = String(form?.get("generatedAt") || new Date().toISOString());
   const createdAt = new Date().toISOString();
 
-  await env.REPORT_ARCHIVE.put(key, bytes, {
+  await env.PROFILE_IMAGES.put(key, bytes, {
     httpMetadata: { contentType: mimeType, contentDisposition: `attachment; filename="${fileName}"`, cacheControl: "private, no-store" },
     customMetadata: { reportId, reportType, periodFrom, periodTo, generatedBy: actor.id, reportVersion, dataSnapshotHash, fileSha256 },
   });
@@ -108,7 +108,7 @@ export async function handleReportArchive(req: Request, env: Env, actor: Actor |
       "CALCULATED", key, fileName, file.size, mimeType, fileSha256, createdAt,
     ).run();
   } catch (error) {
-    await env.REPORT_ARCHIVE.delete(key).catch(() => undefined);
+    await env.PROFILE_IMAGES.delete(key).catch(() => undefined);
     return json({ error: "تعذر تسجيل التقرير في سجل الأرشيف", detail: error instanceof Error ? error.message : String(error) }, 409, origin);
   }
 
