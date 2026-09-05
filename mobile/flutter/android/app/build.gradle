@@ -1,0 +1,20 @@
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+    id 'dev.flutter.flutter-gradle-plugin'
+}
+
+android {
+    namespace 'com.hadir.attendance'
+    compileSdk flutter.compileSdkVersion
+
+    defaultConfig {
+        applicationId 'com.hadir.attendance'
+        minSdk 24
+        targetSdk flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+    }
+}
+
+flutter { source '../..' }
