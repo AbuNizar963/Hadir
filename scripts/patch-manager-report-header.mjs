@@ -48,28 +48,26 @@ const wrappedSectionStart = '<section className="service-report bg-white text-bl
 if (source.includes(sectionStart) && !source.includes(wrappedSectionStart)) source = source.replace(sectionStart, wrappedSectionStart);
 if (!source.includes(wrappedSectionStart)) throw new Error("ManagerReports: daily service report section anchor not found.");
 
-const printBlock = [
-  '<div className="daily-print-report" dir="rtl">',
-  '  <header className="daily-print-header">',
-  '    {settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="daily-print-logo" />}',
-  '    <div className="daily-print-company">{settings.brandName || "HADIR"}</div>',
-  '    <div className="daily-print-title">سجل الحضور والانصراف ليوم {days[dateOf(date).getDay()]} {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div>',
-  '  </header>',
-  '  <table className="daily-print-table">',
-  '    <colgroup><col className="daily-print-no" /><col className="daily-print-specialty" /><col className="daily-print-name" /><col className="daily-print-status" /><col className="daily-print-time" /><col className="daily-print-time" /><col className="daily-print-note" /></colgroup>',
-  '    <thead><tr><th>ت</th><th>الاختصاص</th><th>اسم الموظف</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ملاحظات</th></tr></thead>',
-  '    <tbody>{dailyServiceRows.map((row, i) => <tr key={row.employee.id}>',
-  '      <td className="daily-print-center">{i + 1}</td>',
-  '      <td>{specialtyOf(row.employee)}</td>',
-  '      <td className="daily-print-name-cell">{row.employee.name}</td>',
-  '      <td className="daily-print-center"><span className={cls[row.status] + " daily-print-status"}>{labels[row.status]}</span></td>',
-  '      <td className="daily-print-center">{row.checkIn}</td>',
-  '      <td className="daily-print-center">{row.checkOut}</td>',
-  '      <td>{row.note || "—"}</td>',
-  '    </tr>)}</tbody>',
-  '  </table>',
-  '</div>',
-].join("\n");
+const printBlock = `<div className="daily-print-report" dir="rtl">
+        <header className="daily-print-header">
+          {settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="daily-print-logo" />}
+          <div className="daily-print-company">{settings.brandName || "HADIR"}</div>
+          <div className="daily-print-title">سجل الحضور والانصراف ليوم {days[dateOf(date).getDay()]} {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div>
+        </header>
+        <table className="daily-print-table">
+          <colgroup><col className="daily-print-no" /><col className="daily-print-specialty" /><col className="daily-print-name" /><col className="daily-print-status" /><col className="daily-print-time" /><col className="daily-print-time" /><col className="daily-print-note" /></colgroup>
+          <thead><tr><th>ت</th><th>الاختصاص</th><th>اسم الموظف</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ملاحظات</th></tr></thead>
+          <tbody>{dailyServiceRows.map((row, i) => <tr key={row.employee.id}>
+            <td className="daily-print-center">{i + 1}</td>
+            <td>{specialtyOf(row.employee)}</td>
+            <td className="daily-print-name-cell">{row.employee.name}</td>
+            <td className="daily-print-center"><span className={"daily-print-status " + cls[row.status]}>{labels[row.status]}</span></td>
+            <td className="daily-print-center">{row.checkIn}</td>
+            <td className="daily-print-center">{row.checkOut}</td>
+            <td>{row.note || "—"}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>`;
 const dailySectionEnd = '</div>\n    </section> : <div className="hud-card';
 if (source.includes(dailySectionEnd) && !source.includes('className="daily-print-report"')) {
   source = source.replace(dailySectionEnd, `</div>${printBlock}\n    </section> : <div className="hud-card`);
