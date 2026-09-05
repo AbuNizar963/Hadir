@@ -18,38 +18,21 @@ class HadirApi {
     if (error is DioException) {
       final data = error.response?.data;
       if (data is Map && data['error'] is String) return data['error'] as String;
-      if (error.type == DioExceptionType.connectionError || error.type == DioExceptionType.connectionTimeout) {
-        return 'تعذر الاتصال بخادم حاضر. تحقق من الإنترنت ثم حاول مرة أخرى.';
-      }
+      if (error.type == DioExceptionType.connectionError || error.type == DioExceptionType.connectionTimeout) return 'تعذر الاتصال بخادم حاضر. تحقق من الإنترنت ثم حاول مرة أخرى.';
       return 'تعذر إكمال العملية (${error.response?.statusCode ?? 'شبكة'}).';
     }
     return error.toString();
   }
 
-  Future<Map<String, dynamic>> login(String username, String password, {required String deviceId, required String deviceLabel, String? fingerprint}) async {
-    final r = await dio.post('/api/auth/login', data: {
-      'username': username.trim(), 'password': password, 'deviceId': deviceId,
-      'deviceLabel': deviceLabel, 'deviceFingerprint': fingerprint ?? deviceId,
-    });
-    return Map<String, dynamic>.from(r.data as Map);
-  }
-
+  Future<Map<String, dynamic>> login(String username, String password, {required String deviceId, required String deviceLabel, String? fingerprint}) async => Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password, 'deviceId': deviceId, 'deviceLabel': deviceLabel, 'deviceFingerprint': fingerprint ?? deviceId})).data as Map);
   Future<Map<String, dynamic>> me() async => Map<String, dynamic>.from((await dio.get('/api/me')).data as Map);
   Future<Map<String, dynamic>> employeeProfile() async => Map<String, dynamic>.from((await dio.get('/api/employee/profile')).data as Map);
   Future<List<dynamic>> locations() async => List<dynamic>.from((await dio.get('/api/locations')).data as List);
   Future<List<dynamic>> attendance({int limit = 500}) async => List<dynamic>.from((await dio.get('/api/attendance', queryParameters: {'limit': limit.clamp(1, 2000)})).data as List);
-
-  Future<Map<String, dynamic>> createChallenge({required String type, required double lat, required double lng, required String qrCode, required String deviceId}) async {
-    final r = await dio.post('/api/attendance/challenge', data: {'type': type, 'lat': lat, 'lng': lng, 'qrCode': qrCode, 'deviceId': deviceId});
-    return Map<String, dynamic>.from(r.data as Map);
-  }
-
-  Future<Map<String, dynamic>> createAttendance(Map<String, dynamic> record) async {
-    final r = await dio.post('/api/attendance', data: record);
-    return Map<String, dynamic>.from(r.data as Map);
-  }
-
+  Future<Map<String, dynamic>> createChallenge({required String type, required double lat, required double lng, required String qrCode, required String deviceId}) async => Map<String, dynamic>.from((await dio.post('/api/attendance/challenge', data: {'type': type, 'lat': lat, 'lng': lng, 'qrCode': qrCode, 'deviceId': deviceId})).data as Map);
+  Future<Map<String, dynamic>> createAttendance(Map<String, dynamic> record) async => Map<String, dynamic>.from((await dio.post('/api/attendance', data: record)).data as Map);
   Future<List<dynamic>> requests() async => List<dynamic>.from((await dio.get('/api/requests')).data as List);
-  Future<Map<String, dynamic>> createRequest(Map<String, dynamic> data) async => Map<String, dynamic>.from((await dio.post('/api/requests', data: data)).data as Map);
+  Future<Map<String, dynamic>> createRequest({required String type, required String reason, String? startDate, String? endDate, String? employeeId}) async => Map<String, dynamic>.from((await dio.post('/api/requests', data: {'type': type, 'reason': reason, if (startDate != null) 'startDate': startDate, if (endDate != null) 'endDate': endDate, if (employeeId != null) 'employeeId': employeeId})).data as Map);
+  Future<Map<String, dynamic>> confirmRequest(String id) async => Map<String, dynamic>.from((await dio.post('/api/requests/$id/confirm')).data as Map);
   Future<void> logout() async { try { await dio.post('/api/auth/logout', data: {}); } catch (_) {} }
 }
