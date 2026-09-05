@@ -5,7 +5,7 @@ let source = readFileSync(file, "utf8");
 const fail = (message) => { throw new Error(`ManagerSettings Telegram screen: ${message}; refusing unsafe replacement.`); };
 
 // Important UX rule: the Settings entry/button itself stays in the normal manager UI.
-// Only a category selected INSIDE Settings opens as a viewport-level fullscreen screen.
+// Only a category selected INSIDE Settings opens as a viewport-level screen.
 // Existing settings controls and handlers are intentionally preserved.
 
 if (!source.includes('import { useNavigate } from "react-router-dom";')) {
@@ -20,7 +20,7 @@ if (!source.includes("const navigate = useNavigate();")) {
   source = source.replace(managerRegex, '$1 const navigate = useNavigate();');
 }
 
-// Track the fullscreen category viewport so every category opens from its true top.
+// Track the settings category viewport so every category opens from its true top.
 if (!source.includes("const settingsDetailRef = useRef<HTMLElement>(null);")) {
   const settingsHomeAnchor = '  const [settingsHome, setSettingsHome] = useState(true);';
   if (!source.includes(settingsHomeAnchor)) fail("settings home state anchor not found");
@@ -33,12 +33,12 @@ source = source.replace(
   '      {settingsHome ? <section className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm" aria-label="قائمة أقسام الإعدادات">'
 );
 
-// Only the selected category/detail screen is fullscreen.
+// Only the selected category/detail screen is fixed, starting below both manager bars.
 const detailOpen = '      </section> : <section className="space-y-4">';
 if (!source.includes(detailOpen)) fail("settings detail opening anchor not found");
 source = source.replace(
   detailOpen,
-  '      </section> : <section ref={settingsDetailRef} className="settings-detail-screen fixed inset-0 z-[80] min-h-screen overflow-y-auto bg-background" aria-label="إعدادات القسم">'
+  '      </section> : <section ref={settingsDetailRef} className="settings-detail-screen fixed top-[138px] bottom-0 inset-x-0 z-[80] overflow-y-auto bg-background" aria-label="إعدادات القسم">'
 );
 
 // Remove the directional arrows from the Settings category list; the rows are clickable without them.
@@ -84,4 +84,4 @@ if (source.includes(host)) {
 }
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerSettings: X/back return to the Settings list; category list arrows are removed; category screens reset to the top on open.");
+console.log("ManagerSettings: category screens now start below both manager bars.");
