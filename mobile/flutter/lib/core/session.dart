@@ -4,14 +4,27 @@ import 'package:uuid/uuid.dart';
 
 class HadirSession {
   static const _tokenKey = 'hadir.employee.token';
+  static const _adminTokenKey = 'hadir.admin.token';
   static const _deviceKey = 'hadir.device.id';
   static const _fingerprintKey = 'hadir.device.fingerprint';
   final FlutterSecureStorage storage;
   HadirSession({FlutterSecureStorage? storage}) : storage = storage ?? const FlutterSecureStorage();
 
   Future<String?> token() => storage.read(key: _tokenKey);
-  Future<void> saveToken(String token) => storage.write(key: _tokenKey, value: token);
-  Future<void> clear() => storage.delete(key: _tokenKey);
+  Future<void> saveToken(String token) async {
+    await storage.delete(key: _adminTokenKey);
+    await storage.write(key: _tokenKey, value: token);
+  }
+  Future<String?> adminToken() => storage.read(key: _adminTokenKey);
+  Future<void> saveAdminToken(String token) async {
+    await storage.delete(key: _tokenKey);
+    await storage.write(key: _adminTokenKey, value: token);
+  }
+  Future<void> clear() async {
+    await storage.delete(key: _tokenKey);
+    await storage.delete(key: _adminTokenKey);
+  }
+  Future<void> clearAdmin() => storage.delete(key: _adminTokenKey);
 
   Future<String> deviceId() async {
     final existing = await storage.read(key: _deviceKey);
