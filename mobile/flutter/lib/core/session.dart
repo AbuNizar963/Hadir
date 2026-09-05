@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 class HadirSession {
   static const _tokenKey = 'hadir.employee.token';
   static const _deviceKey = 'hadir.device.id';
+  static const _fingerprintKey = 'hadir.device.fingerprint';
   final FlutterSecureStorage storage;
   HadirSession({FlutterSecureStorage? storage}) : storage = storage ?? const FlutterSecureStorage();
 
@@ -15,10 +16,18 @@ class HadirSession {
   Future<String> deviceId() async {
     final existing = await storage.read(key: _deviceKey);
     if (existing != null && existing.isNotEmpty) return existing;
-    final id = const Uuid().v4();
+    final id = 'dev-${const Uuid().v4()}';
     await storage.write(key: _deviceKey, value: id);
     return id;
   }
 
-  String get platformLabel => Platform.isIOS ? 'iPhone' : 'Android';
+  Future<String> deviceFingerprint() async {
+    final existing = await storage.read(key: _fingerprintKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+    final fingerprint = 'native-${const Uuid().v4()}';
+    await storage.write(key: _fingerprintKey, value: fingerprint);
+    return fingerprint;
+  }
+
+  String get platformLabel => Platform.isIOS ? 'iPhone · حاضر' : 'Android · حاضر';
 }
