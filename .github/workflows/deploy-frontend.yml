@@ -29,6 +29,8 @@ on:
       - "scripts/patch-manager-settings-locations-dedicated.mjs"
       - "scripts/patch-manager-settings-locations-fixes.mjs"
       - "scripts/patch-manager-settings-reset-placement.mjs"
+      - "scripts/patch-global-attendance-schedule-filter.mjs"
+      - "scripts/patch-global-attendance-print-report.mjs"
       - ".github/workflows/deploy-frontend.yml"
 
 permissions:
