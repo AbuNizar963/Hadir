@@ -9,9 +9,6 @@ class RequestsService {
     return rows.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
-  Future<Map<String, dynamic>> create({required String type, required String reason, String? startDate, String? endDate}) {
-    return api.createRequest(type: type, reason: reason, startDate: startDate, endDate: endDate);
-  }
-
+  Future<Map<String, dynamic>> create({required String type, required String reason, String? startDate, String? endDate}) => api.createRequest(type: type, reason: reason, startDate: startDate, endDate: endDate);
   Future<Map<String, dynamic>> confirm(String id) => api.confirmRequest(id);
 }
