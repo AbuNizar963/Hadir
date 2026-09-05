@@ -19,6 +19,7 @@ import ManagerRequests from "@/pages/ManagerRequests";
 import ManagerAudit from "@/pages/ManagerAudit";
 import ManagerSettings from "@/pages/ManagerSettings";
 import GlobalAttendanceReports from "@/pages/GlobalAttendanceReports";
+import ReportArchive from "@/pages/ReportArchive";
 import EmployeeLayout from "@/components/layout/EmployeeLayout";
 import NotFound from "@/pages/NotFound";
 import ProtectedEmployee from "@/components/ProtectedEmployee";
@@ -188,6 +189,7 @@ export default function App() {
       <Route path="/manager/requests" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerRequests /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/audit" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerAudit /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/reports" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><GlobalAttendanceReports /></RequireManagerRole></ManagerOnly>} />
+      <Route path="/manager/report-archive" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ReportArchive /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager/settings" element={<ManagerOnly><RequireManagerRole roles={["owner"]}><ManagerSettings /></RequireManagerRole></ManagerOnly>} />
       <Route path="/manager-home" element={<Navigate to="/manager" replace />} />
       <Route path="*" element={<NotFound />} />
