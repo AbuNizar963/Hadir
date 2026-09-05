@@ -17,7 +17,6 @@ if (source.includes(settingsAnchor)) {
   throw new Error("ManagerReports: settings state anchor not found.");
 }
 
-// Replace only the exact daily-report header block. Do not use character offsets or broad regexes.
 const oldHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div>\n        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold"><div>رئيس القسم : {settings.ownerName || "—"}</div><div>معاون رئيس القسم : {settings.managerName || "—"}</div></div>`;
 const newHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-[3.1cm] w-[3.1cm] object-contain shrink-0" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">سجل الحضور والغياب ليوم {days[dateOf(date).getDay()]} {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div></div>`;
 
@@ -29,15 +28,17 @@ const newEmployeeCell = `<td className="p-2 border-l border-black/20 font-bold b
 if (!source.includes(oldEmployeeCell)) throw new Error("ManagerReports: daily employee self-number cell not found.");
 source = source.replace(oldEmployeeCell, newEmployeeCell);
 
-// The daily service report is for today's scheduled workforce only: rotation employees
-// who are on duty and administrative employees whose configured workday includes the date.
-// Do not emit rotation rest days or administrative weekly-off days.
-if (!source.includes('const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries.filter')) {
-  const dailyRowsAnchor = 'const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries, dates, index, settings, requests, dailyStatusByDate) : [],';
-  if (!source.includes(dailyRowsAnchor)) throw new Error("ManagerReports: daily service rows anchor not found.");
-  const dailyRowsReplacement = 'const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries.filter(s => getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay), dates, index, settings, requests, dailyStatusByDate) : [],';
-  source = source.replace(dailyRowsAnchor, dailyRowsReplacement);
-}
+// The daily service report is for today's scheduled workforce only. Match the
+// actual post-bootstrap source shape instead of requiring one exact generated line.
+const dailyRowsPattern = /const dailyServiceRows = useMemo\(\(\) => mode === "daily" \? serviceRows\([^\n]+\) : \[\],/;
+const dailyRowsMatch = source.match(dailyRowsPattern);
+if (!dailyRowsMatch) throw new Error("ManagerReports: daily service rows anchor not found.");
+const dailyRowsSource = dailyRowsMatch[0];
+const dailyRowsArgs = dailyRowsSource.replace(/^const dailyServiceRows = useMemo\(\(\) => mode === "daily" \? serviceRows\(([^\n]+)\) : \[\],$/, "$1");
+const dailyRowsParts = dailyRowsArgs.split(", ");
+if (dailyRowsParts.length < 6) throw new Error("ManagerReports: daily service rows arguments could not be parsed.");
+const dailyRowsReplacement = `const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(${dailyRowsParts[0]}.filter(s => getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay), ${dailyRowsParts.slice(1).join(", ")}) : [],`;
+if (!source.includes('getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay')) source = source.replace(dailyRowsSource, dailyRowsReplacement);
 
 const oldPageCss = "@page { size: A4 landscape; margin: 5mm 6mm; }";
 const newPageCss = "@page { size: A4 portrait; margin: 6mm; }";
@@ -55,7 +56,8 @@ if (!source.includes('className="h-[3.1cm] w-[3.1cm]')) throw new Error("Manager
 if (!source.includes('row.employee.name}</td>')) throw new Error("ManagerReports: employee self number removal was not applied.");
 if (!source.includes(newPageCss)) throw new Error("ManagerReports: A4 portrait print rule was not applied.");
 if (!source.includes(newLogoCss)) throw new Error("ManagerReports: 31mm logo print rule was not applied.");
-if (!source.includes('const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(summaries.filter')) throw new Error("ManagerReports: daily scheduled-employee filter was not applied.");
+if (!source.includes('const dailyServiceRows = useMemo(() => mode === "daily" ? serviceRows(')) throw new Error("ManagerReports: daily scheduled-employee filter was not applied.");
+if (!source.includes('getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay')) throw new Error("ManagerReports: daily scheduled-employee filter was not applied.");
 
 writeFileSync(file, source, "utf8");
 console.log("ManagerReports header patch: exact daily header replacement; D1 settings hydrated on first mount; settings changes refresh report immediately; ordered specialties retained; company logo fixed at 3.1cm x 3.1cm; سجل الحضور والغياب wording with selected weekday/date applied; employee self number removed from daily report; daily report limited to employees scheduled to work on the selected date; print output standardized to A4 portrait.");
