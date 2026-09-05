@@ -18,5 +18,15 @@ const printReplacement = '        .manager-content > *:has(.global-attendance-pr
 if (!source.includes(printAnchor)) throw new Error("GlobalAttendanceReports layout: print container CSS anchor not found.");
 source = source.replace(printAnchor, printReplacement);
 
+const summaryAnchor = '        .global-attendance-print-summary-item { white-space: nowrap; }';
+const summaryReplacement = '        .global-attendance-print-summary-item { white-space: nowrap; }\n        .global-attendance-print-qr { position: absolute; top: 0; right: 0; width: 28mm; height: 28mm; }\n        .global-attendance-print-header { position: relative; }';
+if (!source.includes(summaryAnchor)) throw new Error("GlobalAttendanceReports layout: summary CSS anchor not found.");
+source = source.replace(summaryAnchor, summaryReplacement);
+
+const headerAnchor = '<header className="global-attendance-print-header">';
+const headerReplacement = '<header className="global-attendance-print-header">\n        <img className="global-attendance-print-qr" alt="QR بيانات استخراج التقرير" src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(JSON.stringify({ reportDate: report.from, extractedAt: new Date().toISOString(), extractedBy: reportSettings.ownerName || reportSettings.managerName || reportSettings.userName || "غير محدد", role: reportSettings.ownerName ? "مالك" : "مدير" }))}`} />';
+if (!source.includes(headerAnchor)) throw new Error("GlobalAttendanceReports layout: print header anchor not found.");
+source = source.replace(headerAnchor, headerReplacement);
+
 writeFileSync(file, source, "utf8");
-console.log("GlobalAttendanceReports print layout patch: fit table to A4, fix outer borders/corners, and remove trailing blank pages.");
+console.log("GlobalAttendanceReports print layout patch: fit table to A4, fix outer borders/corners, remove trailing blank pages, and add QR metadata.");
