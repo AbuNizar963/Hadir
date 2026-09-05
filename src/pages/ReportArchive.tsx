@@ -60,23 +60,24 @@ export default function ReportArchive() {
     setSaving(true); setError(null); setMessage(null);
     try {
       const hash = await snapshotHash(currentReport);
-      await new Promise<void>((resolve, reject) => {
-        try {
-          downloadProfessionalAttendanceReport({
-            mode: currentReport.days === 1 ? "daily" : currentReport.days <= 31 ? "monthly" : "annual",
-            period: `${currentReport.from} → ${currentReport.to}`,
-            generatedAt: currentReport.generatedAt,
-            summaries: currentReport.analytics.employeeSummaries.map((x) => ({ employee: { name: x.employeeName, jobNumber: x.jobNumber }, workDays: x.days, present: x.present, absent: x.absent, early: x.earlyLeaveMinutes, late: x.late, open: x.open, off: x.rest, worked: x.workedMinutes })),
-            dailyRows: currentReport.rows.map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, date: x.attendanceDay, day: x.attendanceDay, status: labels[x.status] || x.status, checkIn: x.checkInAt || "—", checkOut: x.checkOutAt || "—", worked: fmt(x.workedMinutes || 0), late: x.lateMinutes, early: x.earlyLeaveMinutes, detail: x.exceptionCode || "" })),
-            chartData: [
-              { label: "حاضر", value: currentReport.summary.present }, { label: "متأخر", value: currentReport.summary.late }, { label: "غياب", value: currentReport.summary.absent },
-              { label: "إجازة", value: currentReport.summary.leave }, { label: "استئذان", value: currentReport.summary.permission }, { label: "راحة", value: currentReport.summary.rest },
-            ].filter((x) => x.value > 0),
-            absenceRows: currentReport.rows.filter((x) => x.status === "ABSENT").map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, date: x.attendanceDay, day: x.attendanceDay, status: "غياب", checkIn: "—", checkOut: "—", worked: "—", late: 0, early: 0, detail: x.exceptionCode || "" })),
-            onBlob: (blob) => { void archiveReportFile({ file: blob, fileName: `Hadir-${currentReport.from}-${currentReport.to}-professional-attendance.xlsx`, reportType: employeeId ? "attendance_employee" : currentReport.days === 1 ? "attendance_daily" : "attendance_period", periodFrom: currentReport.from, periodTo: currentReport.to, employeeId: employeeId || undefined, generatedAt: currentReport.generatedAt, reportVersion: currentReport.reportVersion, dataSnapshotHash: hash }).then(() => { setMessage("تم حفظ نسخة Excel الرسمية في أرشيف R2 بنجاح."); void refreshArchives(); }).catch((e) => { setError(e instanceof Error ? e.message : "تعذر حفظ ملف الأرشيف"); }).finally(() => resolve()); }
-          });
-        } catch (e) { reject(e); }
+      let archivePromise: Promise<unknown> | null = null;
+      downloadProfessionalAttendanceReport({
+        mode: currentReport.days === 1 ? "daily" : currentReport.days <= 31 ? "monthly" : "annual",
+        period: `${currentReport.from} → ${currentReport.to}`,
+        generatedAt: currentReport.generatedAt,
+        summaries: currentReport.analytics.employeeSummaries.map((x) => ({ employee: { name: x.employeeName, jobNumber: x.jobNumber }, workDays: x.days, present: x.present, absent: x.absent, early: x.earlyLeaveMinutes, late: x.late, open: x.open, off: x.rest, worked: x.workedMinutes })),
+        dailyRows: currentReport.rows.map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, date: x.attendanceDay, day: x.attendanceDay, status: labels[x.status] || x.status, checkIn: x.checkInAt || "—", checkOut: x.checkOutAt || "—", worked: fmt(x.workedMinutes || 0), late: x.lateMinutes, early: x.earlyLeaveMinutes, detail: x.exceptionCode || "" })),
+        chartData: [
+          { label: "حاضر", value: currentReport.summary.present }, { label: "متأخر", value: currentReport.summary.late }, { label: "غياب", value: currentReport.summary.absent },
+          { label: "إجازة", value: currentReport.summary.leave }, { label: "استئذان", value: currentReport.summary.permission }, { label: "راحة", value: currentReport.summary.rest },
+        ].filter((x) => x.value > 0),
+        absenceRows: currentReport.rows.filter((x) => x.status === "ABSENT").map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, date: x.attendanceDay, day: x.attendanceDay, status: "غياب", checkIn: "—", checkOut: "—", worked: "—", late: 0, early: 0, detail: x.exceptionCode || "" })),
+        onBlob: (blob) => { archivePromise = archiveReportFile({ file: blob, fileName: `Hadir-${currentReport.from}-${currentReport.to}-professional-attendance.xlsx`, reportType: employeeId ? "attendance_employee" : currentReport.days === 1 ? "attendance_daily" : "attendance_period", periodFrom: currentReport.from, periodTo: currentReport.to, employeeId: employeeId || undefined, generatedAt: currentReport.generatedAt, reportVersion: currentReport.reportVersion, dataSnapshotHash: hash }); },
       });
+      if (!archivePromise) throw new Error("تعذر إنشاء ملف Excel للأرشفة");
+      await archivePromise;
+      setMessage("تم حفظ نسخة Excel الرسمية في أرشيف R2 بنجاح.");
+      await refreshArchives();
     } catch (e) { setError(e instanceof Error ? e.message : "تعذر إنشاء الأرشيف"); }
     finally { setSaving(false); }
   };
