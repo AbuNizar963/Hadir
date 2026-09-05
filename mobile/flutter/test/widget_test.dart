@@ -9,6 +9,5 @@ void main() {
 
     expect(find.byType(HadirApp), findsOneWidget);
     expect(find.byType(MaterialApp), findsOneWidget);
-    expect(find.byType(MaterialApp).first.evaluate().isNotEmpty, isTrue);
   });
 }
