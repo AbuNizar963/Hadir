@@ -18,15 +18,17 @@ GoRouter buildModernRouter() => GoRouter(
     final employeeToken = await _modernSession.token();
     final adminToken = await _modernSession.adminToken();
     final location = state.matchedLocation;
-    if (employeeToken == null && adminToken == null && location != '/login' && location != '/admin-login') return '/login';
-    if (adminToken != null && (location == '/login' || location == '/admin-login')) return '/admin';
-    if (employeeToken != null && (location == '/login' || location == '/admin-login')) return '/home';
+    final publicLocations = {'/login', '/employee-login', '/admin-login'};
+    if (employeeToken == null && adminToken == null && !publicLocations.contains(location)) return '/login';
+    if (adminToken != null && publicLocations.contains(location)) return '/admin';
+    if (employeeToken != null && publicLocations.contains(location)) return '/home';
     if (adminToken == null && location == '/admin') return '/admin-login';
     if (employeeToken == null && location != '/admin' && location != '/admin-login' && location != '/login') return '/login';
     return null;
   },
   routes: [
     GoRoute(path: '/login', builder: (_, __) => const LoginEntryPage()),
+    GoRoute(path: '/employee-login', builder: (_, __) => const LoginPage()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
     GoRoute(path: '/admin', builder: (_, __) => const AdminHomePage()),
     GoRoute(path: '/home', builder: (_, __) => const ModernHomePage()),
@@ -57,10 +59,7 @@ class LoginEntryPage extends StatelessWidget {
                     width: 82,
                     height: 82,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0B6B5A),
-                      borderRadius: BorderRadius.circular(26),
-                    ),
+                    decoration: BoxDecoration(color: const Color(0xFF0B6B5A), borderRadius: BorderRadius.circular(26)),
                     child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 44),
                   ),
                   const SizedBox(height: 24),
@@ -69,7 +68,7 @@ class LoginEntryPage extends StatelessWidget {
                   const Text('اختر نوع الدخول', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF70817B), fontSize: 15)),
                   const SizedBox(height: 30),
                   FilledButton.icon(
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginPage())),
+                    onPressed: () => context.go('/employee-login'),
                     icon: const Icon(Icons.badge_outlined),
                     label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('دخول الموظفين')),
                   ),
