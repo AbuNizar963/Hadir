@@ -207,7 +207,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
                     decoration: const InputDecoration(labelText: 'كلمة المرور'),
                   ),
                   DropdownButtonFormField<String>(
-                    value: role,
+                    initialValue: role,
                     decoration: const InputDecoration(labelText: 'الصلاحية'),
                     items: const [
                       DropdownMenuItem(value: 'manager', child: Text('مدير')),
