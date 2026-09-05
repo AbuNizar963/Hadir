@@ -69,7 +69,7 @@ export default function GlobalAttendanceReports() {
       mode: report.days === 1 ? "daily" : report.days <= 31 ? "monthly" : "annual",
       period: `${report.from} → ${report.to}`,
       generatedAt: report.generatedAt,
-      summaries: employeeSummary.map((x) => ({ employee: { name: x.employeeName, jobNumber: x.jobNumber }, workDays: x.days, present: x.present, absent: x.absent, early: 0, late: x.late, open: x.open, off: x.rest, worked: x.workedMinutes })),
+      summaries: employeeSummary.map((x) => ({ employee: { name: x.employeeName, jobNumber: x.jobNumber }, workDays: x.days, present: x.present, absent: x.absent, early: x.earlyLeaveMinutes, late: x.late, open: x.open, off: x.rest, worked: x.workedMinutes })),
       dailyRows: rows.map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, date: x.attendanceDay, day: x.attendanceDay, status: labels[x.status] || x.status, checkIn: x.checkInAt || "—", checkOut: x.checkOutAt || "—", worked: fmt(x.workedMinutes || 0), late: x.lateMinutes, early: x.earlyLeaveMinutes, detail: x.exceptionCode || "" })),
       chartData: statusData,
       absenceRows: rows.filter((x) => x.status === "ABSENT").map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, date: x.attendanceDay, day: x.attendanceDay, status: "غياب", checkIn: "—", checkOut: "—", worked: "—", late: 0, early: 0, detail: x.exceptionCode || "" })),
