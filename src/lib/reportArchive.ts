@@ -51,6 +51,17 @@ export async function listArchivedReports(limit = 25) {
   return data?.reports || [];
 }
 
+export async function deleteArchivedReport(reportId: string) {
+  const response = await fetch(`${API_URL}/api/reports/archive/${encodeURIComponent(reportId)}`, {
+    method: "DELETE",
+    headers: adminHeaders(),
+    credentials: "include",
+  });
+  const data = await response.json().catch(() => null) as { error?: string } | null;
+  if (!response.ok) throw new Error(String(data?.error || `HTTP ${response.status}`));
+  return data;
+}
+
 export function archivedReportUrl(reportId: string) {
   return `${API_URL}/api/reports/archive/${encodeURIComponent(reportId)}`;
 }
