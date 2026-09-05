@@ -2,6 +2,7 @@ import base, { HadirRealtime } from "./automation-entry";
 import { handleDeviceRebind } from "./device-rebind-api";
 import { handleDailyStatus } from "./daily-status-api";
 import { handleProfessionalAttendanceReport } from "./professional-attendance-report-api";
+import { handleReportArchive } from "./report-archive";
 import { handleCompanyLogoRequest } from "./company-logo";
 import { runAutomaticVip } from "./automatic-vip";
 
@@ -78,6 +79,15 @@ export default {
 
     const url = new URL(request.url);
     const normalizedPath = url.pathname.replace(/\/$/, "");
+    if (normalizedPath.startsWith("/api/reports/archive")) {
+      const actorProbe = new URL(request.url);
+      actorProbe.pathname = "/api/me";
+      actorProbe.search = "";
+      const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
+      const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
+      return handleReportArchive(request, env, actor, origin(request, env));
+    }
+
     if (normalizedPath === "/api/manager/daily-status" || normalizedPath === "/api/reports/attendance" || normalizedPath === "/api/reports/professional-attendance") {
       const cors = dailyCors(request, env);
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
