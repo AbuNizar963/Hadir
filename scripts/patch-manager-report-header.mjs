@@ -48,26 +48,28 @@ const wrappedSectionStart = '<section className="service-report bg-white text-bl
 if (source.includes(sectionStart) && !source.includes(wrappedSectionStart)) source = source.replace(sectionStart, wrappedSectionStart);
 if (!source.includes(wrappedSectionStart)) throw new Error("ManagerReports: daily service report section anchor not found.");
 
-const printBlock = `<div className="daily-print-report" dir="rtl">
-        <header className="daily-print-header">
-          {settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="daily-print-logo" />}
-          <div className="daily-print-company">{settings.brandName || "HADIR"}</div>
-          <div className="daily-print-title">سجل الحضور والانصراف ليوم {days[dateOf(date).getDay()]} {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div>
-        </header>
-        <table className="daily-print-table">
-          <colgroup><col className="daily-print-no" /><col className="daily-print-specialty" /><col className="daily-print-name" /><col className="daily-print-status" /><col className="daily-print-time" /><col className="daily-print-time" /><col className="daily-print-note" /></colgroup>
-          <thead><tr><th>ت</th><th>الاختصاص</th><th>اسم الموظف</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ملاحظات</th></tr></thead>
-          <tbody>{dailyServiceRows.map((row, i) => <tr key={row.employee.id}>
-            <td className="daily-print-center">{i + 1}</td>
-            <td>{specialtyOf(row.employee)}</td>
-            <td className="daily-print-name-cell">{row.employee.name}</td>
-            <td className="daily-print-center"><span className={\`daily-print-status ${cls[row.status]}\`}>{labels[row.status]}</span></td>
-            <td className="daily-print-center">{row.checkIn}</td>
-            <td className="daily-print-center">{row.checkOut}</td>
-            <td>{row.note || "—"}</td>
-          </tr>)}</tbody>
-        </table>
-      </div>`;
+const printBlock = [
+  '<div className="daily-print-report" dir="rtl">',
+  '  <header className="daily-print-header">',
+  '    {settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="daily-print-logo" />}',
+  '    <div className="daily-print-company">{settings.brandName || "HADIR"}</div>',
+  '    <div className="daily-print-title">سجل الحضور والانصراف ليوم {days[dateOf(date).getDay()]} {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div>',
+  '  </header>',
+  '  <table className="daily-print-table">',
+  '    <colgroup><col className="daily-print-no" /><col className="daily-print-specialty" /><col className="daily-print-name" /><col className="daily-print-status" /><col className="daily-print-time" /><col className="daily-print-time" /><col className="daily-print-note" /></colgroup>',
+  '    <thead><tr><th>ت</th><th>الاختصاص</th><th>اسم الموظف</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ملاحظات</th></tr></thead>',
+  '    <tbody>{dailyServiceRows.map((row, i) => <tr key={row.employee.id}>',
+  '      <td className="daily-print-center">{i + 1}</td>',
+  '      <td>{specialtyOf(row.employee)}</td>',
+  '      <td className="daily-print-name-cell">{row.employee.name}</td>',
+  '      <td className="daily-print-center"><span className={cls[row.status] + " daily-print-status"}>{labels[row.status]}</span></td>',
+  '      <td className="daily-print-center">{row.checkIn}</td>',
+  '      <td className="daily-print-center">{row.checkOut}</td>',
+  '      <td>{row.note || "—"}</td>',
+  '    </tr>)}</tbody>',
+  '  </table>',
+  '</div>',
+].join("\n");
 const dailySectionEnd = '</div>\n    </section> : <div className="hud-card';
 if (source.includes(dailySectionEnd) && !source.includes('className="daily-print-report"')) {
   source = source.replace(dailySectionEnd, `</div>${printBlock}\n    </section> : <div className="hud-card`);
@@ -104,7 +106,7 @@ if (!source.includes('daily-print-table {')) {
 }
 
 const printMediaOld = ' .service-report { position: static !important; width: 100% !important; max-width: none !important; min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; display: block !important; }';
-const printMediaNew = ' .service-report { position: static !important; width: 100% !important; max-width: none !important; min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; display: block !important; } .service-report > .print\\:hidden { display: none !important; } .daily-print-report { display: block !important; width: 100% !important; font-size: 9pt !important; color: #000 !important; } .daily-print-header { text-align: center; padding: 0 0 6mm; border-bottom: 0.5mm solid #111; margin-bottom: 5mm; break-inside: avoid; page-break-inside: avoid; } .daily-print-logo { display: block; width: 31mm !important; height: 31mm !important; max-width: 31mm !important; max-height: 31mm !important; object-fit: contain !important; margin: 0 auto 2mm; } .daily-print-company { font-size: 18pt; font-weight: 900; margin-bottom: 2mm; } .daily-print-title { font-size: 12pt; font-weight: 900; } .daily-print-table thead { display: table-header-group !important; } .daily-print-table tbody { display: table-row-group !important; } .daily-print-table tr { break-inside: avoid !important; page-break-inside: avoid !important; } .daily-print-table td, .daily-print-table th { line-height: 1.35 !important; } .daily-print-status.bg-emerald-500\\/15 { background: #d1fae5 !important; color: #047857 !important; } .daily-print-status.bg-amber-500\\/15 { background: #fef3c7 !important; color: #b45309 !important; } .daily-print-status.bg-red-500\\/15 { background: #fee2e2 !important; color: #b91c1c !important; } .daily-print-status.bg-orange-500\\/15 { background: #ffedd5 !important; color: #c2410c !important; } .daily-print-status.bg-yellow-500\\/15 { background: #fef9c3 !important; color: #a16207 !important; } .daily-print-status.bg-sky-500\\/15 { background: #e0f2fe !important; color: #0369a1 !important; } .daily-print-status.bg-violet-500\\/15 { background: #ede9fe !important; color: #6d28d9 !important; }';
+const printMediaNew = ' .service-report { position: static !important; width: 100% !important; max-width: none !important; min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; display: block !important; } .service-report > .print\\:hidden { display: none !important; } .daily-print-report { display: block !important; width: 100% !important; font-size: 9pt !important; color: #000 !important; } .daily-print-header { text-align: center; padding: 0 0 6mm; border-bottom: 0.5mm solid #111; margin-bottom: 5mm; break-inside: avoid; page-break-inside: avoid; } .daily-print-logo { display: block; width: 31mm !important; height: 31mm !important; max-width: 31mm !important; max-height: 31mm !important; object-fit: contain !important; margin: 0 auto 2mm; } .daily-print-company { font-size: 18pt; font-weight: 900; margin-bottom: 2mm; } .daily-print-title { font-size: 12pt; font-weight: 900; } .daily-print-table thead { display: table-header-group !important; } .daily-print-table tbody { display: table-row-group !important; } .daily-print-table tr { break-inside: avoid !important; page-break-inside: avoid !important; } .daily-print-table td, .daily-print-table th { line-height: 1.35 !important; }';
 if (!source.includes('.daily-print-report { display: block !important;')) {
   if (!source.includes(printMediaOld)) throw new Error("ManagerReports: print media layout anchor not found.");
   source = source.replace(printMediaOld, printMediaNew);
