@@ -75,6 +75,36 @@ async function materializeDay(env: Env, day: string, actor: any, employeeId?: st
     eventsByEmployee.set(id, list);
   }
 
+  // Read all approved/confirmed requests for the day once. The overlap rule mirrors
+  // daily-status requestActive(), including open-ended requests via created_at.
+  const requestResult = employeeId
+    ? await env.DB.prepare("SELECT id,employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE employee_id=? AND status IN ('approved','confirmed')").bind(employeeId).all<any>()
+    : await env.DB.prepare("SELECT id,employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed')").all<any>();
+  const requestsByEmployee = new Map<string, any[]>();
+  for (const requestRow of requestResult.results || []) {
+    const id = String(requestRow.employeeId || "");
+    if (!id) continue;
+    const requestStart = String(requestRow.startDate || requestRow.createdAt || "").slice(0, 10);
+    const requestEnd = String(requestRow.endDate || requestRow.startDate || requestRow.createdAt || "").slice(0, 10);
+    if (!requestStart || !requestEnd || requestStart > day || day > requestEnd) continue;
+    const list = requestsByEmployee.get(id) || [];
+    list.push(requestRow);
+    requestsByEmployee.set(id, list);
+  }
+
+  // Audit is also read once per day instead of once per employee/day.
+  const auditResult = employeeId
+    ? await env.DB.prepare("SELECT id,employee_id AS employeeId,timestamp FROM audit WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(employeeId, start, end).all<any>()
+    : await env.DB.prepare("SELECT id,employee_id AS employeeId,timestamp FROM audit WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(start, end).all<any>();
+  const auditsByEmployee = new Map<string, any[]>();
+  for (const auditRow of auditResult.results || []) {
+    const id = String(auditRow.employeeId || "");
+    if (!id) continue;
+    const list = auditsByEmployee.get(id) || [];
+    list.push(auditRow);
+    auditsByEmployee.set(id, list);
+  }
+
   const statements: D1PreparedStatement[] = [];
   const today = localDayNow();
   const quality = day === today ? "exact" : "reconstructed";
@@ -96,8 +126,8 @@ async function materializeDay(env: Env, day: string, actor: any, employeeId?: st
     const open = checkInAt && !checkOutAt ? 1 : 0;
     const exceptionCode = outs.length && !ins.length ? "CHECKOUT_WITHOUT_CHECKIN" : open ? "MISSING_CHECKOUT" : String(e.status) === "ABSENT" ? "ABSENT_NO_APPROVED_REASON" : lateMinutes ? "LATE_ARRIVAL" : earlyLeaveMinutes ? "EARLY_LEAVE" : overtimeMinutes ? "OVERTIME" : null;
 
-    const requests = await env.DB.prepare("SELECT id FROM requests WHERE employee_id=? AND ((start_date IS NULL AND end_date IS NULL) OR (start_date<=? AND end_date>=?)) AND status IN ('approved','confirmed')").bind(id, day, day).all<any>();
-    const audits = await env.DB.prepare("SELECT id FROM audit WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(id, start, end).all<any>();
+    const requests = requestsByEmployee.get(id) || [];
+    const audits = auditsByEmployee.get(id) || [];
     const scheduleSnapshot = {
       scheduleType: e.scheduleType || null,
       scheduledStart: e.scheduledStart || null,
@@ -112,7 +142,7 @@ async function materializeDay(env: Env, day: string, actor: any, employeeId?: st
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(attendance_day,employee_id) DO UPDATE SET
         job_number=excluded.job_number,employee_name=excluded.employee_name,location_id=excluded.location_id,status=excluded.status,schedule_type=excluded.schedule_type,scheduled_start=excluded.scheduled_start,scheduled_end=excluded.scheduled_end,expected_minutes=excluded.expected_minutes,check_in_at=excluded.check_in_at,check_out_at=excluded.check_out_at,worked_minutes=excluded.worked_minutes,late_minutes=excluded.late_minutes,early_leave_minutes=excluded.early_leave_minutes,overtime_minutes=excluded.overtime_minutes,open=excluded.open,exception_code=excluded.exception_code,attendance_event_ids_json=excluded.attendance_event_ids_json,request_ids_json=excluded.request_ids_json,audit_ids_json=excluded.audit_ids_json,calculation_source=excluded.calculation_source,calculation_version=excluded.calculation_version,computed_at=excluded.computed_at,schedule_snapshot_json=CASE WHEN attendance_reporting_facts.historical_data_quality='exact' AND excluded.historical_data_quality='reconstructed' THEN attendance_reporting_facts.schedule_snapshot_json ELSE excluded.schedule_snapshot_json END,data_quality_reason=excluded.data_quality_reason`)
-      .bind(day,id,String(e.jobNumber || ""),String(e.employeeName || ""),e.locationId || null,String(e.status || "INVALID"),String(e.scheduleType || "ADMIN"),e.scheduledStart || null,e.scheduledEnd || null,expectedMinutes,checkInAt,checkOutAt,workedMinutes,lateMinutes,earlyLeaveMinutes,overtimeMinutes,open,exceptionCode,json(events.map((x) => String(x.id))),json((requests.results || []).map((x: any) => String(x.id))),json((audits.results || []).map((x: any) => String(x.id))),"attendance+requests+schedule+daily_attendance_status", "report-v2", quality, TZ, new Date().toISOString(), json(scheduleSnapshot), qualityReason));
+      .bind(day,id,String(e.jobNumber || ""),String(e.employeeName || ""),e.locationId || null,String(e.status || "INVALID"),String(e.scheduleType || "ADMIN"),e.scheduledStart || null,e.scheduledEnd || null,expectedMinutes,checkInAt,checkOutAt,workedMinutes,lateMinutes,earlyLeaveMinutes,overtimeMinutes,open,exceptionCode,json(events.map((x) => String(x.id))),json(requests.map((x) => String(x.id))),json(audits.map((x) => String(x.id))),"attendance+requests+schedule+daily_attendance_status", "report-v2", quality, TZ, new Date().toISOString(), json(scheduleSnapshot), qualityReason));
   }
   if (statements.length) await env.DB.batch(statements);
   return statements.length;
