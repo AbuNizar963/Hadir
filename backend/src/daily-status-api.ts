@@ -11,7 +11,7 @@ function tzParts(date:Date){const p=new Intl.DateTimeFormat("en-CA",{timeZone:TZ
 const dayKey=(date:Date)=>{const p=tzParts(date);return `${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}`;};
 const dayNumber=(day:string)=>Date.UTC(Number(day.slice(0,4)),Number(day.slice(5,7))-1,Number(day.slice(8,10)))/DAY_MS;
 const addDays=(day:string,n:number)=>new Date((dayNumber(day)+n)*DAY_MS).toISOString().slice(0,10);
-function parseTime(value:string|null|undefined,fallback:string){const f=/^(\d{1,2}):(\d{2})/.exec(fallback);const m=/^(\d{1,2}):(\d{2})/.exec(String(value||""));const h=Number(m?.[1]??f?.[1]??9),min=Number(m?.[2]??f?.[2]??0);return{h:Number.isFinite(h)?Math.min(23,Math.max(0,h)):9,m:Number.isFinite(min)?Math.min(59,Math.max(0,min)):0};}
+function parseTime(value:string|null|undefined,fallback:string){const f=/(\d{1,2}):(\d{2})/.exec(fallback);const m=/(\d{1,2}):(\d{2})/.exec(String(value||""));const h=Number(m?.[1]??f?.[1]??9),min=Number(m?.[2]??f?.[2]??0);return{h:Number.isFinite(h)?Math.min(23,Math.max(0,h)):9,m:Number.isFinite(min)?Math.min(59,Math.max(0,min)):0};}
 function damascusOffsetMinutes(day:string){const noon=new Date(`${day}T12:00:00Z`);const p=tzParts(noon);return Math.round((Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute)-noon.getTime())/60000);}
 function localDateTimeUtc(day:string,time:string|null|undefined){const t=parseTime(time,"09:00");return new Date(Date.UTC(Number(day.slice(0,4)),Number(day.slice(5,7))-1,Number(day.slice(8,10)),t.h,t.m)-damascusOffsetMinutes(day)*60000);}
 function workDays(employee:EmployeeRow){try{const parsed=JSON.parse(employee.workDaysJson||"[]");if(Array.isArray(parsed)){const values=[...new Set(parsed.filter((n:unknown)=>Number.isInteger(n)&&Number(n)>=0&&Number(n)<=6).map(Number))];if(values.length)return values;}}catch{}return[0,1,2,3,4];}
@@ -19,20 +19,19 @@ function rotationParams(employee:EmployeeRow){const startDay=String(employee.rot
 function rotationScheduleAt(employee:EmployeeRow,instant:Date){const p=rotationParams(employee);if(!p)return{work:false,status:"INVALID" as const,start:null,end:null};const elapsed=instant.getTime()-p.firstStart.getTime();if(elapsed<0)return{work:false,status:"NOT_STARTED" as const,start:null,end:null};const cycleIndex=Math.floor(elapsed/p.cycleMs),within=elapsed-cycleIndex*p.cycleMs,periodStart=new Date(p.firstStart.getTime()+cycleIndex*p.cycleMs),periodEnd=new Date(periodStart.getTime()+p.workMs);if(within>=p.workMs)return{work:false,status:"REST" as const,start:periodStart,end:periodEnd};return{work:true,status:"WORK" as const,start:periodStart,end:periodEnd};}
 function scheduleFor(employee:EmployeeRow,day:string){const kind=String(employee.scheduleType||"ADMIN").trim().toUpperCase();if(kind!=="ROTATION"){const weekday=new Date(dayNumber(day)*DAY_MS).getUTCDay();if(!workDays(employee).includes(weekday))return{work:false,status:"REST" as const,start:null,end:null};const start=localDateTimeUtc(day,employee.workStartTime||"09:00");const rawEnd=localDateTimeUtc(day,employee.workEndTime||"16:00");const end=rawEnd.getTime()<=start.getTime()?new Date(rawEnd.getTime()+DAY_MS):rawEnd;return{work:true,status:"WORK" as const,start,end};}
   const p=rotationParams(employee);if(!p)return{work:false,status:"INVALID" as const,start:null,end:null};
-  const dayStart=localDateTimeUtc(day,"00:00"),elapsed=dayStart.getTime()-p.firstStart.getTime();
-  if(elapsed<0)return{work:false,status:"NOT_STARTED" as const,start:null,end:null};
-  const cycleIndex=Math.floor(elapsed/p.cycleMs),within=elapsed-cycleIndex*p.cycleMs,periodStart=new Date(p.firstStart.getTime()+cycleIndex*p.cycleMs),periodEnd=new Date(periodStart.getTime()+p.workMs);
-  if(within>=p.workMs)return{work:false,status:"REST" as const,start:periodStart,end:periodEnd};
-  return{work:true,status:"WORK" as const,start:periodStart,end:periodEnd};
+  // A rotation report date represents the rotation period that starts on that
+  // calendar date at the employee's shift start time, not midnight-to-midnight.
+  const dayAnchor=localDateTimeUtc(day,employee.workStartTime||"09:00");
+  return rotationScheduleAt(employee,dayAnchor);
 }
 
 export async function handleDailyStatus(req:Request,env:Env,actor:any){
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS_HEADERS});
   if(req.method!=="GET")return json({error:"الطريقة غير مدعومة"},405);
   if(!actor||!["owner","manager","supervisor"].includes(String(actor.role)))return json({error:"غير مصرح"},403);
-  const url=new URL(req.url),requestedDay=String(url.searchParams.get("date")||"").trim(),day=/^\d{4}-\d{2}-\d{2}$/.test(requestedDay)?requestedDay:dayKey(new Date()),nextDay=addDays(day,1),from=localDateTimeUtc(day,"00:00").toISOString(),to=localDateTimeUtc(nextDay,"00:00").toISOString();
+  const url=new URL(req.url),requestedDay=String(url.searchParams.get("date")||"").trim(),day=/^\d{4}-\d{2}-\d{2}$/.test(requestedDay)?requestedDay:dayKey(new Date()),nextDay=addDays(day,1),from=localDateTimeUtc(addDays(day,-8),"00:00").toISOString(),to=localDateTimeUtc(addDays(day,9),"00:00").toISOString();
   try{
-    const employeeQuery=await env.DB.prepare("SELECT e.id,e.name,e.job_number AS jobNumber,e.status,e.schedule_type AS scheduleType,e.work_start_time AS workStartTime,e.work_end_time AS workEndTime,e.work_days_json AS workDaysJson,e.rotation_start_date AS rotationStartDate,e.rotation_days_on AS rotationDaysOn,e.rotation_days_off AS rotationDaysOff,e.grace_period_minutes AS gracePeriodMinutes,e.is_vip AS isVip FROM employees e WHERE e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?) ORDER BY e.name").bind(from,to).all<EmployeeRow>();
+    const employeeQuery=await env.DB.prepare("SELECT e.id,e.name,e.job_number AS jobNumber,e.status,e.schedule_type AS scheduleType,e.work_start_time AS workStartTime,e.work_end_time AS workEndTime,e.work_days_json AS workDaysJson,e.rotation_start_date AS rotationStartDate,e.rotation_days_on AS rotationDaysOn,e.rotation_days_off AS rotationDaysOff,e.grace_period_minutes AS gracePeriodMinutes,e.is_vip AS isVip FROM employees e WHERE e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?) ORDER BY e.name").bind(localDateTimeUtc(day,"00:00").toISOString(),localDateTimeUtc(nextDay,"00:00").toISOString()).all<EmployeeRow>();
     const attendanceQuery=await env.DB.prepare("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(from,to).all<any>();
     const requestQuery=await env.DB.prepare("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission')").all<any>();
     const employees=employeeQuery.results||[], attendance=attendanceQuery.results||[], requests=requestQuery.results||[];
@@ -45,8 +44,19 @@ export async function handleDailyStatus(req:Request,env:Env,actor:any){
     const historicalByEmployee=new Map<string,any[]>();for(const row of historical.results||[]){const id=String(row.employeeId||"");if(id){const list=historicalByEmployee.get(id)||[];list.push(row);historicalByEmployee.set(id,list);}}
     const now=new Date(),today=dayKey(now);
     const result=employees.map(employee=>{
-      const id=String(employee.id),isRotation=String(employee.scheduleType||"").trim().toUpperCase()==="ROTATION";let schedule=isRotation&&day===today?rotationScheduleAt(employee,now):scheduleFor(employee,day);const rows=byEmployee.get(id)||[];let checkIn=rows.find(r=>String(r.type)==="check-in")||null;let checkOut=[...rows].reverse().find(r=>String(r.type)==="check-out")||null;
-      if(isRotation&&schedule.work){const cycleStart=schedule.start||localDateTimeUtc(day,"00:00");if(!checkIn){const candidate=(historicalByEmployee.get(id)||[]).find((r:any)=>String(r.type)==="check-in"&&String(r.timestamp)>=cycleStart.toISOString());if(candidate)checkIn=candidate;}if(!checkOut){const candidate=[...(historicalByEmployee.get(id)||[])].reverse().find((r:any)=>String(r.type)==="check-out"&&String(r.timestamp)>=cycleStart.toISOString());if(candidate)checkOut=candidate;}}
+      const id=String(employee.id),isRotation=String(employee.scheduleType||"").trim().toUpperCase()==="ROTATION";let schedule=isRotation&&day===today?rotationScheduleAt(employee,now):scheduleFor(employee,day);const rows=byEmployee.get(id)||[];let checkIn=null;let checkOut=null;
+      if(isRotation){
+        const periodStart=schedule.start;
+        const periodEnd=schedule.end;
+        if(schedule.work&&periodStart&&periodEnd){
+          const periodEvents=(historicalByEmployee.get(id)||[]).filter((r:any)=>{const ts=Date.parse(String(r.timestamp));return Number.isFinite(ts)&&ts>=periodStart.getTime()&&ts<periodEnd.getTime();});
+          checkIn=periodEvents.find((r:any)=>String(r.type)==="check-in")||null;
+          checkOut=[...periodEvents].reverse().find((r:any)=>String(r.type)==="check-out")||null;
+        }
+      } else {
+        checkIn=rows.find(r=>String(r.type)==="check-in")||null;
+        checkOut=[...rows].reverse().find(r=>String(r.type)==="check-out")||null;
+      }
       let status:Status;if(leaveIds.has(id))status="LEAVE";else if(permissionIds.has(id))status="PERMISSION";else if(schedule.status==="REST")status="REST";else if(schedule.status==="NOT_STARTED")status="NOT_STARTED";else if(schedule.status==="INVALID")status="INVALID";else if(checkIn){const grace=Number.isFinite(Number(employee.gracePeriodMinutes))?Math.max(0,Number(employee.gracePeriodMinutes)):10;status=isRotation?"PRESENT":(schedule.start&&Date.parse(String(checkIn.timestamp))>schedule.start.getTime()+grace*60000?"LATE":"PRESENT");}else if(Number(employee.isVip)===1&&schedule.start&&day===today&&now.getTime()>=schedule.start.getTime())status="PRESENT";else if(day===today&&schedule.end&&now.getTime()>=schedule.end.getTime())status="REST";else if(day===today&&schedule.start&&now.getTime()<schedule.start.getTime())status="NOT_STARTED";else if(!schedule.work)status="REST";else status="ABSENT";
       return{attendanceDay:day,employeeId:id,employeeName:String(employee.name||""),jobNumber:String(employee.jobNumber||""),status,scheduleType:String(employee.scheduleType||"ADMIN").toUpperCase(),checkInAt:checkIn?.timestamp||null,checkOutAt:checkOut?.timestamp||null,scheduledStart:schedule.start?.toISOString()||null,scheduledEnd:schedule.end?.toISOString()||null};
     });
