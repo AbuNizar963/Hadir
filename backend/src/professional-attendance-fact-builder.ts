@@ -15,6 +15,36 @@ const minutesBetween = (from: string | null, to: string | null) => {
 };
 const json = (value: unknown) => JSON.stringify(value ?? []);
 
+function tzParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return {
+    year: Number(get("year")),
+    month: Number(get("month")),
+    day: Number(get("day")),
+    hour: Number(get("hour")),
+    minute: Number(get("minute")),
+  };
+}
+
+function timezoneOffsetMinutes(day: string) {
+  const noonUtc = new Date(`${day}T12:00:00Z`);
+  const local = tzParts(noonUtc);
+  return Math.round((Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute) - noonUtc.getTime()) / 60000);
+}
+
+function localMidnightUtc(day: string) {
+  return new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), 0, 0) - timezoneOffsetMinutes(day) * 60000);
+}
+
 function localDayNow() {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
   const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
@@ -30,9 +60,9 @@ async function materializeDay(env: Env, day: string, actor: any, employeeId?: st
   const filtered = employees.filter((e: any) => !employeeId || String(e.employeeId) === employeeId);
   if (!filtered.length) return 0;
 
-  const start = `${day}T00:00:00.000Z`;
+  const start = localMidnightUtc(day).toISOString();
   const next = addDays(day, 1);
-  const end = `${next}T00:00:00.000Z`;
+  const end = localMidnightUtc(next).toISOString();
   const eventsResult = employeeId
     ? await env.DB.prepare("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? AND employee_id=? ORDER BY timestamp ASC").bind(start, end, employeeId).all<any>()
     : await env.DB.prepare("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(start, end).all<any>();
