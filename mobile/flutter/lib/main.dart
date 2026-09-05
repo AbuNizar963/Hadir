@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_fixed.dart';
+import 'modern_router.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,7 +65,7 @@ class HadirApp extends StatelessWidget {
           indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(14))),
         ),
       ),
-      routerConfig: buildRouter(),
+      routerConfig: buildModernRouter(),
     );
   }
 }
