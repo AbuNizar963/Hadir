@@ -17,6 +17,17 @@ const json = (data: unknown, status: number, origin: string) => new Response(JSO
 const dayNumber = (day: string) => Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10))) / 86_400_000;
 const addDays = (day: string, n: number) => new Date((dayNumber(day) + n) * 86_400_000).toISOString().slice(0, 10);
 const daysBetween = (from: string, to: string) => Math.round(dayNumber(to) - dayNumber(from));
+const tzParts = (date: Date) => {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return { year: Number(get("year")), month: Number(get("month")), day: Number(get("day")), hour: Number(get("hour")), minute: Number(get("minute")) };
+};
+const damascusOffsetMinutes = (day: string) => {
+  const noon = new Date(`${day}T12:00:00Z`);
+  const p = tzParts(noon);
+  return Math.round((Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - noon.getTime()) / 60000);
+};
+const localDateTimeUtc = (day: string, hour: number, minute: number) => new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), hour, minute) - damascusOffsetMinutes(day) * 60000);
 const minutesBetween = (from: string | null, to: string | null) => {
   if (!from || !to) return null;
   const a = Date.parse(from), b = Date.parse(to);
@@ -54,9 +65,9 @@ export async function handleAttendanceReport(req: Request, env: Env, actor: any)
       }
       const daily = await dailyResponse.json() as any;
       const dailyEmployees = Array.isArray(daily.employees) ? daily.employees : [];
-      const dayStart = `${day}T00:00:00.000Z`;
+      const dayStart = localDateTimeUtc(day, 0, 0).toISOString();
       const nextDay = addDays(day, 1);
-      const dayEnd = `${nextDay}T00:00:00.000Z`;
+      const dayEnd = localDateTimeUtc(nextDay, 0, 0).toISOString();
       const eventQuery = employeeId
         ? await env.DB.prepare("SELECT id,employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,type,timestamp,lat,lng,distance_meters AS distanceMeters,device_id AS deviceId,ip,qr_code AS qrCode,location_id AS locationId FROM attendance WHERE timestamp>=? AND timestamp<? AND employee_id=? ORDER BY timestamp ASC").bind(dayStart, dayEnd, employeeId).all<any>()
         : await env.DB.prepare("SELECT id,employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,type,timestamp,lat,lng,distance_meters AS distanceMeters,device_id AS deviceId,ip,qr_code AS qrCode,location_id AS locationId FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(dayStart, dayEnd).all<any>();
@@ -142,7 +153,6 @@ export async function handleAttendanceReport(req: Request, env: Env, actor: any)
     }
 
     summary.employees = seenEmployees.size;
-    const workdays = rows.filter((row) => ["PRESENT", "LATE", "ABSENT", "PERMISSION", "OPEN"].includes(row.status));
     const attendanceRateDenominator = rows.filter((row) => ["PRESENT", "LATE", "ABSENT"].includes(row.status)).length;
     const attendanceRate = attendanceRateDenominator ? Number(((summary.present + summary.late) / attendanceRateDenominator * 100).toFixed(2)) : 0;
     const punctualityDenominator = summary.present + summary.late;
