@@ -60,8 +60,12 @@ jobs:
           HADIR_RELEASE_KEY_ALIAS: hadir-ci
           HADIR_RELEASE_KEY_PASSWORD: changeit
         run: |
-          flutter build appbundle --release
-          test -f build/app/outputs/bundle/release/app-release.aab
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --stacktrace
+          test -f app/build/outputs/bundle/release/app-release.aab
+          mkdir -p ../build/app/outputs/bundle/release
+          cp app/build/outputs/bundle/release/app-release.aab ../build/app/outputs/bundle/release/app-release.aab
       - uses: actions/upload-artifact@v4
         with:
           name: hadir-android-debug
