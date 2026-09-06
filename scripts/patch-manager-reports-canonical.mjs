@@ -4,7 +4,7 @@ const file = "src/pages/ManagerReports.tsx";
 if (!existsSync(file)) throw new Error("ManagerReports canonical patch: source file not found.");
 let source = readFileSync(file, "utf8");
 
-if (source.includes("function calculateDetails(employee: Employee, dates: Date[]") && source.includes("dailyStatusByDate?.get(k)?.get(employee.id)")) {
+if (source.includes("function calculateDetails(employee: Employee, dates: Date[]") && source.includes("_index: Map<string, { in?: Audit; out?: Audit }>") && !source.includes('import { getEmployeeWorkPeriod } from "@/lib/schedule";')) {
   console.log("ManagerReports canonical patch: already applied.");
   process.exit(0);
 }
