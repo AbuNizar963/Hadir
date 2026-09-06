@@ -21,7 +21,7 @@ class AttendanceInsightsPage extends StatefulWidget {
 
 class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
   final _session = HadirSession();
-  List<dynamic> _records = const [];
+  List<Map<String, dynamic>> _records = const [];
   bool _loading = true;
   String? _error;
 
@@ -37,7 +37,7 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
       final records = await api.attendance(limit: 100);
       if (!mounted) return;
       setState(() {
-        _records = records;
+        _records = records.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
         _loading = false;
         _error = null;
       });
@@ -50,18 +50,37 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     }
   }
 
-  List<DateTime> _timesIn(DateTime from, DateTime to) => _records
-      .whereType<Map>()
-      .map((e) => DateTime.tryParse('${e['timestamp']}'))
-      .whereType<DateTime>()
-      .where((d) => !d.isBefore(from) && d.isBefore(to))
-      .toList()
-    ..sort();
+  List<Map<String, dynamic>> _recordsIn(DateTime from, DateTime to) {
+    return _records.where((record) {
+      final value = DateTime.tryParse('${record['timestamp']}');
+      if (value == null) return false;
+      final local = value.toLocal();
+      return !local.isBefore(from) && local.isBefore(to);
+    }).toList()
+      ..sort((a, b) {
+        final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return at.compareTo(bt);
+      });
+  }
 
-  Duration _durationFor(List<DateTime> times) {
+  Duration _durationFor(List<Map<String, dynamic>> records) {
     Duration total = Duration.zero;
-    for (var i = 0; i + 1 < times.length; i += 2) {
-      total += times[i + 1].difference(times[i]);
+    DateTime? checkIn;
+    for (final record in records) {
+      final time = DateTime.tryParse('${record['timestamp']}')?.toLocal();
+      if (time == null) continue;
+      final type = record['type'];
+      if (type == 'check-in') {
+        checkIn = time;
+      } else if (type == 'check-out' && checkIn != null && !time.isBefore(checkIn)) {
+        total += time.difference(checkIn);
+        checkIn = null;
+      }
+    }
+    if (checkIn != null) {
+      final now = DateTime.now();
+      if (now.isAfter(checkIn)) total += now.difference(checkIn);
     }
     return total;
   }
@@ -71,7 +90,9 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     return '${d.inHours}س ${d.inMinutes.remainder(60)}د';
   }
 
-  int _daysWithActivity(List<DateTime> times) => times
+  int _daysWithActivity(List<Map<String, dynamic>> records) => records
+      .map((record) => DateTime.tryParse('${record['timestamp']}')?.toLocal())
+      .whereType<DateTime>()
       .map((d) => '${d.year}-${d.month}-${d.day}')
       .toSet()
       .length;
@@ -82,11 +103,14 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     final monthStart = DateTime(now.year, now.month);
     final nextMonth = DateTime(now.year, now.month + 1);
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final week = _timesIn(
+    final week = _recordsIn(
       DateTime(weekStart.year, weekStart.month, weekStart.day),
       DateTime(now.year, now.month, now.day + 1),
     );
-    final month = _timesIn(monthStart, nextMonth);
+    final month = _recordsIn(monthStart, nextMonth);
+    final monthDuration = _durationFor(month);
+    final activeDays = _daysWithActivity(month);
+    final average = activeDays == 0 ? Duration.zero : Duration(minutes: monthDuration.inMinutes ~/ activeDays);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -127,8 +151,8 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
               ] else ...[
                 _SummaryCard(
                   title: 'هذا الشهر',
-                  hours: _hours(_durationFor(month)),
-                  days: '${_daysWithActivity(month)} يوم نشط',
+                  hours: _hours(monthDuration),
+                  days: '$activeDays يوم نشط',
                   movements: '${month.length} حركة',
                 ),
                 const SizedBox(height: 10),
@@ -138,8 +162,10 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
                   days: '${_daysWithActivity(week)} يوم نشط',
                   movements: '${week.length} حركة',
                 ),
+                const SizedBox(height: 10),
+                _AverageCard(value: _hours(average)),
                 const SizedBox(height: 18),
-                _section('آخر يوم مسجل'),
+                _section('آخر حركة مسجلة'),
                 const SizedBox(height: 9),
                 _lastActivity(month),
                 const SizedBox(height: 18),
@@ -173,22 +199,23 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
 
   Widget _section(String text) => Text(text, style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w900));
 
-  Widget _lastActivity(List<DateTime> month) {
+  Widget _lastActivity(List<Map<String, dynamic>> month) {
     if (month.isEmpty) return const _MessageCard('لا توجد حركات مسجلة لهذا الشهر.', Icons.event_available_rounded);
     final latest = month.last;
+    final time = DateTime.tryParse('${latest['timestamp']}')?.toLocal();
+    final checkout = latest['type'] == 'check-out';
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
       child: Row(
         children: [
-          Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.schedule_rounded, color: _green)),
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: checkout ? const Color(0xFFFFEFED) : _soft, borderRadius: BorderRadius.circular(14)), child: Icon(checkout ? Icons.logout_rounded : Icons.login_rounded, color: checkout ? const Color(0xFFB94A3D) : _green)),
           const SizedBox(width: 11),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(latest), style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)),
+            Text(checkout ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)),
             const SizedBox(height: 4),
-            Text(intl.DateFormat('HH:mm').format(latest), style: const TextStyle(color: _muted, fontSize: 11)),
+            Text(time == null ? 'وقت غير معروف' : intl.DateFormat('EEEE، d MMMM · HH:mm', 'ar').format(time), style: const TextStyle(color: _muted, fontSize: 10.5)),
           ])),
-          const Icon(Icons.chevron_left_rounded, color: _muted),
         ],
       ),
     );
@@ -222,6 +249,23 @@ class _SummaryCard extends StatelessWidget {
             const SizedBox(height: 5),
             Text(movements, style: const TextStyle(color: Colors.white70, fontSize: 10)),
           ]),
+        ]),
+      );
+}
+
+class _AverageCard extends StatelessWidget {
+  final String value;
+  const _AverageCard({required this.value});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
+        child: Row(children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.insights_rounded, color: _green, size: 20)),
+          const SizedBox(width: 10),
+          const Expanded(child: Text('متوسط ساعات اليوم النشط', style: TextStyle(color: _ink, fontSize: 11.5, fontWeight: FontWeight.w800))),
+          Text(value, style: const TextStyle(color: _green, fontSize: 14, fontWeight: FontWeight.w900)),
         ]),
       );
 }
