@@ -1,4 +1,4 @@
-export type DailyStatusCode = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "NOT_STARTED" | "INVALID";
+export type DailyStatusCode = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "NOT_STARTED" | "INVALID" | "OPEN";
 
 export type DailyStatusRow = {
   attendanceDay: string;
