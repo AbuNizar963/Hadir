@@ -35,20 +35,86 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/login', builder: (_, __) => const LoginEntryPage()),
     GoRoute(path: '/employee-login', builder: (_, __) => const LoginPage()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
-    GoRoute(path: '/admin', builder: (_, __) => const AdminHomePage()),
-    GoRoute(path: '/admin/manage', builder: (_, __) => const AdminManagementPage()),
-    GoRoute(path: '/admin/operations', builder: (_, __) => const AdminOperationsPage()),
-    GoRoute(path: '/admin/reports', builder: (_, __) => const AdminReportsPage()),
+    GoRoute(path: '/admin', builder: (_, __) => const SwipeBackPage(child: AdminHomePage())),
+    GoRoute(path: '/admin/manage', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
+    GoRoute(path: '/admin/operations', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
+    GoRoute(path: '/admin/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/home', builder: (_, __) => const ModernHomePage()),
-    GoRoute(path: '/center', builder: (_, __) => const EmployeeCenterPage()),
-    GoRoute(path: '/attendance', builder: (_, s) => AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in')),
-    GoRoute(path: '/history', builder: (_, __) => const HistoryPage()),
-    GoRoute(path: '/requests', builder: (_, __) => const RequestsPage()),
-    GoRoute(path: '/notifications', builder: (_, __) => const NotificationsPage()),
-    GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
-    GoRoute(path: '/services', builder: (_, __) => const ServicesPage()),
+    GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
+    GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
+    GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: HistoryPage())),
+    GoRoute(path: '/requests', builder: (_, __) => const SwipeBackPage(child: RequestsPage())),
+    GoRoute(path: '/notifications', builder: (_, __) => const SwipeBackPage(child: NotificationsPage())),
+    GoRoute(path: '/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
+    GoRoute(path: '/services', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
   ],
 );
+
+class SwipeBackPage extends StatefulWidget {
+  const SwipeBackPage({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<SwipeBackPage> createState() => _SwipeBackPageState();
+}
+
+class _SwipeBackPageState extends State<SwipeBackPage> {
+  static const _edgeWidth = 32.0;
+  static const _triggerDistance = 90.0;
+  bool _tracking = false;
+  bool _fromLeft = true;
+  double _dragDistance = 0;
+
+  void _start(DragStartDetails details) {
+    if (!context.canPop()) return;
+    final width = MediaQuery.sizeOf(context).width;
+    final x = details.globalPosition.dx;
+    if (x <= _edgeWidth) {
+      _tracking = true;
+      _fromLeft = true;
+      _dragDistance = 0;
+    } else if (x >= width - _edgeWidth) {
+      _tracking = true;
+      _fromLeft = false;
+      _dragDistance = 0;
+    }
+  }
+
+  void _update(DragUpdateDetails details) {
+    if (!_tracking) return;
+    final delta = details.primaryDelta ?? 0;
+    _dragDistance += _fromLeft ? delta : -delta;
+    if (_dragDistance < 0) _dragDistance = 0;
+  }
+
+  void _end(DragEndDetails details) {
+    if (!_tracking) return;
+    final velocity = details.primaryVelocity ?? 0;
+    final effectiveVelocity = _fromLeft ? velocity : -velocity;
+    final shouldPop = _dragDistance >= _triggerDistance || effectiveVelocity > 700;
+    _tracking = false;
+    _dragDistance = 0;
+    if (shouldPop && mounted && context.canPop()) context.pop();
+  }
+
+  void _cancel() {
+    _tracking = false;
+    _dragDistance = 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: _start,
+      onHorizontalDragUpdate: _update,
+      onHorizontalDragEnd: _end,
+      onHorizontalDragCancel: _cancel,
+      child: widget.child,
+    );
+  }
+}
 
 class LoginEntryPage extends StatelessWidget {
   const LoginEntryPage({super.key});
