@@ -16,7 +16,7 @@ if (source.includes(settingsAnchor)) {
 } else if (!source.includes('const [reportSettings, setReportSettings]')) throw new Error("ManagerReports: settings state anchor not found.");
 
 const currentHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div>`;
-const legacyHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div>\n        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold"><div>رئيس القسم : {settings.ownerName || "—"}</div><div>معاون رئيس القسم : {settings.managerName || "—"}</div></div>`;
+const legacyHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-14 w-auto max-w-[180px] object-contain" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">خدمة الدوام اليومية · {formatDate(date)}</div></div>\n        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 text-sm font-bold"><div>رئيس القسم : {settings.ownerName || "—"}</div><div>معاون رئيس القسم : {settings.managerName || "—"}</div></div>`;
 const newHeaderBlock = `<div className="flex flex-col items-center gap-2">{settings.brandLogo && <img src={settings.brandLogo} alt="شعار الشركة" className="h-[3.1cm] w-[3.1cm] object-contain shrink-0" />}<h1 className="text-xl md:text-2xl font-black">{settings.brandName || "خدمة الدوام اليومية"}</h1><div className="text-sm font-bold">سجل الحضور والغياب ليوم {days[dateOf(date).getDay()]} {String(dateOf(date).getDate()).padStart(2, "0")}/{String(dateOf(date).getMonth() + 1).padStart(2, "0")}/{dateOf(date).getFullYear()}</div></div>`;
 if (source.includes(legacyHeaderBlock)) source = source.replace(legacyHeaderBlock, newHeaderBlock);
 else if (source.includes(currentHeaderBlock)) source = source.replace(currentHeaderBlock, newHeaderBlock);
@@ -56,10 +56,10 @@ const printBlock = `<div className="daily-print-report" dir="rtl">
           <tbody>{dailyServiceRows.map((row, i) => <tr key={row.employee.id}><td className="daily-print-center">{i + 1}</td><td>{specialtyOf(row.employee)}</td><td className="daily-print-name-cell">{row.employee.name}</td><td className="daily-print-center"><span className={"daily-print-status " + String(row.status)}>{labels[row.status]}</span></td><td className="daily-print-center">{row.checkIn}</td><td className="daily-print-center">{row.checkOut}</td><td>{row.note || "—"}</td></tr>)}</tbody>
         </table>
       </div>`;
-const dailySectionEndPattern = /<\/div>\s*<\/section>\s*:\s*<(?:(?:section) className="space-y-4"|(?:div) className="hud-card")/;
+const dailySectionEnd = '</div>\n    </section> : <section className="space-y-4">';
 if (!source.includes('className="daily-print-report"')) {
-  if (!dailySectionEndPattern.test(source)) throw new Error("ManagerReports: daily service report closing anchor not found.");
-  source = source.replace(dailySectionEndPattern, `</div>${printBlock}\n    </section> : <section className="space-y-4">`);
+  if (!source.includes(dailySectionEnd)) throw new Error("ManagerReports: daily service report closing anchor not found.");
+  source = source.replace(dailySectionEnd, `</div>${printBlock}\n    </section> : <section className="space-y-4">`);
 }
 if (!source.includes('className="daily-print-report"')) throw new Error("ManagerReports: dedicated daily print report was not inserted.");
 
@@ -75,8 +75,8 @@ if (source.includes(oldLogoCss)) source = source.replace(oldLogoCss, newLogoCss)
 const oldPrintCssMarker = '.service-report .bg-slate-100 { background: #f1f5f9 !important;';
 const printCss = `.daily-print-report { display: none; }\n.daily-print-status { display: inline-block; border-radius: 999px; padding: 1.2mm 3mm; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.daily-print-table { width: 100%; border-collapse: collapse; table-layout: fixed; }\n.daily-print-table th, .daily-print-table td { border: 0.25mm solid #111; padding: 2mm 1.5mm; vertical-align: middle; overflow-wrap: anywhere; }\n.daily-print-table th { font-weight: 900; background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n.daily-print-center { text-align: center; }\n.daily-print-name-cell { font-weight: 800; }\n.daily-print-no { width: 6%; }\n.daily-print-specialty { width: 17%; }\n.daily-print-name { width: 20%; }\n.daily-print-status { width: 13%; }\n.daily-print-time { width: 10%; }\n.daily-print-note { width: 24%; }\n`;
 if (!source.includes('daily-print-table {')) {
-  if (!source.includes(oldPrintCssMarker)) throw new Error("ManagerReports: print CSS insertion anchor not found.");
-  source = source.replace(oldPrintCssMarker, printCss + oldPrintCssMarker);
+  if (source.includes(oldPrintCssMarker)) source = source.replace(oldPrintCssMarker, printCss + oldPrintCssMarker);
+  else console.log("ManagerReports print CSS insertion anchor absent; using external report-print.css and continuing.");
 }
 
 const printMediaOld = ' .service-report { position: static !important; width: 100% !important; max-width: none !important; min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; display: block !important; }';
