@@ -25,6 +25,7 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
   List<dynamic> _records = const [];
   bool _loading = true;
   String? _error;
+  int _viewMode = 0;
 
   @override
   void initState() {
@@ -49,6 +50,20 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
         _error = HadirApi.errorMessage(e);
       });
     }
+  }
+
+  List<dynamic> get _visibleRecords {
+    final now = DateTime.now();
+    if (_viewMode == 0) {
+      return _records.where((raw) {
+        final date = _date(raw)?.toLocal();
+        return date != null && date.year == now.year && date.month == now.month && date.day == now.day;
+      }).toList();
+    }
+    return _records.where((raw) {
+      final date = _date(raw)?.toLocal();
+      return date != null && date.year == now.year && date.month == now.month;
+    }).toList();
   }
 
   @override
@@ -103,35 +118,58 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
         children: [_message(_error!, Icons.cloud_off_rounded)],
       );
     }
-    if (_records.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(18),
-        children: [_summary(), const SizedBox(height: 18), _message('لا توجد حركات حضور بعد.', Icons.event_available_rounded)],
-      );
-    }
 
+    final visible = _visibleRecords;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
       children: [
         _summary(),
+        const SizedBox(height: 14),
+        _viewSelector(),
         const SizedBox(height: 18),
-        const Text('كل الحركات', style: TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900)),
+        Text(_viewMode == 0 ? 'اليوم' : 'هذا الشهر', style: const TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900)),
         const SizedBox(height: 10),
-        ..._records.map(_recordTile),
+        if (visible.isEmpty) _message(_viewMode == 0 ? 'لا توجد حركات حضور اليوم.' : 'لا توجد حركات حضور هذا الشهر.', Icons.event_available_rounded),
+        ...visible.map(_recordTile),
       ],
+    );
+  }
+
+  Widget _viewSelector() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: _line)),
+      child: Row(
+        children: [
+          Expanded(child: _viewTab('اليومي', 0)),
+          Expanded(child: _viewTab('الشهري', 1)),
+        ],
+      ),
+    );
+  }
+
+  Widget _viewTab(String label, int value) {
+    final selected = _viewMode == value;
+    return GestureDetector(
+      onTap: () => setState(() => _viewMode = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(color: selected ? _soft : Colors.transparent, borderRadius: BorderRadius.circular(11)),
+        child: Text(label, textAlign: TextAlign.center, style: TextStyle(color: selected ? _green : _muted, fontSize: 11, fontWeight: FontWeight.w900)),
+      ),
     );
   }
 
   Widget _summary() {
     final now = DateTime.now();
     final month = _records.where((raw) {
-      final date = _date(raw);
+      final date = _date(raw)?.toLocal();
       return date != null && date.year == now.year && date.month == now.month;
     }).length;
     final today = _records.where((raw) {
-      final date = _date(raw);
+      final date = _date(raw)?.toLocal();
       return date != null && date.year == now.year && date.month == now.month && date.day == now.day;
     }).length;
     return Container(
@@ -174,7 +212,7 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
   Widget _recordTile(dynamic raw) {
     final item = Map<String, dynamic>.from(raw as Map);
     final checkout = item['type'] == 'check-out';
-    final date = _date(item);
+    final date = _date(item)?.toLocal();
     final distance = double.tryParse('${item['distanceMeters']}');
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
