@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -64,7 +66,7 @@ class _AdminReportArchivePageState extends State<AdminReportArchivePage> {
       final fileName = _value(report['file_name']) == '—' ? 'hadir-report' : _value(report['file_name']);
       final mimeType = _value(report['mime_type']) == '—' ? 'application/octet-stream' : _value(report['mime_type']);
       await SharePlus.instance.share(ShareParams(
-        files: [XFile.fromData(bytes, name: fileName, mimeType: mimeType)],
+        files: [XFile.fromData(Uint8List.fromList(bytes), name: fileName, mimeType: mimeType)],
         subject: 'تقرير HADIR المؤرشف',
         title: fileName,
       ));
