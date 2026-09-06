@@ -3,6 +3,7 @@ package com.hadir.attendance.ui
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
+import android.location.Location
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -48,19 +50,25 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.location.LocationServices
 import com.hadir.attendance.data.AttendanceRecord
 import com.hadir.attendance.data.HadirRepository
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.coroutines.resume
 
 class HadirViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = HadirRepository(application)
+    private val fusedLocation = LocationServices.getFusedLocationProviderClient(application)
+
     var loggedIn by mutableStateOf(false); private set
     var employee by mutableStateOf<com.hadir.attendance.data.Employee?>(null); private set
     var attendance by mutableStateOf<List<AttendanceRecord>>(emptyList()); private set
     var loading by mutableStateOf(false); private set
+    var attendanceLoading by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
 
     fun login(username: String, password: String) {
@@ -76,10 +84,46 @@ class HadirViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun clock(type: String, qrCode: String, hasLocationPermission: Boolean) {
+        if (employee == null) return
+        attendanceLoading = true
+        error = null
+        viewModelScope.launch {
+            try {
+                if (!hasLocationPermission) error("اسمح للموقع أولًا لتنفيذ تسجيل الحضور.")
+                else {
+                    val location = lastLocation() ?: error("تعذر الحصول على موقعك الحالي. فعّل الموقع وحاول مرة أخرى.")
+                    val challenge = repo.createChallenge(type, location.latitude, location.longitude, qrCode.trim())
+                    if (!challenge.ok) error("تعذر إنشاء طلب التحقق.")
+                    repo.createAttendance(
+                        employeeId = employee!!.id,
+                        type = type,
+                        timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(Date()),
+                        lat = location.latitude,
+                        lng = location.longitude,
+                        challengeId = challenge.challengeId
+                    )
+                    attendance = repo.attendance()
+                }
+            } catch (e: Exception) {
+                error = e.message ?: "تعذر تسجيل الحضور"
+            } finally { attendanceLoading = false }
+        }
+    }
+
+    private suspend fun lastLocation(): Location? = suspendCancellableCoroutine { continuation ->
+        fusedLocation.lastLocation
+            .addOnSuccessListener { continuation.resume(it) }
+            .addOnFailureListener { continuation.resume(null) }
+    }
+
+    fun clearError() { error = null }
+
     fun logout() {
         loggedIn = false
         employee = null
         attendance = emptyList()
+        error = null
     }
 }
 
@@ -128,7 +172,10 @@ private fun LoginScreen(vm: HadirViewModel) {
 private fun HomeScreen(vm: HadirViewModel) {
     val context = LocalContext.current
     var showPermissionHint by remember { mutableStateOf(false) }
+    var showQrDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
+    var pendingType by remember { mutableStateOf("check-in") }
+    var qrCode by remember { mutableStateOf("") }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         showPermissionHint = result.values.any { !it }
     }
@@ -144,6 +191,48 @@ private fun HomeScreen(vm: HadirViewModel) {
     val checkedIn = latest?.type == "check-in"
     val workedEntries = vm.attendance.count { it.type == "check-in" }
     val today = SimpleDateFormat("EEEE، d MMMM", Locale("ar")).format(Date())
+    val hasLocationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    if (showQrDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!vm.attendanceLoading) showQrDialog = false },
+            title = { Text(if (pendingType == "check-in") "تسجيل الحضور" else "تسجيل الانصراف", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("أدخل رمز الموقع/QR المعتمد لإكمال التحقق.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedTextField(
+                        value = qrCode,
+                        onValueChange = { qrCode = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        label = { Text("رمز QR") },
+                        singleLine = true,
+                        enabled = !vm.attendanceLoading,
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 10.dp)) }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = qrCode.isNotBlank() && !vm.attendanceLoading,
+                    onClick = {
+                        vm.clearError()
+                        vm.clock(pendingType, qrCode, hasLocationPermission)
+                    }
+                ) { Text(if (vm.attendanceLoading) "جارٍ التحقق…" else "تأكيد") }
+            },
+            dismissButton = {
+                TextButton(enabled = !vm.attendanceLoading, onClick = { showQrDialog = false }) { Text("إلغاء") }
+            }
+        )
+    }
+
+    LaunchedEffect(vm.attendanceLoading) {
+        if (!vm.attendanceLoading && showQrDialog && vm.error == null) {
+            showQrDialog = false
+            qrCode = ""
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -179,22 +268,30 @@ private fun HomeScreen(vm: HadirViewModel) {
             }
 
             item {
-                Card(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(26.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
                     Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(if (checkedIn) "أنت تعمل الآن" else "ساعة العمل", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                         Text(if (checkedIn) "مسجّل حضور" else "غير مسجّل", fontWeight = FontWeight.Bold, fontSize = 22.sp, modifier = Modifier.padding(top = 4.dp))
                         Spacer(Modifier.height(18.dp))
-                        Box(Modifier.size(168.dp).clip(CircleShape).background(if (checkedIn) MaterialTheme.colorScheme.primaryContainer else Color(0xFFEAF7F0)), contentAlignment = Alignment.Center) {
-                            Box(Modifier.size(136.dp).clip(CircleShape).background(if (checkedIn) MaterialTheme.colorScheme.primary else Color(0xFF16A66A)), contentAlignment = Alignment.Center) {
+                        Button(
+                            onClick = {
+                                pendingType = if (checkedIn) "check-out" else "check-in"
+                                qrCode = ""
+                                vm.clearError()
+                                showQrDialog = true
+                            },
+                            enabled = !vm.attendanceLoading,
+                            modifier = Modifier.size(168.dp),
+                            shape = CircleShape,
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(if (checkedIn) "انصراف" else "حضور", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                                Text(if (vm.attendanceLoading) "جارٍ التحقق…" else "اضغط للمتابعة", color = Color.White.copy(alpha = 0.82f), fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
                             }
                         }
-                        Text(if (checkedIn) "اضغط عند انتهاء دوامك" else "اضغط لتسجيل بداية دوامك", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp))
+                        Text(if (checkedIn) "اضغط عند انتهاء دوامك" else "يتحقق من الموقع ورمز الموقع قبل التسجيل", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp), textAlign = TextAlign.Center)
                         if (showPermissionHint) Text("تحتاج الكاميرا والموقع لتنفيذ التحقق الآمن.", color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
                     }
                 }
@@ -219,17 +316,10 @@ private fun HomeScreen(vm: HadirViewModel) {
                 }
             }
 
-            item {
-                Text("آخر النشاطات", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.padding(top = 2.dp))
-            }
+            item { Text("آخر النشاطات", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.padding(top = 2.dp)) }
 
-            if (vm.attendance.isEmpty()) {
-                item { EmptyActivity() }
-            } else {
-                items(vm.attendance.sortedByDescending { it.timestamp }.take(5)) { record ->
-                    ActivityRow(record)
-                }
-            }
+            if (vm.attendance.isEmpty()) item { EmptyActivity() }
+            else items(vm.attendance.sortedByDescending { it.timestamp }.take(5)) { record -> ActivityRow(record) }
         }
     }
 }
