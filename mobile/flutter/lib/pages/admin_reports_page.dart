@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/api.dart';
 import '../core/session.dart';
@@ -76,7 +77,13 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
     final analytics = _report?['analytics'] is Map ? Map<String, dynamic>.from(_report!['analytics'] as Map) : <String, dynamic>{};
     final exceptions = analytics['exceptions'] is List ? List<dynamic>.from(analytics['exceptions'] as List) : <dynamic>[];
     return Scaffold(
-      appBar: AppBar(title: const Text('التقارير العالمية', style: TextStyle(fontWeight: FontWeight.w900)), actions: [IconButton(onPressed: _loadReport, icon: const Icon(Icons.refresh_rounded))]),
+      appBar: AppBar(
+        title: const Text('التقارير العالمية', style: TextStyle(fontWeight: FontWeight.w900)),
+        actions: [
+          IconButton(onPressed: () => context.push('/admin/reports/archive'), tooltip: 'أرشيف التقارير', icon: const Icon(Icons.inventory_2_outlined)),
+          IconButton(onPressed: _loadReport, tooltip: 'تحديث', icon: const Icon(Icons.refresh_rounded)),
+        ],
+      ),
       body: RefreshIndicator(onRefresh: _loadReport, child: ListView(padding: const EdgeInsets.fromLTRB(16, 10, 16, 32), children: [
         Container(padding: const EdgeInsets.all(19), decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_reportBrand, Color(0xFF084F44)]), borderRadius: BorderRadius.circular(25)), child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('لوحة الحضور التنفيذية', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)), SizedBox(height: 6), Text('التقرير الرسمي من طبقة بيانات HADIR Web، بدون إعادة حساب محلي للدوام.', style: TextStyle(color: Colors.white70, height: 1.5, fontSize: 12))])),
         const SizedBox(height: 14),
