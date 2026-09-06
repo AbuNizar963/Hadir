@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' as intl;
@@ -52,6 +53,12 @@ class _ModernHomePageState extends State<ModernHomePage> {
         _error = null;
       });
     } catch (e) {
+      if (e is DioException && e.response?.statusCode == 401) {
+        await _session.clear();
+        if (!mounted) return;
+        context.go('/login');
+        return;
+      }
       if (!mounted) return;
       setState(() {
         _loading = false;
