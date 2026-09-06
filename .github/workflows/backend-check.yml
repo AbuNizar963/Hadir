@@ -1,0 +1,34 @@
+name: Hadir Backend Check
+
+on:
+  push:
+    branches: [android-native]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-check.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        run: npm install --package-lock=false
+      - name: Validate Worker bundle
+        run: npm run check
