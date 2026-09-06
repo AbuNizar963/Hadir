@@ -16,7 +16,6 @@ class SessionStore(context: Context) {
     var token: String?
         get() = prefs.getString("token", null)
         set(value) { prefs.edit().putString("token", value).apply() }
-
     val deviceId: String
         get() {
             val existing = prefs.getString("device_id", null)
@@ -29,22 +28,12 @@ class SessionStore(context: Context) {
 }
 
 class BearerInterceptor(private val session: SessionStore) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request().newBuilder()
-            .apply { session.token?.let { header("Authorization", "Bearer $it") } }
-            .build()
-        return chain.proceed(request)
-    }
+    override fun intercept(chain: Interceptor.Chain): Response = chain.proceed(chain.request().newBuilder().apply { session.token?.let { header("Authorization", "Bearer $it") } }.build())
 }
 
 class HadirRepository(context: Context) {
     private val session = SessionStore(context.applicationContext)
-    private val api = Retrofit.Builder()
-        .baseUrl(HADIR_API)
-        .client(OkHttpClient.Builder().addInterceptor(BearerInterceptor(session)).build())
-        .addConverterFactory(MoshiConverterFactory.create())
-        .build()
-        .create(HadirApi::class.java)
+    private val api = Retrofit.Builder().baseUrl(HADIR_API).client(OkHttpClient.Builder().addInterceptor(BearerInterceptor(session)).build()).addConverterFactory(MoshiConverterFactory.create()).build().create(HadirApi::class.java)
 
     suspend fun login(username: String, password: String): Employee = withContext(Dispatchers.IO) {
         val response = api.login(LoginRequest(username, password, session.deviceId, "Android", session.deviceId))
@@ -52,20 +41,12 @@ class HadirRepository(context: Context) {
         session.token = response.token
         response.user
     }
-
     suspend fun attendance(): List<AttendanceRecord> = withContext(Dispatchers.IO) { api.attendance() }
-
-    suspend fun createChallenge(type: String, lat: Double, lng: Double, qrCode: String): AttendanceChallengeResponse =
-        withContext(Dispatchers.IO) { api.challenge(AttendanceChallengeRequest(type, lat, lng, qrCode, session.deviceId)) }
-
-    suspend fun createAttendance(
-        employeeId: String,
-        type: String,
-        timestamp: String,
-        lat: Double,
-        lng: Double,
-        challengeId: String
-    ) = withContext(Dispatchers.IO) {
-        api.createAttendance(AttendanceCreateRequest(employeeId, type, timestamp, lat, lng, challengeId))
+    suspend fun requests(): List<EmployeeRequest> = withContext(Dispatchers.IO) { api.requests() }
+    suspend fun createRequest(employee: Employee, type: String, reason: String, startDate: String?, endDate: String?) = withContext(Dispatchers.IO) {
+        api.createRequest(CreateRequestBody(employee.id, employee.name.orEmpty(), employee.jobNumber.orEmpty(), type, reason.ifBlank { null }, startDate, endDate))
     }
+    suspend fun createChallenge(type: String, lat: Double, lng: Double, qrCode: String): AttendanceChallengeResponse = withContext(Dispatchers.IO) { api.challenge(AttendanceChallengeRequest(type, lat, lng, qrCode, session.deviceId)) }
+    suspend fun createAttendance(employeeId: String, type: String, timestamp: String, lat: Double, lng: Double, challengeId: String) = withContext(Dispatchers.IO) { api.createAttendance(AttendanceCreateRequest(employeeId, type, timestamp, lat, lng, challengeId)) }
+    fun logout() { session.token = null }
 }
