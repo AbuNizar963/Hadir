@@ -124,30 +124,235 @@ class LoginEntryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(width: 82, height: 82, alignment: Alignment.center, decoration: BoxDecoration(color: const Color(0xFF0B6B5A), borderRadius: BorderRadius.circular(26)), child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 44)),
-                  const SizedBox(height: 24),
-                  const Text('حاضر', textAlign: TextAlign.center, style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, color: Color(0xFF17322C))),
-                  const SizedBox(height: 8),
-                  const Text('اختر نوع الدخول', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF70817B), fontSize: 15)),
-                  const SizedBox(height: 30),
-                  FilledButton.icon(onPressed: () => context.go('/employee-login'), icon: const Icon(Icons.badge_outlined), label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('دخول الموظفين'))),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(onPressed: () => context.go('/admin-login'), icon: const Icon(Icons.admin_panel_settings_outlined), label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('دخول الإدارة'))),
-                  const SizedBox(height: 22),
-                  const Text('حساب الإدارة منفصل تمامًا عن حساب الموظف.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF70817B), fontSize: 12)),
-                ],
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF4F7F6),
+        body: Stack(
+          children: [
+            Positioned(
+              top: -100,
+              left: -80,
+              child: Container(
+                width: 260,
+                height: 260,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF0B6B5A).withValues(alpha: .09),
+                ),
               ),
             ),
+            Positioned(
+              bottom: -130,
+              right: -90,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF0B6B5A).withValues(alpha: .06),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 58,
+                              height: 58,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topRight,
+                                  end: Alignment.bottomLeft,
+                                  colors: [Color(0xFF0B6B5A), Color(0xFF064B40)],
+                                ),
+                                borderRadius: BorderRadius.circular(19),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x220B6B5A),
+                                    blurRadius: 22,
+                                    offset: Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.how_to_reg_rounded,
+                                color: Colors.white,
+                                size: 30,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'حاضر',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF142D27),
+                            fontSize: 34,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -.8,
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                        const Text(
+                          'منصة العمل اليومية للموظف والإدارة',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF73827E),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(27),
+                            border: Border.all(color: const Color(0xFFDCE6E2)),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x0D142D27),
+                                blurRadius: 24,
+                                offset: Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              _EntryCard(
+                                icon: Icons.badge_outlined,
+                                title: 'مساحة الموظف',
+                                subtitle: 'الحضور، السجل، الطلبات والخدمات',
+                                accent: const Color(0xFF0B6B5A),
+                                onTap: () => context.go('/employee-login'),
+                              ),
+                              const SizedBox(height: 4),
+                              _EntryCard(
+                                icon: Icons.admin_panel_settings_outlined,
+                                title: 'مساحة الإدارة',
+                                subtitle: 'التشغيل، الموظفون والتقارير',
+                                accent: const Color(0xFF344B65),
+                                onTap: () => context.go('/admin-login'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF4F0),
+                            borderRadius: BorderRadius.circular(17),
+                            border: Border.all(color: const Color(0xFFD3E8E0)),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.shield_outlined, color: Color(0xFF0B6B5A), size: 19),
+                              SizedBox(width: 9),
+                              Expanded(
+                                child: Text(
+                                  'تجربة موحدة، مع فصل كامل بين صلاحيات الموظف والإدارة.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(0xFF064B40),
+                                    fontSize: 10.5,
+                                    height: 1.4,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'بعض المزايا المتقدمة ستظهر داخل التطبيق بعلامة «قريباً» حتى يتم ربطها بالواجهة الخلفية.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Color(0xFF899691), fontSize: 9.5, height: 1.45),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EntryCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _EntryCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(21),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(21),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Icon(icon, color: accent, size: 23),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Color(0xFF142D27),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(color: Color(0xFF73827E), fontSize: 10.5),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 15),
+            ],
           ),
         ),
       ),
