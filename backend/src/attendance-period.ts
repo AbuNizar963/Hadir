@@ -89,11 +89,8 @@ export function getAttendanceShift(employee: any, instant = new Date(), tz = DEF
   for (const day of [today, yesterday]) {
     const start = localDateTime(day, employee.workStartTime || "09:00", tz);
     const rawEnd = localDateTime(day, employee.workEndTime || "16:00", tz);
-    const startMinutes = Number(String(employee.workStartTime || "09:00").split(":")[0]) * 60 + Number(String(employee.workStartTime || "09:00").split(":")[1] || 0);
-    const endMinutes = Number(String(employee.workEndTime || "16:00").split(":")[0]) * 60 + Number(String(employee.workEndTime || "16:00").split(":")[1] || 0);
     const end = rawEnd.getTime() <= start.getTime() ? new Date(rawEnd.getTime() + DAY_MS) : rawEnd;
     if (workDays(employee).includes(parts(start, tz).weekday) && instant.getTime() >= start.getTime() && instant.getTime() <= end.getTime() + 60000) return { start, end, isWorkDay: true, kind: "ADMIN" };
-    void startMinutes; void endMinutes;
   }
   const start = localDateTime(today, employee.workStartTime || "09:00", tz);
   const rawEnd = localDateTime(today, employee.workEndTime || "16:00", tz);
@@ -114,8 +111,10 @@ export function getAttendanceShiftForDay(employee: any, day: string, tz = DEFAUL
     const cycleIndex = Math.floor(diff / cycle);
     const cycleDay = diff - cycleIndex * cycle;
     const periodStartDay = addDays(startDay, cycleIndex * cycle);
-    if (cycleDay >= on) return { start: localDateTime(periodStartDay, employee.workStartTime, tz), end: localDateTime(addDays(periodStartDay, on), employee.workEndTime || employee.workStartTime, tz), isWorkDay: false, kind: "ROTATION" };
-    return rotationShiftForDay(employee, periodStartDay, tz);
+    const period = rotationShiftForDay(employee, periodStartDay, tz);
+    if (cycleDay < on) return period;
+    if (cycleDay === on) return { ...period, isWorkDay: false };
+    return { start: period.start, end: period.end, isWorkDay: false, kind: "ROTATION" };
   }
   const start = localDateTime(day, employee.workStartTime || "09:00", tz);
   const rawEnd = localDateTime(day, employee.workEndTime || "16:00", tz);
