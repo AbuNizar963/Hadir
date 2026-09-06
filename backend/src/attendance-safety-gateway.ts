@@ -45,8 +45,9 @@ function dayStart(day: string) {
 
 async function prepareEmployee(request: Request, env: Env, ctx: ExecutionContext) {
   const actor = await currentUser(request, env, ctx);
-  if (!actor || String(actor.role).toLowerCase() !== "owner") {
-    return new Response(JSON.stringify({ error: "المالك فقط يستطيع التحضير المباشر" }), { status: 403, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+  const role = String(actor?.role || "").toLowerCase();
+  if (!actor || !["owner", "manager"].includes(role)) {
+    return new Response(JSON.stringify({ error: "المالك أو المدير فقط يستطيعان التحضير المباشر" }), { status: 403, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
   }
 
   const body = await request.json().catch(() => ({})) as any;
@@ -74,7 +75,7 @@ async function prepareEmployee(request: Request, env: Env, ctx: ExecutionContext
   const timestamp = now.toISOString();
   const deviceId = "ADMIN_DIRECT:المالك";
   await env.DB.prepare("INSERT INTO attendance(id,employee_id,job_number,employee_name,type,timestamp,lat,lng,distance_meters,device_id,ip,qr_code,location_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, employee.id, employee.jobNumber, employee.name, "check-in", timestamp, null, null, null, deviceId, "system", "DIRECT_ADMIN", null).run();
-  await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip,lat,lng,distance_meters) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), employee.id, employee.jobNumber, actor.name || "المالك", "check-in", "success", "تحضير مباشر من الإدارة", timestamp, deviceId, "system", null, null, null).run().catch(() => undefined);
+  await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip,lat,lng,distance_meters) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), employee.id, employee.jobNumber, actor.name || (role === "manager" ? "المدير" : "المالك"), "check-in", "success", "تحضير مباشر من الإدارة", timestamp, deviceId, "system", null, null, null).run().catch(() => undefined);
 
   return new Response(JSON.stringify({ ok: true, record: { id, employeeId: employee.id, jobNumber: employee.jobNumber, employeeName: employee.name, type: "check-in", timestamp, deviceId, ip: "system", qrCode: "DIRECT_ADMIN", locationId: null } }), { status: 201, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 }
