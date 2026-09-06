@@ -4,9 +4,10 @@
     android:height="48dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- HADIR approved mark for pre-adaptive-icon Android launchers. -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#22C58A"
+        android:strokeColor="#22C68A"
         android:strokeWidth="2.4"
         android:strokeLineCap="round"
         android:pathData="M12,6 A4,4 0,1 0,12,14 A4,4 0,1 0,12,6 M12,2 L12,5 M12,19 L12,22 M4.9,4.9 L7,7 M17,17 L19.1,19.1 M2,12 L5,12 M19,12 L22,12" />
