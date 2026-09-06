@@ -68,6 +68,7 @@ class NativeServicesViewModel(application: Application) : AndroidViewModel(appli
     private suspend fun currentLocation(): Location? = suspendCancellableCoroutine { c -> val source = CancellationTokenSource(); c.invokeOnCancellation { source.cancel() }; fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, source.token).addOnSuccessListener { c.resume(it) }.addOnFailureListener { c.resume(null) } }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeMainFeatures(vm: NativeServicesViewModel = viewModel(), onBack: () -> Unit) {
     val context = LocalContext.current
