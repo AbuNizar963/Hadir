@@ -42,6 +42,17 @@ data class AttendanceChallengeRequest(
 
 data class AttendanceChallengeResponse(val ok: Boolean, val challengeId: String, val expiresAt: String)
 
+data class AttendanceCreateRequest(
+    val employeeId: String,
+    val type: String,
+    val timestamp: String,
+    val lat: Double,
+    val lng: Double,
+    val challengeId: String
+)
+
+data class AttendanceCreateResponse(val ok: Boolean)
+
 interface HadirApi {
     @POST("api/auth/login")
     suspend fun login(@Body request: LoginRequest): LoginResponse<Employee>
@@ -54,4 +65,7 @@ interface HadirApi {
 
     @POST("api/attendance/challenge")
     suspend fun challenge(@Body request: AttendanceChallengeRequest): AttendanceChallengeResponse
+
+    @POST("api/attendance")
+    suspend fun createAttendance(@Body request: AttendanceCreateRequest): AttendanceCreateResponse
 }
