@@ -5,6 +5,7 @@ export type ProfessionalAttendanceRow = {
   jobNumber: string | null;
   locationId: string | null;
   status: string;
+  attendanceSource: "AUTOMATIC_VIP" | "AUTOMATIC" | "MANUAL_OWNER" | "MANUAL_EMPLOYEE" | "MIXED" | "UNKNOWN";
   scheduleType: string;
   scheduledStart: string | null;
   scheduledEnd: string | null;
@@ -61,11 +62,12 @@ export type ProfessionalAttendanceReport = {
     dailySeries: Array<{ attendanceDay: string; present: number; late: number; absent: number; leave: number; permission: number; rest: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>;
     employeeSummaries: Array<{ employeeId: string; employeeName: string; jobNumber: string | null; days: number; present: number; late: number; absent: number; leave: number; permission: number; rest: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>;
     exceptionCounts: Record<string, number>;
-    exceptions: Array<{ attendanceDay: string; employeeId: string; employeeName: string; jobNumber: string | null; code: string; status: string; minutes: number; attendanceEventIds: string[]; requestIds: string[]; auditIds: string[] }>;
+    attendanceSourceCounts: Record<string, number>;
+    exceptions: Array<{ attendanceDay: string; employeeId: string; employeeName: string; jobNumber: string | null; code: string; status: string; attendanceSource: ProfessionalAttendanceRow["attendanceSource"]; minutes: number; attendanceEventIds: string[]; requestIds: string[]; auditIds: string[] }>;
   };
   rows: ProfessionalAttendanceRow[];
   dataQuality: { byStatus: Record<string, number>; complete: boolean };
-  integrity: { sourceOfTruth: string; rawSource: string; noRawAttendanceMutation: boolean; periodScoped: boolean; maxDays: number; drillDownAvailable: boolean; sourceEventIdsIncluded: boolean; requestIdsIncluded: boolean; auditIdsIncluded: boolean };
+  integrity: { sourceOfTruth: string; rawSource: string; noRawAttendanceMutation: boolean; periodScoped: boolean; maxDays: number; drillDownAvailable: boolean; sourceEventIdsIncluded: boolean; requestIdsIncluded: boolean; auditIdsIncluded: boolean; attendanceSourceDerivedFromRawEvents: boolean };
 };
 
 export type ProfessionalAttendanceDrilldown = {
@@ -79,6 +81,7 @@ export type ProfessionalAttendanceDrilldown = {
     jobNumber: string | null;
     locationId: string | null;
     status: string;
+    attendanceSource: ProfessionalAttendanceRow["attendanceSource"];
     scheduleType: string;
     scheduledStart: string | null;
     scheduledEnd: string | null;
