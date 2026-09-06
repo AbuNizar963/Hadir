@@ -105,11 +105,20 @@ function getRotationInfo(employee: Employee, target: Date): { firstStart: Date; 
   const daysOn = Math.max(1, Math.floor(employee.rotationDaysOn ?? 4)); const daysOff = Math.max(0, Math.floor(employee.rotationDaysOff ?? 4)); const cycleLength = daysOn + daysOff;
   if (cycleLength <= 0) return null;
   const firstStart = localDateTimeUtc(startDay, employee.workStartTime || employee.rotationStartTime || "09:00");
-  const elapsed = target.getTime() - firstStart.getTime();
-  if (elapsed < 0) return { firstStart, periodStart: firstStart, daysOn, daysOff, cycleDay: 0, workDay: 0, phase: "NOT_STARTED" };
-  const cycleMs = cycleLength * DAY_MS; const cycleIndex = Math.floor(elapsed / cycleMs); const cycleElapsed = elapsed - cycleIndex * cycleMs; const cycleDay = Math.floor(cycleElapsed / DAY_MS); const periodStart = new Date(firstStart.getTime() + cycleIndex * cycleMs);
-  if (cycleDay >= daysOn) return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: 0, phase: "OFF" };
-  return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: cycleDay, phase: "WORK" };
+  if (target.getTime() < firstStart.getTime()) return { firstStart, periodStart: firstStart, daysOn, daysOff, cycleDay: 0, workDay: 0, phase: "NOT_STARTED" };
+  const targetDay = dayKey(target);
+  const diff = Math.floor(dayNumber(targetDay) - dayNumber(startDay));
+  if (diff < 0) return { firstStart, periodStart: firstStart, daysOn, daysOff, cycleDay: 0, workDay: 0, phase: "NOT_STARTED" };
+  const cycleIndex = Math.floor(diff / cycleLength);
+  const cycleDay = diff - cycleIndex * cycleLength;
+  const periodStartDay = addLocalDaysToKey(startDay, cycleIndex * cycleLength);
+  const periodStart = localDateTimeUtc(periodStartDay, employee.workStartTime || employee.rotationStartTime || "09:00");
+  if (cycleDay < daysOn) return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: cycleDay, phase: "WORK" };
+  if (cycleDay === daysOn) {
+    const periodEnd = localDateTimeUtc(addLocalDaysToKey(periodStartDay, daysOn), employee.workEndTime || employee.workStartTime || "09:00");
+    if (target.getTime() < periodEnd.getTime()) return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: daysOn - 1, phase: "WORK" };
+  }
+  return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: 0, phase: "OFF" };
 }
 
 function normalizeWorkDays(days: number[] | undefined): number[] { if (!Array.isArray(days)) return [...DEFAULT_ADMIN_DAYS]; return [...new Set(days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b); }
