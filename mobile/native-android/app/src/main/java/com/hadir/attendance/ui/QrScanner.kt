@@ -73,9 +73,11 @@ fun QrScanner(
     var completed by remember { mutableStateOf(false) }
     val scanner = remember { BarcodeScanning.getClient() }
     val analyzerExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
     DisposableEffect(Unit) {
         onDispose {
+            cameraProvider?.unbindAll()
             scanner.close()
             analyzerExecutor.shutdown()
         }
@@ -88,7 +90,8 @@ fun QrScanner(
                 val previewView = PreviewView(ctx)
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                 cameraProviderFuture.addListener({
-                    val cameraProvider = cameraProviderFuture.get()
+                    val provider = cameraProviderFuture.get()
+                    cameraProvider = provider
                     val preview = Preview.Builder().build().also {
                         it.surfaceProvider = previewView.surfaceProvider
                     }
@@ -111,13 +114,14 @@ fun QrScanner(
                                 val value = barcodes.firstOrNull()?.rawValue?.trim().orEmpty()
                                 if (value.isNotEmpty() && !completed) {
                                     completed = true
+                                    provider.unbindAll()
                                     onResult(value)
                                 }
                             }
                             .addOnCompleteListener { proxy.close() }
                     }
-                    cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
+                    provider.unbindAll()
+                    provider.bindToLifecycle(
                         lifecycleOwner,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
