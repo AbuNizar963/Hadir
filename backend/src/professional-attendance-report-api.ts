@@ -36,6 +36,21 @@ async function fetchByIds(db: D1Database, table: "attendance" | "requests" | "au
   return rows.sort((a, b) => (order.get(String(a.id)) ?? 0) - (order.get(String(b.id)) ?? 0));
 }
 
+function classifyAttendanceSource(attendance: Record<string, unknown>[]) {
+  const sources = new Set<string>();
+  for (const row of attendance) {
+    const deviceId = String(row.device_id || "");
+    const qrCode = String(row.qr_code || "");
+    if (deviceId === "AUTO_VIP" || qrCode === "AUTO_VIP") sources.add("AUTOMATIC_VIP");
+    else if (qrCode === "AUTO_DIRECT" || deviceId === "ADMIN_DIRECT:التلقائي") sources.add("AUTOMATIC");
+    else if (deviceId === "ADMIN_DIRECT" || qrCode === "ADMIN_DIRECT") sources.add("MANUAL_OWNER");
+    else sources.add("MANUAL_EMPLOYEE");
+  }
+  if (!sources.size) return "UNKNOWN";
+  if (sources.size === 1) return Array.from(sources)[0];
+  return "MIXED";
+}
+
 async function buildProfessionalAttendanceDrilldown(env: Env, attendanceDay: string, employeeId: string) {
   const fact = await env.DB.prepare(
     `SELECT * FROM attendance_reporting_facts WHERE attendance_day = ? AND employee_id = ? LIMIT 1`,
@@ -55,6 +70,7 @@ async function buildProfessionalAttendanceDrilldown(env: Env, attendanceDay: str
     fetchByIds(env.DB, "requests", requestIds),
     fetchByIds(env.DB, "audit", auditIds),
   ]);
+  const attendanceSource = classifyAttendanceSource(attendance);
 
   return {
     ok: true,
@@ -67,6 +83,7 @@ async function buildProfessionalAttendanceDrilldown(env: Env, attendanceDay: str
       jobNumber: fact.job_number,
       locationId: fact.location_id,
       status: fact.status,
+      attendanceSource,
       scheduleType: fact.schedule_type,
       scheduledStart: fact.scheduled_start,
       scheduledEnd: fact.scheduled_end,
