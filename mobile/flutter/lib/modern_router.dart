@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'app_fixed.dart' show LoginPage, HistoryPage;
+import 'app_fixed.dart' show LoginPage;
 import 'core/session.dart';
 import 'pages/admin_home_page.dart';
 import 'pages/admin_login_page.dart';
@@ -11,6 +11,7 @@ import 'pages/admin_reports_page.dart';
 import 'pages/admin_report_archive_page.dart';
 import 'pages/attendance_page.dart';
 import 'pages/employee_center_page.dart';
+import 'pages/jibble_history_page.dart';
 import 'pages/jibble_workspace_page.dart';
 import 'pages/requests_page.dart';
 import 'pages/notifications_page.dart';
@@ -45,7 +46,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/home', builder: (_, __) => const JibbleWorkspacePage()),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
-    GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: HistoryPage())),
+    GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
     GoRoute(path: '/requests', builder: (_, __) => const SwipeBackPage(child: RequestsPage())),
     GoRoute(path: '/notifications', builder: (_, __) => const SwipeBackPage(child: NotificationsPage())),
     GoRoute(path: '/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
