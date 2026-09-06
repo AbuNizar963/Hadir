@@ -6,22 +6,28 @@ import '../core/api.dart';
 import '../core/session.dart';
 
 const _brand = Color(0xFF0B6B5A);
-const _ink = Color(0xFF17322C);
-const _muted = Color(0xFF70817B);
-const _surface = Color(0xFFFFFFFF);
-const _soft = Color(0xFFEAF4F0);
+const _brandDark = Color(0xFF064B40);
+const _brandSoft = Color(0xFFE8F5F0);
+const _canvas = Color(0xFFF4F7F6);
+const _ink = Color(0xFF142D27);
+const _muted = Color(0xFF73827E);
+const _line = Color(0xFFDCE6E2);
+const _orange = Color(0xFFB97822);
+const _red = Color(0xFFB94A3D);
 
 class ModernHomePage extends StatefulWidget {
   const ModernHomePage({super.key});
-  @override State<ModernHomePage> createState() => _ModernHomePageState();
+
+  @override
+  State<ModernHomePage> createState() => _ModernHomePageState();
 }
 
 class _ModernHomePageState extends State<ModernHomePage> {
   final _session = HadirSession();
-  String name = 'الموظف';
-  List<dynamic> recent = const [];
-  bool loading = true;
-  String? error;
+  String _name = 'الموظف';
+  List<dynamic> _recent = const [];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -31,7 +37,8 @@ class _ModernHomePageState extends State<ModernHomePage> {
 
   Future<void> _load() async {
     try {
-      final api = HadirApi(token: await _session.token());
+      final token = await _session.token();
+      final api = HadirApi(token: token);
       final results = await Future.wait([
         api.me(),
         api.attendance(limit: 5),
@@ -40,237 +47,772 @@ class _ModernHomePageState extends State<ModernHomePage> {
       final user = me['user'];
       if (!mounted) return;
       setState(() {
-        name = user is Map ? '${user['name'] ?? 'الموظف'}' : 'الموظف';
-        recent = results[1] as List<dynamic>;
-        loading = false;
+        _name = user is Map ? '${user['name'] ?? 'الموظف'}' : 'الموظف';
+        _recent = results[1] as List<dynamic>;
+        _loading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        error = HadirApi.errorMessage(e);
-        loading = false;
+        _loading = false;
+        _error = HadirApi.errorMessage(e);
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final firstName = name.trim().split(RegExp(r'\s+')).first;
     final now = DateTime.now();
-    final greeting = now.hour < 12 ? 'صباح الخير' : now.hour < 17 ? 'مساء الخير' : 'مساء الخير';
+    final firstName = _name.trim().split(RegExp(r'\s+')).first;
+    final greeting = now.hour < 12 ? 'صباح الخير' : 'مساء الخير';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F9F8),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverAppBar(
-              backgroundColor: const Color(0xFFF7F9F8),
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              pinned: true,
-              expandedHeight: 86,
-              automaticallyImplyLeading: false,
-              titleSpacing: 20,
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(greeting, style: const TextStyle(fontSize: 13, color: _muted)),
-                        const SizedBox(height: 2),
-                        Text(firstName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _ink)),
-                      ],
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: _canvas,
+        body: RefreshIndicator(
+          color: _brand,
+          onRefresh: _load,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                backgroundColor: _canvas,
+                surfaceTintColor: Colors.transparent,
+                automaticallyImplyLeading: false,
+                toolbarHeight: 74,
+                titleSpacing: 18,
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            greeting,
+                            style: const TextStyle(
+                              color: _muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            firstName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: _ink,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _CircleAction(
+                      icon: Icons.notifications_none_rounded,
+                      badge: true,
+                      onTap: () => context.push('/notifications'),
+                    ),
+                    const SizedBox(width: 8),
+                    _ProfileAvatar(onTap: () => context.push('/profile')),
+                  ],
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 30),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _hero(now, firstName),
+                    const SizedBox(height: 16),
+                    _sectionTitle('ملخص اليوم'),
+                    const SizedBox(height: 10),
+                    _dailySummary(),
+                    const SizedBox(height: 20),
+                    _sectionTitle('الوصول السريع'),
+                    const SizedBox(height: 10),
+                    _quickActions(),
+                    const SizedBox(height: 20),
+                    _sectionTitle(
+                      'آخر النشاطات',
+                      action: TextButton(
+                        onPressed: () => context.push('/history'),
+                        child: const Text('عرض السجل'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _recentActivity(),
+                    const SizedBox(height: 20),
+                    _sectionTitle('المزايا القادمة'),
+                    const SizedBox(height: 10),
+                    _comingSoonStrip(),
+                    const SizedBox(height: 18),
+                    _securityBanner(),
+                  ]),
+                ),
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: _bottomNavigation(context),
+      ),
+    );
+  }
+
+  Widget _hero(DateTime now, String firstName) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [_brand, _brandDark],
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x240B6B5A),
+            blurRadius: 30,
+            offset: Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 9,
+                height: 9,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF91E3C6),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'دوامك اليوم',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                intl.DateFormat('EEEE، d MMMM', 'ar').format(now),
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'أهلًا $firstName 👋',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 26,
+              height: 1.1,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 7),
+          const Text(
+            'كل ما تحتاجه ليوم عملك في مكان واحد، بتجربة بسيطة وآمنة.',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12.5,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => context.push('/attendance?type=check-in'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: _brand,
+                    minimumSize: const Size.fromHeight(53),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(17),
                     ),
                   ),
-                  _RoundIconButton(icon: Icons.notifications_none_rounded, onTap: () => context.push('/notifications')),
-                  const SizedBox(width: 8),
-                  _AvatarButton(onTap: () => context.push('/profile')),
-                ],
+                  icon: const Icon(Icons.login_rounded, size: 20),
+                  label: const Text(
+                    'تسجيل الحضور',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 28),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _hero(now),
-                  const SizedBox(height: 18),
-                  _sectionHeader('يومك اليوم', null),
-                  const SizedBox(height: 10),
-                  _stats(),
-                  const SizedBox(height: 22),
-                  _sectionHeader('الوصول السريع', null),
-                  const SizedBox(height: 10),
-                  _quickGrid(),
-                  const SizedBox(height: 22),
-                  _sectionHeader('آخر النشاطات', () => context.push('/history')),
-                  const SizedBox(height: 8),
-                  if (loading) ...const [_ActivitySkeleton(), _ActivitySkeleton()]
-                  else if (error != null) _errorCard()
-                  else if (recent.isEmpty) _emptyCard()
-                  else ...recent.take(4).map(_activityTile),
-                ]),
+              const SizedBox(width: 9),
+              SizedBox(
+                width: 53,
+                height: 53,
+                child: FilledButton(
+                  onPressed: () => context.push('/attendance?type=check-out'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: .14),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(17),
+                    ),
+                  ),
+                  child: const Icon(Icons.logout_rounded),
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        onDestinationSelected: (index) {
-          if (index == 1) context.push('/history');
-          if (index == 2) context.push('/requests');
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'الرئيسية'),
-          NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history_rounded), label: 'السجل'),
-          NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment_rounded), label: 'الطلبات'),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _hero(DateTime now) {
+  Widget _dailySummary() {
+    return Row(
+      children: [
+        Expanded(
+          child: _summaryCard(
+            Icons.schedule_rounded,
+            'ساعات العمل',
+            '—',
+            'اليوم',
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: _summaryCard(
+            Icons.location_on_outlined,
+            'الموقع',
+            'جاهز',
+            'GPS',
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: _summaryCard(
+            Icons.shield_outlined,
+            'الحماية',
+            'نشطة',
+            'الجهاز',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _summaryCard(IconData icon, String title, String value, String caption) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF0B6B5A), Color(0xFF084F44)]),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [BoxShadow(blurRadius: 28, offset: Offset(0, 14), color: Color(0x220B6B5A))],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: _line),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Container(width: 10, height: 10, decoration: const BoxDecoration(color: Color(0xFF8BE0C5), shape: BoxShape.circle)),
-          const SizedBox(width: 8),
-          const Text('الدوام اليوم', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
-          const Spacer(),
-          Text(intl.DateFormat('d MMMM', 'ar').format(now), style: const TextStyle(color: Colors.white70, fontSize: 12)),
-        ]),
-        const SizedBox(height: 20),
-        const Text('جاهز للحضور؟', style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w800, height: 1.1)),
-        const SizedBox(height: 7),
-        const Text('تحقق ذكي من الموقع وQR والجهاز قبل اعتماد حضورك.', style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.45)),
-        const SizedBox(height: 18),
-        Row(children: [
-          Expanded(child: FilledButton.icon(
-            onPressed: () => context.push('/attendance?type=check-in'),
-            style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: _brand, minimumSize: const Size.fromHeight(54), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17))),
-            icon: const Icon(Icons.login_rounded),
-            label: const Text('تسجيل الحضور', style: TextStyle(fontWeight: FontWeight.w800)),
-          )),
-          const SizedBox(width: 10),
-          SizedBox(width: 54, height: 54, child: FilledButton(
-            onPressed: () => context.push('/attendance?type=check-out'),
-            style: FilledButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: .14), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)), padding: EdgeInsets.zero),
-            child: const Icon(Icons.logout_rounded),
-          )),
-        ]),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: _brandSoft,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: _brand, size: 20),
+          ),
+          const SizedBox(height: 10),
+          Text(title, style: const TextStyle(color: _muted, fontSize: 10.5)),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(caption, style: const TextStyle(color: _muted, fontSize: 9)),
+        ],
+      ),
     );
   }
 
-  Widget _stats() {
-    return Row(children: [
-      Expanded(child: _stat(Icons.schedule_rounded, 'الساعات', '—', 'اليوم')),
-      const SizedBox(width: 10),
-      Expanded(child: _stat(Icons.location_on_outlined, 'الموقع', 'جاهز', 'GPS')),
-      const SizedBox(width: 10),
-      Expanded(child: _stat(Icons.verified_user_outlined, 'الحماية', 'نشطة', 'الجهاز')),
-    ]);
-  }
-
-  Widget _stat(IconData icon, String title, String value, String caption) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E9E6))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(width: 38, height: 38, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _brand, size: 21)),
-        const SizedBox(height: 11),
-        Text(title, style: const TextStyle(fontSize: 12, color: _muted)),
-        const SizedBox(height: 3),
-        Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _ink)),
-        const SizedBox(height: 1),
-        Text(caption, style: const TextStyle(fontSize: 10, color: _muted)),
-      ]),
+  Widget _quickActions() {
+    return GridView.count(
+      crossAxisCount: 4,
+      mainAxisSpacing: 9,
+      crossAxisSpacing: 9,
+      childAspectRatio: .88,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        _quickAction(
+          Icons.qr_code_scanner_rounded,
+          'الحضور',
+          'GPS + QR',
+          onTap: () => context.push('/attendance?type=check-in'),
+        ),
+        _quickAction(
+          Icons.history_rounded,
+          'السجل',
+          'حركاتي',
+          onTap: () => context.push('/history'),
+        ),
+        _quickAction(
+          Icons.description_outlined,
+          'الطلبات',
+          'إجازات',
+          onTap: () => context.push('/requests'),
+        ),
+        _quickAction(
+          Icons.apps_rounded,
+          'الخدمات',
+          'المزيد',
+          onTap: () => context.push('/services'),
+        ),
+      ],
     );
   }
 
-  Widget _quickGrid() {
-    return Row(children: [
-      Expanded(child: _quick(Icons.qr_code_scanner_rounded, 'الحضور', 'QR + GPS', () => context.push('/attendance?type=check-in'))),
-      const SizedBox(width: 10),
-      Expanded(child: _quick(Icons.logout_rounded, 'الانصراف', 'إنهاء الدوام', () => context.push('/attendance?type=check-out'))),
-      const SizedBox(width: 10),
-      Expanded(child: _quick(Icons.assignment_outlined, 'الطلبات', 'إجازة وطلب', () => context.push('/requests'))),
-    ]);
-  }
-
-  Widget _quick(IconData icon, String title, String subtitle, VoidCallback onTap) {
+  Widget _quickAction(
+    IconData icon,
+    String title,
+    String subtitle, {
+    VoidCallback? onTap,
+  }) {
     return Material(
-      color: _surface,
-      borderRadius: BorderRadius.circular(20),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(21),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(21),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(13, 14, 13, 13),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E9E6))),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: _brand)),
-            const SizedBox(height: 11),
-            Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _ink)),
-            const SizedBox(height: 3),
-            Text(subtitle, style: const TextStyle(fontSize: 10, color: _muted)),
-          ]),
+          padding: const EdgeInsets.fromLTRB(9, 12, 9, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(21),
+            border: Border.all(color: _line),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: _brandSoft,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: _brand, size: 21),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(color: _muted, fontSize: 8.5),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _sectionHeader(String title, VoidCallback? action) => Row(children: [
-    Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _ink))),
-    if (action != null) TextButton(onPressed: action, child: const Text('عرض الكل')),
-  ]);
+  Widget _sectionTitle(String title, {Widget? action}) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        if (action != null) action,
+      ],
+    );
+  }
+
+  Widget _recentActivity() {
+    if (_loading) {
+      return Column(
+        children: const [
+          _ActivitySkeleton(),
+          SizedBox(height: 8),
+          _ActivitySkeleton(),
+        ],
+      );
+    }
+    if (_error != null) return _errorCard();
+    if (_recent.isEmpty) return _emptyActivity();
+
+    return Column(
+      children: _recent.take(4).map(_activityTile).toList(),
+    );
+  }
 
   Widget _activityTile(dynamic item) {
-    final r = Map<String, dynamic>.from(item as Map);
-    final checkout = r['type'] == 'check-out';
-    final time = DateTime.tryParse('${r['timestamp']}');
-    final distance = r['distanceMeters'];
+    final record = Map<String, dynamic>.from(item as Map);
+    final checkout = record['type'] == 'check-out';
+    final time = DateTime.tryParse('${record['timestamp']}');
+    final distance = double.tryParse('${record['distanceMeters']}');
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE2E9E6))),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
-        leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: checkout ? const Color(0xFFFFF1EE) : _soft, borderRadius: BorderRadius.circular(14)), child: Icon(checkout ? Icons.logout_rounded : Icons.login_rounded, color: checkout ? const Color(0xFFB94A3D) : _brand)),
-        title: Text(checkout ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _ink)),
-        subtitle: Text(time == null ? 'وقت غير معروف' : intl.DateFormat('EEEE · HH:mm', 'ar').format(time.toLocal()), style: const TextStyle(fontSize: 11, color: _muted)),
-        trailing: distance == null ? null : Text('${double.tryParse('$distance')?.toStringAsFixed(0) ?? distance} م', style: const TextStyle(fontSize: 11, color: _muted, fontWeight: FontWeight.w600)),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: _line),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              color: checkout ? const Color(0xFFFFF1EE) : _brandSoft,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              checkout ? Icons.logout_rounded : Icons.login_rounded,
+              color: checkout ? _red : _brand,
+              size: 21,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  checkout ? 'تسجيل الانصراف' : 'تسجيل الحضور',
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  time == null
+                      ? 'وقت غير معروف'
+                      : intl.DateFormat('EEEE · HH:mm', 'ar').format(time.toLocal()),
+                  style: const TextStyle(color: _muted, fontSize: 10.5),
+                ),
+              ],
+            ),
+          ),
+          if (distance != null)
+            Text(
+              '${distance.toStringAsFixed(0)} م',
+              style: const TextStyle(
+                color: _muted,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _emptyCard() => Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE2E9E6))), child: const Row(children: [Icon(Icons.event_available_outlined, color: _brand), SizedBox(width: 12), Text('لا توجد حركات مسجلة بعد', style: TextStyle(color: _muted, fontSize: 13))]));
+  Widget _emptyActivity() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: _line),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.event_available_outlined, color: _brand),
+          SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              'لا توجد حركات مسجلة بعد.',
+              style: TextStyle(color: _muted, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _errorCard() => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: const Color(0xFFFFF4F2), borderRadius: BorderRadius.circular(18)), child: Row(children: [const Icon(Icons.wifi_off_rounded, color: Color(0xFFB94A3D)), const SizedBox(width: 10), Expanded(child: Text(error!, style: const TextStyle(color: Color(0xFF8D332C), fontSize: 12))), TextButton(onPressed: _load, child: const Text('إعادة'))]));
+  Widget _errorCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4F2),
+        borderRadius: BorderRadius.circular(19),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off_rounded, color: _red),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _error ?? 'تعذر تحميل البيانات.',
+              style: const TextStyle(color: Color(0xFF8D332C), fontSize: 11),
+            ),
+          ),
+          TextButton(onPressed: _load, child: const Text('إعادة')),
+        ],
+      ),
+    );
+  }
+
+  Widget _comingSoonStrip() {
+    return SizedBox(
+      height: 126,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _futureCard(Icons.payments_outlined, 'قسائم الراتب', 'قريباً'),
+          const SizedBox(width: 10),
+          _futureCard(Icons.insights_outlined, 'الأداء والتقييم', 'قريباً'),
+          const SizedBox(width: 10),
+          _futureCard(Icons.groups_outlined, 'دليل الموظفين', 'قريباً'),
+          const SizedBox(width: 10),
+          _futureCard(Icons.fingerprint_rounded, 'الدخول بالبصمة', 'قريباً'),
+        ],
+      ),
+    );
+  }
+
+  Widget _futureCard(IconData icon, String title, String status) {
+    return Container(
+      width: 148,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: _line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F4F3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: _muted, size: 20),
+              ),
+              const Spacer(),
+              _SoonBadge(),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: _ink,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(status, style: const TextStyle(color: _orange, fontSize: 9)),
+        ],
+      ),
+    );
+  }
+
+  Widget _securityBanner() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF4F0),
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: const Color(0xFFD3E8E0)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.verified_user_outlined, color: _brand, size: 22),
+          SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              'حاضر يحافظ على أمان عملية الحضور باستخدام الموقع والجهاز ورمز QR قبل الاعتماد.',
+              style: TextStyle(
+                color: _brandDark,
+                fontSize: 10.5,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bottomNavigation(BuildContext context) {
+    return NavigationBar(
+      height: 72,
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 8,
+      selectedIndex: 0,
+      onDestinationSelected: (index) {
+        if (index == 1) context.push('/history');
+        if (index == 2) context.push('/requests');
+        if (index == 3) context.push('/profile');
+      },
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home_rounded),
+          label: 'الرئيسية',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.history_outlined),
+          selectedIcon: Icon(Icons.history_rounded),
+          label: 'السجل',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.description_outlined),
+          selectedIcon: Icon(Icons.description_rounded),
+          label: 'الطلبات',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline_rounded),
+          selectedIcon: Icon(Icons.person_rounded),
+          label: 'حسابي',
+        ),
+      ],
+    );
+  }
 }
 
-class _RoundIconButton extends StatelessWidget {
-  final IconData icon; final VoidCallback onTap;
-  const _RoundIconButton({required this.icon, required this.onTap});
-  @override Widget build(BuildContext context) => Material(color: Colors.white, shape: const CircleBorder(), child: InkWell(onTap: onTap, customBorder: const CircleBorder(), child: Padding(padding: const EdgeInsets.all(10), child: Icon(icon, color: _ink, size: 22))));
-}
-
-class _AvatarButton extends StatelessWidget {
+class _CircleAction extends StatelessWidget {
+  final IconData icon;
   final VoidCallback onTap;
-  const _AvatarButton({required this.onTap});
-  @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(24), child: const CircleAvatar(radius: 21, backgroundColor: _soft, child: Icon(Icons.person_rounded, color: _brand)));
+  final bool badge;
+
+  const _CircleAction({required this.icon, required this.onTap, this.badge = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: Colors.white,
+          shape: const CircleBorder(),
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: const Padding(
+              padding: EdgeInsets.all(11),
+              child: Icon(Icons.notifications_none_rounded, color: _ink, size: 21),
+            ),
+          ),
+        ),
+        if (badge)
+          Positioned(
+            top: 1,
+            right: 2,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: _red,
+                shape: BoxShape.circle,
+                border: Border.all(color: _canvas, width: 1.5),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _ProfileAvatar({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: _brandSoft,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: const SizedBox(
+          width: 43,
+          height: 43,
+          child: Icon(Icons.person_rounded, color: _brand, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+class _SoonBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3DE),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Text(
+        'قريباً',
+        style: TextStyle(
+          color: _orange,
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
 }
 
 class _ActivitySkeleton extends StatelessWidget {
   const _ActivitySkeleton();
-  @override Widget build(BuildContext context) => Container(height: 68, margin: const EdgeInsets.only(bottom: 8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE2E9E6))));
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 68,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: _line),
+      ),
+    );
+  }
 }
