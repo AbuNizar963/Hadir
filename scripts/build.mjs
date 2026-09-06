@@ -30,6 +30,7 @@ run("node", ["scripts/patch-global-attendance-print-layout.mjs"]);
 run("node", ["scripts/patch-global-attendance-print-qr.mjs"]);
 run("node", ["scripts/patch-report-archive-delete.mjs"]);
 run("node", ["scripts/patch-manager-report-share.mjs"]);
+run("node", ["scripts/patch-professional-report-share.mjs"]);
 run("node", ["scripts/patch-manager-report-filename.mjs"]);
 run("node", ["scripts/patch-company-logo-refresh.mjs"]);
 run("node", ["scripts/patch-company-logo-settings-preview.mjs"]);
