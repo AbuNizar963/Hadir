@@ -22,6 +22,7 @@ type FactRow = {
   attendanceEventIdsJson: string;
   requestIdsJson: string;
   auditIdsJson: string;
+  attendanceSource: string;
   calculationSource: string;
   calculationVersion: string;
   historicalDataQuality: string;
@@ -52,9 +53,19 @@ function validatePeriod(from: string, to: string) {
 }
 
 async function loadFacts(env: Env, from: string, to: string, employeeId?: string): Promise<FactRow[]> {
+  const sourceExpression = `(SELECT CASE
+    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE a.device_id = 'AUTO_VIP' OR a.qr_code = 'AUTO_VIP')
+      AND NOT EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE NOT (a.device_id = 'AUTO_VIP' OR a.qr_code = 'AUTO_VIP' OR a.qr_code = 'AUTO_DIRECT' OR a.device_id LIKE 'ADMIN_DIRECT:%')) THEN 'AUTOMATIC_VIP'
+    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE a.qr_code = 'AUTO_DIRECT' OR a.device_id = 'ADMIN_DIRECT:التلقائي')
+      AND NOT EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE NOT (a.device_id = 'AUTO_VIP' OR a.qr_code = 'AUTO_VIP' OR a.qr_code = 'AUTO_DIRECT' OR a.device_id = 'ADMIN_DIRECT:التلقائي')) THEN 'AUTOMATIC'
+    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE a.device_id = 'AUTO_VIP' OR a.qr_code = 'AUTO_VIP' OR a.qr_code = 'AUTO_DIRECT' OR a.device_id = 'ADMIN_DIRECT:التلقائي') THEN 'MIXED'
+    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE a.device_id = 'ADMIN_DIRECT' OR a.qr_code = 'ADMIN_DIRECT') THEN 'MANUAL_OWNER'
+    WHEN json_array_length(f.attendance_event_ids_json) > 0 THEN 'MANUAL_EMPLOYEE'
+    ELSE 'UNKNOWN'
+  END FROM attendance_reporting_facts f2 WHERE f2.attendance_day = f.attendance_day AND f2.employee_id = f.employee_id)`;
   const sql = employeeId
-    ? `SELECT attendance_day AS attendanceDay,employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,location_id AS locationId,status,schedule_type AS scheduleType,scheduled_start AS scheduledStart,scheduled_end AS scheduledEnd,expected_minutes AS expectedMinutes,check_in_at AS checkInAt,check_out_at AS checkOutAt,worked_minutes AS workedMinutes,late_minutes AS lateMinutes,early_leave_minutes AS earlyLeaveMinutes,overtime_minutes AS overtimeMinutes,open,exception_code AS exceptionCode,attendance_event_ids_json AS attendanceEventIdsJson,request_ids_json AS requestIdsJson,audit_ids_json AS auditIdsJson,calculation_source AS calculationSource,calculation_version AS calculationVersion,historical_data_quality AS historicalDataQuality,timezone,computed_at AS computedAt FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND employee_id=? ORDER BY attendance_day ASC,employee_name ASC`
-    : `SELECT attendance_day AS attendanceDay,employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,location_id AS locationId,status,schedule_type AS scheduleType,scheduled_start AS scheduledStart,scheduled_end AS scheduledEnd,expected_minutes AS expectedMinutes,check_in_at AS checkInAt,check_out_at AS checkOutAt,worked_minutes AS workedMinutes,late_minutes AS lateMinutes,early_leave_minutes AS earlyLeaveMinutes,overtime_minutes AS overtimeMinutes,open,exception_code AS exceptionCode,attendance_event_ids_json AS attendanceEventIdsJson,request_ids_json AS requestIdsJson,audit_ids_json AS auditIdsJson,calculation_source AS calculationSource,calculation_version AS calculationVersion,historical_data_quality AS historicalDataQuality,timezone,computed_at AS computedAt FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? ORDER BY attendance_day ASC,employee_name ASC`;
+    ? `SELECT f.attendance_day AS attendanceDay,f.employee_id AS employeeId,f.job_number AS jobNumber,f.employee_name AS employeeName,f.location_id AS locationId,f.status,f.schedule_type AS scheduleType,f.scheduled_start AS scheduledStart,f.scheduled_end AS scheduledEnd,f.expected_minutes AS expectedMinutes,f.check_in_at AS checkInAt,f.check_out_at AS checkOutAt,f.worked_minutes AS workedMinutes,f.late_minutes AS lateMinutes,f.early_leave_minutes AS earlyLeaveMinutes,f.overtime_minutes AS overtimeMinutes,f.open,f.exception_code AS exceptionCode,f.attendance_event_ids_json AS attendanceEventIdsJson,f.request_ids_json AS requestIdsJson,f.audit_ids_json AS auditIdsJson,${sourceExpression} AS attendanceSource,f.calculation_source AS calculationSource,f.calculation_version AS calculationVersion,f.historical_data_quality AS historicalDataQuality,f.timezone,f.computed_at AS computedAt FROM attendance_reporting_facts f WHERE f.attendance_day>=? AND f.attendance_day<=? AND f.employee_id=? ORDER BY f.attendance_day ASC,f.employee_name ASC`
+    : `SELECT f.attendance_day AS attendanceDay,f.employee_id AS employeeId,f.job_number AS jobNumber,f.employee_name AS employeeName,f.location_id AS locationId,f.status,f.schedule_type AS scheduleType,f.scheduled_start AS scheduledStart,f.scheduled_end AS scheduledEnd,f.expected_minutes AS expectedMinutes,f.check_in_at AS checkInAt,f.check_out_at AS checkOutAt,f.worked_minutes AS workedMinutes,f.late_minutes AS lateMinutes,f.early_leave_minutes AS earlyLeaveMinutes,f.overtime_minutes AS overtimeMinutes,f.open,f.exception_code AS exceptionCode,f.attendance_event_ids_json AS attendanceEventIdsJson,f.request_ids_json AS requestIdsJson,f.audit_ids_json AS auditIdsJson,${sourceExpression} AS attendanceSource,f.calculation_source AS calculationSource,f.calculation_version AS calculationVersion,f.historical_data_quality AS historicalDataQuality,f.timezone,f.computed_at AS computedAt FROM attendance_reporting_facts f WHERE f.attendance_day>=? AND f.attendance_day<=? ORDER BY f.attendance_day ASC,f.employee_name ASC`;
   const query = employeeId ? env.DB.prepare(sql).bind(from, to, employeeId) : env.DB.prepare(sql).bind(from, to);
   const result = await query.all<FactRow>();
   return result.results || [];
@@ -68,6 +79,7 @@ function toPublicRow(row: FactRow) {
     jobNumber: row.jobNumber,
     locationId: row.locationId,
     status: row.status,
+    attendanceSource: row.attendanceSource,
     scheduleType: row.scheduleType,
     scheduledStart: row.scheduledStart,
     scheduledEnd: row.scheduledEnd,
@@ -101,6 +113,7 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
   let present = 0, late = 0, absent = 0, leave = 0, permission = 0, rest = 0, notStarted = 0, invalid = 0, open = 0;
   let workedMinutes = 0, expectedMinutes = 0, lateMinutes = 0, earlyLeaveMinutes = 0, overtimeMinutes = 0;
   const qualityCounts: Record<string, number> = {};
+  const sourceCounts: Record<string, number> = {};
 
   for (const row of rows) {
     if (row.status === "PRESENT") present++;
@@ -119,6 +132,7 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
     overtimeMinutes += row.overtimeMinutes;
     if (row.exceptionCode) exceptionCounts[row.exceptionCode] = (exceptionCounts[row.exceptionCode] || 0) + 1;
     qualityCounts[row.historicalDataQuality] = (qualityCounts[row.historicalDataQuality] || 0) + 1;
+    sourceCounts[row.attendanceSource] = (sourceCounts[row.attendanceSource] || 0) + 1;
 
     const current = employees.get(row.employeeId) || { employeeId: row.employeeId, employeeName: row.employeeName, jobNumber: row.jobNumber, days: 0, present: 0, late: 0, absent: 0, leave: 0, permission: 0, rest: 0, open: 0, workedMinutes: 0, expectedMinutes: 0, lateMinutes: 0, earlyLeaveMinutes: 0, overtimeMinutes: 0 };
     current.days++;
@@ -178,6 +192,7 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
       dailySeries: Array.from(daily.values()).sort((a, b) => a.attendanceDay.localeCompare(b.attendanceDay)),
       employeeSummaries: Array.from(employees.values()).sort((a, b) => a.employeeName.localeCompare(b.employeeName, "ar")),
       exceptionCounts,
+      attendanceSourceCounts: sourceCounts,
       exceptions: rows.filter((row) => row.exceptionCode).map((row) => ({
         attendanceDay: row.attendanceDay,
         employeeId: row.employeeId,
@@ -185,6 +200,7 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
         jobNumber: row.jobNumber,
         code: row.exceptionCode,
         status: row.status,
+        attendanceSource: row.attendanceSource,
         minutes: row.lateMinutes || row.earlyLeaveMinutes || row.overtimeMinutes || 0,
         attendanceEventIds: row.attendanceEventIds,
         requestIds: row.requestIds,
@@ -203,6 +219,7 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
       sourceEventIdsIncluded: true,
       requestIdsIncluded: true,
       auditIdsIncluded: true,
+      attendanceSourceDerivedFromRawEvents: true,
     },
   };
 }
