@@ -36,6 +36,7 @@ run("node", ["scripts/patch-company-logo-refresh.mjs"]);
 run("node", ["scripts/patch-company-logo-settings-preview.mjs"]);
 run("node", ["scripts/patch-manager-report-share-filename-safe.mjs"]);
 run("node", ["scripts/patch-manager-reports-historical-v2.mjs"]);
+run("node", ["scripts/patch-manager-reports-canonical.mjs"]);
 run("node", ["scripts/patch-manager-reports-damascus-date.mjs"]);
 run("node", ["scripts/patch-manager-settings-ui.mjs"]);
 run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
