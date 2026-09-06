@@ -15,7 +15,7 @@ function currentShift(employee:any,now:Date) {
   const today=dayKey(now); const yesterday=new Date(now.getTime()-86400000); const candidates=[today,dayKey(yesterday)];
   for(const day of candidates){
     const d=localDateTime(day,employee.workStartTime); const endTime=String(employee.workEndTime||""); const startMinutes=(()=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(employee.workStartTime||""));return m?Number(m[1])*60+Number(m[2]):9*60;})(); const endMinutes=(()=>{const m=/^(\d{1,2}):(\d{2})$/.exec(endTime);return m?Number(m[1])*60+Number(m[2]):16*60;})(); const overnight=endMinutes<=startMinutes; const end=new Date(d.getTime()+((overnight?endMinutes+1440:endMinutes)-startMinutes)*60000); const localDate=new Date(`${day}T00:00:00Z`); const active=kind==="ROTATION"?rotationActive(employee,localDate):workDays(employee).includes(parts(d).weekday);
-    if(active && now.getTime()>=d.getTime() && now.getTime()<=end.getTime()+60000)return {start:d,end};
+    if(active && now.getTime()>=d.getTime() && now.getTime()<=end.getTime()+60000)return {start:d,end,isWorkDay:true};
   }
   const base=localDateTime(today,employee.workStartTime); const startMinutes=(()=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(employee.workStartTime||""));return m?Number(m[1])*60+Number(m[2]):9*60;})(); const endMinutes=(()=>{const m=/^(\d{1,2}):(\d{2})$/.exec(String(employee.workEndTime||""));return m?Number(m[1])*60+Number(m[2]):16*60;})(); const overnight=endMinutes<=startMinutes; const end=new Date(base.getTime()+((overnight?endMinutes+1440:endMinutes)-startMinutes)*60000); const active=kind==="ROTATION"?rotationActive(employee,new Date(`${today}T00:00:00Z`)):workDays(employee).includes(parts(base).weekday); return {start:base,end,isWorkDay:active};
 }
