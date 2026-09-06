@@ -82,6 +82,7 @@ function dailyStatusFor(row: DailyStatusRow | undefined): Status | null {
   switch (row.status) {
     case "PRESENT": return "present";
     case "LATE": return "late";
+    case "OPEN": return "open";
     case "ABSENT": return "absent";
     case "REST": return "off";
     case "LEAVE": return "leave";
