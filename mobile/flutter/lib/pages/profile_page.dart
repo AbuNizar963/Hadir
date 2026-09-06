@@ -177,8 +177,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _securityRow(IconData icon, String title, String subtitle, Widget? trailing) {
-    return Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _brand, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5))])), if (trailing != null) trailing]),
-    );
+    return Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _brand, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5))])), if (trailing != null) trailing]);
   }
 
   Widget _futureCard(IconData icon, String title, String status) {
@@ -196,12 +195,31 @@ class _ProfilePageState extends State<ProfilePage> {
 
 class _StatusBadge extends StatelessWidget {
   const _StatusBadge();
+
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(20)), child: const Text('موثّق', style: TextStyle(color: _brand, fontSize: 9, fontWeight: FontWeight.w900)));
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(20)),
+      child: const Text('نشط', style: TextStyle(color: _brand, fontSize: 9, fontWeight: FontWeight.w900)),
+    );
+  }
 }
 
 class _ProfileSkeleton extends StatelessWidget {
   const _ProfileSkeleton();
+
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 30), children: [Container(height: 185, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28))), const SizedBox(height: 22), Container(height: 18, width: 120, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))), const SizedBox(height: 9), Container(height: 130, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22))), const SizedBox(height: 18), Container(height: 18, width: 150, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))), const SizedBox(height: 9), Container(height: 180, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22)))]);
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        Container(height: 190, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28))),
+        const SizedBox(height: 16),
+        Container(height: 116, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22))),
+        const SizedBox(height: 16),
+        Container(height: 170, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22))),
+      ],
+    );
+  }
 }
