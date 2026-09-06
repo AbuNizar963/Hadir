@@ -123,11 +123,10 @@ export async function runAutomaticVip(env: Env) {
 
     if (now >= startAt && !hasIn) {
       const record = await insertAutoAttendance(env.DB, employee, "check-in", startAt.toISOString());
-      if (record) { results.push(record); hasIn = true; }
+      if (record) { rowsForShift.push({ type: record.type, timestamp: record.timestamp }); hasIn = true; results.push(record); }
     }
 
-    // Checkout must be based on the latest check-in within this shift, not the employee's global latest event.
-    // A later event from another shift/date must not prevent the scheduled VIP checkout.
+    // Checkout is shift-scoped and includes a check-in created earlier in this same scheduler run.
     if (now >= endAt && !hasOut) {
       const latestShiftIn = [...rowsForShift]
         .filter((r) => r.type === "check-in" && Date.parse(String(r.timestamp)) <= endAt.getTime())
