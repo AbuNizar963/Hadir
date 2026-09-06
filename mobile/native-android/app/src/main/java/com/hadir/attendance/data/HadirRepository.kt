@@ -12,7 +12,8 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.UUID
 
 class SessionStore(context: Context) {
-    private val prefs = context.getSharedPreferences("hadir_native", Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences("hadir_native", Context.MODE_PRIVATE)
     var token: String?
         get() = prefs.getString("token", null)
         set(value) { prefs.edit().putString("token", value).apply() }
@@ -20,7 +21,7 @@ class SessionStore(context: Context) {
         get() {
             val existing = prefs.getString("device_id", null)
             if (existing != null) return existing
-            val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+            val androidId = Settings.Secure.getString(appContext.contentResolver, Settings.Secure.ANDROID_ID)
             val value = androidId?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
             prefs.edit().putString("device_id", value).apply()
             return value
@@ -32,7 +33,7 @@ class BearerInterceptor(private val session: SessionStore) : Interceptor {
 }
 
 class HadirRepository(context: Context) {
-    private val session = SessionStore(context.applicationContext)
+    private val session = SessionStore(context)
     private val api = Retrofit.Builder().baseUrl(HADIR_API).client(OkHttpClient.Builder().addInterceptor(BearerInterceptor(session)).build()).addConverterFactory(MoshiConverterFactory.create()).build().create(HadirApi::class.java)
 
     suspend fun login(username: String, password: String): Employee = withContext(Dispatchers.IO) {
