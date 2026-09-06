@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/api.dart';
 import '../core/session.dart';
@@ -22,6 +23,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Map<String, dynamic>? user;
   String? error;
   bool loading = true;
+  bool _loggingOut = false;
   String? _avatarUrl;
   String? _token;
 
@@ -53,6 +55,34 @@ class _ProfilePageState extends State<ProfilePage> {
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  Future<void> _logout() async {
+    if (_loggingOut) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تسجيل الخروج', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: const Text('سيتم إنهاء جلسة الموظف على هذا الجهاز. يمكنك تسجيل الدخول مرة أخرى في أي وقت.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _brand),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('تسجيل الخروج', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _loggingOut = true);
+    await HadirSession().clear();
+    if (!mounted) return;
+    context.go('/login');
   }
 
   @override
@@ -91,6 +121,10 @@ class _ProfilePageState extends State<ProfilePage> {
                         _sectionHeader('الأمان والحماية', 'عناصر التحقق المستخدمة في الحضور'),
                         const SizedBox(height: 9),
                         _securityCard(),
+                        const SizedBox(height: 18),
+                        _sectionHeader('الجلسة', 'التحكم في جلسة هذا الجهاز'),
+                        const SizedBox(height: 9),
+                        _logoutCard(),
                         const SizedBox(height: 18),
                         _sectionHeader('مزايا قادمة', 'مساحة جاهزة لتوسعات التطبيق'),
                         const SizedBox(height: 9),
@@ -195,6 +229,19 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _securityRow(IconData icon, String title, String subtitle, Widget? trailing) {
     return Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _brand, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5))])), if (trailing != null) trailing]);
+  }
+
+  Widget _logoutCard() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFE8D9D6))),
+      child: Row(children: [
+        Container(width: 44, height: 44, decoration: BoxDecoration(color: const Color(0xFFFFEFED), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.logout_rounded, color: Color(0xFFB94A3D))),
+        const SizedBox(width: 12),
+        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('جلسة الموظف', style: TextStyle(color: _ink, fontSize: 12.5, fontWeight: FontWeight.w900)), SizedBox(height: 3), Text('إنهاء الجلسة على هذا الجهاز بأمان', style: TextStyle(color: _muted, fontSize: 10.5))])),
+        FilledButton.tonal(onPressed: _loggingOut ? null : _logout, child: _loggingOut ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('خروج', style: TextStyle(fontWeight: FontWeight.w900))),
+      ]),
+    );
   }
 
   Widget _futureCard(IconData icon, String title, String status) {
