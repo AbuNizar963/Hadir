@@ -1,0 +1,125 @@
+package com.hadir.attendance
+
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+
+private const val RELEASES_URL = "https://api.github.com/repos/AbuNizar963/Hadir/releases?per_page=20"
+private const val ASSET_NAME = "hadir-android-native-production.apk"
+private const val APK_MIME = "application/vnd.android.package-archive"
+
+data class NativeUpdateInfo(
+    val versionCode: Long,
+    val versionName: String,
+    val downloadUrl: String,
+    val releaseNotes: String
+)
+
+class NativeUpdater(private val context: Context) {
+    suspend fun check(): NativeUpdateInfo? = withContext(Dispatchers.IO) {
+        runCatching {
+            val currentCode = currentVersionCode()
+            val connection = (URL(RELEASES_URL).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10_000
+                readTimeout = 15_000
+                setRequestProperty("Accept", "application/vnd.github+json")
+                setRequestProperty("User-Agent", "Hadir-Android-Updater")
+            }
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            connection.disconnect()
+
+            val releases = org.json.JSONArray(response)
+            var best: NativeUpdateInfo? = null
+            for (index in 0 until releases.length()) {
+                val release = releases.getJSONObject(index)
+                if (release.optBoolean("draft") || release.optBoolean("prerelease")) continue
+                val tag = release.optString("tag_name")
+                val code = Regex("android-v1\\.0\\.(\\d+)").find(tag)?.groupValues?.getOrNull(1)?.toLongOrNull() ?: continue
+                if (code <= currentCode || (best != null && code <= best.versionCode)) continue
+
+                val assets = release.optJSONArray("assets") ?: continue
+                var downloadUrl: String? = null
+                for (assetIndex in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(assetIndex)
+                    if (asset.optString("name") == ASSET_NAME) {
+                        downloadUrl = asset.optString("browser_download_url")
+                        break
+                    }
+                }
+                if (!downloadUrl.isNullOrBlank()) {
+                    best = NativeUpdateInfo(
+                        versionCode = code,
+                        versionName = "1.0.$code",
+                        downloadUrl = downloadUrl,
+                        releaseNotes = release.optString("body").trim()
+                    )
+                }
+            }
+            best
+        }.getOrNull()
+    }
+
+    suspend fun downloadAndInstall(update: NativeUpdateInfo): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                !context.packageManager.canRequestPackageInstalls()
+            ) {
+                throw InstallPermissionRequiredException()
+            }
+
+            val apkFile = File(context.cacheDir, "hadir-update-${update.versionCode}.apk")
+            val connection = (URL(update.downloadUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 15_000
+                readTimeout = 120_000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "Hadir-Android-Updater")
+            }
+            connection.inputStream.use { input ->
+                apkFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            connection.disconnect()
+            if (!apkFile.exists() || apkFile.length() < 1024) error("تعذر تنزيل ملف التحديث")
+
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
+            )
+            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                data = uri
+                type = APK_MIME
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        }
+    }
+
+    fun openInstallPermissionSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val uri = Uri.parse("package:${context.packageName}")
+            context.startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
+
+    private fun currentVersionCode(): Long {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong()
+    }
+}
+
+class InstallPermissionRequiredException : IllegalStateException()
