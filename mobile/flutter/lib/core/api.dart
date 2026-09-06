@@ -18,6 +18,8 @@ class HadirApi {
     return error.toString();
   }
 
+  String employeeAvatarUrl(String employeeId) => '$baseUrl/api/employees/${Uri.encodeComponent(employeeId)}/avatar';
+
   Future<Map<String, dynamic>> login(String username, String password, {required String deviceId, required String deviceLabel, required String fingerprint}) async => Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password, 'deviceId': deviceId, 'deviceLabel': deviceLabel, 'deviceFingerprint': fingerprint})).data as Map);
   Future<Map<String, dynamic>> adminLogin(String username, String password) async => Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password})).data as Map);
   Future<Map<String, dynamic>> me() async => Map<String, dynamic>.from((await dio.get('/api/me')).data as Map);
