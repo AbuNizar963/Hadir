@@ -33,11 +33,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 @Composable
 fun QrScanner(
@@ -53,7 +54,7 @@ fun QrScanner(
         hasPermission = it
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(hasPermission) {
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
@@ -71,9 +72,13 @@ fun QrScanner(
 
     var completed by remember { mutableStateOf(false) }
     val scanner = remember { BarcodeScanning.getClient() }
+    val analyzerExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
 
     DisposableEffect(Unit) {
-        onDispose { scanner.close() }
+        onDispose {
+            scanner.close()
+            analyzerExecutor.shutdown()
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -90,7 +95,7 @@ fun QrScanner(
                     val analysis = ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
-                    analysis.setAnalyzer(ContextCompat.getMainExecutor(ctx)) { proxy ->
+                    analysis.setAnalyzer(analyzerExecutor) { proxy ->
                         if (completed) {
                             proxy.close()
                             return@setAnalyzer
@@ -113,7 +118,7 @@ fun QrScanner(
                     }
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
-                        lifecycleOwner as LifecycleOwner,
+                        lifecycleOwner,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
                         analysis
