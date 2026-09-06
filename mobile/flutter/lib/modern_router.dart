@@ -12,6 +12,7 @@ import 'pages/admin_report_archive_page.dart';
 import 'pages/attendance_page.dart';
 import 'pages/attendance_insights_page.dart';
 import 'pages/employee_center_page.dart';
+import 'pages/employee_login_page.dart';
 import 'pages/jibble_history_page.dart';
 import 'pages/modern_home_page.dart';
 import 'pages/requests_page.dart';
@@ -37,7 +38,7 @@ GoRouter buildModernRouter() => GoRouter(
   },
   routes: [
     GoRoute(path: '/login', builder: (_, __) => const LoginEntryPage()),
-    GoRoute(path: '/employee-login', builder: (_, __) => const LoginPage()),
+    GoRoute(path: '/employee-login', builder: (_, __) => const EmployeeLoginPage()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
     GoRoute(path: '/admin', builder: (_, __) => const SwipeBackPage(child: AdminHomePage())),
     GoRoute(path: '/admin/manage', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
