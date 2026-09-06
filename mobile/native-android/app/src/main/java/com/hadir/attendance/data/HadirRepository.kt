@@ -42,9 +42,19 @@ class HadirRepository(context: Context) {
         session.token = response.token
         response.user
     }
-    suspend fun attendance(): List<AttendanceRecord> = withContext(Dispatchers.IO) { api.attendance() }
+    suspend fun loginAdmin(username: String, password: String): Admin = withContext(Dispatchers.IO) {
+        val response = api.loginAdmin(LoginRequest(username, password, session.deviceId, "Android", session.deviceId))
+        if (response.kind != "admin") error("هذا الحساب ليس حساب إدارة")
+        session.token = response.token
+        response.user
+    }
+    suspend fun attendance(limit: Int = 200): List<AttendanceRecord> = withContext(Dispatchers.IO) { api.attendance(limit) }
     suspend fun requests(): List<EmployeeRequest> = withContext(Dispatchers.IO) { api.requests() }
     suspend fun notifications(): List<AppNotification> = withContext(Dispatchers.IO) { api.notifications() }
+    suspend fun employees(): List<Map<String, Any?>> = withContext(Dispatchers.IO) { api.employees() }
+    suspend fun audit(limit: Int = 200): List<Map<String, Any?>> = withContext(Dispatchers.IO) { api.audit(limit) }
+    suspend fun locations(): List<Map<String, Any?>> = withContext(Dispatchers.IO) { api.locations() }
+    suspend fun updateRequest(id: String, status: String) = withContext(Dispatchers.IO) { api.updateRequest(id, RequestStatusBody(status)) }
     suspend fun createRequest(employee: Employee, type: String, reason: String, startDate: String?, endDate: String?) = withContext(Dispatchers.IO) {
         api.createRequest(CreateRequestBody(employee.id, employee.name.orEmpty(), employee.jobNumber.orEmpty(), type, reason.ifBlank { null }, startDate, endDate))
     }
