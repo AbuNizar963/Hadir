@@ -11,7 +11,7 @@ import 'pages/admin_reports_page.dart';
 import 'pages/admin_report_archive_page.dart';
 import 'pages/attendance_page.dart';
 import 'pages/employee_center_page.dart';
-import 'pages/modern_home_page.dart';
+import 'pages/jibble_workspace_page.dart';
 import 'pages/requests_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/profile_page.dart';
@@ -42,7 +42,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin/operations', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
     GoRoute(path: '/admin/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/admin/reports/archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
-    GoRoute(path: '/home', builder: (_, __) => const ModernHomePage()),
+    GoRoute(path: '/home', builder: (_, __) => const JibbleWorkspacePage()),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: HistoryPage())),
@@ -301,61 +301,24 @@ class _EntryCard extends StatelessWidget {
   final Color accent;
   final VoidCallback onTap;
 
-  const _EntryCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.accent,
-    required this.onTap,
-  });
+  const _EntryCard({required this.icon, required this.title, required this.subtitle, required this.accent, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    borderRadius: BorderRadius.circular(21),
+    child: InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(21),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(21),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .09),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(icon, color: accent, size: 23),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Color(0xFF142D27),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(color: Color(0xFF73827E), fontSize: 10.5),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 15),
-            ],
-          ),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+        child: Row(children: [
+          Container(width: 48, height: 48, decoration: BoxDecoration(color: accent.withValues(alpha: .09), borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: accent, size: 23)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Color(0xFF142D27), fontSize: 14, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: Color(0xFF73827E), fontSize: 10.5))])),
+          Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 15),
+        ]),
       ),
-    );
-  }
+    ),
+  );
 }
