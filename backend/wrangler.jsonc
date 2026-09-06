@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hadir-api",
-  "main": "src/attendance-production-gateway.ts",
+  "main": "src/attendance-safety-gateway.ts",
   "compatibility_date": "2026-08-28",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
