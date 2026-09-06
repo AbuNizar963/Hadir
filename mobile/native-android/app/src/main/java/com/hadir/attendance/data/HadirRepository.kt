@@ -57,4 +57,15 @@ class HadirRepository(context: Context) {
 
     suspend fun createChallenge(type: String, lat: Double, lng: Double, qrCode: String): AttendanceChallengeResponse =
         withContext(Dispatchers.IO) { api.challenge(AttendanceChallengeRequest(type, lat, lng, qrCode, session.deviceId)) }
+
+    suspend fun createAttendance(
+        employeeId: String,
+        type: String,
+        timestamp: String,
+        lat: Double,
+        lng: Double,
+        challengeId: String
+    ) = withContext(Dispatchers.IO) {
+        api.createAttendance(AttendanceCreateRequest(employeeId, type, timestamp, lat, lng, challengeId))
+    }
 }
