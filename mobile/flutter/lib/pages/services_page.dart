@@ -218,7 +218,7 @@ class _ServicesPageState extends State<ServicesPage> {
           width: 46,
           height: 46,
           decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(15)),
-          child: const Icon(Icons.auto_awesome_rounded, color: _brand),
+          child: Icon(icon, color: _brand),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -232,34 +232,6 @@ class _ServicesPageState extends State<ServicesPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _metric(String label, String value, IconData icon) {
-    return Container(
-      width: 145,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FBFA),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _line),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: _brand),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(fontSize: 11, color: _muted)),
-                const SizedBox(height: 2),
-                Text(value, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: _ink)),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -371,7 +343,7 @@ class _ServicesPageState extends State<ServicesPage> {
   Widget _prayerView() {
     final times = Map<String, dynamic>.from((_prayer['timings'] as Map?) ?? {});
     const names = <String, String>{'Fajr': 'الفجر', 'Sunrise': 'الشروق', 'Dhuhr': 'الظهر', 'Asr': 'العصر', 'Maghrib': 'المغرب', 'Isha': 'العشاء'};
-    const icons = <String, IconData>{'Fajr': Icons.wb_twilight_rounded, 'Sunrise': Icons.wb_sunny_outlined, 'Dhuhr': Icons.wb_sunny_rounded, 'Asr': Icons.sunny_snowing_rounded, 'Maghrib': Icons.wb_twilight_rounded, 'Isha': Icons.nightlight_round};
+    const icons = <String, IconData>{'Fajr': Icons.wb_twilight_rounded, 'Sunrise': Icons.wb_sunny_outlined, 'Dhuhr': Icons.wb_sunny_rounded, 'Asr': Icons.wb_sunny_rounded, 'Maghrib': Icons.wb_twilight_rounded, 'Isha': Icons.nightlight_round};
 
     return RefreshIndicator(
       onRefresh: _loadLocationServices,
