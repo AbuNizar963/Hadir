@@ -62,7 +62,7 @@ export default {
     }
     return base.fetch(request, env, ctx);
   },
-  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+  async scheduled(controller: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     const scheduled = (base as any).scheduled;
     if (typeof scheduled === "function") return scheduled(controller, env, ctx);
   },
