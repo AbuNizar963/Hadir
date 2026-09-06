@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +26,7 @@ class ModernHomePage extends StatefulWidget {
 
 class _ModernHomePageState extends State<ModernHomePage> {
   final _session = HadirSession();
+  Timer? _clockTimer;
   String _name = 'الموظف';
   List<dynamic> _attendance = const [];
   bool _loading = true;
@@ -33,6 +36,15 @@ class _ModernHomePageState extends State<ModernHomePage> {
   void initState() {
     super.initState();
     _load();
+    _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && _clockedIn) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -69,34 +81,33 @@ class _ModernHomePageState extends State<ModernHomePage> {
 
   List<Map<String, dynamic>> get _todayRecords {
     final today = DateTime.now();
-    return _attendance
+    final records = _attendance
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .where((item) {
-          final value = DateTime.tryParse('${item['timestamp']}');
-          return value != null && value.toLocal().year == today.year && value.toLocal().month == today.month && value.toLocal().day == today.day;
+          final value = DateTime.tryParse('${item['timestamp']}')?.toLocal();
+          return value != null &&
+              value.year == today.year &&
+              value.month == today.month &&
+              value.day == today.day;
         })
         .toList();
+    records.sort((a, b) {
+      final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return at.compareTo(bt);
+    });
+    return records;
   }
 
   bool get _clockedIn {
     final records = _todayRecords;
     if (records.isEmpty) return false;
-    records.sort((a, b) {
-      final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return at.compareTo(bt);
-    });
-    return records.last['type'] != 'check-out';
+    return records.last['type'] == 'check-in';
   }
 
   String get _trackedHours {
     final records = _todayRecords;
-    records.sort((a, b) {
-      final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return at.compareTo(bt);
-    });
     Duration total = Duration.zero;
     DateTime? checkIn;
     for (final item in records) {
@@ -105,14 +116,24 @@ class _ModernHomePageState extends State<ModernHomePage> {
       if (item['type'] == 'check-in') {
         checkIn = time;
       } else if (item['type'] == 'check-out' && checkIn != null) {
-        total += time.difference(checkIn);
+        final duration = time.difference(checkIn);
+        if (!duration.isNegative) total += duration;
         checkIn = null;
       }
     }
-    if (checkIn != null) total += DateTime.now().difference(checkIn);
+    if (checkIn != null) {
+      final duration = DateTime.now().difference(checkIn);
+      if (!duration.isNegative) total += duration;
+    }
     final hours = total.inHours;
     final minutes = total.inMinutes.remainder(60);
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+  }
+
+  DateTime? get _lastActivityTime {
+    final records = _todayRecords;
+    if (records.isEmpty) return null;
+    return DateTime.tryParse('${records.last['timestamp']}')?.toLocal();
   }
 
   @override
@@ -217,9 +238,18 @@ class _ModernHomePageState extends State<ModernHomePage> {
               _StatusPill(label: active ? 'على رأس العمل' : 'خارج الدوام', active: active),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(active ? 'تم تسجيل الحضور' : 'جاهز لتسجيل الحضور', textAlign: TextAlign.center, style: const TextStyle(color: _ink, fontSize: 18, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 5),
+          const SizedBox(height: 15),
+          Text(_trackedHours, textAlign: TextAlign.center, style: const TextStyle(color: _ink, fontSize: 32, height: 1, fontWeight: FontWeight.w900, letterSpacing: .3)),
+          const SizedBox(height: 8),
+          Text(active ? 'الوقت المتتبع اليوم' : 'إجمالي الوقت المتتبع اليوم', textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 10.5, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          if (_lastActivityTime != null)
+            Text(
+              '${active ? 'آخر دخول' : 'آخر حركة'} · ${intl.DateFormat('HH:mm', 'ar').format(_lastActivityTime!)}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _muted, fontSize: 10),
+            ),
+          const SizedBox(height: 14),
           Text(active ? 'يمكنك تسجيل الانصراف عند انتهاء دوامك.' : 'استخدم الموقع والجهاز وQR لإكمال عملية التحقق.', textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 11, height: 1.4)),
           const SizedBox(height: 16),
           SizedBox(
@@ -265,9 +295,11 @@ class _ModernHomePageState extends State<ModernHomePage> {
     return Row(
       children: [
         Expanded(child: _ActionCard(icon: Icons.history_rounded, label: 'السجل', onTap: () => context.push('/history'))),
-        const SizedBox(width: 9),
+        const SizedBox(width: 8),
         Expanded(child: _ActionCard(icon: Icons.description_outlined, label: 'الطلبات', onTap: () => context.push('/requests'))),
-        const SizedBox(width: 9),
+        const SizedBox(width: 8),
+        Expanded(child: _ActionCard(icon: Icons.insights_outlined, label: 'الإحصاءات', onTap: () => context.push('/insights'))),
+        const SizedBox(width: 8),
         Expanded(child: _ActionCard(icon: Icons.apps_rounded, label: 'الخدمات', onTap: () => context.push('/services'))),
       ],
     );
@@ -283,7 +315,16 @@ class _ModernHomePageState extends State<ModernHomePage> {
     if (_attendance.isEmpty) {
       return _emptyCard('لا توجد حركات مسجلة بعد.', Icons.event_available_outlined);
     }
-    return Column(children: _attendance.take(4).map(_activityTile).toList());
+    final recent = _attendance
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    recent.sort((a, b) {
+      final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bt.compareTo(at);
+    });
+    return Column(children: recent.take(4).map(_activityTile).toList());
   }
 
   Widget _activityTile(dynamic item) {
@@ -393,7 +434,7 @@ class _ActionCard extends StatelessWidget {
   final VoidCallback onTap;
   const _ActionCard({required this.icon, required this.label, required this.onTap});
   @override
-  Widget build(BuildContext context) => Material(color: Colors.white, borderRadius: BorderRadius.circular(17), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(17), child: Container(padding: const EdgeInsets.symmetric(vertical: 13), decoration: BoxDecoration(borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)), child: Column(children: [Icon(icon, color: _brand, size: 22), const SizedBox(height: 7), Text(label, style: const TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w900))]))));
+  Widget build(BuildContext context) => Material(color: Colors.white, borderRadius: BorderRadius.circular(17), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(17), child: Container(padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 2), decoration: BoxDecoration(borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)), child: Column(children: [Icon(icon, color: _brand, size: 20), const SizedBox(height: 6), Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 9.5, fontWeight: FontWeight.w900))]))));
 }
 
 class _ActivitySkeleton extends StatelessWidget {
