@@ -732,9 +732,9 @@ class _CircleAction extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             customBorder: const CircleBorder(),
-            child: const Padding(
-              padding: EdgeInsets.all(11),
-              child: Icon(Icons.notifications_none_rounded, color: _ink, size: 21),
+            child: Padding(
+              padding: const EdgeInsets.all(11),
+              child: Icon(icon, color: _ink, size: 21),
             ),
           ),
         ),
