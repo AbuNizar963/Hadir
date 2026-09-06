@@ -17,6 +17,8 @@ data class AttendanceCreateRequest(val employeeId: String, val type: String, val
 data class AttendanceCreateResponse(val ok: Boolean)
 data class EmployeeRequest(val id: String, val employeeId: String, val employeeName: String? = null, val jobNumber: String? = null, val type: String, val reason: String? = null, val status: String, val createdAt: String, val startDate: String? = null, val endDate: String? = null)
 data class CreateRequestBody(val employeeId: String, val employeeName: String, val jobNumber: String, val type: String, val reason: String? = null, val startDate: String? = null, val endDate: String? = null)
+data class AppNotification(val id: String, val title: String, val body: String? = null, val message: String? = null, val type: String = "info", val read: Boolean = false, val createdAt: String)
+data class NotificationListResponse(val notifications: List<AppNotification> = emptyList())
 
 interface HadirApi {
     @POST("api/auth/login") suspend fun login(@Body request: LoginRequest): LoginResponse<Employee>
@@ -26,4 +28,5 @@ interface HadirApi {
     @POST("api/attendance") suspend fun createAttendance(@Body request: AttendanceCreateRequest): AttendanceCreateResponse
     @GET("api/requests") suspend fun requests(): List<EmployeeRequest>
     @POST("api/requests") suspend fun createRequest(@Body request: CreateRequestBody): Map<String, Any?>
+    @GET("api/notifications") suspend fun notifications(): List<AppNotification>
 }
