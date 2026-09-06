@@ -139,11 +139,20 @@ export default {
 
   async scheduled(controller: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     try {
-      const run = runAutomaticVip(env);
-      ctx.waitUntil(run);
-      await run;
+      // Preserve the complete upstream scheduled chain. automation-entry runs the
+      // general automatic-attendance engine after its own upstream scheduled work.
+      const upstream = (base as any).scheduled;
+      if (typeof upstream === "function") {
+        await upstream(controller, env, ctx);
+      }
+
+      // Keep the dedicated VIP engine as a second, idempotent pass so VIP rules
+      // continue to work even when the general automatic engine has no matching row.
+      const vipRun = runAutomaticVip(env);
+      ctx.waitUntil(vipRun);
+      await vipRun;
     } catch (error) {
-      console.error("automatic-vip cron failed", error);
+      console.error("automatic attendance cron failed", error);
     }
   },
 };
