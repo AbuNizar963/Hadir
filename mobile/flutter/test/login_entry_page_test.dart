@@ -24,9 +24,7 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      MaterialApp.router(routerConfig: router),
-    );
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
 
     expect(find.text('مساحة الموظف'), findsOneWidget);
@@ -37,5 +35,11 @@ void main() {
     await tester.tap(find.text('مساحة الموظف'));
     await tester.pumpAndSettle();
     expect(find.text('employee'), findsOneWidget);
+
+    router.go('/login');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('مساحة الإدارة'));
+    await tester.pumpAndSettle();
+    expect(find.text('admin'), findsOneWidget);
   });
 }
