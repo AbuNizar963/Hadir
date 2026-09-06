@@ -56,7 +56,10 @@ class AttendanceService {
     return Geolocator.distanceBetween(lat1, lon1, lat2, lon2);
   }
 
-  Future<AttendanceResult> record({required String type, required String qrCode}) async {
+  Future<AttendanceChallenge> prepareChallenge({required String type, required String qrCode}) async {
+    final code = qrCode.trim();
+    if (code.isEmpty) throw Exception('امسح رمز QR أو أدخله يدويًا.');
+
     final place = await workplace();
     final lat = double.tryParse('${place['lat']}');
     final lng = double.tryParse('${place['lng']}');
@@ -78,14 +81,30 @@ class AttendanceService {
       type: type,
       lat: position.latitude,
       lng: position.longitude,
-      qrCode: qrCode.trim(),
+      qrCode: code,
       deviceId: deviceId,
     );
     final challengeId = challenge['challengeId']?.toString();
-    if (challengeId == null || challengeId.isEmpty) {
+    final expiresAt = DateTime.tryParse('${challenge['expiresAt'] ?? ''}');
+    if (challengeId == null || challengeId.isEmpty || expiresAt == null) {
       throw Exception('لم يكتمل التحقق من الحضور على الخادم.');
     }
 
+    return AttendanceChallenge(
+      challengeId: challengeId,
+      expiresAt: expiresAt.toUtc(),
+      distance: distance,
+      accuracyMeters: position.accuracy,
+      locationName: '${place['name'] ?? 'موقع العمل'}',
+      radiusMeters: radius,
+    );
+  }
+
+  Future<AttendanceResult> completeChallenge({
+    required String type,
+    required String qrCode,
+    required AttendanceChallenge challenge,
+  }) async {
     final profile = await api.employeeProfile();
     final employee = Map<String, dynamic>.from(profile['employee'] is Map ? profile['employee'] : profile);
     await api.createAttendance({
@@ -94,20 +113,49 @@ class AttendanceService {
       'employeeName': employee['name'],
       'type': type,
       'timestamp': DateTime.now().toUtc().toIso8601String(),
-      'lat': position.latitude,
-      'lng': position.longitude,
-      'distanceMeters': distance,
-      'deviceId': deviceId,
+      'lat': challenge.latitude,
+      'lng': challenge.longitude,
+      'distanceMeters': challenge.distance,
+      'deviceId': await session.deviceId(),
       'qrCode': qrCode.trim(),
-      'locationId': place['id'],
-      'challengeId': challengeId,
+      'locationId': challenge.locationId,
+      'challengeId': challenge.challengeId,
     });
     return AttendanceResult(
       DateTime.now(),
-      distance,
-      accuracyMeters: position.accuracy,
+      challenge.distance,
+      accuracyMeters: challenge.accuracyMeters,
     );
   }
+
+  Future<AttendanceResult> record({required String type, required String qrCode}) async {
+    final challenge = await prepareChallenge(type: type, qrCode: qrCode);
+    return completeChallenge(type: type, qrCode: qrCode, challenge: challenge);
+  }
+}
+
+class AttendanceChallenge {
+  final String challengeId;
+  final DateTime expiresAt;
+  final double distance;
+  final double accuracyMeters;
+  final String locationName;
+  final double radiusMeters;
+  final double latitude;
+  final double longitude;
+  final String locationId;
+
+  const AttendanceChallenge({
+    required this.challengeId,
+    required this.expiresAt,
+    required this.distance,
+    required this.accuracyMeters,
+    required this.locationName,
+    required this.radiusMeters,
+    this.latitude = 0,
+    this.longitude = 0,
+    this.locationId = 'main',
+  });
 }
 
 class AttendanceResult {
