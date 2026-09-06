@@ -96,7 +96,7 @@ export async function runAutomaticVip(env: Env) {
 
   const now = new Date();
   const today = dateKey(now, tz);
-  const rows = await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,location_id AS locationId,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson,is_vip AS isVip FROM employees WHERE status='active' AND is_vip=1").all<any>();
+  const rows = await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,location_id AS locationId,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees WHERE status='active' AND is_vip=1 AND (auto_check_in=1 OR auto_check_out=1)").all<any>();
   const results: any[] = [];
 
   for (const employee of (rows.results || []) as any[]) {
@@ -121,13 +121,13 @@ export async function runAutomaticVip(env: Env) {
     let hasIn = rowsForShift.some((r) => r.type === "check-in");
     const hasOut = rowsForShift.some((r) => r.type === "check-out");
 
-    if (now >= startAt && !hasIn) {
+    if (employee.autoCheckIn && now >= startAt && !hasIn) {
       const record = await insertAutoAttendance(env.DB, employee, "check-in", startAt.toISOString());
       if (record) { results.push(record); hasIn = true; }
     }
 
     const latest = await env.DB.prepare("SELECT type,timestamp FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1").bind(employee.id).first<any>();
-    if (now >= endAt && !hasOut && latest?.type === "check-in" && Date.parse(String(latest.timestamp)) <= endAt.getTime()) {
+    if (employee.autoCheckOut && now >= endAt && !hasOut && latest?.type === "check-in" && Date.parse(String(latest.timestamp)) <= endAt.getTime()) {
       const record = await insertAutoAttendance(env.DB, employee, "check-out", endAt.toISOString());
       if (record) results.push(record);
     }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key><string>حاضر</string>
+    <key>CFBundleIdentifier</key><string>com.hadir.attendance</string>
+    <key>CFBundleName</key><string>Hadir</string>
+    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>LSRequiresIPhoneOS</key><true/>
+    <key>NSCameraUsageDescription</key><string>يستخدم حاضر الكاميرا لمسح رمز الحضور QR.</string>
+    <key>NSLocationWhenInUseUsageDescription</key><string>يستخدم حاضر موقعك للتحقق من موقع العمل عند تسجيل الحضور.</string>
+    <key>UILaunchStoryboardName</key><string></string>
+</dict>
+</plist>

@@ -1,0 +1,99 @@
+name: Flutter Mobile
+
+on:
+  push:
+    branches: [android-native]
+    paths:
+      - 'mobile/flutter/**'
+      - '.github/workflows/flutter-mobile.yml'
+  pull_request:
+    paths:
+      - 'mobile/flutter/**'
+      - '.github/workflows/flutter-mobile.yml'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile/flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - name: Generate Android wrapper when incomplete
+        run: |
+          if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            flutter create --platforms=android --project-name hadir .
+          fi
+          rm -f android/build.gradle.kts android/settings.gradle.kts android/app/build.gradle.kts
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p ../build/app/outputs/flutter-apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../build/app/outputs/flutter-apk/app-debug.apk
+      - name: Prepare ephemeral release signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/ci-release.keystore \
+            -storepass changeit \
+            -keypass changeit \
+            -alias hadir-ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -dname "CN=HADIR CI, OU=Build, O=HADIR, L=NA, ST=NA, C=US"
+      - name: Build Android release AAB
+        env:
+          HADIR_RELEASE_KEYSTORE: ../ci-release.keystore
+          HADIR_RELEASE_STORE_PASSWORD: changeit
+          HADIR_RELEASE_KEY_ALIAS: hadir-ci
+          HADIR_RELEASE_KEY_PASSWORD: changeit
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --stacktrace
+          test -f app/build/outputs/bundle/release/app-release.aab
+          mkdir -p ../build/app/outputs/bundle/release
+          cp app/build/outputs/bundle/release/app-release.aab ../build/app/outputs/bundle/release/app-release.aab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hadir-android-debug
+          path: mobile/flutter/build/app/outputs/flutter-apk/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hadir-android-release-aab
+          path: mobile/flutter/build/app/outputs/bundle/release/app-release.aab
+
+  ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile/flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - name: Generate iOS project files when incomplete
+        run: |
+          if [ ! -d ios/Runner.xcodeproj ]; then
+            flutter create --platforms=ios --project-name hadir .
+          fi
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build ios --no-codesign
