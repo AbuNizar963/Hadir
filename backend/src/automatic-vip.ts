@@ -126,10 +126,16 @@ export async function runAutomaticVip(env: Env) {
       if (record) { results.push(record); hasIn = true; }
     }
 
-    const latest = await env.DB.prepare("SELECT type,timestamp FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1").bind(employee.id).first<any>();
-    if (now >= endAt && !hasOut && latest?.type === "check-in" && Date.parse(String(latest.timestamp)) <= endAt.getTime()) {
-      const record = await insertAutoAttendance(env.DB, employee, "check-out", endAt.toISOString());
-      if (record) results.push(record);
+    // Checkout must be based on the latest check-in within this shift, not the employee's global latest event.
+    // A later event from another shift/date must not prevent the scheduled VIP checkout.
+    if (now >= endAt && !hasOut) {
+      const latestShiftIn = [...rowsForShift]
+        .filter((r) => r.type === "check-in" && Date.parse(String(r.timestamp)) <= endAt.getTime())
+        .sort((a, b) => Date.parse(String(b.timestamp)) - Date.parse(String(a.timestamp)))[0];
+      if (latestShiftIn) {
+        const record = await insertAutoAttendance(env.DB, employee, "check-out", endAt.toISOString());
+        if (record) results.push(record);
+      }
     }
   }
 
