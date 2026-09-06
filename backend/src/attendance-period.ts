@@ -1,0 +1,125 @@
+export type AttendanceShift = {
+  start: Date;
+  end: Date;
+  isWorkDay: boolean;
+  kind: "ADMIN" | "ROTATION";
+};
+
+const DAY_MS = 86_400_000;
+const DEFAULT_TZ = "Asia/Damascus";
+
+function parts(date: Date, tz: string) {
+  const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date);
+  const get = (t: string) => p.find((x) => x.type === t)?.value || "";
+  return { year: Number(get("year")), month: Number(get("month")), day: Number(get("day")), weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday")), hour: Number(get("hour")) % 24, minute: Number(get("minute")) };
+}
+
+export function dateKey(date: Date, tz = DEFAULT_TZ) {
+  const p = parts(date, tz);
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
+function dayNumber(day: string) {
+  return Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10))) / DAY_MS;
+}
+
+function addDays(day: string, days: number) {
+  return new Date((dayNumber(day) + days) * DAY_MS).toISOString().slice(0, 10);
+}
+
+function offsetMinutes(day: string, tz: string) {
+  const noon = new Date(`${day}T12:00:00Z`);
+  const p = parts(noon, tz);
+  return Math.round((Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - noon.getTime()) / 60000);
+}
+
+export function localDateTime(day: string, value: string | null | undefined, tz = DEFAULT_TZ) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(value || ""));
+  const h = Math.min(23, Math.max(0, Number(m?.[1] ?? 9)));
+  const minute = Math.min(59, Math.max(0, Number(m?.[2] ?? 0)));
+  return new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), h, minute) - offsetMinutes(day, tz) * 60000);
+}
+
+function validTime(value: unknown) {
+  return /^(\d{1,2}):(\d{2})$/.test(String(value || ""));
+}
+
+function workDays(employee: any) {
+  try {
+    const parsed = JSON.parse(String(employee.workDaysJson || "[]"));
+    if (Array.isArray(parsed)) {
+      const values = [...new Set(parsed.map(Number).filter((n: number) => Number.isInteger(n) && n >= 0 && n <= 6))];
+      if (values.length) return values;
+    }
+  } catch {}
+  return [0, 1, 2, 3, 4];
+}
+
+function rotationShiftForDay(employee: any, periodStartDay: string, tz: string): AttendanceShift {
+  const start = localDateTime(periodStartDay, employee.workStartTime || "09:00", tz);
+  const end = localDateTime(addDays(periodStartDay, Math.max(1, Math.floor(Number(employee.rotationDaysOn ?? 4)))), employee.workEndTime || employee.workStartTime || "09:00", tz);
+  return { start, end, isWorkDay: true, kind: "ROTATION" };
+}
+
+export function getAttendanceShift(employee: any, instant = new Date(), tz = DEFAULT_TZ): AttendanceShift {
+  const kind = String(employee?.scheduleType || "ADMIN").trim().toUpperCase();
+  if (kind === "ROTATION") {
+    const startDay = String(employee.rotationStartDate || "").slice(0, 10);
+    const on = Math.max(1, Math.floor(Number(employee.rotationDaysOn ?? 4)));
+    const off = Math.max(0, Math.floor(Number(employee.rotationDaysOff ?? 4)));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDay) || !validTime(employee.workStartTime) || !validTime(employee.workEndTime) || on + off <= 0) return { start: instant, end: instant, isWorkDay: false, kind: "ROTATION" };
+    const firstStart = localDateTime(startDay, employee.workStartTime, tz);
+    if (instant.getTime() < firstStart.getTime()) return { start: firstStart, end: firstStart, isWorkDay: false, kind: "ROTATION" };
+    const targetDay = dateKey(instant, tz);
+    const diff = Math.floor(dayNumber(targetDay) - dayNumber(startDay));
+    const cycle = on + off;
+    const cycleIndex = Math.floor(diff / cycle);
+    const cycleDay = diff - cycleIndex * cycle;
+    const periodStartDay = addDays(startDay, cycleIndex * cycle);
+    const shift = rotationShiftForDay(employee, periodStartDay, tz);
+    if (cycleDay < on) return shift;
+    if (cycleDay === on && instant.getTime() < shift.end.getTime()) return shift;
+    const nextStartDay = addDays(periodStartDay, cycle);
+    const nextStart = localDateTime(nextStartDay, employee.workStartTime, tz);
+    return { start: nextStart, end: nextStart, isWorkDay: false, kind: "ROTATION" };
+  }
+
+  const today = dateKey(instant, tz);
+  const yesterday = addDays(today, -1);
+  for (const day of [today, yesterday]) {
+    const start = localDateTime(day, employee.workStartTime || "09:00", tz);
+    const rawEnd = localDateTime(day, employee.workEndTime || "16:00", tz);
+    const startMinutes = Number(String(employee.workStartTime || "09:00").split(":")[0]) * 60 + Number(String(employee.workStartTime || "09:00").split(":")[1] || 0);
+    const endMinutes = Number(String(employee.workEndTime || "16:00").split(":")[0]) * 60 + Number(String(employee.workEndTime || "16:00").split(":")[1] || 0);
+    const end = rawEnd.getTime() <= start.getTime() ? new Date(rawEnd.getTime() + DAY_MS) : rawEnd;
+    if (workDays(employee).includes(parts(start, tz).weekday) && instant.getTime() >= start.getTime() && instant.getTime() <= end.getTime() + 60000) return { start, end, isWorkDay: true, kind: "ADMIN" };
+    void startMinutes; void endMinutes;
+  }
+  const start = localDateTime(today, employee.workStartTime || "09:00", tz);
+  const rawEnd = localDateTime(today, employee.workEndTime || "16:00", tz);
+  const end = rawEnd.getTime() <= start.getTime() ? new Date(rawEnd.getTime() + DAY_MS) : rawEnd;
+  return { start, end, isWorkDay: workDays(employee).includes(parts(start, tz).weekday), kind: "ADMIN" };
+}
+
+export function getAttendanceShiftForDay(employee: any, day: string, tz = DEFAULT_TZ): AttendanceShift {
+  const kind = String(employee?.scheduleType || "ADMIN").trim().toUpperCase();
+  if (kind === "ROTATION") {
+    const startDay = String(employee.rotationStartDate || "").slice(0, 10);
+    const on = Math.max(1, Math.floor(Number(employee.rotationDaysOn ?? 4)));
+    const off = Math.max(0, Math.floor(Number(employee.rotationDaysOff ?? 4)));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDay) || on + off <= 0) return { start: localDateTime(day, employee.workStartTime, tz), end: localDateTime(day, employee.workEndTime, tz), isWorkDay: false, kind: "ROTATION" };
+    const diff = Math.floor(dayNumber(day) - dayNumber(startDay));
+    if (diff < 0) return { start: localDateTime(day, employee.workStartTime, tz), end: localDateTime(day, employee.workEndTime, tz), isWorkDay: false, kind: "ROTATION" };
+    const cycle = on + off;
+    const cycleIndex = Math.floor(diff / cycle);
+    const cycleDay = diff - cycleIndex * cycle;
+    const periodStartDay = addDays(startDay, cycleIndex * cycle);
+    if (cycleDay >= on) return { start: localDateTime(periodStartDay, employee.workStartTime, tz), end: localDateTime(addDays(periodStartDay, on), employee.workEndTime || employee.workStartTime, tz), isWorkDay: false, kind: "ROTATION" };
+    return rotationShiftForDay(employee, periodStartDay, tz);
+  }
+  const start = localDateTime(day, employee.workStartTime || "09:00", tz);
+  const rawEnd = localDateTime(day, employee.workEndTime || "16:00", tz);
+  const end = rawEnd.getTime() <= start.getTime() ? new Date(rawEnd.getTime() + DAY_MS) : rawEnd;
+  const weekday = parts(start, tz).weekday;
+  return { start, end, isWorkDay: workDays(employee).includes(weekday), kind: "ADMIN" };
+}
