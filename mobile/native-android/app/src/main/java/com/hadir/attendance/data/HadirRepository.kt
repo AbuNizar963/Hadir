@@ -43,6 +43,7 @@ class HadirRepository(context: Context) {
     }
     suspend fun attendance(): List<AttendanceRecord> = withContext(Dispatchers.IO) { api.attendance() }
     suspend fun requests(): List<EmployeeRequest> = withContext(Dispatchers.IO) { api.requests() }
+    suspend fun notifications(): List<AppNotification> = withContext(Dispatchers.IO) { api.notifications() }
     suspend fun createRequest(employee: Employee, type: String, reason: String, startDate: String?, endDate: String?) = withContext(Dispatchers.IO) {
         api.createRequest(CreateRequestBody(employee.id, employee.name.orEmpty(), employee.jobNumber.orEmpty(), type, reason.ifBlank { null }, startDate, endDate))
     }
