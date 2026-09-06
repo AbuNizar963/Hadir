@@ -1,6 +1,6 @@
 import base, { HadirRealtime } from "./automation-entry";
 import { handleDeviceRebind } from "./device-rebind-api";
-import { handleDailyStatus } from "./daily-status-api";
+import { handleDailyStatus } from "./daily-status-canonical";
 import { handleProfessionalAttendanceReport } from "./professional-attendance-report-api";
 import { handleReportArchive } from "./report-archive";
 import { handleCompanyLogoRequest } from "./company-logo";
