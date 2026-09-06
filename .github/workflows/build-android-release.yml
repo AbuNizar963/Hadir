@@ -110,7 +110,7 @@ jobs:
 
       - name: Build native release APK
         working-directory: mobile/native-android
-        run: gradle --no-daemon --stacktrace :app:assembleRelease
+        run: gradle --no-daemon --stacktrace :app:assembleRelease -PversionCode=${{ github.run_number }} -PversionName=1.0.${{ github.run_number }}
 
       - name: Sign production APK
         shell: bash
@@ -130,7 +130,7 @@ jobs:
             app/build/outputs/apk/release/app-release-unsigned.apk
           "$APKSIGNER" verify --verbose app-release-signed.apk
 
-      - name: Verify target SDK and package name
+      - name: Verify target SDK, package name and version
         shell: bash
         working-directory: mobile/native-android
         run: |
@@ -142,10 +142,15 @@ jobs:
           APKANALYZER="$(command -v apkanalyzer || echo "$APKANALYZER")"
           TARGET_SDK="$("$APKANALYZER" manifest target-sdk app-release-signed.apk)"
           PACKAGE_NAME="$("$APKANALYZER" manifest application-id app-release-signed.apk)"
+          VERSION_CODE="$("$APKANALYZER" manifest version-code app-release-signed.apk)"
+          VERSION_NAME="$("$APKANALYZER" manifest version-name app-release-signed.apk)"
           echo "Hadir Native APK targetSdkVersion=$TARGET_SDK"
           echo "Hadir Native APK applicationId=$PACKAGE_NAME"
+          echo "Hadir Native APK versionCode=$VERSION_CODE versionName=$VERSION_NAME"
           test "$TARGET_SDK" = "36"
           test "$PACKAGE_NAME" = "com.hadir.attendance"
+          test "$VERSION_CODE" = "${{ github.run_number }}"
+          test "$VERSION_NAME" = "1.0.${{ github.run_number }}"
 
       - name: Print production certificate fingerprint
         shell: bash
