@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string-array name="asset_statements">
-        <item>{"include":["https://hadir-9rq.pages.dev/.well-known/assetlinks.json"]}</item>
-    </string-array>
-</resources>
