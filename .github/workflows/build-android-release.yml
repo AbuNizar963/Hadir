@@ -1,6 +1,9 @@
-name: Build Hadir Android Release
+name: Build Hadir Android Native Release
 
 on:
+  push:
+    branches:
+      - android-native
   workflow_dispatch:
     inputs:
       source_ref:
@@ -14,22 +17,22 @@ permissions:
 
 jobs:
   build-android-release:
-    name: Build signed production Android APK
+    name: Build signed native Android APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout source ref
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ inputs.source_ref || github.ref_name }}
           fetch-depth: 1
 
-      - name: Verify Android project files
+      - name: Verify native Android project files
         shell: bash
         run: |
-          test -f mobile/android/settings.gradle || { echo "Missing mobile/android/settings.gradle"; exit 1; }
-          test -f mobile/android/build.gradle || { echo "Missing mobile/android/build.gradle"; exit 1; }
-          test -f mobile/android/app/build.gradle || { echo "Missing mobile/android/app/build.gradle"; exit 1; }
+          test -f mobile/native-android/settings.gradle.kts || { echo "Missing mobile/native-android/settings.gradle.kts"; exit 1; }
+          test -f mobile/native-android/build.gradle.kts || { echo "Missing mobile/native-android/build.gradle.kts"; exit 1; }
+          test -f mobile/native-android/app/build.gradle.kts || { echo "Missing mobile/native-android/app/build.gradle.kts"; exit 1; }
           echo "Native Android source is present at commit $(git rev-parse HEAD)"
 
       - name: Set up JDK 17
@@ -105,13 +108,13 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/hadir-release.keystore"
           test -s "$RUNNER_TEMP/hadir-release.keystore"
 
-      - name: Build unsigned release APK
-        working-directory: mobile/android
+      - name: Build native release APK
+        working-directory: mobile/native-android
         run: gradle --no-daemon --stacktrace :app:assembleRelease
 
       - name: Sign production APK
         shell: bash
-        working-directory: mobile/android
+        working-directory: mobile/native-android
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -129,18 +132,24 @@ jobs:
 
       - name: Verify target SDK and package name
         shell: bash
-        working-directory: mobile/android
+        working-directory: mobile/native-android
         run: |
-          TARGET_SDK="$(command -v apkanalyzer >/dev/null 2>&1 && apkanalyzer manifest target-sdk app-release-signed.apk || "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer" manifest target-sdk app-release-signed.apk)"
-          PACKAGE_NAME="$(command -v apkanalyzer >/dev/null 2>&1 && apkanalyzer manifest application-id app-release-signed.apk || "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer" manifest application-id app-release-signed.apk)"
-          echo "Hadir APK targetSdkVersion=$TARGET_SDK"
-          echo "Hadir APK applicationId=$PACKAGE_NAME"
+          APKANALYZER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer"
+          if ! command -v apkanalyzer >/dev/null 2>&1 && [ ! -x "$APKANALYZER" ]; then
+            echo "apkanalyzer was not found"
+            exit 1
+          fi
+          APKANALYZER="$(command -v apkanalyzer || echo "$APKANALYZER")"
+          TARGET_SDK="$("$APKANALYZER" manifest target-sdk app-release-signed.apk)"
+          PACKAGE_NAME="$("$APKANALYZER" manifest application-id app-release-signed.apk)"
+          echo "Hadir Native APK targetSdkVersion=$TARGET_SDK"
+          echo "Hadir Native APK applicationId=$PACKAGE_NAME"
           test "$TARGET_SDK" = "36"
           test "$PACKAGE_NAME" = "com.hadir.attendance"
 
       - name: Print production certificate fingerprint
         shell: bash
-        working-directory: mobile/android
+        working-directory: mobile/native-android
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -154,6 +163,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hadir-android-native-production-api36-apk
-          path: mobile/android/app-release-signed.apk
+          path: mobile/native-android/app-release-signed.apk
           if-no-files-found: error
           retention-days: 14
