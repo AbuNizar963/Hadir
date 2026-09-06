@@ -14,7 +14,6 @@ import 'pages/employee_center_page.dart';
 import 'pages/employee_login_page.dart';
 import 'pages/jibble_history_page.dart';
 import 'pages/jibble_workspace_page.dart';
-import 'pages/modern_home_page.dart';
 import 'pages/requests_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/profile_page.dart';
