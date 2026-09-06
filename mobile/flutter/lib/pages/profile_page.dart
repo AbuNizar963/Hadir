@@ -4,6 +4,7 @@ import '../core/api.dart';
 import '../core/session.dart';
 
 const _brand = Color(0xFF0B6B5A);
+const _brandDark = Color(0xFF064B40);
 const _soft = Color(0xFFE8F5F0);
 const _canvas = Color(0xFFF4F7F6);
 const _ink = Color(0xFF142D27);
@@ -29,6 +30,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _load() async {
+    if (mounted) setState(() => loading = true);
     try {
       final data = await HadirApi(token: await HadirSession().token()).me();
       final raw = data['user'] is Map ? data['user'] : data;
@@ -52,13 +54,14 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Scaffold(
         backgroundColor: _canvas,
         appBar: AppBar(
-          title: const Text('حسابي', style: TextStyle(fontWeight: FontWeight.w900)),
+          title: const Text('حسابي', style: TextStyle(fontWeight: FontWeight.w900, color: _ink)),
           backgroundColor: _canvas,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
+          actions: [IconButton(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh_rounded, color: _ink))],
         ),
         body: loading
-            ? const Center(child: CircularProgressIndicator(color: _brand))
+            ? const _ProfileSkeleton()
             : error != null
                 ? _errorView()
                 : RefreshIndicator(
@@ -66,24 +69,26 @@ class _ProfilePageState extends State<ProfilePage> {
                     onRefresh: _load,
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 34),
                       children: [
                         _identityCard(),
-                        const SizedBox(height: 12),
-                        _section('بيانات الموظف', [
+                        const SizedBox(height: 16),
+                        _sectionHeader('الملف الشخصي', 'بيانات حسابك في HADIR'),
+                        const SizedBox(height: 9),
+                        _infoGroup([
                           _infoTile(Icons.badge_outlined, 'رقم الموظف', '${user?['username'] ?? user?['jobNumber'] ?? '—'}'),
                           _infoTile(Icons.work_outline_rounded, 'الدور', 'موظف'),
                         ]),
-                        const SizedBox(height: 12),
-                        _section('الأمان والجهاز', [
-                          _infoTile(Icons.phone_android_rounded, 'الجهاز', 'مرتبط بحساب الموظف', trailing: const _StatusBadge()),
-                          _infoTile(Icons.shield_outlined, 'حماية الحضور', 'الموقع + الجهاز + QR'),
-                        ]),
-                        const SizedBox(height: 12),
-                        _section('المزايا القادمة', [
-                          _futureTile(Icons.fingerprint_rounded, 'تسجيل دخول بالبصمة', 'قريباً'),
-                          _futureTile(Icons.dark_mode_outlined, 'الوضع الليلي', 'قريباً'),
-                        ]),
+                        const SizedBox(height: 18),
+                        _sectionHeader('الأمان والحماية', 'عناصر التحقق المستخدمة في الحضور'),
+                        const SizedBox(height: 9),
+                        _securityCard(),
+                        const SizedBox(height: 18),
+                        _sectionHeader('مزايا قادمة', 'مساحة جاهزة لتوسعات التطبيق'),
+                        const SizedBox(height: 9),
+                        _futureCard(Icons.fingerprint_rounded, 'تسجيل الدخول بالبصمة', 'قريباً'),
+                        const SizedBox(height: 9),
+                        _futureCard(Icons.dark_mode_outlined, 'الوضع الليلي', 'قريباً'),
                       ],
                     ),
                   ),
@@ -92,114 +97,111 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _identityCard() {
+    final name = '${user?['name'] ?? 'الموظف'}';
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [_brand, Color(0xFF064B40)],
-        ),
-        borderRadius: BorderRadius.circular(27),
-        boxShadow: const [BoxShadow(color: Color(0x220B6B5A), blurRadius: 25, offset: Offset(0, 12))],
+        gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_brand, _brandDark]),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [BoxShadow(color: Color(0x250B6B5A), blurRadius: 28, offset: Offset(0, 13))],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 66,
-            height: 66,
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), shape: BoxShape.circle),
-            child: const Icon(Icons.person_rounded, color: Colors.white, size: 34),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${user?['name'] ?? 'الموظف'}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 4),
-                const Text('حساب الموظف', style: TextStyle(color: Colors.white70, fontSize: 11)),
-              ],
-            ),
-          ),
-          const Icon(Icons.verified_user_rounded, color: Color(0xFF91E3C6), size: 23),
-        ],
-      ),
-    );
-  }
-
-  Widget _section(String title, List<Widget> children) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(15, 11, 15, 5),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(title, style: const TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w900)),
-            ),
+          Row(
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: .18))),
+                child: const Icon(Icons.person_rounded, color: Colors.white, size: 35),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 5),
+                  const Text('حساب الموظف', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+              const Icon(Icons.verified_user_rounded, color: Color(0xFF91E3C6), size: 24),
+            ],
           ),
-          ...children,
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .09), borderRadius: BorderRadius.circular(16)),
+            child: const Row(children: [Icon(Icons.shield_rounded, color: Color(0xFFB7EBD8), size: 18), SizedBox(width: 9), Expanded(child: Text('الحساب محمي بطبقات تحقق الحضور', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)))]),
+          ),
         ],
       ),
     );
   }
 
-  Widget _infoTile(IconData icon, String title, String subtitle, {Widget? trailing}) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)),
-        child: Icon(icon, color: _brand, size: 20),
-      ),
-      title: Text(title, style: const TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w800)),
-      subtitle: Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5)),
-      trailing: trailing,
+  Widget _sectionHeader(String title, String subtitle) {
+    return Row(
+      children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5))])),
+      ],
     );
   }
 
-  Widget _futureTile(IconData icon, String title, String status) {
+  Widget _infoGroup(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
+      child: Column(children: [for (var i = 0; i < children.length; i++) ...[children[i], if (i < children.length - 1) const Divider(height: 1, indent: 68, color: _line)]]),
+    );
+  }
+
+  Widget _infoTile(IconData icon, String title, String value) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 1),
-      leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: const Color(0xFFF1F3F2), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _muted)),
-      title: Text(title, style: const TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w800)),
-      subtitle: Text(status, style: const TextStyle(color: Color(0xFFB97822), fontSize: 10)),
-      trailing: const Icon(Icons.lock_outline_rounded, color: _muted, size: 18),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      leading: Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: _brand, size: 21)),
+      title: Text(title, style: const TextStyle(color: _muted, fontSize: 10.5, fontWeight: FontWeight.w700)),
+      subtitle: Padding(padding: const EdgeInsets.only(top: 2), child: Text(value, style: const TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w900))),
+    );
+  }
+
+  Widget _securityCard() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
+      child: Column(children: [
+        _securityRow(Icons.phone_android_rounded, 'الجهاز', 'مرتبط بحساب الموظف', const _StatusBadge()),
+        const Divider(height: 22, color: _line),
+        _securityRow(Icons.location_on_outlined, 'الموقع', 'يُتحقق منه أثناء تسجيل الحضور', null),
+        const Divider(height: 22, color: _line),
+        _securityRow(Icons.qr_code_2_rounded, 'رمز الحضور', 'يُستخدم لإكمال عملية التحقق', null),
+      ]),
+    );
+  }
+
+  Widget _securityRow(IconData icon, String title, String subtitle, Widget? trailing) {
+    return Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _brand, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5))])), if (trailing != null) trailing]),
+    );
+  }
+
+  Widget _futureCard(IconData icon, String title, String status) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
+      child: Row(children: [Container(width: 44, height: 44, decoration: BoxDecoration(color: const Color(0xFFF1F3F2), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: _muted)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 12.5, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(status, style: const TextStyle(color: Color(0xFFB97822), fontSize: 10, fontWeight: FontWeight.w800))])), const Icon(Icons.lock_outline_rounded, color: _muted, size: 18)]),
     );
   }
 
   Widget _errorView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off_rounded, color: Color(0xFFB94A3D), size: 44),
-            const SizedBox(height: 12),
-            Text(error ?? 'تعذر تحميل الحساب.', textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: _load, child: const Text('إعادة المحاولة')),
-          ],
-        ),
-      ),
-    );
+    return Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(width: 72, height: 72, decoration: BoxDecoration(color: const Color(0xFFFFEFED), borderRadius: BorderRadius.circular(22)), child: const Icon(Icons.cloud_off_rounded, color: Color(0xFFB94A3D), size: 35)), const SizedBox(height: 14), Text(error ?? 'تعذر تحميل الحساب.', textAlign: TextAlign.center, style: const TextStyle(color: _ink, fontWeight: FontWeight.w800)), const SizedBox(height: 14), FilledButton(onPressed: _load, style: FilledButton.styleFrom(backgroundColor: _brand), child: const Text('إعادة المحاولة', style: TextStyle(fontWeight: FontWeight.w800)))])));
   }
 }
 
 class _StatusBadge extends StatelessWidget {
   const _StatusBadge();
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(color: const Color(0xFFE8F5F0), borderRadius: BorderRadius.circular(20)),
-      child: const Text('موثّق', style: TextStyle(color: _brand, fontSize: 9, fontWeight: FontWeight.w900)),
-    );
-  }
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(20)), child: const Text('موثّق', style: TextStyle(color: _brand, fontSize: 9, fontWeight: FontWeight.w900)));
+}
+
+class _ProfileSkeleton extends StatelessWidget {
+  const _ProfileSkeleton();
+  @override
+  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 30), children: [Container(height: 185, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28))), const SizedBox(height: 22), Container(height: 18, width: 120, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))), const SizedBox(height: 9), Container(height: 130, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22))), const SizedBox(height: 18), Container(height: 18, width: 150, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))), const SizedBox(height: 9), Container(height: 180, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22)))]);
 }
