@@ -36,11 +36,11 @@ function localDay(date: Date) {
 
 function dayStart(day: string) {
   const [y, m, d] = day.split("-").map(Number);
-  const noon = new Date(Date.UTC(y, m - 1, d, 12));
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Damascus", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(noon);
+  const utcNoon = new Date(Date.UTC(y, m - 1, d, 12));
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Damascus", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(utcNoon);
   const get = (type: string) => parts.find(x => x.type === type)?.value || "";
-  const offset = Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")), Number(get("hour")), Number(get("minute"))) - noon.getTime();
-  return noon.getTime() - offset;
+  const offset = Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")), Number(get("hour")), Number(get("minute"))) - utcNoon.getTime();
+  return utcNoon.getTime() - offset - 12 * 60 * 60 * 1000;
 }
 
 async function prepareEmployee(request: Request, env: Env, ctx: ExecutionContext) {
