@@ -53,14 +53,19 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     allEmployeeRecords=getAttendance().filter((r)=>r.employeeId===employee!.id).sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());
   }
 
-  const last=allEmployeeRecords[0];
-  const openSession=last?.type==="check-in";
+  const periodRecords=currentPeriod.start
+    ? allEmployeeRecords.filter((record)=>{
+        const t=new Date(record.timestamp).getTime();
+        return Number.isFinite(t) && t>=currentPeriod.start!.getTime() && (!currentPeriod.end || t<=currentPeriod.end.getTime()+60_000);
+      }).sort((a,b)=>new Date(a.timestamp).getTime()-new Date(b.timestamp).getTime())
+    : allEmployeeRecords;
+  const currentPeriodLast=periodRecords[periodRecords.length-1];
+  const currentPeriodOpenSession=currentPeriodLast?.type==="check-in";
 
   if(args.type==="check-in"){
     if(!currentPeriod.isWorkDay || !currentPeriod.start || !currentPeriod.end){return{ok:false,reason:`لا يوجد دوام للموظف الآن: ${currentPeriod.label}${currentPeriod.detail?` · ${currentPeriod.detail}`:""}`};}
-    const periodRecords=recordsForPeriod(employee.id,currentPeriod.start,currentPeriod.end);
     if(periodRecords.some((r)=>r.type==="check-in"))return{ok:false,reason:"تم تسجيل الحضور مسبقًا لهذه الفترة"};
-  }else if(!openSession){return{ok:false,reason:"لا يمكن تسجيل الانصراف قبل تسجيل الحضور"};}
+  }else if(!currentPeriodOpenSession){return{ok:false,reason:"لا يمكن تسجيل الانصراف قبل تسجيل الحضور"};}
 
   const deviceId=getDeviceId();
   if(!employee.deviceId){const employees=getEmployees();const index=employees.findIndex((item)=>item.id===employee!.id);if(index>=0){employees[index]={...employees[index],deviceId};saveEmployees(employees);}}
@@ -77,7 +82,7 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
   const distance=haversineMeters(args.position,{lat:targetLat,lng:targetLng});
   if(!Number.isFinite(distance)||distance>targetRadius)return{ok:false,reason:Number.isFinite(distance)?`أنت خارج نطاق مقر العمل. المسافة الحالية: ${distance} م (الحد المسموح: ${targetRadius} م)`:"تعذر التحقق من موقعك.",...(Number.isFinite(distance)?{distance}:{})};
 
-  const periodForTiming=args.type==="check-out"&&openSession&&last?getActiveWorkPeriod(employee,now):currentPeriod;
+  const periodForTiming=args.type==="check-out"&&currentPeriodOpenSession?getActiveWorkPeriod(employee,now):currentPeriod;
   const start=periodForTiming.start;
   const end=periodForTiming.end;
   const grace=Math.max(0,employee.gracePeriodMinutes??settings.lateGraceMinutes??10);
