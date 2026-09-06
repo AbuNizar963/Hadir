@@ -1,4 +1,6 @@
-import production from "./attendance-production-gateway";
+import production, { HadirRealtime } from "./attendance-production-gateway";
+
+export { HadirRealtime };
 
 type Env = {
   DB: D1Database;
