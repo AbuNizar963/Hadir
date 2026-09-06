@@ -347,7 +347,7 @@ class _AttendancePageState extends State<AttendancePage> with WidgetsBindingObse
       Row(children: [Expanded(child: _metric('الوقت', result == null ? '—' : intl.DateFormat('HH:mm').format(result.time))), const SizedBox(width: 10), Expanded(child: _metric('المسافة', result == null ? '—' : '${result.distance.toStringAsFixed(1)} م')), const SizedBox(width: 10), Expanded(child: _metric('الدقة', result == null ? '—' : '±${result.accuracyMeters.toStringAsFixed(1)} م'))]),
       const SizedBox(height: 20),
       SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: () => context.go('/home'), icon: const Icon(Icons.home_rounded), label: const Text('العودة للرئيسية'))),
-    ])));
+    ]))));
   }
 
   Widget _panel({required IconData icon, required String title, required String subtitle, Widget? trailing, Widget? child}) => Container(
