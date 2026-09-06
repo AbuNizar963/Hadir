@@ -2,20 +2,18 @@ package com.hadir.attendance
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
 private const val RELEASES_URL = "https://api.github.com/repos/AbuNizar963/Hadir/releases?per_page=20"
-private const val ASSET_NAME = "hadir-android-native-production.apk"
+private const val ASSET_NAME = "app-release-signed.apk"
 private const val APK_MIME = "application/vnd.android.package-archive"
 
 data class NativeUpdateInfo(
@@ -36,6 +34,7 @@ class NativeUpdater(private val context: Context) {
                 setRequestProperty("Accept", "application/vnd.github+json")
                 setRequestProperty("User-Agent", "Hadir-Android-Updater")
             }
+            if (connection.responseCode !in 200..299) error("تعذر التحقق من التحديث")
             val response = connection.inputStream.bufferedReader().use { it.readText() }
             connection.disconnect()
 
@@ -86,6 +85,7 @@ class NativeUpdater(private val context: Context) {
                 instanceFollowRedirects = true
                 setRequestProperty("User-Agent", "Hadir-Android-Updater")
             }
+            if (connection.responseCode !in 200..299) error("تعذر تنزيل ملف التحديث")
             connection.inputStream.use { input ->
                 apkFile.outputStream().use { output -> input.copyTo(output) }
             }
@@ -97,13 +97,14 @@ class NativeUpdater(private val context: Context) {
                 "${context.packageName}.fileprovider",
                 apkFile
             )
-            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                data = uri
-                type = APK_MIME
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            withContext(Dispatchers.Main) {
+                context.startActivity(Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                    data = uri
+                    type = APK_MIME
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
             }
-            context.startActivity(intent)
         }
     }
 
