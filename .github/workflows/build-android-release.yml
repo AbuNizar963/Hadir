@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: 'Git ref containing the Android TWA project to build'
+        description: 'Git ref containing the standalone native Android project to build'
         required: true
-        default: 'fix/android-webapk-warning'
+        default: 'android-native'
         type: string
 
 permissions:
@@ -30,7 +30,7 @@ jobs:
           test -f mobile/android/settings.gradle || { echo "Missing mobile/android/settings.gradle"; exit 1; }
           test -f mobile/android/build.gradle || { echo "Missing mobile/android/build.gradle"; exit 1; }
           test -f mobile/android/app/build.gradle || { echo "Missing mobile/android/app/build.gradle"; exit 1; }
-          echo "Android TWA source is present at commit $(git rev-parse HEAD)"
+          echo "Native Android source is present at commit $(git rev-parse HEAD)"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -153,7 +153,7 @@ jobs:
       - name: Upload production APK
         uses: actions/upload-artifact@v4
         with:
-          name: hadir-android-production-api36-apk
+          name: hadir-android-native-production-api36-apk
           path: mobile/android/app-release-signed.apk
           if-no-files-found: error
           retention-days: 14
