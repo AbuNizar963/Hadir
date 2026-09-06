@@ -31,7 +31,7 @@ export async function handleDailyStatus(req:Request,env:Env,actor:any){
   if(!actor||!["owner","manager","supervisor"].includes(String(actor.role)))return json({error:"غير مصرح"},403);
   const url=new URL(req.url),requestedDay=String(url.searchParams.get("date")||"").trim(),day=/^\d{4}-\d{2}-\d{2}$/.test(requestedDay)?requestedDay:dayKey(new Date()),nextDay=addDays(day,1),from=localDateTimeUtc(addDays(day,-8),"00:00").toISOString(),to=localDateTimeUtc(addDays(day,9),"00:00").toISOString();
   try{
-    const employeeQuery=await env.DB.prepare("SELECT e.id,e.name,e.job_number AS jobNumber,e.status,e.schedule_type AS scheduleType,e.work_start_time AS workStartTime,e.work_end_time AS workEndTime,e.work_days_json AS workDaysJson,e.rotation_start_date AS rotationStartDate,e.rotation_days_on AS rotationDaysOn,e.rotation_days_off AS rotationDaysOff,e.grace_period_minutes AS gracePeriodMinutes,e.is_vip AS isVip FROM employees e WHERE e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?) ORDER BY e.name").bind(localDateTimeUtc(day,"00:00").toISOString(),localDateTimeUtc(nextDay,"00:00").toISOString()).all<EmployeeRow>();
+    const employeeQuery=await env.DB.prepare("SELECT e.id,e.name,e.job_number AS jobNumber,e.status,e.schedule_type AS scheduleType,e.work_start_time AS workStartTime,e.work_end_time AS workEndTime,e.work_days_json AS workDaysJson,e.rotation_start_date AS rotationStartDate,e.rotation_days_on AS rotationDaysOn,e.rotation_days_off AS rotationDaysOff,e.grace_period_minutes AS gracePeriodMinutes,e.isVip AS isVip FROM employees e WHERE e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?) ORDER BY e.name").bind(localDateTimeUtc(day,"00:00").toISOString(),localDateTimeUtc(nextDay,"00:00").toISOString()).all<EmployeeRow>();
     const attendanceQuery=await env.DB.prepare("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(from,to).all<any>();
     const requestQuery=await env.DB.prepare("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission')").all<any>();
     const employees=employeeQuery.results||[], attendance=attendanceQuery.results||[], requests=requestQuery.results||[];
@@ -42,20 +42,24 @@ export async function handleDailyStatus(req:Request,env:Env,actor:any){
     const historicalFrom=localDateTimeUtc(addDays(day,-7),"00:00").toISOString();
     const historical=await env.DB.prepare("SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(historicalFrom,to).all<any>();
     const historicalByEmployee=new Map<string,any[]>();for(const row of historical.results||[]){const id=String(row.employeeId||"");if(id){const list=historicalByEmployee.get(id)||[];list.push(row);historicalByEmployee.set(id,list);}}
-    const now=new Date(),today=dayKey(now);
+    const now=new Date(),today=dayKey(now),dayStartUtc=localDateTimeUtc(day,"00:00"),dayEndUtc=localDateTimeUtc(nextDay,"00:00");
     const result=employees.map(employee=>{
       const id=String(employee.id),isRotation=String(employee.scheduleType||"").trim().toUpperCase()==="ROTATION";let schedule=isRotation&&day===today?rotationScheduleAt(employee,now):scheduleFor(employee,day);const rows=byEmployee.get(id)||[];let checkIn=null;let checkOut=null;
       if(isRotation){
         const periodStart=schedule.start;
         const periodEnd=schedule.end;
         if(schedule.work&&periodStart&&periodEnd){
-          const periodEvents=(historicalByEmployee.get(id)||[]).filter((r:any)=>{const ts=Date.parse(String(r.timestamp));return Number.isFinite(ts)&&ts>=periodStart.getTime()&&ts<periodEnd.getTime();});
+          const periodEvents=(historicalByEmployee.get(id)||[]).filter((r:any)=>{const ts=Date.parse(String(r.timestamp));return Number.isFinite(ts)&&ts>=periodStart.getTime()&&ts<periodEnd.getTime()&&(! (day===today) || ts<=now.getTime());});
           checkIn=periodEvents.find((r:any)=>String(r.type)==="check-in")||null;
           checkOut=[...periodEvents].reverse().find((r:any)=>String(r.type)==="check-out")||null;
         }
       } else {
-        checkIn=rows.find(r=>String(r.type)==="check-in")||null;
-        checkOut=[...rows].reverse().find(r=>String(r.type)==="check-out")||null;
+        // ADMIN attendance belongs to the requested local calendar day. The
+        // broader query above is retained for employee discovery/history, but
+        // must never leak yesterday's or future events into today's status.
+        const dayEvents=rows.filter((r:any)=>{const ts=Date.parse(String(r.timestamp));return Number.isFinite(ts)&&ts>=dayStartUtc.getTime()&&ts<dayEndUtc.getTime()&&(!(day===today)||ts<=now.getTime());});
+        checkIn=dayEvents.find((r:any)=>String(r.type)==="check-in")||null;
+        checkOut=[...dayEvents].reverse().find((r:any)=>String(r.type)==="check-out")||null;
       }
       let status:Status;if(leaveIds.has(id))status="LEAVE";else if(permissionIds.has(id))status="PERMISSION";else if(schedule.status==="REST")status="REST";else if(schedule.status==="NOT_STARTED")status="NOT_STARTED";else if(schedule.status==="INVALID")status="INVALID";else if(checkIn){const grace=Number.isFinite(Number(employee.gracePeriodMinutes))?Math.max(0,Number(employee.gracePeriodMinutes)):10;status=isRotation?"PRESENT":(schedule.start&&Date.parse(String(checkIn.timestamp))>schedule.start.getTime()+grace*60000?"LATE":"PRESENT");}else if(Number(employee.isVip)===1&&schedule.start&&day===today&&now.getTime()>=schedule.start.getTime())status="PRESENT";else if(day===today&&schedule.end&&now.getTime()>=schedule.end.getTime())status="REST";else if(day===today&&schedule.start&&now.getTime()<schedule.start.getTime())status="NOT_STARTED";else if(!schedule.work)status="REST";else status="ABSENT";
       return{attendanceDay:day,employeeId:id,employeeName:String(employee.name||""),jobNumber:String(employee.jobNumber||""),status,scheduleType:String(employee.scheduleType||"ADMIN").toUpperCase(),checkInAt:checkIn?.timestamp||null,checkOutAt:checkOut?.timestamp||null,scheduledStart:schedule.start?.toISOString()||null,scheduledEnd:schedule.end?.toISOString()||null};
