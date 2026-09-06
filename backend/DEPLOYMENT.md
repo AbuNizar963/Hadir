@@ -1,6 +1,6 @@
 # Cloudflare deployment contract
 
-The production backend is the `hadir-api` Cloudflare Worker. The Worker is the single API origin for the Hadir frontend and is deployed from `backend/src/entry.ts`.
+The production backend is the `hadir-api` Cloudflare Worker. The Worker is the single API origin for the Hadir frontend and is deployed from `backend/src/attendance-production-gateway.ts`, which wraps the production gateway chain and scopes employee attendance to the active shift.
 
 Production origin:
 
