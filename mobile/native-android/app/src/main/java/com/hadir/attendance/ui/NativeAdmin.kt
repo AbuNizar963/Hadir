@@ -87,15 +87,16 @@ class NativeAdminViewModel(application: Application) : AndroidViewModel(applicat
     fun refresh() {
         viewModelScope.launch {
             try {
-                val result = kotlinx.coroutines.async {
-                    listOf(repo.employees(), repo.attendance(2000), repo.requests(), repo.locations(), repo.audit(300))
-                }
-                val data = result.await()
-                employees = data[0] as List<Map<String, Any?>>
-                attendanceCount = (data[1] as List<*>).size
-                requests = data[2] as List<EmployeeRequest>
-                locationsCount = (data[3] as List<*>).size
-                audit = data[4] as List<Map<String, Any?>>
+                val employeesData = repo.employees()
+                val attendanceData = repo.attendance(2000)
+                val requestsData = repo.requests()
+                val locationsData = repo.locations()
+                val auditData = repo.audit(300)
+                employees = employeesData
+                attendanceCount = attendanceData.size
+                requests = requestsData
+                locationsCount = locationsData.size
+                audit = auditData
             } catch (e: Exception) { error = e.message ?: "تعذر تحديث لوحة الإدارة" }
         }
     }
@@ -216,7 +217,7 @@ private fun AdminRequests(vm: NativeAdminViewModel, p: PaddingValues) {
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(19.dp)) { Column(Modifier.padding(16.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${r.employeeName ?: r.employeeId} · ${requestLabel(r.type)}", fontWeight = FontWeight.Bold); Text(statusLabel(r.status), color = statusColor(r.status), fontSize = 12.sp) }
                 if (!r.reason.isNullOrBlank()) Text(r.reason!!, color = AdminMuted, modifier = Modifier.padding(top = 7.dp))
-                if (r.status == "pending") Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, modifier = Modifier.padding(top = 8.dp)) {
+                if (r.status == "pending") Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
                     FilterChip(selected = false, onClick = { vm.updateRequest(r.id, "rejected") }, label = { Text("رفض") })
                     Spacer(Modifier.width(8.dp))
                     FilterChip(selected = false, onClick = { vm.updateRequest(r.id, "approved") }, label = { Text("موافقة") })
