@@ -257,3 +257,20 @@ class _ModernHomePageState extends State<ModernHomePage> {
 
   Widget _errorCard() => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: const Color(0xFFFFF4F2), borderRadius: BorderRadius.circular(18)), child: Row(children: [const Icon(Icons.wifi_off_rounded, color: Color(0xFFB94A3D)), const SizedBox(width: 10), Expanded(child: Text(error!, style: const TextStyle(color: Color(0xFF8D332C), fontSize: 12))), TextButton(onPressed: _load, child: const Text('إعادة'))]));
 }
+
+class _RoundIconButton extends StatelessWidget {
+  final IconData icon; final VoidCallback onTap;
+  const _RoundIconButton({required this.icon, required this.onTap});
+  @override Widget build(BuildContext context) => Material(color: Colors.white, shape: const CircleBorder(), child: InkWell(onTap: onTap, customBorder: const CircleBorder(), child: Padding(padding: const EdgeInsets.all(10), child: Icon(icon, color: _ink, size: 22))));
+}
+
+class _AvatarButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AvatarButton({required this.onTap});
+  @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(24), child: const CircleAvatar(radius: 21, backgroundColor: _soft, child: Icon(Icons.person_rounded, color: _brand)));
+}
+
+class _ActivitySkeleton extends StatelessWidget {
+  const _ActivitySkeleton();
+  @override Widget build(BuildContext context) => Container(height: 68, margin: const EdgeInsets.only(bottom: 8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE2E9E6))));
+}
