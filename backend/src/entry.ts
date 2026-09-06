@@ -2,6 +2,7 @@ import app from "./app";
 import { HadirRealtime } from "./realtime";
 import { bindEmployeeDevice, clearEmployeeDevice, deviceStatus, registrationOptions, verifyRegistration } from "./deviceSecurity";
 import { handleWorkforce } from "./workforce";
+import { handleEmployeeAttendance } from "./employee-attendance-gateway";
 
 type Env = { REALTIME: DurableObjectNamespace; DB: D1Database; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_RECOVERY_CODE?: string; PROFILE_IMAGES?: R2Bucket; WEBAUTHN_RP_ID?: string; WEBAUTHN_ORIGIN?: string };
 const SESSION_COOKIE = "hadir_session";
@@ -57,6 +58,10 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
     }
 
     const actor=await actorFromSession(request,env);
+    if(url.pathname==="/api/attendance"){
+      const attendanceResponse=await handleEmployeeAttendance(prepared.request,env,actor,origin);
+      if(attendanceResponse)return addDeviceCookie(attendanceResponse,prepared.deviceId,prepared.setCookie,origin);
+    }
     const workforceActor = (url.pathname === "/api/notifications" || url.pathname === "/api/notifications/read" || url.pathname === "/api/violations" || url.pathname.startsWith("/api/violations/") || url.pathname === "/api/workforce/live" || url.pathname === "/api/device-rebind-requests" || url.pathname === "/api/workforce/reset" || url.pathname === "/api/workforce/reset-test-data") ? await actorForAdministrativeAction(request,env) : actor;
     if(url.pathname==="/api/notifications"||url.pathname==="/api/notifications/read"||url.pathname==="/api/violations"||url.pathname.startsWith("/api/violations/")||url.pathname==="/api/workforce/live"||url.pathname==="/api/device-rebind-requests"||url.pathname==="/api/workforce/reset"||url.pathname==="/api/workforce/reset-test-data"){
       const workforceResponse=await handleWorkforce(prepared.request,env,workforceActor,url.pathname);
