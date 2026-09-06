@@ -22,6 +22,8 @@ class _ProfilePageState extends State<ProfilePage> {
   Map<String, dynamic>? user;
   String? error;
   bool loading = true;
+  String? _avatarUrl;
+  String? _token;
 
   @override
   void initState() {
@@ -32,11 +34,17 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _load() async {
     if (mounted) setState(() => loading = true);
     try {
-      final data = await HadirApi(token: await HadirSession().token()).me();
+      final token = await HadirSession().token();
+      final api = HadirApi(token: token);
+      final data = await api.me();
       final raw = data['user'] is Map ? data['user'] : data;
+      final nextUser = Map<String, dynamic>.from(raw as Map);
+      final employeeId = '${nextUser['id'] ?? ''}'.trim();
       if (mounted) {
         setState(() {
-          user = Map<String, dynamic>.from(raw as Map);
+          user = nextUser;
+          _token = token;
+          _avatarUrl = employeeId.isEmpty ? null : api.employeeAvatarUrl(employeeId);
           error = null;
         });
       }
@@ -77,7 +85,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         const SizedBox(height: 9),
                         _infoGroup([
                           _infoTile(Icons.badge_outlined, 'رقم الموظف', '${user?['username'] ?? user?['jobNumber'] ?? '—'}'),
-                          _infoTile(Icons.work_outline_rounded, 'الدور', 'موظف'),
+                          _infoTile(Icons.work_outline_rounded, 'الدور', '${user?['role'] ?? 'موظف'}'),
                         ]),
                         const SizedBox(height: 18),
                         _sectionHeader('الأمان والحماية', 'عناصر التحقق المستخدمة في الحضور'),
@@ -110,12 +118,7 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           Row(
             children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: .18))),
-                child: const Icon(Icons.person_rounded, color: Colors.white, size: 35),
-              ),
+              _avatar(),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -138,12 +141,26 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _sectionHeader(String title, String subtitle) {
-    return Row(
-      children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5))])),
-      ],
+  Widget _avatar() {
+    final headers = _token == null || _token!.isEmpty ? null : <String, String>{'Authorization': 'Bearer $_token'};
+    return Container(
+      width: 68,
+      height: 68,
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: .18))),
+      clipBehavior: Clip.antiAlias,
+      child: _avatarUrl == null
+          ? const Icon(Icons.person_rounded, color: Colors.white, size: 35)
+          : Image.network(
+              _avatarUrl!,
+              headers: headers,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Colors.white, size: 35),
+            ),
     );
+  }
+
+  Widget _sectionHeader(String title, String subtitle) {
+    return Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5))]))]);
   }
 
   Widget _infoGroup(List<Widget> children) {
