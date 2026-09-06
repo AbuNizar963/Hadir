@@ -31,7 +31,7 @@ type FactRow = {
 };
 
 const MAX_DAYS = 366;
-const VALID_STATUSES = new Set(["PRESENT", "LATE", "ABSENT", "REST", "LEAVE", "PERMISSION", "NOT_STARTED", "INVALID"]);
+const VALID_STATUSES = new Set(["PRESENT", "LATE", "ABSENT", "REST", "LEAVE", "PERMISSION", "NOT_STARTED", "INVALID", "OPEN"]);
 const jsonArray = (value: string | null | undefined): string[] => {
   try {
     const parsed = JSON.parse(value || "[]");
