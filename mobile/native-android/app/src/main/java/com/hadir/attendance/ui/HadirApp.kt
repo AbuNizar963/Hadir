@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,7 +34,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,7 +54,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.hadir.attendance.data.AttendanceRecord
 import com.hadir.attendance.data.HadirRepository
 import kotlinx.coroutines.launch
@@ -62,7 +69,7 @@ import kotlin.coroutines.resume
 
 class HadirViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = HadirRepository(application)
-    private val fusedLocation = LocationServices.getFusedLocationProviderClient(application)
+    private val fusedLocation: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(application)
 
     var loggedIn by mutableStateOf(false); private set
     var employee by mutableStateOf<com.hadir.attendance.data.Employee?>(null); private set
@@ -72,7 +79,8 @@ class HadirViewModel(application: Application) : AndroidViewModel(application) {
     var error by mutableStateOf<String?>(null); private set
 
     fun login(username: String, password: String) {
-        loading = true; error = null
+        loading = true
+        error = null
         viewModelScope.launch {
             try {
                 employee = repo.login(username, password)
@@ -80,39 +88,51 @@ class HadirViewModel(application: Application) : AndroidViewModel(application) {
                 attendance = repo.attendance()
             } catch (e: Exception) {
                 error = e.message ?: "تعذر تسجيل الدخول"
-            } finally { loading = false }
+            } finally {
+                loading = false
+            }
         }
     }
 
     fun clock(type: String, qrCode: String, hasLocationPermission: Boolean) {
-        if (employee == null) return
+        if (employee == null || attendanceLoading) return
         attendanceLoading = true
         error = null
         viewModelScope.launch {
             try {
-                if (!hasLocationPermission) error("اسمح للموقع أولًا لتنفيذ تسجيل الحضور.")
-                else {
-                    val location = lastLocation() ?: error("تعذر الحصول على موقعك الحالي. فعّل الموقع وحاول مرة أخرى.")
-                    val challenge = repo.createChallenge(type, location.latitude, location.longitude, qrCode.trim())
-                    if (!challenge.ok) error("تعذر إنشاء طلب التحقق.")
-                    repo.createAttendance(
-                        employeeId = employee!!.id,
-                        type = type,
-                        timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(Date()),
-                        lat = location.latitude,
-                        lng = location.longitude,
-                        challengeId = challenge.challengeId
-                    )
-                    attendance = repo.attendance()
+                if (!hasLocationPermission) {
+                    error("اسمح للموقع أولًا لتنفيذ تسجيل الحضور.")
+                    return@launch
                 }
+                if (qrCode.isBlank()) {
+                    error("امسح QR الخاص بالموقع أولًا.")
+                    return@launch
+                }
+                val location = currentLocation()
+                    ?: error("تعذر الحصول على موقعك الحالي. فعّل الموقع وحاول مرة أخرى.")
+                val challenge = repo.createChallenge(type, location.latitude, location.longitude, qrCode.trim())
+                if (!challenge.ok) error("تعذر إنشاء طلب التحقق.")
+                repo.createAttendance(
+                    employeeId = employee!!.id,
+                    type = type,
+                    timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(Date()),
+                    lat = location.latitude,
+                    lng = location.longitude,
+                    challengeId = challenge.challengeId
+                )
+                attendance = repo.attendance()
             } catch (e: Exception) {
                 error = e.message ?: "تعذر تسجيل الحضور"
-            } finally { attendanceLoading = false }
+            } finally {
+                attendanceLoading = false
+            }
         }
     }
 
-    private suspend fun lastLocation(): Location? = suspendCancellableCoroutine { continuation ->
-        fusedLocation.lastLocation
+    private suspend fun currentLocation(): Location? = suspendCancellableCoroutine { continuation ->
+        val tokenSource = CancellationTokenSource()
+        continuation.invokeOnCancellation { tokenSource.cancel() }
+        fusedLocation.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.token)
             .addOnSuccessListener { continuation.resume(it) }
             .addOnFailureListener { continuation.resume(null) }
     }
@@ -172,10 +192,11 @@ private fun LoginScreen(vm: HadirViewModel) {
 private fun HomeScreen(vm: HadirViewModel) {
     val context = LocalContext.current
     var showPermissionHint by remember { mutableStateOf(false) }
-    var showQrDialog by remember { mutableStateOf(false) }
+    var showScanner by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) }
     var pendingType by remember { mutableStateOf("check-in") }
-    var qrCode by remember { mutableStateOf("") }
+    var scanError by remember { mutableStateOf<String?>(null) }
+
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         showPermissionHint = result.values.any { !it }
     }
@@ -193,45 +214,23 @@ private fun HomeScreen(vm: HadirViewModel) {
     val today = SimpleDateFormat("EEEE، d MMMM", Locale("ar")).format(Date())
     val hasLocationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-    if (showQrDialog) {
-        AlertDialog(
-            onDismissRequest = { if (!vm.attendanceLoading) showQrDialog = false },
-            title = { Text(if (pendingType == "check-in") "تسجيل الحضور" else "تسجيل الانصراف", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text("أدخل رمز الموقع/QR المعتمد لإكمال التحقق.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedTextField(
-                        value = qrCode,
-                        onValueChange = { qrCode = it },
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                        label = { Text("رمز QR") },
-                        singleLine = true,
-                        enabled = !vm.attendanceLoading,
-                        shape = RoundedCornerShape(14.dp)
-                    )
-                    vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 10.dp)) }
-                }
+    if (showScanner) {
+        QrScanner(
+            onResult = { code ->
+                showScanner = false
+                scanError = null
+                vm.clock(pendingType, code, hasLocationPermission)
             },
-            confirmButton = {
-                TextButton(
-                    enabled = qrCode.isNotBlank() && !vm.attendanceLoading,
-                    onClick = {
-                        vm.clearError()
-                        vm.clock(pendingType, qrCode, hasLocationPermission)
-                    }
-                ) { Text(if (vm.attendanceLoading) "جارٍ التحقق…" else "تأكيد") }
-            },
-            dismissButton = {
-                TextButton(enabled = !vm.attendanceLoading, onClick = { showQrDialog = false }) { Text("إلغاء") }
+            onCancel = {
+                showScanner = false
+                scanError = null
             }
         )
+        return
     }
 
     LaunchedEffect(vm.attendanceLoading) {
-        if (!vm.attendanceLoading && showQrDialog && vm.error == null) {
-            showQrDialog = false
-            qrCode = ""
-        }
+        if (!vm.attendanceLoading && vm.error == null) scanError = null
     }
 
     Scaffold(
@@ -276,9 +275,9 @@ private fun HomeScreen(vm: HadirViewModel) {
                         Button(
                             onClick = {
                                 pendingType = if (checkedIn) "check-out" else "check-in"
-                                qrCode = ""
+                                scanError = null
                                 vm.clearError()
-                                showQrDialog = true
+                                if (!hasLocationPermission) showPermissionHint = true else showScanner = true
                             },
                             enabled = !vm.attendanceLoading,
                             modifier = Modifier.size(168.dp),
@@ -288,11 +287,13 @@ private fun HomeScreen(vm: HadirViewModel) {
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(if (checkedIn) "انصراف" else "حضور", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-                                Text(if (vm.attendanceLoading) "جارٍ التحقق…" else "اضغط للمتابعة", color = Color.White.copy(alpha = 0.82f), fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
+                                Text(if (vm.attendanceLoading) "جارٍ التحقق…" else "امسح QR للمتابعة", color = Color.White.copy(alpha = 0.82f), fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
                             }
                         }
-                        Text(if (checkedIn) "اضغط عند انتهاء دوامك" else "يتحقق من الموقع ورمز الموقع قبل التسجيل", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp), textAlign = TextAlign.Center)
+                        Text(if (checkedIn) "امسح QR عند انتهاء دوامك" else "يمسح QR ثم يتحقق من GPS قبل التسجيل", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp), textAlign = TextAlign.Center)
                         if (showPermissionHint) Text("تحتاج الكاميرا والموقع لتنفيذ التحقق الآمن.", color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
+                        vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp)) }
+                        scanError?.let { Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp)) }
                     }
                 }
             }
@@ -317,7 +318,6 @@ private fun HomeScreen(vm: HadirViewModel) {
             }
 
             item { Text("آخر النشاطات", fontWeight = FontWeight.Bold, fontSize = 17.sp, modifier = Modifier.padding(top = 2.dp)) }
-
             if (vm.attendance.isEmpty()) item { EmptyActivity() }
             else items(vm.attendance.sortedByDescending { it.timestamp }.take(5)) { record -> ActivityRow(record) }
         }
@@ -351,28 +351,28 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
 @Composable
 private fun ScheduleRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-        Text(value, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun EmptyActivity() {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))) {
+        Text("لا توجد سجلات حضور بعد.", modifier = Modifier.fillMaxWidth().padding(22.dp), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun ActivityRow(record: AttendanceRecord) {
     val isIn = record.type == "check-in"
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).clip(CircleShape).background(if (isIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error))
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(if (isIn) "تسجيل حضور" else "تسجيل انصراف", fontWeight = FontWeight.SemiBold)
-            Text(record.timestamp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column {
+                Text(if (isIn) "حضور" else "انصراف", fontWeight = FontWeight.Bold)
+                Text(record.timestamp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+            }
+            Text(if (isIn) "دخول" else "خروج", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
         }
-        Text(if (isIn) "حضور" else "انصراف", color = if (isIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, fontSize = 12.sp)
-    }
-}
-
-@Composable
-private fun EmptyActivity() {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Text("لا توجد سجلات حضور بعد", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(18.dp), textAlign = TextAlign.Center)
     }
 }
