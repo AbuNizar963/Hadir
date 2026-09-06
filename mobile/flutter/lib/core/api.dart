@@ -34,4 +34,13 @@ class HadirApi {
   Future<void> deleteNotification({String? id}) async { await dio.delete('/api/notifications', data: {if (id != null) 'id': id}); }
   Future<Map<String, dynamic>> confirmRequest(String id) async => Map<String, dynamic>.from((await dio.post('/api/requests/$id/confirm')).data as Map);
   Future<void> logout() async { try { await dio.post('/api/auth/logout', data: {}); } catch (_) {} }
+
+  Future<Map<String, dynamic>> professionalAttendanceReport({required String from, required String to, String? employeeId}) async => Map<String, dynamic>.from((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': from, 'to': to, if (employeeId != null && employeeId.isNotEmpty) 'employeeId': employeeId})).data as Map);
+  Future<Map<String, dynamic>> professionalAttendanceDrilldown({required String attendanceDay, required String employeeId}) async => Map<String, dynamic>.from((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': attendanceDay, 'to': attendanceDay, 'employeeId': employeeId, 'drilldown': '1'})).data as Map);
+  Future<List<dynamic>> archivedReports({int limit = 25}) async => List<dynamic>.from((await dio.get('/api/reports/archive', queryParameters: {'limit': limit.clamp(1, 100)})).data as List);
+  Future<Map<String, dynamic>> workforceLive() async => Map<String, dynamic>.from((await dio.get('/api/workforce/live')).data as Map);
+  Future<List<dynamic>> violations({int limit = 100}) async => List<dynamic>.from((await dio.get('/api/violations', queryParameters: {'limit': limit.clamp(1, 500)})).data as List);
+  Future<List<dynamic>> deviceRebindRequests() async => List<dynamic>.from((await dio.get('/api/device-rebind-requests')).data as List);
+  Future<Map<String, dynamic>> dailyStatus({required String date}) async => Map<String, dynamic>.from((await dio.get('/api/manager/daily-status', queryParameters: {'date': date})).data as Map);
+  Future<Map<String, dynamic>> health() async => Map<String, dynamic>.from((await dio.get('/api/health')).data as Map);
 }
