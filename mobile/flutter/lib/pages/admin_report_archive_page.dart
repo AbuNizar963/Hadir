@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/api.dart';
 import '../core/session.dart';
@@ -20,6 +21,7 @@ class _AdminReportArchivePageState extends State<AdminReportArchivePage> {
   List<dynamic> _reports = const [];
   bool _loading = true;
   String? _error;
+  String? _sharingId;
 
   @override
   void initState() {
@@ -49,6 +51,27 @@ class _AdminReportArchivePageState extends State<AdminReportArchivePage> {
         _loading = false;
         _error = HadirApi.errorMessage(e);
       });
+    }
+  }
+
+  Future<void> _share(Map<String, dynamic> report) async {
+    final id = _value(report['report_id']);
+    if (id == '—' || _api == null) return;
+    setState(() => _sharingId = id);
+    try {
+      final bytes = await _api!.downloadArchivedReport(id);
+      if (bytes.isEmpty) throw Exception('ملف التقرير المؤرشف فارغ.');
+      final fileName = _value(report['file_name']) == '—' ? 'hadir-report' : _value(report['file_name']);
+      final mimeType = _value(report['mime_type']) == '—' ? 'application/octet-stream' : _value(report['mime_type']);
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile.fromData(bytes, name: fileName, mimeType: mimeType)],
+        subject: 'تقرير HADIR المؤرشف',
+        title: fileName,
+      ));
+    } catch (e) {
+      if (mounted) setState(() => _error = HadirApi.errorMessage(e));
+    } finally {
+      if (mounted) setState(() => _sharingId = null);
     }
   }
 
@@ -131,6 +154,7 @@ class _AdminReportArchivePageState extends State<AdminReportArchivePage> {
     final version = _value(report['report_version']);
     final hash = _value(report['data_snapshot_hash']);
     final fileName = _value(report['file_name']);
+    final sharing = _sharingId == id;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -140,7 +164,7 @@ class _AdminReportArchivePageState extends State<AdminReportArchivePage> {
             Container(width: 44, height: 44, decoration: BoxDecoration(color: _archiveSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.description_outlined, color: _archiveBrand)),
             const SizedBox(width: 11),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$from → $to', style: const TextStyle(fontWeight: FontWeight.w900, color: _archiveInk)), const SizedBox(height: 3), Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: _archiveMuted))])),
-            PopupMenuButton<String>(onSelected: (action) { if (action == 'delete' && id != '—') _delete(id); }, itemBuilder: (_) => const [PopupMenuItem(value: 'delete', child: Text('حذف النسخة'))]),
+            PopupMenuButton<String>(onSelected: (action) { if (action == 'share') _share(report); if (action == 'delete' && id != '—') _delete(id); }, itemBuilder: (_) => const [PopupMenuItem(value: 'share', child: Text('تنزيل ومشاركة')), PopupMenuItem(value: 'delete', child: Text('حذف النسخة'))]),
           ]),
           const SizedBox(height: 13),
           Wrap(spacing: 7, runSpacing: 7, children: [
@@ -152,7 +176,7 @@ class _AdminReportArchivePageState extends State<AdminReportArchivePage> {
           const SizedBox(height: 12),
           Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFF7F9F8), borderRadius: BorderRadius.circular(12)), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.fingerprint_rounded, size: 18, color: _archiveBrand), const SizedBox(width: 7), Expanded(child: Text(hash, style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: _archiveMuted)))])),
           const SizedBox(height: 9),
-          Row(children: [const Icon(Icons.info_outline_rounded, size: 15, color: _archiveMuted), const SizedBox(width: 5), Expanded(child: Text('معرّف النسخة: $id', style: const TextStyle(fontSize: 10, color: _archiveMuted))), TextButton(onPressed: () => _showDetails(report), child: const Text('التفاصيل'))]),
+          Row(children: [const Icon(Icons.info_outline_rounded, size: 15, color: _archiveMuted), const SizedBox(width: 5), Expanded(child: Text('معرّف النسخة: $id', style: const TextStyle(fontSize: 10, color: _archiveMuted))), if (sharing) const SizedBox(width: 8, height: 8, child: CircularProgressIndicator(strokeWidth: 1.7)), TextButton(onPressed: sharing ? null : () => _showDetails(report), child: const Text('التفاصيل'))]),
         ]),
       ),
     );
