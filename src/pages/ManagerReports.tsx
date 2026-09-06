@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import ManagerLayout from "@/components/layout/manager/ManagerLayout";
+import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getEmployees, getSettings } from "@/lib/storage";
 import { getBackendAudit, getBackendEmployees, getBackendRequests } from "@/lib/backend";
 import { getDailyStatus, type DailyStatusRow } from "@/lib/dailyStatus";
@@ -108,9 +108,6 @@ function calculateDetails(employee: Employee, dates: Date[], index: Map<string, 
       else st = "open";
     }
     if (dailyStatus && serverStatus) {
-      // A successful check-in without a matching checkout is always an open
-      // attendance record. Never let the server's PRESENT/LATE snapshot hide
-      // that missing checkout in the detailed report.
       if (cin && !cout && (serverStatus === "present" || serverStatus === "late")) st = "open";
       else st = serverStatus === "late" && !cout ? "open" : serverStatus;
     }
