@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'app_fixed.dart';
+import 'app_fixed.dart' show LoginEntryPage, SwipeBackPage;
 import 'core/session.dart';
 import 'pages/admin_home_page.dart';
 import 'pages/admin_login_page.dart';
@@ -9,6 +9,7 @@ import 'pages/admin_management_page.dart';
 import 'pages/admin_operations_page.dart';
 import 'pages/admin_reports_page.dart';
 import 'pages/admin_report_archive_page.dart';
+import 'pages/attendance_page.dart';
 import 'pages/employee_center_page.dart';
 import 'pages/modern_home_page.dart';
 import 'pages/requests_page.dart';
@@ -114,42 +115,6 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
       onHorizontalDragEnd: _end,
       onHorizontalDragCancel: _cancel,
       child: widget.child,
-    );
-  }
-}
-
-class LoginEntryPage extends StatelessWidget {
-  const LoginEntryPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(width: 82, height: 82, alignment: Alignment.center, decoration: BoxDecoration(color: const Color(0xFF0B6B5A), borderRadius: BorderRadius.circular(26)), child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 44)),
-                  const SizedBox(height: 24),
-                  const Text('حاضر', textAlign: TextAlign.center, style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, color: Color(0xFF17322C))),
-                  const SizedBox(height: 8),
-                  const Text('اختر نوع الدخول', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF70817B), fontSize: 15)),
-                  const SizedBox(height: 30),
-                  FilledButton.icon(onPressed: () => context.go('/employee-login'), icon: const Icon(Icons.badge_outlined), label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('دخول الموظفين'))),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(onPressed: () => context.go('/admin-login'), icon: const Icon(Icons.admin_panel_settings_outlined), label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('دخول الإدارة'))),
-                  const SizedBox(height: 22),
-                  const Text('حساب الإدارة منفصل تمامًا عن حساب الموظف.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF70817B), fontSize: 12)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
