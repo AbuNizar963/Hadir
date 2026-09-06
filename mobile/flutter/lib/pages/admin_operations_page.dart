@@ -147,7 +147,7 @@ class _AdminOperationsPageState extends State<AdminOperationsPage> {
   Widget _hero(String title, String subtitle) => Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF0B6B5A), Color(0xFF084F44)]), borderRadius: BorderRadius.circular(24)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)), const SizedBox(height: 6), Text(subtitle, style: const TextStyle(color: Colors.white70, height: 1.45, fontSize: 12))],
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)), const SizedBox(height: 6), Text(subtitle, style: const TextStyle(color: Colors.white70, height: 1.45, fontSize: 12))]),
   );
 
   Widget _statRow(String title, String value, IconData icon) => Card(child: ListTile(leading: const Icon(Icons.analytics_outlined), title: Text(title), trailing: Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900))));
