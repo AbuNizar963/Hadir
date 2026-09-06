@@ -86,9 +86,9 @@ class _ModernHomePageState extends State<ModernHomePage> {
                       ],
                     ),
                   ),
-                  _RoundIconButton(icon: Icons.notifications_none_rounded, onTap: () => context.go('/notifications')),
+                  _RoundIconButton(icon: Icons.notifications_none_rounded, onTap: () => context.push('/notifications')),
                   const SizedBox(width: 8),
-                  _AvatarButton(onTap: () => context.go('/profile')),
+                  _AvatarButton(onTap: () => context.push('/profile')),
                 ],
               ),
             ),
@@ -106,7 +106,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
                   const SizedBox(height: 10),
                   _quickGrid(),
                   const SizedBox(height: 22),
-                  _sectionHeader('آخر النشاطات', () => context.go('/history')),
+                  _sectionHeader('آخر النشاطات', () => context.push('/history')),
                   const SizedBox(height: 8),
                   if (loading) ...const [_ActivitySkeleton(), _ActivitySkeleton()]
                   else if (error != null) _errorCard()
@@ -121,8 +121,8 @@ class _ModernHomePageState extends State<ModernHomePage> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: 0,
         onDestinationSelected: (index) {
-          if (index == 1) context.go('/history');
-          if (index == 2) context.go('/requests');
+          if (index == 1) context.push('/history');
+          if (index == 2) context.push('/requests');
         },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'الرئيسية'),
@@ -156,14 +156,14 @@ class _ModernHomePageState extends State<ModernHomePage> {
         const SizedBox(height: 18),
         Row(children: [
           Expanded(child: FilledButton.icon(
-            onPressed: () => context.go('/attendance?type=check-in'),
+            onPressed: () => context.push('/attendance?type=check-in'),
             style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: _brand, minimumSize: const Size.fromHeight(54), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17))),
             icon: const Icon(Icons.login_rounded),
             label: const Text('تسجيل الحضور', style: TextStyle(fontWeight: FontWeight.w800)),
           )),
           const SizedBox(width: 10),
           SizedBox(width: 54, height: 54, child: FilledButton(
-            onPressed: () => context.go('/attendance?type=check-out'),
+            onPressed: () => context.push('/attendance?type=check-out'),
             style: FilledButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: .14), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)), padding: EdgeInsets.zero),
             child: const Icon(Icons.logout_rounded),
           )),
@@ -200,11 +200,11 @@ class _ModernHomePageState extends State<ModernHomePage> {
 
   Widget _quickGrid() {
     return Row(children: [
-      Expanded(child: _quick(Icons.qr_code_scanner_rounded, 'الحضور', 'QR + GPS', () => context.go('/attendance?type=check-in'))),
+      Expanded(child: _quick(Icons.qr_code_scanner_rounded, 'الحضور', 'QR + GPS', () => context.push('/attendance?type=check-in'))),
       const SizedBox(width: 10),
-      Expanded(child: _quick(Icons.logout_rounded, 'الانصراف', 'إنهاء الدوام', () => context.go('/attendance?type=check-out'))),
+      Expanded(child: _quick(Icons.logout_rounded, 'الانصراف', 'إنهاء الدوام', () => context.push('/attendance?type=check-out'))),
       const SizedBox(width: 10),
-      Expanded(child: _quick(Icons.assignment_outlined, 'الطلبات', 'إجازة وطلب', () => context.go('/requests'))),
+      Expanded(child: _quick(Icons.assignment_outlined, 'الطلبات', 'إجازة وطلب', () => context.push('/requests'))),
     ]);
   }
 
@@ -256,21 +256,4 @@ class _ModernHomePageState extends State<ModernHomePage> {
   Widget _emptyCard() => Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE2E9E6))), child: const Row(children: [Icon(Icons.event_available_outlined, color: _brand), SizedBox(width: 12), Text('لا توجد حركات مسجلة بعد', style: TextStyle(color: _muted, fontSize: 13))]));
 
   Widget _errorCard() => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: const Color(0xFFFFF4F2), borderRadius: BorderRadius.circular(18)), child: Row(children: [const Icon(Icons.wifi_off_rounded, color: Color(0xFFB94A3D)), const SizedBox(width: 10), Expanded(child: Text(error!, style: const TextStyle(color: Color(0xFF8D332C), fontSize: 12))), TextButton(onPressed: _load, child: const Text('إعادة'))]));
-}
-
-class _RoundIconButton extends StatelessWidget {
-  final IconData icon; final VoidCallback onTap;
-  const _RoundIconButton({required this.icon, required this.onTap});
-  @override Widget build(BuildContext context) => Material(color: Colors.white, shape: const CircleBorder(), child: InkWell(onTap: onTap, customBorder: const CircleBorder(), child: Padding(padding: const EdgeInsets.all(10), child: Icon(icon, color: _ink, size: 22))));
-}
-
-class _AvatarButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _AvatarButton({required this.onTap});
-  @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(24), child: const CircleAvatar(radius: 21, backgroundColor: _soft, child: Icon(Icons.person_rounded, color: _brand)));
-}
-
-class _ActivitySkeleton extends StatelessWidget {
-  const _ActivitySkeleton();
-  @override Widget build(BuildContext context) => Container(height: 68, margin: const EdgeInsets.only(bottom: 8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE2E9E6))));
 }
