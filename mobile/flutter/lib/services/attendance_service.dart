@@ -8,8 +8,12 @@ class AttendanceService {
   AttendanceService(this.api, this.session);
 
   Future<Map<String, dynamic>> workplace() async {
-    final profile = await api.employeeProfile();
-    final locations = await api.locations();
+    final results = await Future.wait([
+      api.employeeProfile(),
+      api.locations(),
+    ]);
+    final profile = Map<String, dynamic>.from(results[0] as Map);
+    final locations = List<dynamic>.from(results[1] as List);
     final profileMap = Map<String, dynamic>.from(profile['employee'] is Map ? profile['employee'] : profile);
     final wanted = profileMap['locationId']?.toString();
     Map<String, dynamic>? selected;
