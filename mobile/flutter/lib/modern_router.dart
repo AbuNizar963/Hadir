@@ -14,6 +14,7 @@ import 'pages/attendance_insights_page.dart';
 import 'pages/employee_center_page.dart';
 import 'pages/jibble_history_page.dart';
 import 'pages/jibble_workspace_page.dart';
+import 'pages/modern_home_page.dart';
 import 'pages/requests_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/profile_page.dart';
@@ -44,7 +45,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin/operations', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
     GoRoute(path: '/admin/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/admin/reports/archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
-    GoRoute(path: '/home', builder: (_, __) => const JibbleWorkspacePage()),
+    GoRoute(path: '/home', builder: (_, __) => const ModernHomePage()),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
