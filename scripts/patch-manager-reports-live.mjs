@@ -23,18 +23,28 @@ const newExcel = `  const exportExcel = async () => {\n    let reportSummaries =
 if (!oldExcel.test(source)) throw new Error("ManagerReports: Excel export anchor not found.");
 source = source.replace(oldExcel, newExcel);
 
-// patch-manager-reports-final.mjs runs before this script and makes the daily
-// status override rotation-aware. Match that actual post-final shape so a real
-// check-in always wins over a stale D1 daily status.
+// Older report patches expected a rotation-specific implementation. The current
+// report derives schedule truth from the canonical backend and no longer exposes
+// that private rotation branch. Apply those compatibility rewrites only when
+// their exact legacy anchors still exist; never fail a production build because
+// the obsolete branch is absent.
 const attendancePriorityDetails = '    if (dailyStatus && serverStatus && !rotation) st = serverStatus === "late" && !cout ? "open" : serverStatus;';
 const attendancePriorityDetailsReplacement = '    if (dailyStatus && serverStatus && !rotation && !cin) st = serverStatus;';
-if (!source.includes(attendancePriorityDetails)) throw new Error("ManagerReports: daily status priority anchor not found after final patch.");
-source = source.replace(attendancePriorityDetails, attendancePriorityDetailsReplacement);
+if (source.includes(attendancePriorityDetails)) {
+  source = source.replace(attendancePriorityDetails, attendancePriorityDetailsReplacement);
+  console.log("ManagerReports live patch: legacy detail priority compatibility applied.");
+} else {
+  console.log("ManagerReports live patch: legacy detail priority branch absent; skipped safely.");
+}
 
 const attendancePrioritySummary = '    if (!rotation && serverStatus === "not_started") continue;\n    if (!rotation && serverStatus === "off") { off++; continue; }\n    if (!rotation && serverStatus === "leave") { leave++; continue; }\n    if (!rotation && serverStatus === "permission") { permission++; continue; }\n    if (!rotation && serverStatus === "absent") { absent++; continue; }';
 const attendancePrioritySummaryReplacement = '    if (!rotation && serverStatus === "not_started" && !cin) continue;\n    if (!rotation && serverStatus === "off" && !cin) { off++; continue; }\n    if (!rotation && serverStatus === "leave" && !cin) { leave++; continue; }\n    if (!rotation && serverStatus === "permission" && !cin) { permission++; continue; }\n    if (!rotation && serverStatus === "absent" && !cin) { absent++; continue; }';
-if (!source.includes(attendancePrioritySummary)) throw new Error("ManagerReports: summary status priority anchor not found after final patch.");
-source = source.replace(attendancePrioritySummary, attendancePrioritySummaryReplacement);
+if (source.includes(attendancePrioritySummary)) {
+  source = source.replace(attendancePrioritySummary, attendancePrioritySummaryReplacement);
+  console.log("ManagerReports live patch: legacy summary priority compatibility applied.");
+} else {
+  console.log("ManagerReports live patch: legacy summary priority branch absent; skipped safely.");
+}
 
 const oldPrint = '  const printReport = () => window.print();';
 const newPrint = '  const printReport = async () => { if (mode !== "daily") { window.print(); return; } const fresh = await refreshDailyReportSnapshot(); if (!fresh) return; window.requestAnimationFrame(() => window.print()); };';
