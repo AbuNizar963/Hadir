@@ -97,6 +97,9 @@ class AttendanceService {
       accuracyMeters: position.accuracy,
       locationName: '${place['name'] ?? 'موقع العمل'}',
       radiusMeters: radius,
+      latitude: position.latitude,
+      longitude: position.longitude,
+      locationId: '${place['id'] ?? 'main'}',
     );
   }
 
@@ -105,6 +108,9 @@ class AttendanceService {
     required String qrCode,
     required AttendanceChallenge challenge,
   }) async {
+    if (DateTime.now().toUtc().isAfter(challenge.expiresAt)) {
+      throw Exception('انتهت مهلة التحقق. أعد مسح رمز QR ثم أكّد العملية مرة أخرى.');
+    }
     final profile = await api.employeeProfile();
     final employee = Map<String, dynamic>.from(profile['employee'] is Map ? profile['employee'] : profile);
     await api.createAttendance({
