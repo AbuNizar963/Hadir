@@ -56,10 +56,10 @@ const printBlock = `<div className="daily-print-report" dir="rtl">
           <tbody>{dailyServiceRows.map((row, i) => <tr key={row.employee.id}><td className="daily-print-center">{i + 1}</td><td>{specialtyOf(row.employee)}</td><td className="daily-print-name-cell">{row.employee.name}</td><td className="daily-print-center"><span className={"daily-print-status " + String(row.status)}>{labels[row.status]}</span></td><td className="daily-print-center">{row.checkIn}</td><td className="daily-print-center">{row.checkOut}</td><td>{row.note || "—"}</td></tr>)}</tbody>
         </table>
       </div>`;
-const dailySectionEnd = '</div>\n    </section> : <div className="hud-card';
+const dailySectionEnd = '</div>\n    </section> : <section className="space-y-4">';
 if (!source.includes('className="daily-print-report"')) {
   if (!source.includes(dailySectionEnd)) throw new Error("ManagerReports: daily service report closing anchor not found.");
-  source = source.replace(dailySectionEnd, `</div>${printBlock}\n    </section> : <div className="hud-card`);
+  source = source.replace(dailySectionEnd, `</div>${printBlock}\n    </section> : <section className="space-y-4">`);
 }
 if (!source.includes('className="daily-print-report"')) throw new Error("ManagerReports: dedicated daily print report was not inserted.");
 
@@ -91,7 +91,7 @@ if (!source.includes('getBackendSettings')) throw new Error("ManagerReports: bac
 if (!source.includes('className="h-[3.1cm] w-[3.1cm]')) throw new Error("ManagerReports: 3.1cm logo markup was not applied.");
 if (!source.includes(newPageCss)) throw new Error("ManagerReports: A4 portrait print rule was not applied.");
 if (!source.includes('getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay')) throw new Error("ManagerReports: daily scheduled-employee filter was not applied.");
-if (!source.includes('className="daily-print-report"')) throw new Error("ManagerReports: dedicated print report was not applied.");
+if (!source.includes('className="daily-print-report"')) throw new Error("ManagerReports: dedicated daily print report was not applied.");
 if (!source.includes('سجل الحضور والانصراف ليوم')) throw new Error("ManagerReports: daily print title was not applied.");
 
 writeFileSync(file, source, "utf8");
