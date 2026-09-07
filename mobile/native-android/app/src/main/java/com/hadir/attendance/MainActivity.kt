@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.hadir.attendance.data.HadirRepository
 import com.hadir.attendance.ui.NativeAdminApp
 import com.hadir.attendance.ui.NativeAttendanceAnalytics
-import com.hadir.attendance.ui.NativeMainApp
+import com.hadir.attendance.ui.NativeEmployeeStableApp
 import com.hadir.attendance.ui.NativeMainFeatures
 import com.hadir.attendance.ui.NativeNotificationCenter
 import com.hadir.attendance.ui.NativeRoleEntry
@@ -89,7 +89,7 @@ class MainActivity : ComponentActivity() {
                                 features -> NativeMainFeatures(onBack = { features = false })
                                 notifications -> NativeNotificationCenter(onBack = { notifications = false })
                                 else -> Box(Modifier.fillMaxSize()) {
-                                    NativeMainApp(
+                                    NativeEmployeeStableApp(
                                         onEmployeeAuthenticated = { employeeAuthenticated = true },
                                         onEmployeeLoggedOut = {
                                             employeeAuthenticated = false
