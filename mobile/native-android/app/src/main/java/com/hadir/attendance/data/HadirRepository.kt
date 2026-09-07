@@ -5,8 +5,12 @@ import android.provider.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.json.JSONObject
 import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -39,17 +43,26 @@ class BearerInterceptor(private val session: SessionStore) : Interceptor {
 class HadirRepository(context: Context) {
     private val session = SessionStore(context)
     private val api = Retrofit.Builder().baseUrl(HADIR_API).client(OkHttpClient.Builder().addInterceptor(BearerInterceptor(session)).build()).addConverterFactory(MoshiConverterFactory.create()).build().create(HadirApi::class.java)
+    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
+    private fun authBody(username: String, password: String, deviceId: String? = null, deviceLabel: String? = null, fingerprint: String? = null): RequestBody {
+        val json = JSONObject().put("username", username.trim()).put("password", password)
+        if (!deviceId.isNullOrBlank()) json.put("deviceId", deviceId.trim())
+        if (!deviceLabel.isNullOrBlank()) json.put("deviceLabel", deviceLabel.trim())
+        if (!fingerprint.isNullOrBlank()) json.put("deviceFingerprint", fingerprint.trim())
+        return json.toString().toRequestBody(jsonMediaType)
+    }
 
     suspend fun login(username: String, password: String): Employee = withContext(Dispatchers.IO) {
         try {
-            val response = api.login(LoginRequest(username.trim(), password, password, session.deviceId, "Android", session.deviceId))
+            val response = api.login(authBody(username, password, session.deviceId, "Android", session.deviceId))
             if (response.kind != "employee") error("هذا الحساب ليس حساب موظف")
             session.token = response.token
             response.user
         } catch (error: HttpException) {
             if (error.code() !in setOf(400, 401)) throw errorWithServerMessage(error)
             try {
-                val response = api.login(LoginRequest(username.trim(), password, password, session.deviceId, "Android", session.deviceId))
+                val response = api.login(authBody(username, password, session.deviceId, "Android"))
                 if (response.kind != "employee") error("هذا الحساب ليس حساب موظف")
                 session.token = response.token
                 response.user
@@ -58,14 +71,15 @@ class HadirRepository(context: Context) {
             }
         }
     }
+
     suspend fun loginAdmin(username: String, password: String): Admin = withContext(Dispatchers.IO) {
         val response = try {
-            api.loginAdminCredentials(AdminCredentialsRequest(username.trim(), password, password))
+            api.loginAdminCredentials(authBody(username, password))
         } catch (error: HttpException) {
             if (error.code() !in setOf(400, 401)) throw errorWithServerMessage(error)
             val deviceId = session.deviceId
             try {
-                api.loginAdmin(AdminLoginRequest(username.trim(), password, password, deviceId, "Android", deviceId))
+                api.loginAdmin(authBody(username, password, deviceId, "Android", deviceId))
             } catch (retryError: HttpException) {
                 throw errorWithServerMessage(retryError)
             }
@@ -74,6 +88,7 @@ class HadirRepository(context: Context) {
         session.token = response.token
         response.user
     }
+
     suspend fun attendance(limit: Int = 200): List<AttendanceRecord> = withContext(Dispatchers.IO) { api.attendance(limit) }
     suspend fun requests(): List<EmployeeRequest> = withContext(Dispatchers.IO) { api.requests() }
     suspend fun notifications(): List<AppNotification> = withContext(Dispatchers.IO) { api.notifications() }
