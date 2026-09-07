@@ -181,7 +181,7 @@ class HadirRepository(context: Context) {
 
     private fun errorWithServerMessage(error: HttpException): Exception {
         val body = runCatching { error.response()?.errorBody()?.string() }.getOrNull().orEmpty()
-        val serverMessage = Regex("\\\"error\\\"\\s*:\s*\\\"([^\\\"]+)").find(body)?.groupValues?.getOrNull(1)
+        val serverMessage = Regex("""\"error\"\s*:\s*\"([^\"]+)""").find(body)?.groupValues?.getOrNull(1)
         return IllegalStateException(serverMessage ?: "خطأ من الخادم (${error.code()})", error)
     }
 }
