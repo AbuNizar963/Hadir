@@ -10,9 +10,9 @@ import retrofit2.http.Query
 
 const val HADIR_API = "https://hadir-api.abunizar963.workers.dev/"
 
-data class LoginRequest(val username: String, val password: String, val deviceId: String, val deviceLabel: String, val deviceFingerprint: String)
-data class AdminLoginRequest(val username: String, val password: String, val deviceId: String, val deviceLabel: String, val deviceFingerprint: String)
-data class AdminCredentialsRequest(val username: String, val password: String)
+data class LoginRequest(val username: String, val password: String, val pin: String, val deviceId: String, val deviceLabel: String, val deviceFingerprint: String)
+data class AdminLoginRequest(val username: String, val password: String, val pin: String, val deviceId: String, val deviceLabel: String, val deviceFingerprint: String)
+data class AdminCredentialsRequest(val username: String, val password: String, val pin: String)
 data class LoginResponse<T>(val token: String, val user: T, val kind: String)
 data class Employee(val id: String, val name: String? = null, @Json(name = "jobNumber") val jobNumber: String? = null)
 data class Admin(val id: String, val username: String, val name: String, val role: String)
