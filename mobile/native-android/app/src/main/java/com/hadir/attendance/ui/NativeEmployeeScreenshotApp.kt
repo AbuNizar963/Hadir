@@ -32,15 +32,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val ShotBg = Color(0xFF090D15)
-private val ShotCard = Color(0xFF141923)
-private val ShotPanel = Color(0xFF191E29)
-private val ShotBorder = Color(0xFF29313D)
+private val ShotBg = Color(0xFF0C1018)
+private val ShotCard = Color(0xFF171C26)
+private val ShotPanel = Color(0xFF202631)
+private val ShotBorder = Color(0xFF303744)
 private val ShotGreen = Color(0xFF35C995)
 private val ShotCyan = Color(0xFF35C7F2)
 private val ShotAmber = Color(0xFFE9A52D)
-private val ShotText = Color(0xFFF3F5F8)
-private val ShotMuted = Color(0xFFAEB6C2)
+private val ShotText = Color(0xFFF0F3F7)
+private val ShotMuted = Color(0xFFACB4C1)
 
 @Composable
 fun NativeEmployeeScreenshotApp(vm: NativeMainViewModel = viewModel(), onEmployeeAuthenticated: () -> Unit = {}, onEmployeeLoggedOut: () -> Unit = {}) {
@@ -52,9 +52,7 @@ fun NativeEmployeeScreenshotApp(vm: NativeMainViewModel = viewModel(), onEmploye
     }
     MaterialTheme(colorScheme = darkColorScheme(background = ShotBg, surface = ShotCard, surfaceVariant = ShotPanel, primary = ShotGreen, secondary = ShotCyan, onBackground = ShotText, onSurface = ShotText, onSurfaceVariant = ShotMuted, outline = ShotBorder)) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-            CompositionLocalProvider(LocalTextStyle provides LocalTextStyle.current.copy(textAlign = TextAlign.Right)) {
-                if (vm.employee == null) ScreenshotLogin(vm) else ScreenshotWorkspace(vm)
-            }
+            if (vm.employee == null) ScreenshotLogin(vm) else ScreenshotWorkspace(vm)
         }
     }
 }
@@ -83,7 +81,6 @@ private fun ScreenshotLogin(vm: NativeMainViewModel) {
 private fun ScreenshotWorkspace(vm: NativeMainViewModel) {
     val context = LocalContext.current
     var section by remember { mutableIntStateOf(0) }
-    var profileOpen by remember { mutableStateOf(false) }
     var requestOpen by remember { mutableStateOf(false) }
     var scanner by remember { mutableStateOf(false) }
     var locating by remember { mutableStateOf(false) }
@@ -142,9 +139,9 @@ private fun ScreenshotWorkspace(vm: NativeMainViewModel) {
 
     Surface(Modifier.fillMaxSize(), color = ShotBg) {
         Box(Modifier.fillMaxSize()) {
-            Scaffold(containerColor = ShotBg, bottomBar = { ScreenshotBottomBar(section) { section = it; profileOpen = false } }) { padding ->
+            Scaffold(containerColor = ShotBg, bottomBar = { ScreenshotBottomBar(section) { section = it } }) { padding ->
                 LazyColumn(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()), contentPadding = PaddingValues(start = 14.dp, top = 9.dp, end = 14.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { ScreenshotTopBar(profileOpen, { profileOpen = !profileOpen }) { section = it; profileOpen = false } }
+                    item { ScreenshotTopBar() }
                     item { when (section) { 0 -> ScreenshotHome(vm, startClock, request = { requestOpen = true }, locationAllowed = locationAllowed, cameraAllowed = cameraAllowed); 1 -> ScreenshotCenter(vm); 2 -> ScreenshotHistory(vm); 3 -> ScreenshotRequests(vm) { requestOpen = true }; else -> ScreenshotProfile(vm) { vm.logout() } } }
                 }
             }
@@ -166,29 +163,29 @@ private fun ScreenshotWorkspace(vm: NativeMainViewModel) {
 }
 
 @Composable
-private fun ScreenshotTopBar(open: Boolean, onOpen: () -> Unit, onSection: (Int) -> Unit) {
-    Column(Modifier.fillMaxWidth().height(157.dp)) {
+private fun ScreenshotTopBar() {
+    Column(Modifier.fillMaxWidth().height(118.dp)) {
         Spacer(Modifier.weight(1f))
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
             Text("HADIR  ·  EMPLOYEE", color = ShotMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             Text("لوحة الموظف", color = ShotText, fontSize = 35.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 7.dp))
         }
         Spacer(Modifier.height(18.dp))
-        HorizontalDivider(color = Color(0xFF1C222C))
-        Spacer(Modifier.height(21.dp))
-        DropdownMenu(expanded = open, onDismissRequest = onOpen, modifier = Modifier.background(ShotCard)) {
-            Text("أقسام الموظف", color = ShotMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp, 8.dp))
-            listOf("لوحة الموظف" to Icons.Default.Home, "مركز الموظف" to Icons.Default.Dashboard, "سجل العمل" to Icons.Default.AccessTime, "الطلبات" to Icons.Default.ListAlt, "الملف الشخصي" to Icons.Default.Person).forEachIndexed { i, item ->
-                DropdownMenuItem(text = { Text(item.first, color = ShotText, fontWeight = FontWeight.Bold) }, leadingIcon = { Icon(item.second, null, tint = ShotGreen) }, onClick = { onSection(i) })
-            }
-        }
+        HorizontalDivider(color = ShotBorder.copy(alpha = .55f))
+        Spacer(Modifier.height(9.dp))
     }
 }
 
 @Composable
 private fun ScreenshotBottomBar(section: Int, onSection: (Int) -> Unit) {
     NavigationBar(containerColor = ShotCard, tonalElevation = 0.dp, modifier = Modifier.border(1.dp, ShotBorder)) {
-        listOf(Triple(0, Icons.Default.Home, "الرئيسية"), Triple(1, Icons.Default.Dashboard, "المركز"), Triple(2, Icons.Default.AccessTime, "السجل"), Triple(3, Icons.Default.ListAlt, "الطلبات"), Triple(4, Icons.Default.Person, "الملف")).forEach { (index, icon, label) ->
+        listOf(
+            Triple(0, Icons.Default.Home, "لوحة الموظف"),
+            Triple(1, Icons.Default.Dashboard, "مركز الموظف"),
+            Triple(2, Icons.Default.AccessTime, "سجل العمل"),
+            Triple(3, Icons.Default.ListAlt, "الطلبات"),
+            Triple(4, Icons.Default.Person, "الملف الشخصي")
+        ).forEach { (index, icon, label) ->
             NavigationBarItem(selected = section == index, onClick = { onSection(index) }, icon = { Icon(icon, null, Modifier.size(23.dp)) }, label = { Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = ShotGreen, selectedTextColor = ShotGreen, indicatorColor = Color(0xFF12372E), unselectedIconColor = ShotMuted, unselectedTextColor = ShotMuted))
         }
     }
@@ -251,7 +248,7 @@ private fun ScreenshotHome(vm: NativeMainViewModel, startClock: (String) -> Unit
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         HudShotCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) { Text("مرحبًا بك", color = ShotMuted, fontSize = 12.sp); Text(employee?.name?.ifBlank { "الموظف" } ?: "الموظف", color = ShotText, fontSize = 25.sp, fontWeight = FontWeight.Black); Text("2000 · ${employee?.locationId?.takeIf { it.isNotBlank() } ?: "المقر الرئيسي"}", color = ShotMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp)) }
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) { Text("مرحبًا بك", color = ShotMuted, fontSize = 12.sp); Text(employee?.name?.ifBlank { "الموظف" } ?: "الموظف", color = ShotText, fontSize = 25.sp, fontWeight = FontWeight.Black); Text("${employee?.jobNumber?.takeIf { it.isNotBlank() } ?: "—"} · ${employee?.locationId?.takeIf { it.isNotBlank() } ?: "المقر الرئيسي"}", color = ShotMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 3.dp)) }
                 Box(Modifier.size(64.dp).background(Color(0xFF101E1D), RoundedCornerShape(18.dp)).border(1.dp, Color(0xFF1D6255), RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) { ScreenshotAvatar(employee?.name.orEmpty(), 46.dp) }
                 Spacer(Modifier.width(12.dp))
                 Column(horizontalAlignment = Alignment.Start) { Text(time, color = ShotText, fontSize = 31.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp); Text(today, color = ShotMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp)) }
@@ -274,7 +271,7 @@ private fun ScreenshotHome(vm: NativeMainViewModel, startClock: (String) -> Unit
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) { ShotClockButton("↑", "تسجيل انصراف", "إنهاء الدوام الآن", ShotCyan, enabled = checked && !vm.working, modifier = Modifier.weight(1f)) { startClock("check-out") }; ShotClockButton("↓", "تسجيل حضور", "الدوام جارٍ", ShotGreen, enabled = !checked && !checkedOut && !suspended && !vm.working, modifier = Modifier.weight(1f)) { startClock("check-in") } }
         HudShotCard {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Box(Modifier.background(Color(0xFF20242B), RoundedCornerShape(15.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) { Text("اليوم", color = ShotText, fontSize = 12.sp) }; Column(horizontalAlignment = Alignment.End) { Text("ملخص اليوم", color = ShotMuted, fontSize = 12.sp); Text("سجل الدوام", color = ShotText, fontSize = 23.sp, fontWeight = FontWeight.Black) } }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Box(Modifier.background(ShotPanel, RoundedCornerShape(15.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) { Text("اليوم", color = ShotText, fontSize = 12.sp) }; Column(horizontalAlignment = Alignment.End) { Text("ملخص اليوم", color = ShotMuted, fontSize = 12.sp); Text("سجل الدوام", color = ShotText, fontSize = 23.sp, fontWeight = FontWeight.Black) } }
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { SummaryShot("مدة العمل", worked, Modifier.weight(1f)); SummaryShot("الانصراف", latestOut?.let { displayTime(it.timestamp) } ?: "—", Modifier.weight(1f)); SummaryShot("الحضور", attendanceTime, Modifier.weight(1f)) }
         }
         HudShotCard {
@@ -315,7 +312,7 @@ private fun ScreenshotProfile(vm: NativeMainViewModel, logout: () -> Unit) { val
 private fun ScreenshotRequestDialog(vm: NativeMainViewModel, close: () -> Unit) { var type by remember { mutableStateOf("permission") }; var reason by remember { mutableStateOf("") }; var start by remember { mutableStateOf("") }; var end by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = close, title = { Text("طلب جديد") }, text = { Column(verticalArrangement = Arrangement.spacedBy(9.dp)) { Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("permission" to "استئذان", "leave" to "إجازة", "checkout" to "انصراف").forEach { (id, label) -> FilterChip(selected = type == id, onClick = { type = id }, label = { Text(label) }) } }; OutlinedTextField(reason, { reason = it }, Modifier.fillMaxWidth(), label = { Text("السبب") }, minLines = 2); OutlinedTextField(start, { start = it }, Modifier.fillMaxWidth(), label = { Text("تاريخ البداية (اختياري)") }, singleLine = true); OutlinedTextField(end, { end = it }, Modifier.fillMaxWidth(), label = { Text("تاريخ النهاية (اختياري)") }, singleLine = true) } }, confirmButton = { Button(onClick = { vm.addRequest(type, reason, start, end); close() }) { Text("إرسال") } }, dismissButton = { TextButton(onClick = close) { Text("إلغاء") } }) }
 
 @Composable
-private fun HudShotCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) { Surface(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = ShotCard, border = BorderStroke(1.dp, ShotBorder), tonalElevation = 0.dp) { Column(Modifier.background(Brush.linearGradient(listOf(Color(0xFF171C27), Color(0xFF11161F)))).padding(18.dp), content = content) } }
+private fun HudShotCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) { Surface(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = ShotCard, border = BorderStroke(1.dp, ShotBorder), tonalElevation = 0.dp) { Column(Modifier.background(Brush.linearGradient(listOf(Color(0xFF171C26), Color(0xFF11161F)))).padding(18.dp), content = content) } }
 
 @Composable
 private fun ScreenshotAvatar(name: String, size: androidx.compose.ui.unit.Dp = 43.dp) { val initial = name.trim().firstOrNull()?.toString() ?: "م"; Box(Modifier.size(size).background(Color(0xFF102A25), RoundedCornerShape(size / 3)).border(1.dp, Color(0xFF1D6255), RoundedCornerShape(size / 3)), contentAlignment = Alignment.Center) { Text(initial, color = ShotGreen, fontSize = (size.value * .42f).sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center) } }
