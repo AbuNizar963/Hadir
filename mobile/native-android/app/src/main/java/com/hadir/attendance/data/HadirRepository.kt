@@ -144,6 +144,8 @@ class HadirRepository(context: Context) {
         adminFromJson(parsed.user)
     }
 
+    suspend fun me(): Map<String, Any?> = withContext(Dispatchers.IO) { api.me() }
+
     suspend fun attendance(limit: Int = 200): List<AttendanceRecord> = withContext(Dispatchers.IO) {
         if (session.role == "admin") {
             api.audit(limit).asSequence()
@@ -168,6 +170,7 @@ class HadirRepository(context: Context) {
     suspend fun employees(): List<Map<String, Any?>> = withContext(Dispatchers.IO) { api.employees() }
     suspend fun audit(limit: Int = 200): List<Map<String, Any?>> = withContext(Dispatchers.IO) { api.audit(limit) }
     suspend fun locations(): List<Map<String, Any?>> = withContext(Dispatchers.IO) { api.locations() }
+    suspend fun markNotificationRead(id: String? = null) = withContext(Dispatchers.IO) { api.markNotificationRead(NotificationReadBody(id)) }
     suspend fun updateRequest(id: String, status: String) = withContext(Dispatchers.IO) { api.updateRequest(id, RequestStatusBody(status)) }
     suspend fun createRequest(employee: Employee, type: String, reason: String, startDate: String?, endDate: String?) = withContext(Dispatchers.IO) {
         api.createRequest(CreateRequestBody(employee.id, employee.name.orEmpty(), employee.jobNumber.orEmpty(), type, reason.ifBlank { null }, startDate, endDate))
@@ -178,7 +181,7 @@ class HadirRepository(context: Context) {
 
     private fun errorWithServerMessage(error: HttpException): Exception {
         val body = runCatching { error.response()?.errorBody()?.string() }.getOrNull().orEmpty()
-        val serverMessage = Regex("\\\"error\\\"\\s*:\\s*\\\"([^\\\"]+)").find(body)?.groupValues?.getOrNull(1)
+        val serverMessage = Regex("\\\"error\\\"\\s*:\s*\\\"([^\\\"]+)").find(body)?.groupValues?.getOrNull(1)
         return IllegalStateException(serverMessage ?: "خطأ من الخادم (${error.code()})", error)
     }
 }
