@@ -25,6 +25,14 @@ data class NativeUpdateInfo(
     val releaseNotes: String
 )
 
+data class NativeDownloadProgress(
+    val downloadedBytes: Long,
+    val totalBytes: Long,
+    val percent: Int,
+    val elapsedSeconds: Long,
+    val etaSeconds: Long?
+)
+
 class NativeUpdater(private val context: Context) {
     suspend fun check(): NativeUpdateInfo? = withContext(Dispatchers.IO) {
         runCatching {
@@ -71,7 +79,10 @@ class NativeUpdater(private val context: Context) {
         }.getOrNull()
     }
 
-    suspend fun downloadAndInstall(update: NativeUpdateInfo): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun downloadAndInstall(
+        update: NativeUpdateInfo,
+        onProgress: (NativeDownloadProgress) -> Unit = {}
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
                 !context.packageManager.canRequestPackageInstalls()
@@ -88,12 +99,60 @@ class NativeUpdater(private val context: Context) {
                 setRequestProperty("User-Agent", "Hadir-Android-Updater")
             }
             if (connection.responseCode !in 200..299) error("تعذر تنزيل ملف التحديث")
+
+            val totalBytes = connection.contentLengthLong
+            val startedAt = System.currentTimeMillis()
+            var downloadedBytes = 0L
+            var lastReportedBytes = -1L
+            var lastReportedAt = 0L
+
             connection.inputStream.use { input ->
-                apkFile.outputStream().use { output -> input.copyTo(output) }
+                apkFile.outputStream().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        downloadedBytes += count
+
+                        val now = System.currentTimeMillis()
+                        if (lastReportedBytes < 0L || now - lastReportedAt >= 250L || (totalBytes > 0 && downloadedBytes >= totalBytes)) {
+                            val elapsedSeconds = ((now - startedAt).coerceAtLeast(1L)) / 1000L
+                            val bytesPerSecond = if (elapsedSeconds > 0) downloadedBytes.toDouble() / elapsedSeconds else 0.0
+                            val remainingBytes = if (totalBytes > 0) (totalBytes - downloadedBytes).coerceAtLeast(0L) else 0L
+                            val etaSeconds = if (bytesPerSecond > 0 && totalBytes > 0) {
+                                (remainingBytes / bytesPerSecond).toLong()
+                            } else null
+                            val percent = if (totalBytes > 0) {
+                                ((downloadedBytes * 100L) / totalBytes).coerceIn(0L, 100L).toInt()
+                            } else -1
+                            onProgress(
+                                NativeDownloadProgress(
+                                    downloadedBytes = downloadedBytes,
+                                    totalBytes = totalBytes,
+                                    percent = percent,
+                                    elapsedSeconds = elapsedSeconds,
+                                    etaSeconds = etaSeconds
+                                )
+                            )
+                            lastReportedBytes = downloadedBytes
+                            lastReportedAt = now
+                        }
+                    }
+                }
             }
             connection.disconnect()
             if (!apkFile.exists() || apkFile.length() < 1024) error("تعذر تنزيل ملف التحديث")
 
+            onProgress(
+                NativeDownloadProgress(
+                    downloadedBytes = apkFile.length(),
+                    totalBytes = if (totalBytes > 0) totalBytes else apkFile.length(),
+                    percent = 100,
+                    elapsedSeconds = ((System.currentTimeMillis() - startedAt).coerceAtLeast(1L)) / 1000L,
+                    etaSeconds = 0L
+                )
+            )
             installWithPackageInstaller(apkFile)
         }
     }
