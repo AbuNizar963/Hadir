@@ -1,12 +1,12 @@
 package com.hadir.attendance
 
+import android.app.PendingIntent
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.content.pm.PackageInstaller
 import android.os.Build
 import android.provider.Settings
-import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -15,7 +15,7 @@ import java.net.URL
 
 private const val RELEASES_URL = "https://api.github.com/repos/AbuNizar963/Hadir/releases?per_page=20"
 private const val ASSET_NAME = "app-release-signed.apk"
-private const val APK_MIME = "application/vnd.android.package-archive"
+private const val INSTALL_REQUEST_CODE = 7401
 
 data class NativeUpdateInfo(
     val versionCode: Long,
@@ -93,33 +93,45 @@ class NativeUpdater(private val context: Context) {
             connection.disconnect()
             if (!apkFile.exists() || apkFile.length() < 1024) error("تعذر تنزيل ملف التحديث")
 
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                apkFile
-            )
-            withContext(Dispatchers.Main) {
-                val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                    data = uri
-                    type = APK_MIME
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                try {
-                    // Do not call resolveActivity() here: Android 11+ package-visibility
-                    // rules can make the system package installer appear unavailable even
-                    // though startActivity() can resolve the APK installation intent.
-                    context.startActivity(installIntent)
-                } catch (_: ActivityNotFoundException) {
-                    throw IllegalStateException("لا يوجد تطبيق على الجهاز يستطيع تثبيت ملف APK")
-                }
+            installWithPackageInstaller(apkFile)
+        }
+    }
+
+    private fun installWithPackageInstaller(apkFile: File) {
+        val packageInstaller = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+            setSize(apkFile.length())
+        }
+        val sessionId = packageInstaller.createSession(params)
+        var session: PackageInstaller.Session? = null
+        try {
+            session = packageInstaller.openSession(sessionId)
+            session.openWrite("base.apk", 0, apkFile.length()).use { output ->
+                apkFile.inputStream().use { input -> input.copyTo(output) }
+                output.fsync()
             }
+
+            val callbackIntent = Intent(context, NativeInstallReceiver::class.java).setPackage(context.packageName)
+            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                INSTALL_REQUEST_CODE,
+                callbackIntent,
+                pendingFlags
+            )
+            session.commit(pendingIntent.intentSender)
+        } catch (error: Exception) {
+            runCatching { packageInstaller.abandonSession(sessionId) }
+            throw error
+        } finally {
+            session?.close()
         }
     }
 
     fun openInstallPermissionSettings() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val uri = Uri.parse("package:${context.packageName}")
+            val uri = android.net.Uri.parse("package:${context.packageName}")
             context.startActivity(
                 Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
@@ -133,3 +145,25 @@ class NativeUpdater(private val context: Context) {
 }
 
 class InstallPermissionRequiredException : IllegalStateException()
+
+class NativeInstallReceiver : android.content.BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val status = intent.getIntExtra(
+            PackageInstaller.EXTRA_STATUS,
+            PackageInstaller.STATUS_FAILURE
+        )
+        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            val confirmationIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(PackageInstaller.EXTRA_INTENT, Intent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<Intent>(PackageInstaller.EXTRA_INTENT)
+            }
+            try {
+                confirmationIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let(context::startActivity)
+            } catch (_: ActivityNotFoundException) {
+                // The system installer is unavailable on this device.
+            }
+        }
+    }
+}
