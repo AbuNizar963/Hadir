@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FloatingActionButton
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.hadir.attendance.ui.NativeAdminApp
+import com.hadir.attendance.ui.NativeAttendanceAnalytics
 import com.hadir.attendance.ui.NativeMainApp
 import com.hadir.attendance.ui.NativeMainFeatures
 import com.hadir.attendance.ui.NativeRoleEntry
@@ -42,6 +44,7 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 var workspace by remember { mutableIntStateOf(0) }
                 var features by remember { mutableStateOf(false) }
+                var analytics by remember { mutableStateOf(false) }
                 var updateInfo by remember { mutableStateOf<NativeUpdateInfo?>(null) }
                 var updating by remember { mutableStateOf(false) }
                 var updateError by remember { mutableStateOf<String?>(null) }
@@ -53,10 +56,17 @@ class MainActivity : ComponentActivity() {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     when (workspace) {
                         0 -> NativeRoleEntry(onEmployee = { workspace = 1 }, onAdmin = { workspace = 2 })
-                        1 -> if (features) NativeMainFeatures(onBack = { features = false }) else Box(Modifier.fillMaxSize()) {
-                            NativeMainApp()
-                            FloatingActionButton(onClick = { features = true }, modifier = Modifier.align(Alignment.TopEnd)) {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = "ميزات حاضر")
+                        1 -> when {
+                            analytics -> NativeAttendanceAnalytics(onBack = { analytics = false })
+                            features -> NativeMainFeatures(onBack = { features = false })
+                            else -> Box(Modifier.fillMaxSize()) {
+                                NativeMainApp()
+                                FloatingActionButton(onClick = { analytics = true }, modifier = Modifier.align(Alignment.TopEnd)) {
+                                    Icon(Icons.Default.BarChart, contentDescription = "تحليلات الحضور")
+                                }
+                                FloatingActionButton(onClick = { features = true }, modifier = Modifier.align(Alignment.TopEnd).then(Modifier)) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = "ميزات حاضر")
+                                }
                             }
                         }
                         else -> NativeAdminApp(onBack = { workspace = 0 })
