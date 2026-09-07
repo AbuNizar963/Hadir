@@ -178,9 +178,9 @@ private fun EmployeeRequestsTab(vm: NativeMainViewModel, onNewRequest: () -> Uni
             items(vm.requests) { request ->
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(request.type)
+                        Text("${request.type}")
                         Text(request.reason)
-                        Text(request.status)
+                        Text("${request.status}")
                     }
                 }
             }
