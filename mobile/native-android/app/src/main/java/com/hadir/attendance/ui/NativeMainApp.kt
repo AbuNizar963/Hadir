@@ -156,11 +156,14 @@ private fun NativeShell(vm: NativeMainViewModel) {
     val latest = vm.attendance.maxByOrNull { it.timestamp }
     val checked = latest?.type == "check-in"
     val today = SimpleDateFormat("EEEE، d MMMM", Locale("ar")).format(Date())
+    val employee = vm.employee
+    val schedule = scheduleText(employee?.workStartTime, employee?.workEndTime)
+    val scheduleLocation = employee?.locationId?.takeIf { it.isNotBlank() }?.let { "الموقع المرتبط بالدوام: $it" } ?: "الموقع المخصص"
     LazyColumn(Modifier.fillMaxSize().padding(p), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Avatar(vm.employee?.name); Spacer(Modifier.width(12.dp)); Column { Text("مرحبًا ${vm.employee?.name.orEmpty()}", fontSize = 19.sp, fontWeight = FontWeight.Bold); Text(today, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) } } }
         item { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp)) { Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(if (checked) "أنت تعمل الآن" else "ساعة العمل", color = MaterialTheme.colorScheme.onSurfaceVariant); Text(if (checked) "مسجّل حضور" else "جاهز للتسجيل", fontSize = 22.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.height(18.dp)); Button(onClick = { startClock(if (checked) "check-out" else "check-in") }, enabled = !vm.working, modifier = Modifier.size(170.dp), shape = CircleShape) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(if (checked) "انصراف" else "حضور", fontSize = 24.sp, fontWeight = FontWeight.Bold); Text(if (vm.working) "جارٍ التحقق…" else "QR + GPS", fontSize = 11.sp) } }; if (!locationAllowed) Text("فعّل الموقع لتنفيذ تسجيل الحضور.", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp), textAlign = TextAlign.Center); vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp), textAlign = TextAlign.Center) } } } }
         item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { Metric("سجلات", vm.attendance.size, Modifier.weight(1f)); Metric("طلبات", vm.requests.count { it.status == "pending" }, Modifier.weight(1f)) } }
-        item { SectionCard("جدول اليوم", "09:00 — 17:00", "الموقع المخصص") }
+        item { SectionCard("جدول اليوم", schedule, scheduleLocation) }
         item { Text("آخر النشاطات", fontWeight = FontWeight.Bold, fontSize = 18.sp) }
         items(vm.attendance.sortedByDescending { it.timestamp }.take(5)) { ActivityItem(it) }
     }
@@ -177,9 +180,10 @@ private fun NativeShell(vm: NativeMainViewModel) {
 
 @Composable private fun CenterTab(vm: NativeMainViewModel, p: PaddingValues) {
     val e = vm.employee
+    val schedule = scheduleText(e?.workStartTime, e?.workEndTime)
     LazyColumn(Modifier.fillMaxSize().padding(p), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("مركز الموظف", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black); Text("بطاقتك وملخص التزامك", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        item { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) { Column(Modifier.padding(20.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Avatar(e?.name); Spacer(Modifier.width(14.dp)); Column { Text(e?.name.orEmpty(), fontSize = 21.sp, fontWeight = FontWeight.Black); Text("الرقم الوظيفي: ${e?.jobNumber.orEmpty()}", color = MaterialTheme.colorScheme.onSurfaceVariant) } }; HorizontalDivider(Modifier.padding(vertical = 16.dp)); Info("الحالة", "نشط"); Info("الدوام", "09:00 → 17:00"); Info("عدد السجلات", vm.attendance.size.toString()) } } }
+        item { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp)) { Column(Modifier.padding(20.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Avatar(e?.name); Spacer(Modifier.width(14.dp)); Column { Text(e?.name.orEmpty(), fontSize = 21.sp, fontWeight = FontWeight.Black); Text("الرقم الوظيفي: ${e?.jobNumber.orEmpty()}", color = MaterialTheme.colorScheme.onSurfaceVariant) } }; HorizontalDivider(Modifier.padding(vertical = 16.dp)); Info("الحالة", "نشط"); Info("الدوام", schedule); Info("عدد السجلات", vm.attendance.size.toString()) } } }
         item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { Metric("حضور", vm.attendance.count { it.type == "check-in" || it.type == "in" }, Modifier.weight(1f)); Metric("انصراف", vm.attendance.count { it.type == "check-out" || it.type == "out" }, Modifier.weight(1f)); Metric("طلبات", vm.requests.size, Modifier.weight(1f)) } }
         item { SectionCard("بطاقة رقمية", "رقم الموظف ${e?.jobNumber.orEmpty()}", "يمكن استخدامها للتعريف داخل نظام حاضر") }
     }
@@ -252,6 +256,7 @@ private fun NativeShell(vm: NativeMainViewModel) {
 @Composable private fun ActivityItem(r: AttendanceRecord) { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(if (r.type == "check-in") Icons.Default.Login else Icons.Default.Logout, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(10.dp)); Column { Text(if (r.type == "check-in") "تسجيل حضور" else "تسجيل انصراف", fontWeight = FontWeight.Bold); Text(time(r.timestamp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) } } } }
 @Composable private fun Info(label: String, value: String) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, fontWeight = FontWeight.Bold) } }
 @Composable private fun Empty(text: String) { Box(Modifier.fillMaxWidth().padding(30.dp), contentAlignment = Alignment.Center) { Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+private fun scheduleText(start: String?, end: String?): String = if (!start.isNullOrBlank() && !end.isNullOrBlank()) "$start — $end" else "لم يتم تحديد وقت الدوام"
 private fun time(v: String) = runCatching { SimpleDateFormat("HH:mm", Locale.US).format(Date.from(Instant.parse(v))) }.getOrElse { v.take(16).takeLast(5) }
 private fun duration(a: String?, b: String?): String { if (a == null) return "—"; val end = b ?: Instant.now().toString(); val m = runCatching { Duration.between(Instant.parse(a), Instant.parse(end)).toMinutes() }.getOrDefault(0); return "${m / 60}س ${m % 60}د" }
 private fun requestLabel(t: String) = when(t) { "leave" -> "إجازة"; "checkout" -> "انصراف"; else -> "استئذان" }
