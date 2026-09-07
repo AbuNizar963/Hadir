@@ -369,13 +369,13 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Widget _quick(IconData icon, String title, String sub, VoidCallback onTap) => Material(
     color: Colors.white,
     borderRadius: BorderRadius.circular(18),
-    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6), decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(children: [Container(width: 39, height: 39, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green, size: 19)), const SizedBox(height: 7), Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5)), const SizedBox(height: 2), Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 7.5))])),
+    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6), decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(children: [Container(width: 39, height: 39, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green, size: 19)), const SizedBox(height: 7), Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5)), const SizedBox(height: 2), Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 7.5))]))),
   );
 
   Widget _actionCard(IconData icon, String title, String sub, VoidCallback onTap) => Material(
     color: Colors.white,
     borderRadius: BorderRadius.circular(20),
-    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(sub, style: const TextStyle(color: _muted, fontSize: 10))])),
+    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(sub, style: const TextStyle(color: _muted, fontSize: 10))]))),
   );
 
   Widget _menuTile(IconData icon, String title, String subtitle, VoidCallback onTap) => Card(
@@ -406,10 +406,4 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   String _workHours() { final times = _todayAttendance(DateTime.now()).whereType<Map>().map((e) => DateTime.tryParse('${e['timestamp']}')).whereType<DateTime>().toList()..sort(); if (times.length < 2) return '—'; final d = times.last.difference(times.first); return '${d.inHours}س ${d.inMinutes.remainder(60)}د'; }
 
   int _unreadCount() => _notifications.where((x) => x is Map && x['readAt'] == null && x['read'] != true).length;
-}
-
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard();
-  @override
-  Widget build(BuildContext context) => Container(height: 86, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)), child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: _green)));
 }
