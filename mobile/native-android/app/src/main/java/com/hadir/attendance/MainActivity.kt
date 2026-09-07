@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FloatingActionButton
@@ -26,6 +27,7 @@ import com.hadir.attendance.ui.NativeAdminApp
 import com.hadir.attendance.ui.NativeAttendanceAnalytics
 import com.hadir.attendance.ui.NativeMainApp
 import com.hadir.attendance.ui.NativeMainFeatures
+import com.hadir.attendance.ui.NativeNotificationCenter
 import com.hadir.attendance.ui.NativeRoleEntry
 import com.hadir.attendance.ui.theme.HadirTheme
 import kotlinx.coroutines.launch
@@ -48,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 var workspace by remember { mutableIntStateOf(0) }
                 var features by remember { mutableStateOf(false) }
                 var analytics by remember { mutableStateOf(false) }
+                var notifications by remember { mutableStateOf(false) }
                 var updateInfo by remember { mutableStateOf<NativeUpdateInfo?>(null) }
                 var updating by remember { mutableStateOf(false) }
                 var updateError by remember { mutableStateOf<String?>(null) }
@@ -62,12 +65,16 @@ class MainActivity : ComponentActivity() {
                         1 -> when {
                             analytics -> NativeAttendanceAnalytics(onBack = { analytics = false })
                             features -> NativeMainFeatures(onBack = { features = false })
+                            notifications -> NativeNotificationCenter(onBack = { notifications = false })
                             else -> Box(Modifier.fillMaxSize()) {
                                 NativeMainApp()
                                 Column(
                                     modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
+                                    FloatingActionButton(onClick = { notifications = true }) {
+                                        Icon(Icons.Default.Notifications, contentDescription = "مركز الإشعارات")
+                                    }
                                     FloatingActionButton(onClick = { analytics = true }) {
                                         Icon(Icons.Default.BarChart, contentDescription = "تحليلات الحضور")
                                     }
