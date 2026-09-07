@@ -186,7 +186,7 @@ private fun NativeShell(vm: NativeMainViewModel) {
 @Composable private fun RequestsTab(vm: NativeMainViewModel, p: PaddingValues, add: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize().padding(p), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column { Text("الطلبات", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black); Text("الإجازات والاستئذانات وطلبات الانصراف", color = MaterialTheme.colorScheme.onSurfaceVariant) }; Button(onClick = add) { Text("طلب جديد") } } }
-        items(vm.requests.sortedByDescending { it.createdAt }) { r -> Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(15.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(requestLabel(r.type), fontWeight = FontWeight.Bold); Text(statusLabel(r.status), color = statusColor(r.status)) }; if (!r.reason.isNullOrBlank()) Text(r.reason!!, modifier = Modifier.padding(top = 7.dp)); Text(r.createdAt.take(10), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp)) } } }
+        items(vm.requests.sortedByDescending { it.createdAt }) { r -> Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(15.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(requestLabel(r.type), fontWeight = FontWeight.Bold); Text(statusLabel(r.status), color = statusColor(r.status)) }; if (!r.reason.isNullOrBlank()) Text(r.reason!!, modifier = Modifier.padding(top = 7.dp)); Text(runCatching { r.createdAt.take(10) }.getOrDefault("—"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp)) } } }
         if (vm.requests.isEmpty()) item { Empty("لا توجد طلبات") }
     }
 }
@@ -203,5 +203,4 @@ private fun NativeShell(vm: NativeMainViewModel) {
 private fun time(v: String) = runCatching { SimpleDateFormat("HH:mm", Locale.US).format(Date.from(Instant.parse(v))) }.getOrElse { v.take(16).takeLast(5) }
 private fun duration(a: String?, b: String?): String { if (a == null) return "—"; val end = b ?: Instant.now().toString(); val m = runCatching { Duration.between(Instant.parse(a), Instant.parse(end)).toMinutes() }.getOrDefault(0); return "${m / 60}س ${m % 60}د" }
 private fun requestLabel(t: String) = when(t) { "leave" -> "إجازة"; "checkout" -> "انصراف"; else -> "استئذان" }
-private fun statusLabel(s: String) = when(s) { "approved" -> "مقبول"; "rejected" -> "مرفوض"; "confirmed" -> "مؤكد"; else -> "قيد المراجعة" }
 @Composable private fun statusColor(s: String) = when(s) { "approved", "confirmed" -> Color(0xFF2E7D32); "rejected" -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.primary }
