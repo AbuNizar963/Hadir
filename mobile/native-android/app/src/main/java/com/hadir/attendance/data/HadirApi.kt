@@ -12,6 +12,7 @@ const val HADIR_API = "https://hadir-api.abunizar963.workers.dev/"
 
 data class LoginRequest(val username: String, val password: String, val deviceId: String, val deviceLabel: String, val deviceFingerprint: String)
 data class AdminLoginRequest(val username: String, val password: String, val deviceId: String, val deviceLabel: String, val deviceFingerprint: String)
+data class AdminCredentialsRequest(val username: String, val password: String)
 data class LoginResponse<T>(val token: String, val user: T, val kind: String)
 data class Employee(val id: String, val name: String? = null, @Json(name = "jobNumber") val jobNumber: String? = null)
 data class Admin(val id: String, val username: String, val name: String, val role: String)
@@ -29,6 +30,7 @@ data class RequestStatusBody(val status: String)
 interface HadirApi {
     @POST("api/auth/login") suspend fun login(@Body request: LoginRequest): LoginResponse<Employee>
     @POST("api/auth/login") suspend fun loginAdmin(@Body request: AdminLoginRequest): LoginResponse<Admin>
+    @POST("api/auth/login") suspend fun loginAdminCredentials(@Body request: AdminCredentialsRequest): LoginResponse<Admin>
     @GET("api/me") suspend fun me(): Map<String, Any?>
     @GET("api/attendance") suspend fun attendance(@Query("limit") limit: Int = 200): List<AttendanceRecord>
     @POST("api/attendance/challenge") suspend fun challenge(@Body request: AttendanceChallengeRequest): AttendanceChallengeResponse
