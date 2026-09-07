@@ -6,7 +6,6 @@ import '../core/session.dart';
 const _brand = Color(0xFF0B6B5A);
 const _bg = Color(0xFFF7F9F8);
 const _ink = Color(0xFF17322C);
-const _muted = Color(0xFF70817B);
 const _line = Color(0xFFDCE6E2);
 
 class AdminSettingsPage extends StatefulWidget {
