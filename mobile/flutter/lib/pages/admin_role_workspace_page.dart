@@ -237,9 +237,10 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
     ];
     if (_isOwner || _isManager) {
       features.add(_Feature(icon: Icons.admin_panel_settings_outlined, title: 'الحسابات والصلاحيات', subtitle: _isOwner ? 'المديرون والمشرفون وإدارة النظام' : 'المستخدمون الإداريون المتاحون', onTap: () => context.push('/admin/manage')));
+      features.add(_Feature(icon: Icons.settings_outlined, title: 'إعدادات النظام', subtitle: 'الاسم، رمز QR، الموقع، ساعات العمل وفترات السماح', onTap: () => context.push('/admin/settings')));
     }
     if (_isOwner) {
-      features.add(_Feature(icon: Icons.security_rounded, title: 'التدقيق والإعدادات', subtitle: 'السجل الإداري والإعدادات الحساسة', onTap: () => context.push('/admin/manage')));
+      features.add(_Feature(icon: Icons.security_rounded, title: 'التدقيق والإعدادات الحساسة', subtitle: 'السجل الإداري والإعدادات الحساسة', onTap: () => context.push('/admin/manage')));
       features.add(_Feature(icon: Icons.archive_rounded, title: 'أرشيف التقارير', subtitle: 'التقارير المحفوظة والتنزيل والحذف', onTap: () => context.push('/admin/reports/archive')));
     }
     return features;
