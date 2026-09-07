@@ -144,7 +144,7 @@ private fun ScreenshotWorkspace(vm: NativeMainViewModel) {
         Box(Modifier.fillMaxSize()) {
             Scaffold(containerColor = ShotBg, bottomBar = { ScreenshotBottomBar(section) { section = it; profileOpen = false } }) { padding ->
                 LazyColumn(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()), contentPadding = PaddingValues(start = 14.dp, top = 9.dp, end = 14.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    item { ScreenshotTopBar(vm.employee?.name.orEmpty(), profileOpen, { profileOpen = !profileOpen }) { section = it; profileOpen = false } }
+                    item { ScreenshotTopBar(profileOpen, { profileOpen = !profileOpen }) { section = it; profileOpen = false } }
                     item { when (section) { 0 -> ScreenshotHome(vm, startClock, request = { requestOpen = true }, locationAllowed = locationAllowed, cameraAllowed = cameraAllowed); 1 -> ScreenshotCenter(vm); 2 -> ScreenshotHistory(vm); 3 -> ScreenshotRequests(vm) { requestOpen = true }; else -> ScreenshotProfile(vm) { vm.logout() } } }
                 }
             }
@@ -166,16 +166,16 @@ private fun ScreenshotWorkspace(vm: NativeMainViewModel) {
 }
 
 @Composable
-private fun ScreenshotTopBar(name: String, open: Boolean, onOpen: () -> Unit, onSection: (Int) -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.End) {
-            Column(Modifier.weight(1f).padding(end = 12.dp), horizontalAlignment = Alignment.End) {
-                Text("HADIR  ·  EMPLOYEE", color = ShotMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                Text("لوحة الموظف", color = ShotText, fontSize = 35.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 7.dp))
-            }
-            Surface(onClick = onOpen, modifier = Modifier.size(58.dp), shape = RoundedCornerShape(18.dp), color = if (open) Color(0xFF123A31) else ShotCard, border = BorderStroke(1.dp, if (open) ShotGreen else ShotBorder)) { Box(contentAlignment = Alignment.Center) { ScreenshotAvatar(name) } }
+private fun ScreenshotTopBar(open: Boolean, onOpen: () -> Unit, onSection: (Int) -> Unit) {
+    Column(Modifier.fillMaxWidth().height(157.dp)) {
+        Spacer(Modifier.weight(1f))
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+            Text("HADIR  ·  EMPLOYEE", color = ShotMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Text("لوحة الموظف", color = ShotText, fontSize = 35.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 7.dp))
         }
-        HorizontalDivider(color = Color(0xFF1C222C), modifier = Modifier.padding(top = 13.dp))
+        Spacer(Modifier.height(18.dp))
+        HorizontalDivider(color = Color(0xFF1C222C))
+        Spacer(Modifier.height(21.dp))
         DropdownMenu(expanded = open, onDismissRequest = onOpen, modifier = Modifier.background(ShotCard)) {
             Text("أقسام الموظف", color = ShotMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp, 8.dp))
             listOf("لوحة الموظف" to Icons.Default.Home, "مركز الموظف" to Icons.Default.Dashboard, "سجل العمل" to Icons.Default.AccessTime, "الطلبات" to Icons.Default.ListAlt, "الملف الشخصي" to Icons.Default.Person).forEachIndexed { i, item ->
