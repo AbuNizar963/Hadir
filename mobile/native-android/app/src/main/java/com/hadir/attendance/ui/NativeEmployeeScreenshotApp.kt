@@ -203,14 +203,51 @@ private fun ScreenshotHome(vm: NativeMainViewModel, startClock: (String) -> Unit
     val latestOut = vm.attendance.filter { it.type == "check-out" || it.type == "out" }.maxByOrNull { it.timestamp }
     val latest = vm.attendance.maxByOrNull { it.timestamp }
     val checked = latest?.type == "check-in" || latest?.type == "in"
+    val checkedOut = latest?.type == "check-out" || latest?.type == "out"
+    val suspended = employee?.status != "active"
     val start = employee?.workStartTime?.takeIf { it.isNotBlank() } ?: "09:00"
     val end = employee?.workEndTime?.takeIf { it.isNotBlank() } ?: "09:00"
     val today = SimpleDateFormat("EEEE، dd MMMM", Locale("ar")).format(now)
     val time = SimpleDateFormat("HH:mm", Locale.US).format(now)
     val attendanceTime = latestIn?.let { displayTime(it.timestamp) } ?: "—"
     val worked = durationText(latestIn?.timestamp, latestOut?.timestamp, now, checked)
-    val late = !checked && isAfterStart(now, start)
+    val late = !suspended && !checked && !checkedOut && isAfterStart(now, start)
     val countdown = shiftCountdown(now, start)
+    val statusLabel = when {
+        suspended -> "غير صالح"
+        checkedOut -> "منصرف"
+        checked -> "حاضر"
+        late -> "متأخر"
+        else -> "لم يبدأ"
+    }
+    val statusTitle = when {
+        suspended -> "غير صالح"
+        checkedOut -> "منصرف"
+        checked -> "حاضر"
+        late -> "متأخر"
+        else -> "جاهز"
+    }
+    val statusDescription = when {
+        suspended -> "حساب الموظف غير نشط حاليًا. لا يمكن تسجيل الحضور."
+        checkedOut -> "تم تسجيل الانصراف بنجاح لهذا اليوم."
+        checked -> "تم تسجيل الحضور بنجاح."
+        late -> "تم تجاوز بداية الفترة ولم يتم تسجيل الحضور بعد."
+        else -> "لم يتم تسجيل الحضور لهذه المناوبة بعد."
+    }
+    val statusAccent = when {
+        suspended -> Color(0xFFFF5B67)
+        checkedOut -> ShotCyan
+        checked -> ShotGreen
+        late -> ShotAmber
+        else -> ShotMuted
+    }
+    val statusBackground = when {
+        suspended -> Color(0xFF301B22)
+        checkedOut -> Color(0xFF182B33)
+        checked -> Color(0xFF182C27)
+        late -> Color(0xFF292720)
+        else -> Color(0xFF20242B)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         HudShotCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -220,14 +257,14 @@ private fun ScreenshotHome(vm: NativeMainViewModel, startClock: (String) -> Unit
                 Column(horizontalAlignment = Alignment.Start) { Text(time, color = ShotText, fontSize = 31.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp); Text(today, color = ShotMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp)) }
             }
             Spacer(Modifier.height(17.dp))
-            Box(Modifier.fillMaxWidth().background(Color(0xFF292720), RoundedCornerShape(22.dp)).border(1.dp, ShotAmber.copy(alpha = .62f), RoundedCornerShape(22.dp)).padding(15.dp)) {
+            Box(Modifier.fillMaxWidth().background(statusBackground, RoundedCornerShape(22.dp)).border(1.dp, statusAccent.copy(alpha = .62f), RoundedCornerShape(22.dp)).padding(15.dp)) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.background(ShotAmber.copy(alpha = .17f), RoundedCornerShape(14.dp)).padding(horizontal = 13.dp, vertical = 5.dp)) { Text(if (late) "متأخر" else if (checked) "حاضر" else "لم يبدأ", color = ShotAmber, fontSize = 13.sp, fontWeight = FontWeight.Black) }
-                        Column(horizontalAlignment = Alignment.End) { Text("حالة اليوم", color = ShotMuted, fontSize = 12.sp); Text(if (late) "متأخر" else if (checked) "حاضر" else "جاهز", color = ShotText, fontSize = 25.sp, fontWeight = FontWeight.Black) }
+                        Box(Modifier.background(statusAccent.copy(alpha = .17f), RoundedCornerShape(14.dp)).padding(horizontal = 13.dp, vertical = 5.dp)) { Text(statusLabel, color = statusAccent, fontSize = 13.sp, fontWeight = FontWeight.Black) }
+                        Column(horizontalAlignment = Alignment.End) { Text("حالة اليوم", color = ShotMuted, fontSize = 12.sp); Text(statusTitle, color = ShotText, fontSize = 25.sp, fontWeight = FontWeight.Black) }
                     }
-                    Text(if (late) "تم تسجيل الحضور بعد بداية الفترة." else if (checked) "تم تسجيل الحضور بنجاح." else "لم يتم تسجيل الحضور لهذه المناوبة بعد.", color = ShotMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
-                    Text("اليوم ${if (late) "بعد بداية الفترة" else "في المناوبة"}", color = ShotMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                    Text(statusDescription, color = ShotMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                    Text(if (checkedOut) "اليوم · تم إنهاء الدوام" else if (late) "اليوم · بعد بداية الفترة" else if (checked) "اليوم · في المناوبة" else "اليوم · قبل تسجيل الحضور", color = ShotMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                     Box(Modifier.fillMaxWidth().padding(top = 12.dp).background(Color(0xFF17191D), RoundedCornerShape(17.dp)).padding(horizontal = 14.dp, vertical = 11.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(countdown, color = ShotText, fontSize = 25.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp); Column(horizontalAlignment = Alignment.End) { Text("تنتهي المناوبة خلال", color = ShotMuted, fontSize = 12.sp); Text("المناوبة الحالية", color = ShotText, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp)) } }
                     }
@@ -235,14 +272,14 @@ private fun ScreenshotHome(vm: NativeMainViewModel, startClock: (String) -> Unit
             }
             if (late) Box(Modifier.fillMaxWidth().padding(top = 9.dp).background(Color(0xFF302719), RoundedCornerShape(14.dp)).border(1.dp, ShotAmber.copy(alpha = .65f), RoundedCornerShape(14.dp)).padding(10.dp)) { Text("تم رصد تأخر عن بداية الفترة.", color = ShotAmber, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth()) }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) { ShotClockButton("↑", "تسجيل انصراف", "إنهاء الدوام الآن", ShotCyan, enabled = checked && !vm.working, modifier = Modifier.weight(1f)) { startClock("check-out") }; ShotClockButton("↓", "تسجيل حضور", "الدوام جارٍ", ShotGreen, enabled = !checked && !vm.working, modifier = Modifier.weight(1f)) { startClock("check-in") } }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) { ShotClockButton("↑", "تسجيل انصراف", "إنهاء الدوام الآن", ShotCyan, enabled = checked && !vm.working, modifier = Modifier.weight(1f)) { startClock("check-out") }; ShotClockButton("↓", "تسجيل حضور", "الدوام جارٍ", ShotGreen, enabled = !checked && !checkedOut && !suspended && !vm.working, modifier = Modifier.weight(1f)) { startClock("check-in") } }
         HudShotCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Box(Modifier.background(Color(0xFF20242B), RoundedCornerShape(15.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) { Text("اليوم", color = ShotText, fontSize = 12.sp) }; Column(horizontalAlignment = Alignment.End) { Text("ملخص اليوم", color = ShotMuted, fontSize = 12.sp); Text("سجل الدوام", color = ShotText, fontSize = 23.sp, fontWeight = FontWeight.Black) } }
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { SummaryShot("مدة العمل", worked, Modifier.weight(1f)); SummaryShot("الانصراف", latestOut?.let { displayTime(it.timestamp) } ?: "—", Modifier.weight(1f)); SummaryShot("الحضور", attendanceTime, Modifier.weight(1f)) }
         }
         HudShotCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Box(Modifier.background(ShotGreen.copy(alpha = .14f), RoundedCornerShape(15.dp)).padding(horizontal = 11.dp, vertical = 6.dp)) { Text("يوم عمل", color = ShotGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold) }; Column(horizontalAlignment = Alignment.End) { Text("معلومات الدوام", color = ShotMuted, fontSize = 12.sp); Text("حالتك الحالية", color = ShotText, fontSize = 22.sp, fontWeight = FontWeight.Black) } }
-            val rows = listOf("نوع الدوام" to "تناوبي", "الفترة" to "4 أيام عمل + 4 أيام راحة", "الحالة" to (if (late) "متأخر" else if (checked) "حاضر" else "جاهز"), "وقت المناوبة" to "$start → $end", "الموقع" to (employee?.locationId?.takeIf { it.isNotBlank() } ?: "المقر الرئيسي"), "الجهاز" to "📱 هاتف ·•••")
+            val rows = listOf("نوع الدوام" to "تناوبي", "الفترة" to "4 أيام عمل + 4 أيام راحة", "الحالة" to statusTitle, "وقت المناوبة" to "$start → $end", "الموقع" to (employee?.locationId?.takeIf { it.isNotBlank() } ?: "المقر الرئيسي"), "الجهاز" to "📱 هاتف ·•••")
             Column(Modifier.padding(top = 13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { rows.chunked(2).forEach { pair -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { pair.forEach { (label, value) -> InfoShot(label, value, Modifier.weight(1f)) }; if (pair.size == 1) Spacer(Modifier.weight(1f)) } } }
         }
         OutlinedButton(onClick = request, modifier = Modifier.fillMaxWidth().height(76.dp), shape = RoundedCornerShape(19.dp), border = BorderStroke(1.dp, ShotCyan.copy(alpha = .35f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = ShotCyan)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.ArrowBack, null, tint = ShotCyan, modifier = Modifier.size(27.dp)); Column(horizontalAlignment = Alignment.End) { Text("طلب استئذان أو إجازة", color = ShotCyan, fontSize = 17.sp, fontWeight = FontWeight.Black); Text("إرسال طلب للإدارة", color = ShotMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp)) } } }
