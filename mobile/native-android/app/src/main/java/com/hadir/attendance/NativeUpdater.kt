@@ -8,6 +8,7 @@ import android.content.pm.PackageInstaller
 import android.os.Build
 import android.provider.Settings
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.OutputStream
@@ -35,21 +36,41 @@ data class NativeDownloadProgress(
 
 class NativeUpdater(private val context: Context) {
     suspend fun check(): NativeUpdateInfo? = withContext(Dispatchers.IO) {
-        runCatching {
-            val currentCode = currentVersionCode()
-            val connection = (URL(RELEASES_URL).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 10_000
-                readTimeout = 15_000
-                setRequestProperty("Accept", "application/vnd.github+json")
-                setRequestProperty("User-Agent", "Hadir-Android-Updater")
+        var lastError: Throwable? = null
+        repeat(3) { attempt ->
+            try {
+                return@withContext checkOnce()
+            } catch (error: Throwable) {
+                lastError = error
+                if (attempt < 2) delay(1500L * (attempt + 1))
             }
-            if (connection.responseCode !in 200..299) error("تعذر التحقق من التحديث")
-            val response = connection.inputStream.bufferedReader().use { it.readText() }
-            connection.disconnect()
+        }
+        lastError
+        null
+    }
 
+    private fun checkOnce(): NativeUpdateInfo? {
+        val currentCode = currentVersionCode()
+        val connection = (URL(RELEASES_URL).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 10_000
+            readTimeout = 15_000
+            useCaches = false
+            instanceFollowRedirects = true
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("User-Agent", "Hadir-Android-Updater")
+            setRequestProperty("Cache-Control", "no-cache")
+            setRequestProperty("Pragma", "no-cache")
+        }
+
+        try {
+            if (connection.responseCode !in 200..299) {
+                error("تعذر التحقق من التحديث: HTTP ${connection.responseCode}")
+            }
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
             val releases = org.json.JSONArray(response)
             var best: NativeUpdateInfo? = null
+
             for (index in 0 until releases.length()) {
                 val release = releases.getJSONObject(index)
                 if (release.optBoolean("draft") || release.optBoolean("prerelease")) continue
@@ -75,8 +96,10 @@ class NativeUpdater(private val context: Context) {
                     )
                 }
             }
-            best
-        }.getOrNull()
+            return best
+        } finally {
+            connection.disconnect()
+        }
     }
 
     suspend fun downloadAndInstall(
@@ -173,9 +196,6 @@ class NativeUpdater(private val context: Context) {
             }
 
             val callbackIntent = Intent(context, NativeInstallReceiver::class.java).setPackage(context.packageName)
-            // Android 15+ rejects an immutable PendingIntent as the PackageInstaller
-            // status receiver for apps targeting API 35+. The status callback must be
-            // mutable so PackageInstaller can attach EXTRA_STATUS/EXTRA_INTENT.
             val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
             val pendingIntent = PendingIntent.getBroadcast(
