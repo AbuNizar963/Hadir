@@ -98,12 +98,16 @@ class NativeUpdater(private val context: Context) {
                 apkFile
             )
             withContext(Dispatchers.Main) {
-                context.startActivity(Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                val installIntent = Intent(Intent.ACTION_VIEW).apply {
                     data = uri
                     type = APK_MIME
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                })
+                }
+                if (installIntent.resolveActivity(context.packageManager) == null) {
+                    error("لا يوجد تطبيق على الجهاز يستطيع تثبيت ملف APK")
+                }
+                context.startActivity(installIntent)
             }
         }
     }
