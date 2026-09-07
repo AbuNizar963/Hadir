@@ -20,8 +20,28 @@ class HadirApi {
 
   String employeeAvatarUrl(String employeeId) => '$baseUrl/api/employees/${Uri.encodeComponent(employeeId)}/avatar';
 
-  Future<Map<String, dynamic>> login(String username, String password, {required String deviceId, required String deviceLabel, required String fingerprint}) async => Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password, 'deviceId': deviceId, 'deviceLabel': deviceLabel, 'deviceFingerprint': fingerprint})).data as Map);
-  Future<Map<String, dynamic>> adminLogin(String username, String password) async => Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password})).data as Map);
+  Future<Map<String, dynamic>> login(String username, String password, {required String deviceId, required String deviceLabel, required String fingerprint}) async {
+    try {
+      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password, 'deviceId': deviceId, 'deviceLabel': deviceLabel, 'deviceFingerprint': fingerprint})).data as Map);
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 400) rethrow;
+      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password, 'deviceId': deviceId, 'deviceLabel': deviceLabel})).data as Map);
+    }
+  }
+
+  Future<Map<String, dynamic>> adminLogin(String username, String password, {String? deviceId, String? deviceLabel, String? fingerprint}) async {
+    final full = <String, dynamic>{'username': username.trim(), 'password': password};
+    if (deviceId != null && deviceId.trim().isNotEmpty) full['deviceId'] = deviceId.trim();
+    if (deviceLabel != null && deviceLabel.trim().isNotEmpty) full['deviceLabel'] = deviceLabel.trim();
+    if (fingerprint != null && fingerprint.trim().isNotEmpty) full['deviceFingerprint'] = fingerprint.trim();
+    try {
+      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: full)).data as Map);
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 400 || full.length == 2) rethrow;
+      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password})).data as Map);
+    }
+  }
+
   Future<Map<String, dynamic>> me() async => Map<String, dynamic>.from((await dio.get('/api/me')).data as Map);
   Future<Map<String, dynamic>> employeeProfile() async => Map<String, dynamic>.from((await dio.get('/api/employee/profile')).data as Map);
   Future<Map<String, dynamic>> employeeDeviceStatus() async => Map<String, dynamic>.from((await dio.get('/api/device/status')).data as Map);
