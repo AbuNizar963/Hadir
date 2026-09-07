@@ -4,8 +4,6 @@ import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
 import android.location.Location
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -161,7 +159,6 @@ private fun NativeShell(vm: NativeMainViewModel) {
     var pendingType by remember { mutableStateOf("check-in") }
     val locationAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     val cameraAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
     LaunchedEffect(Unit) { vm.refresh() }
     LaunchedEffect(tab) { if (tab == 3) vm.refreshRequests() }
@@ -170,7 +167,7 @@ private fun NativeShell(vm: NativeMainViewModel) {
     if (requestDialog) AlertDialog(onDismissRequest = { requestDialog = false }, title = { Text("طلب جديد") }, text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("اختر نوع الطلب"); Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("permission" to "استئذان", "leave" to "إجازة", "checkout" to "انصراف").forEach { (id, label) -> FilterChip(selected = requestType == id, onClick = { requestType = id }, label = { Text(label) }) } }; OutlinedTextField(value = requestReason, onValueChange = { requestReason = it }, modifier = Modifier.fillMaxWidth(), label = { Text("السبب") }, minLines = 2); OutlinedTextField(value = requestStart, onValueChange = { requestStart = it }, modifier = Modifier.fillMaxWidth(), label = { Text("تاريخ البداية (اختياري)") }, singleLine = true); OutlinedTextField(value = requestEnd, onValueChange = { requestEnd = it }, modifier = Modifier.fillMaxWidth(), label = { Text("تاريخ النهاية (اختياري)") }, singleLine = true) } }, confirmButton = { Button(onClick = { vm.addRequest(requestType, requestReason, requestStart, requestEnd); requestDialog = false; requestReason = ""; requestStart = ""; requestEnd = "" }) { Text("إرسال") } }, dismissButton = { TextButton(onClick = { requestDialog = false }) { Text("إلغاء") } })
     Scaffold(bottomBar = { NavigationBar { listOf("الرئيسية" to Icons.Default.Home, "ساعاتي" to Icons.Default.CalendarMonth, "مركزي" to Icons.Default.Badge, "الطلبات" to Icons.Default.ListAlt, "حسابي" to Icons.Default.Person).forEachIndexed { i, pair -> NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = { Icon(pair.second, null) }, label = { Text(pair.first) }) } } }) { p ->
         when (tab) {
-            0 -> HomeTab(vm, p, locationAllowed) { pendingType = it; if (!locationAllowed || !cameraAllowed) permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)) else scanner = true }
+            0 -> HomeTab(vm, p, locationAllowed) { pendingType = it; if (locationAllowed && cameraAllowed) scanner = true else vm.errorMessage("يرجى السماح للكاميرا والموقع من إعدادات التطبيق أولًا.") }
             1 -> HoursTab(vm, p)
             2 -> CenterTab(vm, p)
             3 -> RequestsTab(vm, p) { requestDialog = true }
@@ -219,11 +216,7 @@ private fun NativeShell(vm: NativeMainViewModel) {
 @Composable private fun RequestsTab(vm: NativeMainViewModel, p: PaddingValues, add: () -> Unit) {
     var filter by remember { mutableStateOf("all") }
     val filtered = remember(vm.requests, filter) {
-        vm.requests
-            .asSequence()
-            .filter { filter == "all" || it.status.equals(filter, ignoreCase = true) }
-            .sortedByDescending { it.createdAt }
-            .toList()
+        vm.requests.asSequence().filter { filter == "all" || it.status.equals(filter, ignoreCase = true) }.sortedByDescending { it.createdAt }.toList()
     }
     val pending = vm.requests.count { it.status.equals("pending", ignoreCase = true) }
     val approved = vm.requests.count { it.status.equals("approved", ignoreCase = true) || it.status.equals("confirmed", ignoreCase = true) }
@@ -231,43 +224,16 @@ private fun NativeShell(vm: NativeMainViewModel) {
     LazyColumn(Modifier.fillMaxSize().padding(p), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("الطلبات", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-                    Text("الإجازات والاستئذانات وطلبات الانصراف", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    IconButton(onClick = vm::refreshRequests) { Icon(Icons.Default.Refresh, contentDescription = "تحديث الطلبات") }
-                    Button(onClick = add) { Text("طلب جديد") }
-                }
+                Column(Modifier.weight(1f)) { Text("الطلبات", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black); Text("الإجازات والاستئذانات وطلبات الانصراف", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { IconButton(onClick = vm::refreshRequests) { Icon(Icons.Default.Refresh, contentDescription = "تحديث الطلبات") }; Button(onClick = add) { Text("طلب جديد") } }
             }
         }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Metric("الكل", vm.requests.size, Modifier.weight(1f))
-                Metric("معلقة", pending, Modifier.weight(1f))
-                Metric("معتمدة", approved, Modifier.weight(1f))
-            }
-        }
-        item {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                listOf("all" to "الكل", "pending" to "معلقة", "approved" to "معتمدة", "rejected" to "مرفوضة").forEachIndexed { index, (id, label) ->
-                    SegmentedButton(selected = filter == id, onClick = { filter = id }, shape = SegmentedButtonDefaults.itemShape(index, 4)) { Text(label, fontSize = 12.sp) }
-                }
-            }
-        }
+        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { Metric("الكل", vm.requests.size, Modifier.weight(1f)); Metric("معلقة", pending, Modifier.weight(1f)); Metric("معتمدة", approved, Modifier.weight(1f)) } }
+        item { SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) { listOf("all" to "الكل", "pending" to "معلقة", "approved" to "معتمدة", "rejected" to "مرفوضة").forEachIndexed { index, (id, label) -> SegmentedButton(selected = filter == id, onClick = { filter = id }, shape = SegmentedButtonDefaults.itemShape(index, 4)) { Text(label, fontSize = 12.sp) } } } }
         items(filtered) { r ->
             val reason = r.reason.orEmpty().trim()
             val created = r.createdAt.trim()
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
-                Column(Modifier.padding(15.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(requestLabel(r.type), fontWeight = FontWeight.Bold)
-                        Text(statusLabel(r.status), color = statusColor(r.status))
-                    }
-                    if (reason.isNotBlank()) Text(reason, modifier = Modifier.padding(top = 7.dp))
-                    Text(if (created.length >= 10) created.take(10) else "—", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp))
-                }
-            }
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(15.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(requestLabel(r.type), fontWeight = FontWeight.Bold); Text(statusLabel(r.status), color = statusColor(r.status)) }; if (reason.isNotBlank()) Text(reason, modifier = Modifier.padding(top = 7.dp)); Text(if (created.length >= 10) created.take(10) else "—", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp)) } }
         }
         if (filtered.isEmpty()) item { Empty(if (vm.requests.isEmpty()) "لا توجد طلبات" else "لا توجد طلبات بهذا التصنيف") }
         if (rejected > 0 && filter == "all") item { Text("المرفوضة: $rejected", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 4.dp)) }
