@@ -19,6 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.LocalTextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.hadir.attendance.data.HadirRepository
@@ -39,62 +42,69 @@ class MainActivity : ComponentActivity() {
         setContent {
             HadirTheme {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    val context = LocalContext.current
-                    val updater = remember(context) { NativeUpdater(context) }
-                    val repository = remember(context) { HadirRepository(context) }
-                    val scope = rememberCoroutineScope()
-                    var workspace by remember { mutableIntStateOf(0) }
-                    var restoringSession by remember { mutableStateOf(true) }
-                    var updateInfo by remember { mutableStateOf<NativeUpdateInfo?>(null) }
-                    var updating by remember { mutableStateOf(false) }
-                    var updateError by remember { mutableStateOf<String?>(null) }
-                    var downloadProgress by remember { mutableStateOf<NativeDownloadProgress?>(null) }
+                    CompositionLocalProvider(
+                        LocalTextStyle provides LocalTextStyle.current.copy(
+                            textAlign = TextAlign.Right,
+                            textDirection = TextDirection.Rtl
+                        )
+                    ) {
+                        val context = LocalContext.current
+                        val updater = remember(context) { NativeUpdater(context) }
+                        val repository = remember(context) { HadirRepository(context) }
+                        val scope = rememberCoroutineScope()
+                        var workspace by remember { mutableIntStateOf(0) }
+                        var restoringSession by remember { mutableStateOf(true) }
+                        var updateInfo by remember { mutableStateOf<NativeUpdateInfo?>(null) }
+                        var updating by remember { mutableStateOf(false) }
+                        var updateError by remember { mutableStateOf<String?>(null) }
+                        var downloadProgress by remember { mutableStateOf<NativeDownloadProgress?>(null) }
 
-                    LaunchedEffect(Unit) {
-                        workspace = when (repository.savedRole()) { "employee" -> 1; "admin" -> 2; else -> 0 }
-                        restoringSession = false
-                    }
-                    LaunchedEffect(resumeNonce) { if (!updating) updateInfo = updater.check() }
+                        LaunchedEffect(Unit) {
+                            workspace = when (repository.savedRole()) { "employee" -> 1; "admin" -> 2; else -> 0 }
+                            restoringSession = false
+                        }
+                        LaunchedEffect(resumeNonce) { if (!updating) updateInfo = updater.check() }
 
-                    Surface(color = MaterialTheme.colorScheme.background) {
-                        if (restoringSession) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("جارٍ استعادة الجلسة…") }
-                        } else {
-                            when (workspace) {
-                                0 -> NativeRoleEntry(onEmployee = { workspace = 1 }, onAdmin = { workspace = 2 })
-                                1 -> NativeEmployeeScreenshotApp(onEmployeeAuthenticated = {}, onEmployeeLoggedOut = { workspace = 0 })
-                                else -> NativeAdminApp(onBack = { workspace = 0 })
+                        Surface(color = MaterialTheme.colorScheme.background) {
+                            if (restoringSession) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("جارٍ استعادة الجلسة…") }
+                            } else {
+                                when (workspace) {
+                                    0 -> NativeRoleEntry(onEmployee = { workspace = 1 }, onAdmin = { workspace = 2 })
+                                    1 -> NativeEmployeeScreenshotApp(onEmployeeAuthenticated = {}, onEmployeeLoggedOut = { workspace = 0 })
+                                    else -> NativeAdminApp(onBack = { workspace = 0 })
+                                }
                             }
                         }
-                    }
 
-                    updateInfo?.let { info ->
-                        AlertDialog(
-                            onDismissRequest = { if (!updating) updateInfo = null },
-                            title = { Text("تحديث جديد لحاضر") },
-                            text = {
-                                if (updating) {
-                                    val progress = downloadProgress
-                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Text("جاري تنزيل الإصدار ${info.versionName}…")
-                                        if (progress != null) {
-                                            if (progress.percent >= 0) { LinearProgressIndicator(progress = { progress.percent / 100f }, modifier = Modifier.padding(vertical = 4.dp)); Text("${progress.percent}%") }
-                                            else { LinearProgressIndicator(modifier = Modifier.padding(vertical = 4.dp)); Text("جارٍ حساب حجم الملف…") }
-                                            Text("تم تنزيل ${formatBytes(progress.downloadedBytes)}" + if (progress.totalBytes > 0) " من ${formatBytes(progress.totalBytes)}" else "")
-                                            progress.etaSeconds?.let { eta -> Text("الوقت المتبقي التقريبي: ${formatDuration(eta)}") }
-                                            Text("المدة المنقضية: ${formatDuration(max(0L, progress.elapsedSeconds))}")
+                        updateInfo?.let { info ->
+                            AlertDialog(
+                                onDismissRequest = { if (!updating) updateInfo = null },
+                                title = { Text("تحديث جديد لحاضر") },
+                                text = {
+                                    if (updating) {
+                                        val progress = downloadProgress
+                                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            Text("جاري تنزيل الإصدار ${info.versionName}…")
+                                            if (progress != null) {
+                                                if (progress.percent >= 0) { LinearProgressIndicator(progress = { progress.percent / 100f }, modifier = Modifier.padding(vertical = 4.dp)); Text("${progress.percent}%") }
+                                                else { LinearProgressIndicator(modifier = Modifier.padding(vertical = 4.dp)); Text("جارٍ حساب حجم الملف…") }
+                                                Text("تم تنزيل ${formatBytes(progress.downloadedBytes)}" + if (progress.totalBytes > 0) " من ${formatBytes(progress.totalBytes)}" else "")
+                                                progress.etaSeconds?.let { eta -> Text("الوقت المتبقي التقريبي: ${formatDuration(eta)}") }
+                                                Text("المدة المنقضية: ${formatDuration(max(0L, progress.elapsedSeconds))}")
+                                            }
+                                            Text("يرجى إبقاء التطبيق مفتوحًا حتى يكتمل التنزيل.")
                                         }
-                                        Text("يرجى إبقاء التطبيق مفتوحًا حتى يكتمل التنزيل.")
-                                    }
-                                } else Text(if (info.releaseNotes.isBlank()) "الإصدار ${info.versionName} متاح الآن." else "الإصدار ${info.versionName} متاح الآن.\n\n${info.releaseNotes}")
-                            },
-                            confirmButton = {
-                                if (!updating) Button(onClick = { scope.launch { updating = true; updateError = null; downloadProgress = null; val result = updater.downloadAndInstall(info) { downloadProgress = it }; updating = false; result.exceptionOrNull()?.let { error -> if (error is InstallPermissionRequiredException) { updateInfo = null; updater.openInstallPermissionSettings() } else updateError = error.message ?: "تعذر تثبيت التحديث" } ?: run { downloadProgress = null; updateInfo = null } } }) { Text("تحديث الآن") }
-                            },
-                            dismissButton = { if (!updating) Button(onClick = { updateInfo = null }) { Text("لاحقًا") } }
-                        )
+                                    } else Text(if (info.releaseNotes.isBlank()) "الإصدار ${info.versionName} متاح الآن." else "الإصدار ${info.versionName} متاح الآن.\n\n${info.releaseNotes}")
+                                },
+                                confirmButton = {
+                                    if (!updating) Button(onClick = { scope.launch { updating = true; updateError = null; downloadProgress = null; val result = updater.downloadAndInstall(info) { downloadProgress = it }; updating = false; result.exceptionOrNull()?.let { error -> if (error is InstallPermissionRequiredException) { updateInfo = null; updater.openInstallPermissionSettings() } else updateError = error.message ?: "تعذر تثبيت التحديث" } ?: run { downloadProgress = null; updateInfo = null } } }) { Text("تحديث الآن") }
+                                },
+                                dismissButton = { if (!updating) Button(onClick = { updateInfo = null }) { Text("لاحقًا") } }
+                            )
+                        }
+                        updateError?.let { error -> AlertDialog(onDismissRequest = { updateError = null }, title = { Text("تعذر التحديث") }, text = { Text(error) }, confirmButton = { Button(onClick = { updateError = null }) { Text("حسنًا") } }) }
                     }
-                    updateError?.let { error -> AlertDialog(onDismissRequest = { updateError = null }, title = { Text("تعذر التحديث") }, text = { Text(error) }, confirmButton = { Button(onClick = { updateError = null }) { Text("حسنًا") } }) }
                 }
             }
         }
