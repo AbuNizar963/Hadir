@@ -3,13 +3,13 @@ name: Build Hadir Android Flutter Release
 on:
   push:
     branches:
-      - android-native
+      - Apps
   workflow_dispatch:
     inputs:
       source_ref:
         description: 'Git ref containing the Flutter mobile project to build'
         required: true
-        default: 'android-native'
+        default: 'Apps'
         type: string
 
 permissions:
