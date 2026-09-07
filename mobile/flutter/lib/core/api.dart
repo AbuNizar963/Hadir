@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 class HadirApi {
@@ -21,11 +23,13 @@ class HadirApi {
   String employeeAvatarUrl(String employeeId) => '$baseUrl/api/employees/${Uri.encodeComponent(employeeId)}/avatar';
 
   Future<Map<String, dynamic>> login(String username, String password, {required String deviceId, required String deviceLabel, required String fingerprint}) async {
+    final full = <String, dynamic>{'username': username.trim(), 'password': password, 'deviceId': deviceId, 'deviceLabel': deviceLabel, 'deviceFingerprint': fingerprint};
     try {
-      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password, 'deviceId': deviceId, 'deviceLabel': deviceLabel, 'deviceFingerprint': fingerprint})).data as Map);
+      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: jsonEncode(full), options: Options(contentType: Headers.jsonContentType))).data as Map);
     } on DioException catch (error) {
       if (error.response?.statusCode != 400) rethrow;
-      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password, 'deviceId': deviceId, 'deviceLabel': deviceLabel})).data as Map);
+      final legacy = <String, dynamic>{'username': username.trim(), 'password': password, 'deviceId': deviceId, 'deviceLabel': deviceLabel};
+      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: jsonEncode(legacy), options: Options(contentType: Headers.jsonContentType))).data as Map);
     }
   }
 
@@ -35,10 +39,11 @@ class HadirApi {
     if (deviceLabel != null && deviceLabel.trim().isNotEmpty) full['deviceLabel'] = deviceLabel.trim();
     if (fingerprint != null && fingerprint.trim().isNotEmpty) full['deviceFingerprint'] = fingerprint.trim();
     try {
-      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: full)).data as Map);
+      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: jsonEncode(full), options: Options(contentType: Headers.jsonContentType))).data as Map);
     } on DioException catch (error) {
       if (error.response?.statusCode != 400 || full.length == 2) rethrow;
-      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: {'username': username.trim(), 'password': password})).data as Map);
+      final legacy = <String, dynamic>{'username': username.trim(), 'password': password};
+      return Map<String, dynamic>.from((await dio.post('/api/auth/login', data: jsonEncode(legacy), options: Options(contentType: Headers.jsonContentType))).data as Map);
     }
   }
 
