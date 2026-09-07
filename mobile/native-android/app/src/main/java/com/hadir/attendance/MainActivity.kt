@@ -32,7 +32,6 @@ import com.hadir.attendance.ui.NativeMainFeatures
 import com.hadir.attendance.ui.NativeNotificationCenter
 import com.hadir.attendance.ui.NativeRoleEntry
 import com.hadir.attendance.ui.theme.HadirTheme
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -70,23 +69,6 @@ class MainActivity : ComponentActivity() {
                     restoringSession = false
                 }
 
-                LaunchedEffect(workspace) {
-                    employeeAuthenticated = false
-                    if (workspace == 1) {
-                        delay(1000)
-                        if (repository.savedRole() == "employee") {
-                            val employee = repository.restoreEmployee()
-                            if (employee != null) {
-                                employeeAuthenticated = true
-                            } else if (repository.savedRole() != "employee") {
-                                workspace = 0
-                            }
-                        } else {
-                            workspace = 0
-                        }
-                    }
-                }
-
                 LaunchedEffect(resumeNonce) {
                     if (!updating) updateInfo = updater.check()
                 }
@@ -104,7 +86,13 @@ class MainActivity : ComponentActivity() {
                                 features -> NativeMainFeatures(onBack = { features = false })
                                 notifications -> NativeNotificationCenter(onBack = { notifications = false })
                                 else -> Box(Modifier.fillMaxSize()) {
-                                    NativeMainApp()
+                                    NativeMainApp(
+                                        onEmployeeAuthenticated = { employeeAuthenticated = true },
+                                        onEmployeeLoggedOut = {
+                                            employeeAuthenticated = false
+                                            workspace = 0
+                                        }
+                                    )
                                     if (employeeAuthenticated) {
                                         Column(
                                             modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
