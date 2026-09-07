@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
+import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.UUID
@@ -43,8 +44,13 @@ class HadirRepository(context: Context) {
         response.user
     }
     suspend fun loginAdmin(username: String, password: String): Admin = withContext(Dispatchers.IO) {
-        val deviceId = session.deviceId
-        val response = api.loginAdmin(AdminLoginRequest(username, password, deviceId, "Android", deviceId))
+        val response = try {
+            api.loginAdminCredentials(AdminCredentialsRequest(username, password))
+        } catch (error: HttpException) {
+            if (error.code() != 400) throw error
+            val deviceId = session.deviceId
+            api.loginAdmin(AdminLoginRequest(username, password, deviceId, "Android", deviceId))
+        }
         if (response.kind != "admin") error("هذا الحساب ليس حساب إدارة")
         session.token = response.token
         response.user
