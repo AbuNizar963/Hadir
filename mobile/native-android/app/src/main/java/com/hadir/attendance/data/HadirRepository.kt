@@ -57,6 +57,8 @@ class HadirRepository(context: Context) {
         .create(HadirApi::class.java)
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
+    fun savedRole(): String? = session.role?.takeIf { !session.token.isNullOrBlank() }
+
     private fun authBody(username: String, password: String, deviceId: String? = null, deviceLabel: String? = null, fingerprint: String? = null): RequestBody {
         val json = JSONObject()
             .put("username", username.trim())
@@ -113,6 +115,18 @@ class HadirRepository(context: Context) {
         locationId = user.optString("locationId").takeIf { it.isNotBlank() }
     )
 
+    suspend fun restoreEmployee(): Employee? = withContext(Dispatchers.IO) {
+        if (session.role != "employee" || session.token.isNullOrBlank()) return@withContext null
+        try { employeeFromJson(JSONObject(api.me())) }
+        catch (_: Exception) { logout(); null }
+    }
+
+    suspend fun restoreAdmin(): Admin? = withContext(Dispatchers.IO) {
+        if (session.role != "admin" || session.token.isNullOrBlank()) return@withContext null
+        try { adminFromJson(JSONObject(api.me())) }
+        catch (_: Exception) { logout(); null }
+    }
+
     suspend fun login(username: String, password: String): Employee = withContext(Dispatchers.IO) {
         val normalizedUsername = username.trim()
         if (normalizedUsername.isBlank() || password.isBlank()) throw IllegalArgumentException("اسم المستخدم وكلمة المرور مطلوبان")
@@ -136,7 +150,6 @@ class HadirRepository(context: Context) {
     suspend fun loginAdmin(username: String, password: String): Admin = withContext(Dispatchers.IO) {
         val normalizedUsername = username.trim()
         if (normalizedUsername.isBlank() || password.isBlank()) throw IllegalArgumentException("اسم المستخدم وكلمة المرور مطلوبان")
-
         val response = httpClient.newCall(authRequest(authBody(normalizedUsername, password))).execute()
         val parsed = parseAuthResponse(response, "admin")
         session.token = parsed.token
