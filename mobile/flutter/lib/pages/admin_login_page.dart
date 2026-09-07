@@ -40,7 +40,13 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       _error = null;
     });
     try {
-      final response = await HadirApi().adminLogin(_username.text, _password.text);
+      final response = await HadirApi().adminLogin(
+        _username.text,
+        _password.text,
+        deviceId: await _session.deviceId(),
+        deviceLabel: _session.platformLabel,
+        fingerprint: await _session.deviceFingerprint(),
+      );
       if (response['kind'] != 'admin' || response['token'] == null) {
         throw Exception('هذا الحساب ليس حساب إدارة.');
       }
