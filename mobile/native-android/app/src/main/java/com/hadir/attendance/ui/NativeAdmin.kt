@@ -1,6 +1,7 @@
 package com.hadir.attendance.ui
 
 import android.app.Application
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AssignmentTurnedIn
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Logout
@@ -32,7 +34,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
@@ -50,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +64,11 @@ import com.hadir.attendance.data.Admin
 import com.hadir.attendance.data.EmployeeRequest
 import com.hadir.attendance.data.HadirRepository
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
 private val AdminBg = Color(0xFF0C1018)
 private val AdminCard = Color(0xFF171C26)
@@ -187,7 +194,7 @@ private fun NativeAdminShell(vm: NativeAdminViewModel, onBack: () -> Unit) {
     AdminSurface {
         Scaffold(containerColor = AdminBg, bottomBar = {
             NavigationBar(containerColor = AdminCard, tonalElevation = 0.dp) {
-                val items = listOf("الرئيسية" to Icons.Default.Home, "الموظفون" to Icons.Default.People, "الطلبات" to Icons.Default.AssignmentTurnedIn, "التدقيق" to Icons.Default.Settings)
+                val items = listOf("الرئيسية" to Icons.Default.Home, "الموظفون" to Icons.Default.People, "الطلبات" to Icons.Default.AssignmentTurnedIn, "التقارير" to Icons.Default.BarChart, "التدقيق" to Icons.Default.Settings)
                 items.forEachIndexed { i, item -> NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = { Icon(item.second, null) }, label = { Text(item.first, fontSize = 9.sp, fontWeight = FontWeight.Bold) }, colors = androidx.compose.material3.NavigationBarItemDefaults.colors(selectedIconColor = AdminGreen, selectedTextColor = AdminGreen, indicatorColor = Color(0xFF12372E), unselectedIconColor = AdminMuted, unselectedTextColor = AdminMuted)) }
             }
         }) { p ->
@@ -195,6 +202,7 @@ private fun NativeAdminShell(vm: NativeAdminViewModel, onBack: () -> Unit) {
                 0 -> AdminDashboard(vm, p)
                 1 -> AdminEmployees(vm, p)
                 2 -> AdminRequests(vm, p)
+                3 -> AdminReports(vm, p)
                 else -> AdminAudit(vm, p)
             }
         }
@@ -269,6 +277,238 @@ private fun AdminRequests(vm: NativeAdminViewModel, p: PaddingValues) {
             }
         }
         if (vm.requests.isEmpty()) item { AdminEmpty("لا توجد طلبات.") }
+    }
+}
+
+private data class AdminReportSummary(
+    val employeeId: String,
+    val name: String,
+    val job: String,
+    val workDays: Int,
+    val present: Int,
+    val absent: Int,
+    val early: Int,
+    val late: Int,
+    val open: Int,
+    val permission: Int,
+    val leave: Int,
+    val off: Int,
+    val workedMinutes: Int,
+    val lateMinutes: Int,
+    val earlyMinutes: Int
+)
+
+private data class AdminReportDay(
+    val date: LocalDate,
+    val status: String,
+    val checkIn: String,
+    val checkOut: String,
+    val workedMinutes: Int,
+    val lateMinutes: Int,
+    val earlyMinutes: Int,
+    val detail: String
+)
+
+@Composable
+private fun AdminReports(vm: NativeAdminViewModel, p: PaddingValues) {
+    var mode by remember { mutableStateOf("monthly") }
+    var dateText by remember { mutableStateOf(LocalDate.now().toString()) }
+    var monthText by remember { mutableStateOf(YearMonth.now().toString()) }
+    var yearText by remember { mutableStateOf(LocalDate.now().year.toString()) }
+    var expanded by remember { mutableStateOf<String?>(null) }
+    val today = LocalDate.now()
+    val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }
+    val month = runCatching { YearMonth.parse(monthText) }.getOrDefault(YearMonth.now())
+    val year = yearText.toIntOrNull() ?: today.year
+    val dates = remember(mode, dateText, monthText, yearText, today) {
+        when (mode) {
+            "daily" -> listOfNotNull(runCatching { LocalDate.parse(dateText) }.getOrNull()).filter { !it.isAfter(today) }
+            "annual" -> (1..12).flatMap { m -> (1..YearMonth.of(year, m).lengthOfMonth()).map { d -> LocalDate.of(year, m, d) } }.filter { !it.isAfter(today) }
+            else -> (1..month.lengthOfMonth()).map { month.atDay(it) }.filter { !it.isAfter(today) }
+        }
+    }
+    val auditIndex = remember(vm.audit) { buildAdminAuditIndex(vm.audit) }
+    val requestRows = remember(vm.requests) { vm.requests }
+    val summaries = remember(vm.employees, dates, auditIndex, requestRows) {
+        vm.employees.map { employee -> buildAdminSummary(employee, dates, auditIndex, requestRows) }
+    }
+    val totalWorked = summaries.sumOf { it.workedMinutes }
+    val totalLate = summaries.sumOf { it.lateMinutes }
+    val totalEarly = summaries.sumOf { it.earlyMinutes }
+    val context = LocalContext.current
+    val csv = remember(summaries, mode, dateText, monthText, yearText) { buildAdminCsv(summaries, mode, dateText, monthText, yearText) }
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { AdminHeader("تقارير المدير", "نفس أنماط التقرير الموجودة في الموقع: يومي، شهري، سنوي") }
+        item {
+            AdminCard {
+                Column {
+                    Text("نوع التقرير", color = AdminMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Right)
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        FilterChip(selected = mode == "daily", onClick = { mode = "daily" }, label = { Text("يومي") }, modifier = Modifier.weight(1f))
+                        FilterChip(selected = mode == "monthly", onClick = { mode = "monthly" }, label = { Text("شهري") }, modifier = Modifier.weight(1f))
+                        FilterChip(selected = mode == "annual", onClick = { mode = "annual" }, label = { Text("سنوي") }, modifier = Modifier.weight(1f))
+                    }
+                    when (mode) {
+                        "daily" -> OutlinedTextField(dateText, { dateText = it }, Modifier.fillMaxWidth().padding(top = 10.dp), label = { Text("التاريخ yyyy-MM-dd") }, singleLine = true)
+                        "monthly" -> OutlinedTextField(monthText, { monthText = it }, Modifier.fillMaxWidth().padding(top = 10.dp), label = { Text("الشهر yyyy-MM") }, singleLine = true)
+                        else -> OutlinedTextField(yearText, { yearText = it.filter(Char::isDigit).take(4) }, Modifier.fillMaxWidth().padding(top = 10.dp), label = { Text("السنة yyyy") }, singleLine = true)
+                    }
+                    Text("${dates.size} يومًا ضمن الفترة · ${vm.employees.size} موظفًا", color = AdminMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                    Button(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/csv"; putExtra(Intent.EXTRA_SUBJECT, "تقرير حضور حاضر"); putExtra(Intent.EXTRA_TEXT, csv) }, "تصدير التقرير")) }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp), shape = RoundedCornerShape(14.dp), colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = AdminCyan, contentColor = AdminBg)) { Text("تصدير التقرير CSV", fontWeight = FontWeight.Black) }
+                }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AdminMetric("الحضور", summaries.sumOf { it.present }, AdminGreen, Modifier.weight(1f))
+                AdminMetric("الغياب", summaries.sumOf { it.absent }, AdminRed, Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AdminMetric("التأخير", summaries.sumOf { it.late }, AdminAmber, Modifier.weight(1f))
+                AdminMetric("المفتوح", summaries.sumOf { it.open }, AdminCyan, Modifier.weight(1f))
+            }
+        }
+        item {
+            AdminCard {
+                Column {
+                    Text("ملخص الفترة", color = AdminText, fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Right)
+                    Text("ساعات العمل: ${formatAdminMinutes(totalWorked)}", color = AdminText, modifier = Modifier.padding(top = 8.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                    Text("دقائق التأخير: ${formatAdminMinutes(totalLate)}", color = AdminAmber, modifier = Modifier.padding(top = 3.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                    Text("دقائق الانصراف المبكر: ${formatAdminMinutes(totalEarly)}", color = AdminRed, modifier = Modifier.padding(top = 3.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                    Text("استئذان: ${summaries.sumOf { it.permission }} · إجازة: ${summaries.sumOf { it.leave }} · راحة/عطلة: ${summaries.sumOf { it.off }}", color = AdminMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                }
+            }
+        }
+        item { Text("ملخص الموظفين", color = AdminText, fontSize = 19.sp, fontWeight = FontWeight.Black, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), textAlign = TextAlign.Right) }
+        items(summaries) { s ->
+            AdminCard {
+                Column {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${s.present} حاضر · ${s.absent} غياب", color = AdminGreen, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                            Text(s.name, color = AdminText, fontWeight = FontWeight.Black, textAlign = TextAlign.Right)
+                            Text("${s.job} · أيام العمل ${s.workDays}", color = AdminMuted, fontSize = 11.sp, textAlign = TextAlign.Right)
+                        }
+                    }
+                    Text("متأخر ${s.late} · مبكر ${s.early} · تسجيل ناقص ${s.open}", color = AdminMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                    Text("عمل ${formatAdminMinutes(s.workedMinutes)} · تأخير ${formatAdminMinutes(s.lateMinutes)} · مبكر ${formatAdminMinutes(s.earlyMinutes)}", color = AdminText, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                    TextButton(onClick = { expanded = if (expanded == s.employeeId) null else s.employeeId }, modifier = Modifier.fillMaxWidth()) { Text(if (expanded == s.employeeId) "إخفاء التفاصيل اليومية" else "عرض التفاصيل اليومية", color = AdminCyan) }
+                    if (expanded == s.employeeId) {
+                        val detail = dates.map { d -> buildAdminDay(s.employeeId, d, auditIndex, requestRows) }
+                        detail.forEach { day -> AdminReportDayRow(day) }
+                    }
+                }
+            }
+        }
+        if (summaries.isEmpty()) item { AdminEmpty("لا توجد بيانات موظفين للتقرير.") }
+    }
+}
+
+private fun buildAdminAuditIndex(audit: List<Map<String, Any?>>): Map<String, Pair<Map<String, Any?>?, Map<String, Any?>?>> {
+    val map = mutableMapOf<String, Pair<Map<String, Any?>?, Map<String, Any?>?>>()
+    audit.filter { it["result"]?.toString() == "success" && it["employeeId"] != null }.forEach { row ->
+        val employeeId = row["employeeId"].toString()
+        val timestamp = row["timestamp"]?.toString().orEmpty()
+        val date = timestamp.take(10)
+        if (date.length != 10) return@forEach
+        val key = "$employeeId|$date"
+        val current = map[key]
+        when (row["action"]?.toString()) {
+            "check-in" -> if (current?.first == null || timestamp < current.first?.get("timestamp")?.toString().orEmpty()) map[key] = row to current?.second
+            "check-out" -> if (current?.second == null || timestamp > current.second?.get("timestamp")?.toString().orEmpty()) map[key] = current?.first to row
+        }
+    }
+    return map
+}
+
+private fun buildAdminSummary(employee: Map<String, Any?>, dates: List<LocalDate>, index: Map<String, Pair<Map<String, Any?>?, Map<String, Any?>?>>, requests: List<EmployeeRequest>): AdminReportSummary {
+    val id = employee["id"]?.toString().orEmpty()
+    var workDays = 0; var present = 0; var absent = 0; var early = 0; var late = 0; var open = 0; var permission = 0; var leave = 0; var off = 0; var worked = 0; var lateMinutes = 0; var earlyMinutes = 0
+    dates.forEach { d ->
+        val req = requests.firstOrNull { it.employeeId == id && (it.status == "approved" || it.status == "confirmed") && requestCovers(it, d) }
+        val weekday = d.dayOfWeek.value
+        val isWorkDay = weekday <= 5
+        if (!isWorkDay) { off++; return@forEach }
+        workDays++
+        if (req?.type == "leave") { leave++; return@forEach }
+        if (req?.type == "permission") { permission++; return@forEach }
+        val pair = index["$id|$d"]
+        val cin = pair?.first?.get("timestamp")?.toString()
+        val cout = pair?.second?.get("timestamp")?.toString()
+        if (cin == null) { absent++; return@forEach }
+        val cinMin = instantMinutes(cin); val coutMin = cout?.let(::instantMinutes)
+        val start = employee["workStartTime"]?.toString()?.let(::clockMinutes) ?: 8 * 60
+        val end = employee["workEndTime"]?.toString()?.let(::clockMinutes) ?: 16 * 60
+        val grace = employee["gracePeriodMinutes"]?.toString()?.toIntOrNull() ?: 10
+        val lm = maxOf(0, cinMin - start - grace); lateMinutes += lm
+        if (coutMin == null) { open++; return@forEach }
+        worked += maxOf(0, coutMin - cinMin)
+        val em = maxOf(0, end - coutMin); earlyMinutes += em
+        when { em > 0 -> early++; lm > 0 -> late++; else -> present++ }
+    }
+    return AdminReportSummary(id, employee["name"]?.toString() ?: "بدون اسم", employee["jobNumber"]?.toString() ?: "—", workDays, present, absent, early, late, open, permission, leave, off, worked, lateMinutes, earlyMinutes)
+}
+
+private fun buildAdminDay(employeeId: String, date: LocalDate, index: Map<String, Pair<Map<String, Any?>?, Map<String, Any?>?>>, requests: List<EmployeeRequest>): AdminReportDay {
+    val req = requests.firstOrNull { it.employeeId == employeeId && (it.status == "approved" || it.status == "confirmed") && requestCovers(it, date) }
+    if (date.dayOfWeek.value > 5) return AdminReportDay(date, "راحة/عطلة", "—", "—", 0, 0, 0, "يوم راحة/عطلة")
+    if (req?.type == "leave") return AdminReportDay(date, "إجازة", "—", "—", 0, 0, 0, req.reason ?: "إجازة معتمدة")
+    if (req?.type == "permission") return AdminReportDay(date, "استئذان", "—", "—", 0, 0, 0, req.reason ?: "استئذان معتمد")
+    val pair = index["$employeeId|$date"]
+    val cin = pair?.first?.get("timestamp")?.toString()
+    val cout = pair?.second?.get("timestamp")?.toString()
+    if (cin == null) return AdminReportDay(date, "غياب", "—", "—", 0, 0, 0, "لم يسجل حضورًا")
+    val cinMin = instantMinutes(cin); val coutMin = cout?.let(::instantMinutes); val start = 8 * 60; val end = 16 * 60; val grace = 10
+    val lm = maxOf(0, cinMin - start - grace)
+    if (coutMin == null) return AdminReportDay(date, "تسجيل ناقص", formatAdminClock(cinMin), "—", 0, lm, 0, "لم يسجل الانصراف")
+    val worked = maxOf(0, coutMin - cinMin); val em = maxOf(0, end - coutMin)
+    val status = when { em > 0 -> "انصراف مبكر"; lm > 0 -> "متأخر"; else -> "حاضر" }
+    return AdminReportDay(date, status, formatAdminClock(cinMin), formatAdminClock(coutMin), worked, lm, em, "يوم عمل")
+}
+
+private fun requestCovers(r: EmployeeRequest, date: LocalDate): Boolean {
+    val start = r.startDate?.take(10) ?: r.createdAt?.take(10) ?: return false
+    val end = r.endDate?.take(10) ?: start
+    return date.toString() >= start && date.toString() <= end
+}
+
+private fun instantMinutes(value: String): Int {
+    val time = value.substringAfter("T", value).substringAfter(" ").take(5)
+    return clockMinutes(time)
+}
+
+private fun clockMinutes(value: String): Int {
+    val parts = value.take(5).split(":")
+    return (parts.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (parts.getOrNull(1)?.toIntOrNull() ?: 0)
+}
+
+private fun formatAdminMinutes(value: Int): String = "${value / 60}س ${value % 60}د"
+private fun formatAdminClock(value: Int): String = "%02d:%02d".format(Locale.US, value / 60, value % 60)
+
+private fun buildAdminCsv(summaries: List<AdminReportSummary>, mode: String, date: String, month: String, year: String): String {
+    val period = when (mode) { "daily" -> date; "annual" -> year; else -> month }
+    return buildString {
+        appendLine("تقرير حاضر,$period")
+        appendLine("الموظف,الرقم الوظيفي,أيام العمل,حاضر,غياب,انصراف مبكر,متأخر,تسجيل ناقص,استئذان,إجازة,راحة,ساعات العمل,دقائق التأخير,دقائق الانصراف المبكر")
+        summaries.forEach { s -> appendLine(listOf(s.name, s.job, s.workDays, s.present, s.absent, s.early, s.late, s.open, s.permission, s.leave, s.off, formatAdminMinutes(s.workedMinutes), s.lateMinutes, s.earlyMinutes).joinToString(",") { csvEscape(it.toString()) }) }
+    }
+}
+
+private fun csvEscape(value: String): String = "\"${value.replace("\"", "\"\"")}\""
+
+@Composable
+private fun AdminReportDayRow(day: AdminReportDay) {
+    Column(Modifier.fillMaxWidth().background(AdminPanel, RoundedCornerShape(14.dp)).padding(11.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(day.status, color = when (day.status) { "حاضر" -> AdminGreen; "متأخر" -> AdminAmber; "غياب" -> AdminRed; else -> AdminCyan }, fontWeight = FontWeight.Black, fontSize = 11.sp)
+            Text("${day.date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale("ar"))} · ${day.date}", color = AdminText, fontSize = 11.sp, textAlign = TextAlign.Right)
+        }
+        Text("الدخول ${day.checkIn} · الخروج ${day.checkOut}", color = AdminMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+        Text("العمل ${formatAdminMinutes(day.workedMinutes)} · التأخير ${formatAdminMinutes(day.lateMinutes)} · المبكر ${formatAdminMinutes(day.earlyMinutes)}", color = AdminMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+        Text(day.detail, color = AdminMuted, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp).fillMaxWidth(), textAlign = TextAlign.Right)
     }
 }
 
