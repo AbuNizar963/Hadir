@@ -1,6 +1,7 @@
 package com.hadir.attendance.data
 
 import com.squareup.moshi.Json
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
@@ -28,9 +29,9 @@ data class NotificationListResponse(val notifications: List<AppNotification> = e
 data class RequestStatusBody(val status: String)
 
 interface HadirApi {
-    @POST("api/auth/login") suspend fun login(@Body request: LoginRequest): LoginResponse<Employee>
-    @POST("api/auth/login") suspend fun loginAdmin(@Body request: AdminLoginRequest): LoginResponse<Admin>
-    @POST("api/auth/login") suspend fun loginAdminCredentials(@Body request: AdminCredentialsRequest): LoginResponse<Admin>
+    @POST("api/auth/login") suspend fun login(@Body request: RequestBody): LoginResponse<Employee>
+    @POST("api/auth/login") suspend fun loginAdmin(@Body request: RequestBody): LoginResponse<Admin>
+    @POST("api/auth/login") suspend fun loginAdminCredentials(@Body request: RequestBody): LoginResponse<Admin>
     @GET("api/me") suspend fun me(): Map<String, Any?>
     @GET("api/attendance") suspend fun attendance(@Query("limit") limit: Int = 200): List<AttendanceRecord>
     @POST("api/attendance/challenge") suspend fun challenge(@Body request: AttendanceChallengeRequest): AttendanceChallengeResponse
