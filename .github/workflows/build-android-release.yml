@@ -1,4 +1,4 @@
-name: Build Hadir Android Native Release
+name: Build Hadir Android Flutter Release
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: 'Git ref containing the standalone native Android project to build'
+        description: 'Git ref containing the Flutter mobile project to build'
         required: true
         default: 'android-native'
         type: string
@@ -17,76 +17,55 @@ permissions:
 
 jobs:
   build-android-release:
-    name: Build signed native Android APK
+    name: Build signed Flutter Android APK
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: mobile/flutter
     steps:
       - name: Checkout source ref
         uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source_ref || github.ref_name }}
           fetch-depth: 1
-
-      - name: Verify native Android project files
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - name: Generate Android wrapper when incomplete
         shell: bash
         run: |
-          test -f mobile/native-android/settings.gradle.kts || { echo "Missing mobile/native-android/settings.gradle.kts"; exit 1; }
-          test -f mobile/native-android/build.gradle.kts || { echo "Missing mobile/native-android/build.gradle.kts"; exit 1; }
-          test -f mobile/native-android/app/build.gradle.kts || { echo "Missing mobile/native-android/app/build.gradle.kts"; exit 1; }
-          echo "Native Android source is present at commit $(git rev-parse HEAD)"
-
+          if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            flutter create --platforms=android --project-name hadir .
+          fi
+      - name: Verify Flutter Android project
+        shell: bash
+        run: |
+          test -f pubspec.yaml
+          test -f lib/main.dart
+          test -f android/app/build.gradle
+          grep -q "applicationId 'com.hadir.attendance'" android/app/build.gradle
+          echo "Flutter Android source is present at commit $(git rev-parse HEAD)"
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
           packages: ''
-
       - name: Install Android 16 SDK and Build Tools
         shell: bash
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-
-      - name: Locate Android signing tools
-        shell: bash
-        run: |
-          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          test -n "$SDK_ROOT" || { echo "Android SDK root is not set"; exit 1; }
-          test -d "$SDK_ROOT" || { echo "Android SDK root does not exist: $SDK_ROOT"; exit 1; }
-
-          APKSIGNER="$SDK_ROOT/build-tools/36.0.0/apksigner"
-          if [ ! -x "$APKSIGNER" ]; then
-            APKSIGNER="$(find "$SDK_ROOT/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner -perm -111 | sort -V | tail -n 1)"
-          fi
-          test -n "$APKSIGNER" || { echo "apksigner was not found under $SDK_ROOT/build-tools"; exit 1; }
-          test -x "$APKSIGNER" || { echo "apksigner is not executable: $APKSIGNER"; exit 1; }
-
-          echo "APKSIGNER=$APKSIGNER" >> "$GITHUB_ENV"
-          echo "Using apksigner: $APKSIGNER"
-          "$APKSIGNER" --version
-
-      - name: Install Gradle 8.11.1
-        shell: bash
-        run: |
-          GRADLE_VERSION="8.11.1"
-          GRADLE_HOME="$RUNNER_TEMP/gradle-$GRADLE_VERSION"
-          GRADLE_ZIP="$RUNNER_TEMP/gradle-$GRADLE_VERSION-bin.zip"
-          curl --fail --silent --show-error --location \
-            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
-            --output "$GRADLE_ZIP"
-          rm -rf "$GRADLE_HOME"
-          mkdir -p "$GRADLE_HOME"
-          unzip -q "$GRADLE_ZIP" -d "$RUNNER_TEMP"
-          test -x "$RUNNER_TEMP/gradle-${GRADLE_VERSION}/bin/gradle"
-          echo "GRADLE_HOME=$RUNNER_TEMP/gradle-${GRADLE_VERSION}" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
-          "$RUNNER_TEMP/gradle-${GRADLE_VERSION}/bin/gradle" --version
-
       - name: Validate production signing configuration
         shell: bash
         env:
@@ -99,7 +78,6 @@ jobs:
           test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "Missing secret: ANDROID_KEYSTORE_PASSWORD"; exit 1; }
           test -n "$ANDROID_KEY_ALIAS" || { echo "Missing secret: ANDROID_KEY_ALIAS"; exit 1; }
           test -n "$ANDROID_KEY_PASSWORD" || { echo "Missing secret: ANDROID_KEY_PASSWORD"; exit 1; }
-
       - name: Restore production signing key
         shell: bash
         env:
@@ -107,88 +85,66 @@ jobs:
         run: |
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/hadir-release.keystore"
           test -s "$RUNNER_TEMP/hadir-release.keystore"
-
-      - name: Build native release APK
-        working-directory: mobile/native-android
-        run: gradle --no-daemon --stacktrace :app:assembleRelease -PversionCode=${{ github.run_number }} -PversionName=1.0.${{ github.run_number }}
-
-      - name: Sign production APK
-        shell: bash
-        working-directory: mobile/native-android
+      - name: Build signed Flutter release APK
         env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          HADIR_RELEASE_KEYSTORE: ${{ runner.temp }}/hadir-release.keystore
+          HADIR_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          HADIR_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          HADIR_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          test -x "$APKSIGNER" || { echo "apksigner is unavailable: $APKSIGNER"; exit 1; }
-          "$APKSIGNER" sign \
-            --ks "$RUNNER_TEMP/hadir-release.keystore" \
-            --ks-key-alias "$ANDROID_KEY_ALIAS" \
-            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
-            --key-pass env:ANDROID_KEY_PASSWORD \
-            --out app-release-signed.apk \
-            app/build/outputs/apk/release/app-release-unsigned.apk
-          "$APKSIGNER" verify --verbose app-release-signed.apk
-
+          flutter build apk --release \
+            --build-number=${{ github.run_number }} \
+            --build-name=1.0.${{ github.run_number }} \
+            --target-platform=android-arm,android-arm64,android-x64
+          test -f build/app/outputs/flutter-apk/app-release.apk
       - name: Verify target SDK, package name and version
         shell: bash
-        working-directory: mobile/native-android
         run: |
+          APK="build/app/outputs/flutter-apk/app-release.apk"
           APKANALYZER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer"
-          if ! command -v apkanalyzer >/dev/null 2>&1 && [ ! -x "$APKANALYZER" ]; then
-            echo "apkanalyzer was not found"
-            exit 1
-          fi
+          if ! command -v apkanalyzer >/dev/null 2>&1 && [ ! -x "$APKANALYZER" ]; then echo "apkanalyzer was not found"; exit 1; fi
           APKANALYZER="$(command -v apkanalyzer || echo "$APKANALYZER")"
-          TARGET_SDK="$("$APKANALYZER" manifest target-sdk app-release-signed.apk)"
-          PACKAGE_NAME="$("$APKANALYZER" manifest application-id app-release-signed.apk)"
-          VERSION_CODE="$("$APKANALYZER" manifest version-code app-release-signed.apk)"
-          VERSION_NAME="$("$APKANALYZER" manifest version-name app-release-signed.apk)"
-          echo "Hadir Native APK targetSdkVersion=$TARGET_SDK"
-          echo "Hadir Native APK applicationId=$PACKAGE_NAME"
-          echo "Hadir Native APK versionCode=$VERSION_CODE versionName=$VERSION_NAME"
+          TARGET_SDK="$("$APKANALYZER" manifest target-sdk "$APK")"
+          PACKAGE_NAME="$("$APKANALYZER" manifest application-id "$APK")"
+          VERSION_CODE="$("$APKANALYZER" manifest version-code "$APK")"
+          VERSION_NAME="$("$APKANALYZER" manifest version-name "$APK")"
+          echo "Hadir Flutter APK targetSdkVersion=$TARGET_SDK"
+          echo "Hadir Flutter APK applicationId=$PACKAGE_NAME"
+          echo "Hadir Flutter APK versionCode=$VERSION_CODE versionName=$VERSION_NAME"
           test "$TARGET_SDK" = "36"
           test "$PACKAGE_NAME" = "com.hadir.attendance"
           test "$VERSION_CODE" = "${{ github.run_number }}"
           test "$VERSION_NAME" = "1.0.${{ github.run_number }}"
-
+      - name: Verify production APK signature
+        shell: bash
+        run: |
+          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose build/app/outputs/flutter-apk/app-release.apk
       - name: Print production certificate fingerprint
         shell: bash
-        working-directory: mobile/native-android
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          keytool -list -v \
-            -keystore "$RUNNER_TEMP/hadir-release.keystore" \
-            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-            -alias "$ANDROID_KEY_ALIAS" | grep -E "SHA256:|Alias name:"
-
+          keytool -list -v -keystore "$RUNNER_TEMP/hadir-release.keystore" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | grep -E "SHA256:|Alias name:"
       - name: Upload production APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hadir-android-native-production-api36-apk
-          path: mobile/native-android/app-release-signed.apk
+          name: hadir-android-flutter-production-api36-apk
+          path: mobile/flutter/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
-
       - name: Publish production APK release for in-app updater
-        working-directory: mobile/native-android
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           TAG="android-v1.0.${{ github.run_number }}"
           TITLE="HADIR Android 1.0.${{ github.run_number }}"
-          APK="app-release-signed.apk"
+          APK="mobile/flutter/build/app/outputs/flutter-apk/app-release.apk"
           if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --repo "${{ github.repository }}" --clobber
           else
-            gh release create "$TAG" "$APK" \
-              --repo "${{ github.repository }}" \
-              --title "$TITLE" \
-              --target "${{ github.sha }}" \
-              --notes "تحديث تلقائي لتطبيق حاضر Android. versionCode=${{ github.run_number }}."
+            gh release create "$TAG" "$APK" --repo "${{ github.repository }}" --title "$TITLE" --target "${{ github.sha }}" --notes "تحديث تلقائي لتطبيق حاضر Android Flutter. versionCode=${{ github.run_number }}."
           fi
-
-# CI retrigger: keep the native release workflow attached to android-native.
