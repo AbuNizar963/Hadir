@@ -345,14 +345,15 @@ fun NativeEmployeeWebsiteParityApp(
     var end by remember { mutableStateOf("") }
     AlertDialog(onDismissRequest = close, containerColor = SiteCard, title = { Text("طلب جديد", color = SiteText, fontWeight = FontWeight.Black) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { listOf("permission" to "استئذان", "leave" to "إجازة", "checkout" to "انصراف").forEach { (id, label) -> FilterChip(type == id, { type = id }, label = { Text(label) }) } }
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { listOf("permission" to "استئذان", "leave" to "إجازة", "checkout" to "انصراف").forEach { (id, label) -> FilterChip(type == id, { type = id }, label = { Text(label) }) }
+            }
             Field(reason, { reason = it }, "السبب", 2); Field(start, { start = it }, "تاريخ البداية"); Field(end, { end = it }, "تاريخ النهاية")
         }
     }, confirmButton = { Button({ vm.addRequest(type, reason, start, end); close() }, colors = ButtonDefaults.buttonColors(containerColor = SiteGreen, contentColor = Color(0xFF06261B))) { Text("إرسال", fontWeight = FontWeight.Black) } }, dismissButton = { TextButton(close) { Text("إلغاء", color = SiteMuted) } })
 }
 
 @Composable private fun ClockButton(icon: String, title: String, accent: Color, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier.height(112.dp), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, accent.copy(alpha = .5f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = accent, disabledContentColor = SiteMuted, disabledBorderColor = SiteBorder)) {
+    OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier.height(112.dp), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, accent.copy(alpha = .5f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = accent, disabledContentColor = SiteMuted)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(icon, fontSize = 28.sp, fontWeight = FontWeight.Black)
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.Black, color = if (enabled) SiteText else SiteMuted)
