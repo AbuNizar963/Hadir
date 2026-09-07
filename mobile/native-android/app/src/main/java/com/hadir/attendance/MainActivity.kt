@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.hadir.attendance.data.HadirRepository
 import com.hadir.attendance.ui.NativeAdminApp
 import com.hadir.attendance.ui.NativeAttendanceAnalytics
 import com.hadir.attendance.ui.NativeMainApp
@@ -47,8 +48,10 @@ class MainActivity : ComponentActivity() {
             HadirTheme {
                 val context = LocalContext.current
                 val updater = remember(context) { NativeUpdater(context) }
+                val repository = remember(context) { HadirRepository(context) }
                 val scope = rememberCoroutineScope()
                 var workspace by remember { mutableIntStateOf(0) }
+                var restoringSession by remember { mutableStateOf(true) }
                 var features by remember { mutableStateOf(false) }
                 var analytics by remember { mutableStateOf(false) }
                 var notifications by remember { mutableStateOf(false) }
@@ -56,36 +59,51 @@ class MainActivity : ComponentActivity() {
                 var updating by remember { mutableStateOf(false) }
                 var updateError by remember { mutableStateOf<String?>(null) }
 
+                LaunchedEffect(Unit) {
+                    workspace = when (repository.savedRole()) {
+                        "employee" -> 1
+                        "admin" -> 2
+                        else -> 0
+                    }
+                    restoringSession = false
+                }
+
                 LaunchedEffect(resumeNonce) {
                     if (!updating) updateInfo = updater.check()
                 }
 
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    when (workspace) {
-                        0 -> NativeRoleEntry(onEmployee = { workspace = 1 }, onAdmin = { workspace = 2 })
-                        1 -> when {
-                            analytics -> NativeAttendanceAnalytics(onBack = { analytics = false })
-                            features -> NativeMainFeatures(onBack = { features = false })
-                            notifications -> NativeNotificationCenter(onBack = { notifications = false })
-                            else -> Box(Modifier.fillMaxSize()) {
-                                NativeMainApp()
-                                Column(
-                                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    FloatingActionButton(onClick = { notifications = true }) {
-                                        Icon(Icons.Default.Notifications, contentDescription = "مركز الإشعارات")
-                                    }
-                                    FloatingActionButton(onClick = { analytics = true }) {
-                                        Icon(Icons.Default.BarChart, contentDescription = "تحليلات الحضور")
-                                    }
-                                    FloatingActionButton(onClick = { features = true }) {
-                                        Icon(Icons.Default.AutoAwesome, contentDescription = "ميزات حاضر")
+                    if (restoringSession) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("جارٍ استعادة الجلسة…")
+                        }
+                    } else {
+                        when (workspace) {
+                            0 -> NativeRoleEntry(onEmployee = { workspace = 1 }, onAdmin = { workspace = 2 })
+                            1 -> when {
+                                analytics -> NativeAttendanceAnalytics(onBack = { analytics = false })
+                                features -> NativeMainFeatures(onBack = { features = false })
+                                notifications -> NativeNotificationCenter(onBack = { notifications = false })
+                                else -> Box(Modifier.fillMaxSize()) {
+                                    NativeMainApp()
+                                    Column(
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        FloatingActionButton(onClick = { notifications = true }) {
+                                            Icon(Icons.Default.Notifications, contentDescription = "مركز الإشعارات")
+                                        }
+                                        FloatingActionButton(onClick = { analytics = true }) {
+                                            Icon(Icons.Default.BarChart, contentDescription = "تحليلات الحضور")
+                                        }
+                                        FloatingActionButton(onClick = { features = true }) {
+                                            Icon(Icons.Default.AutoAwesome, contentDescription = "ميزات حاضر")
+                                        }
                                     }
                                 }
                             }
+                            else -> NativeAdminApp(onBack = { workspace = 0 })
                         }
-                        else -> NativeAdminApp(onBack = { workspace = 0 })
                     }
                 }
 
