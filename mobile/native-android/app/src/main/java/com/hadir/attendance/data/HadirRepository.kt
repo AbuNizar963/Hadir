@@ -23,6 +23,9 @@ class SessionStore(context: Context) {
     var token: String?
         get() = prefs.getString("token", null)
         set(value) { prefs.edit().putString("token", value).apply() }
+    var role: String?
+        get() = prefs.getString("role", null)
+        set(value) { prefs.edit().putString("role", value).apply() }
     val deviceId: String
         get() {
             val existing = prefs.getString("device_id", null)
@@ -109,12 +112,14 @@ class HadirRepository(context: Context) {
             val response = httpClient.newCall(authRequest(authBody(normalizedUsername, password, session.deviceId, "Android", session.deviceId))).execute()
             val parsed = parseAuthResponse(response, "employee")
             session.token = parsed.token
+            session.role = "employee"
             employeeFromJson(parsed.user)
         } catch (error: IllegalStateException) {
             if (error.message?.contains("400") == true || error.message?.contains("401") == true) {
                 val response = httpClient.newCall(authRequest(authBody(normalizedUsername, password, session.deviceId, "Android"))).execute()
                 val parsed = parseAuthResponse(response, "employee")
                 session.token = parsed.token
+                session.role = "employee"
                 employeeFromJson(parsed.user)
             } else throw error
         }
@@ -127,10 +132,29 @@ class HadirRepository(context: Context) {
         val response = httpClient.newCall(authRequest(authBody(normalizedUsername, password))).execute()
         val parsed = parseAuthResponse(response, "admin")
         session.token = parsed.token
+        session.role = "admin"
         adminFromJson(parsed.user)
     }
 
-    suspend fun attendance(limit: Int = 200): List<AttendanceRecord> = withContext(Dispatchers.IO) { api.attendance(limit) }
+    suspend fun attendance(limit: Int = 200): List<AttendanceRecord> = withContext(Dispatchers.IO) {
+        if (session.role == "admin") {
+            api.audit(limit).asSequence()
+                .filter { row -> row["result"] == "success" && (row["action"] == "check-in" || row["action"] == "check-out") && row["employeeId"] != null }
+                .map { row ->
+                    AttendanceRecord(
+                        id = row["id"].toString(),
+                        employeeId = row["employeeId"].toString(),
+                        type = row["action"].toString(),
+                        timestamp = row["timestamp"].toString(),
+                        lat = (row["lat"] as? Number)?.toDouble(),
+                        lng = (row["lng"] as? Number)?.toDouble()
+                    )
+                }
+                .toList()
+        } else {
+            api.attendance(limit)
+        }
+    }
     suspend fun requests(): List<EmployeeRequest> = withContext(Dispatchers.IO) { api.requests() }
     suspend fun notifications(): List<AppNotification> = withContext(Dispatchers.IO) { api.notifications() }
     suspend fun employees(): List<Map<String, Any?>> = withContext(Dispatchers.IO) { api.employees() }
@@ -142,7 +166,7 @@ class HadirRepository(context: Context) {
     }
     suspend fun createChallenge(type: String, lat: Double, lng: Double, qrCode: String): AttendanceChallengeResponse = withContext(Dispatchers.IO) { api.challenge(AttendanceChallengeRequest(type, lat, lng, qrCode, session.deviceId)) }
     suspend fun createAttendance(employeeId: String, type: String, timestamp: String, lat: Double, lng: Double, challengeId: String) = withContext(Dispatchers.IO) { api.createAttendance(AttendanceCreateRequest(employeeId, type, timestamp, lat, lng, challengeId)) }
-    fun logout() { session.token = null }
+    fun logout() { session.token = null; session.role = null }
 
     private fun errorWithServerMessage(error: HttpException): Exception {
         val body = runCatching { error.response()?.errorBody()?.string() }.getOrNull().orEmpty()
