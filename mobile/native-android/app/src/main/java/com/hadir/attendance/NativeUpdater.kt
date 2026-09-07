@@ -10,6 +10,7 @@ import android.provider.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -106,9 +107,10 @@ class NativeUpdater(private val context: Context) {
         var session: PackageInstaller.Session? = null
         try {
             session = packageInstaller.openSession(sessionId)
-            session.openWrite("base.apk", 0, apkFile.length()).use { output ->
-                apkFile.inputStream().use { input -> input.copyTo(output) }
-                output.fsync()
+            val output: OutputStream = session.openWrite("base.apk", 0, apkFile.length())
+            output.use { stream ->
+                apkFile.inputStream().use { input -> input.copyTo(stream) }
+                session.fsync(output)
             }
 
             val callbackIntent = Intent(context, NativeInstallReceiver::class.java).setPackage(context.packageName)
@@ -154,10 +156,10 @@ class NativeInstallReceiver : android.content.BroadcastReceiver() {
         )
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             val confirmationIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(PackageInstaller.EXTRA_INTENT, Intent::class.java)
+                intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
             } else {
                 @Suppress("DEPRECATION")
-                intent.getParcelableExtra<Intent>(PackageInstaller.EXTRA_INTENT)
+                intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
             }
             try {
                 confirmationIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let(context::startActivity)
