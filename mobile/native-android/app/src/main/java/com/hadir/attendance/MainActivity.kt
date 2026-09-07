@@ -21,8 +21,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.hadir.attendance.data.HadirRepository
 import com.hadir.attendance.ui.NativeAdminApp
+import com.hadir.attendance.ui.NativeEmployeeWebsiteParityApp
 import com.hadir.attendance.ui.NativeRoleEntry
-import com.hadir.attendance.ui.NativeWebEmployeeApp
 import com.hadir.attendance.ui.theme.HadirTheme
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
                     } else {
                         when (workspace) {
                             0 -> NativeRoleEntry(onEmployee = { workspace = 1 }, onAdmin = { workspace = 2 })
-                            1 -> NativeWebEmployeeApp(onEmployeeAuthenticated = {}, onEmployeeLoggedOut = { workspace = 0 })
+                            1 -> NativeEmployeeWebsiteParityApp(onEmployeeAuthenticated = {}, onEmployeeLoggedOut = { workspace = 0 })
                             else -> NativeAdminApp(onBack = { workspace = 0 })
                         }
                     }
