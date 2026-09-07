@@ -108,8 +108,22 @@ class NativeMainViewModel(application: Application) : AndroidViewModel(applicati
 }
 
 @Composable
-fun NativeMainApp(vm: NativeMainViewModel = viewModel()) {
+fun NativeMainApp(
+    vm: NativeMainViewModel = viewModel(),
+    onEmployeeAuthenticated: () -> Unit = {},
+    onEmployeeLoggedOut: () -> Unit = {}
+) {
+    var wasAuthenticated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.restoreSession() }
+    LaunchedEffect(vm.employee) {
+        if (vm.employee != null) {
+            wasAuthenticated = true
+            onEmployeeAuthenticated()
+        } else if (wasAuthenticated) {
+            wasAuthenticated = false
+            onEmployeeLoggedOut()
+        }
+    }
     if (vm.employee == null) NativeLogin(vm) else NativeShell(vm)
 }
 
