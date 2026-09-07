@@ -151,7 +151,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
                   const SizedBox(height: 10),
                   _stats(),
                   const SizedBox(height: 22),
-                  _sectionTitle('مساحة العمل', 'أدوات $ _roleLabel'.replaceAll('$ ', '')),
+                  _sectionTitle('مساحة العمل', 'أدوات $_roleLabel'),
                   const SizedBox(height: 10),
                   ..._features(),
                   const SizedBox(height: 22),
