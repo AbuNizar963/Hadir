@@ -148,7 +148,7 @@ jobs:
         run: |
           TAG="android-v1.0.${{ github.run_number }}"
           TITLE="HADIR Android 1.0.${{ github.run_number }}"
-          APK="mobile/flutter/build/app/outputs/flutter-apk/app-release.apk"
+          APK="build/app/outputs/flutter-apk/app-release.apk"
           if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --repo "${{ github.repository }}" --clobber
           else
