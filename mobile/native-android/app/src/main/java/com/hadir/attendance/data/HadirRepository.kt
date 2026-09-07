@@ -42,22 +42,30 @@ class HadirRepository(context: Context) {
 
     suspend fun login(username: String, password: String): Employee = withContext(Dispatchers.IO) {
         try {
-            val response = api.login(LoginRequest(username, password, session.deviceId, "Android", session.deviceId))
+            val response = api.login(LoginRequest(username.trim(), password, password, session.deviceId, "Android", session.deviceId))
             if (response.kind != "employee") error("هذا الحساب ليس حساب موظف")
             session.token = response.token
             response.user
         } catch (error: HttpException) {
-            throw errorWithServerMessage(error)
+            if (error.code() !in setOf(400, 401)) throw errorWithServerMessage(error)
+            try {
+                val response = api.login(LoginRequest(username.trim(), password, password, session.deviceId, "Android", session.deviceId))
+                if (response.kind != "employee") error("هذا الحساب ليس حساب موظف")
+                session.token = response.token
+                response.user
+            } catch (retryError: HttpException) {
+                throw errorWithServerMessage(retryError)
+            }
         }
     }
     suspend fun loginAdmin(username: String, password: String): Admin = withContext(Dispatchers.IO) {
         val response = try {
-            api.loginAdminCredentials(AdminCredentialsRequest(username, password))
+            api.loginAdminCredentials(AdminCredentialsRequest(username.trim(), password, password))
         } catch (error: HttpException) {
-            if (error.code() != 400) throw errorWithServerMessage(error)
+            if (error.code() !in setOf(400, 401)) throw errorWithServerMessage(error)
             val deviceId = session.deviceId
             try {
-                api.loginAdmin(AdminLoginRequest(username, password, deviceId, "Android", deviceId))
+                api.loginAdmin(AdminLoginRequest(username.trim(), password, password, deviceId, "Android", deviceId))
             } catch (retryError: HttpException) {
                 throw errorWithServerMessage(retryError)
             }
