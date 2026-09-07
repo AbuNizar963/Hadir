@@ -11,6 +11,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -74,6 +75,7 @@ private fun WebEmployeeShell(vm: NativeMainViewModel) {
     var pendingType by remember { mutableStateOf("check-in") }
     var requestDialog by remember { mutableStateOf(false) }
     var menuDialog by remember { mutableStateOf(false) }
+    var profileMenu by remember { mutableStateOf(false) }
     var requestType by remember { mutableStateOf("permission") }
     var requestReason by remember { mutableStateOf("") }
     var requestStart by remember { mutableStateOf("") }
@@ -89,39 +91,89 @@ private fun WebEmployeeShell(vm: NativeMainViewModel) {
     if (menuDialog) MenuDialog({ menuDialog = false }) { vm.logout() }
 
     Surface(Modifier.fillMaxSize(), color = WebBg) {
-        Column(Modifier.fillMaxSize()) {
-            WebHeader { menuDialog = true }
-            WebSectionNav(tab) { tab = it }
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                item { Column(Modifier.padding(horizontal = 4.dp)) { Text("HADIR · EMPLOYEE", color = WebMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp); Text(tabTitle(tab), color = WebText, fontSize = 31.sp, fontWeight = FontWeight.Black) } }
-                when (tab) {
-                    0 -> item { HomeContent(vm, locationAllowed, cameraAllowed, { type -> pendingType = type; if (locationAllowed && cameraAllowed) scanner = true else permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.CAMERA)) }, { requestDialog = true }) }
-                    1 -> item { HoursContent(vm) }
-                    2 -> item { CenterContent(vm) }
-                    3 -> item { RequestsContent(vm) { requestDialog = true } }
-                    4 -> item { AccountContent(vm) }
+        Scaffold(
+            containerColor = WebBg,
+            bottomBar = {
+                WebBottomToolbar(
+                    onMenu = { menuDialog = true },
+                    onNotifications = { },
+                    onWeather = { }
+                )
+            }
+        ) { bottomPadding ->
+            Column(Modifier.fillMaxSize().padding(bottomPadding)) {
+                WebHeader(
+                    employeeName = vm.employee?.name.orEmpty(),
+                    profileMenu = profileMenu,
+                    onProfile = { profileMenu = !profileMenu },
+                    onDismissProfile = { profileMenu = false },
+                    tab = tab,
+                    onTab = { tab = it; profileMenu = false }
+                )
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    item { Column(Modifier.padding(horizontal = 4.dp)) { Text("HADIR · EMPLOYEE", color = WebMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp); Text(tabTitle(tab), color = WebText, fontSize = 31.sp, fontWeight = FontWeight.Black) } }
+                    when (tab) {
+                        0 -> item { HomeContent(vm, locationAllowed, cameraAllowed, { type -> pendingType = type; if (locationAllowed && cameraAllowed) scanner = true else permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.CAMERA)) }, { requestDialog = true }) }
+                        1 -> item { HoursContent(vm) }
+                        2 -> item { CenterContent(vm) }
+                        3 -> item { RequestsContent(vm) { requestDialog = true } }
+                        4 -> item { AccountContent(vm) }
+                    }
                 }
             }
         }
     }
 }
 
-@Composable private fun WebHeader(onMenu: () -> Unit) {
-    Row(Modifier.fillMaxWidth().height(74.dp).padding(horizontal = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Brand()
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) { Utility(Icons.Default.Menu, "القائمة", onMenu); Utility(Icons.Default.Notifications, "الإشعارات") {}; Utility(Icons.Default.WbSunny, "الطقس") {} }
+@Composable
+private fun WebHeader(
+    employeeName: String,
+    profileMenu: Boolean,
+    onProfile: () -> Unit,
+    onDismissProfile: () -> Unit,
+    tab: Int,
+    onTab: (Int) -> Unit
+) {
+    Box(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().height(78.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Brand()
+            Box {
+                OutlinedButton(onClick = onProfile, modifier = Modifier.height(58.dp), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, if (profileMenu) WebGreen else WebBorder), colors = ButtonDefaults.outlinedButtonColors(containerColor = if (profileMenu) Color(0xFF123D32) else WebCard, contentColor = WebText)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.size(38.dp).background(WebPanel, CircleShape).border(1.dp, WebGreen.copy(alpha = .65f), CircleShape), contentAlignment = Alignment.Center) {
+                            Text(employeeName.firstOrNull()?.toString() ?: "م", color = WebGreen, fontWeight = FontWeight.Black)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("الملف الشخصي", color = WebMuted, fontSize = 9.sp)
+                            Text(employeeName.ifBlank { "الموظف" }, color = WebText, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                        }
+                        Icon(Icons.Default.ExpandMore, null, Modifier.size(18.dp))
+                    }
+                }
+                DropdownMenu(expanded = profileMenu, onDismissRequest = onDismissProfile, modifier = Modifier.background(WebCard)) {
+                    Text("أقسام الموظف", color = WebMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    val nav = listOf("لوحة الموظف" to Icons.Default.GridView, "سجل العمل" to Icons.Default.AccessTime, "مركز الموظف" to Icons.Default.Business, "الطلبات" to Icons.Default.ListAlt, "الملف الشخصي" to Icons.Default.Person)
+                    nav.forEachIndexed { i, pair ->
+                        DropdownMenuItem(
+                            text = { Text(pair.first, color = if (i == tab) WebGreen else WebText, fontWeight = if (i == tab) FontWeight.Bold else FontWeight.Normal) },
+                            leadingIcon = { Icon(pair.second, null, tint = if (i == tab) WebGreen else WebMuted) },
+                            onClick = { onTab(i) }
+                        )
+                    }
+                }
+            }
+        }
+        HorizontalDivider(color = WebBorder)
     }
-    HorizontalDivider(color = WebBorder)
 }
 
-@Composable private fun Utility(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) { OutlinedButton(onClick = onClick, modifier = Modifier.width(82.dp).height(58.dp), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, WebBorder), colors = ButtonDefaults.outlinedButtonColors(contentColor = WebMuted)) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, Modifier.size(19.dp)); Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold) } } }
-
-@Composable private fun WebSectionNav(tab: Int, onTab: (Int) -> Unit) {
-    val nav = listOf("لوحة الموظف" to Icons.Default.GridView, "سجل العمل" to Icons.Default.AccessTime, "مركز الموظف" to Icons.Default.Business, "الطلبات" to Icons.Default.ListAlt, "الملف الشخصي" to Icons.Default.Person)
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        nav.forEachIndexed { i, pair -> val active = i == tab; OutlinedButton(onClick = { onTab(i) }, modifier = Modifier.width(if (i == 0) 116.dp else 104.dp).height(62.dp), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, if (active) WebGreen else WebBorder), colors = ButtonDefaults.outlinedButtonColors(containerColor = if (active) Color(0xFF123D32) else WebBg, contentColor = if (active) WebGreen else WebMuted)) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(pair.second, null, Modifier.size(21.dp)); Text(pair.first, fontSize = 10.sp, fontWeight = FontWeight.Bold) } } }
+@Composable
+private fun WebBottomToolbar(onMenu: () -> Unit, onNotifications: () -> Unit, onWeather: () -> Unit) {
+    NavigationBar(containerColor = WebCard, contentColor = WebText) {
+        NavigationBarItem(selected = false, onClick = onMenu, icon = { Icon(Icons.Default.Menu, null) }, label = { Text("القائمة", fontSize = 10.sp) })
+        NavigationBarItem(selected = false, onClick = onNotifications, icon = { Icon(Icons.Default.Notifications, null) }, label = { Text("الإشعارات", fontSize = 10.sp) })
+        NavigationBarItem(selected = false, onClick = onWeather, icon = { Icon(Icons.Default.WbSunny, null) }, label = { Text("الطقس", fontSize = 10.sp) })
     }
-    HorizontalDivider(color = WebBorder)
 }
 
 @Composable private fun HomeContent(vm: NativeMainViewModel, locationAllowed: Boolean, cameraAllowed: Boolean, onClock: (String) -> Unit, onRequest: () -> Unit) {
