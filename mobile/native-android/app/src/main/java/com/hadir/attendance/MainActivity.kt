@@ -3,8 +3,11 @@ package com.hadir.attendance
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
@@ -14,11 +17,11 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import com.hadir.attendance.ui.NativeAdminApp
 import com.hadir.attendance.ui.NativeAttendanceAnalytics
 import com.hadir.attendance.ui.NativeMainApp
@@ -61,11 +64,16 @@ class MainActivity : ComponentActivity() {
                             features -> NativeMainFeatures(onBack = { features = false })
                             else -> Box(Modifier.fillMaxSize()) {
                                 NativeMainApp()
-                                FloatingActionButton(onClick = { analytics = true }, modifier = Modifier.align(Alignment.TopEnd)) {
-                                    Icon(Icons.Default.BarChart, contentDescription = "تحليلات الحضور")
-                                }
-                                FloatingActionButton(onClick = { features = true }, modifier = Modifier.align(Alignment.TopEnd).then(Modifier)) {
-                                    Icon(Icons.Default.AutoAwesome, contentDescription = "ميزات حاضر")
+                                Column(
+                                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    FloatingActionButton(onClick = { analytics = true }) {
+                                        Icon(Icons.Default.BarChart, contentDescription = "تحليلات الحضور")
+                                    }
+                                    FloatingActionButton(onClick = { features = true }) {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = "ميزات حاضر")
+                                    }
                                 }
                             }
                         }
