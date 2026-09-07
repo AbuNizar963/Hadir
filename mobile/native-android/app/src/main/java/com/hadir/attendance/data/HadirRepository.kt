@@ -43,7 +43,8 @@ class HadirRepository(context: Context) {
         response.user
     }
     suspend fun loginAdmin(username: String, password: String): Admin = withContext(Dispatchers.IO) {
-        val response = api.loginAdmin(AdminLoginRequest(username, password))
+        val deviceId = session.deviceId
+        val response = api.loginAdmin(AdminLoginRequest(username, password, deviceId, "Android", deviceId))
         if (response.kind != "admin") error("هذا الحساب ليس حساب إدارة")
         session.token = response.token
         response.user
