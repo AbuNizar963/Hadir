@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
@@ -42,51 +43,91 @@ class BearerInterceptor(private val session: SessionStore) : Interceptor {
 
 class HadirRepository(context: Context) {
     private val session = SessionStore(context)
-    private val api = Retrofit.Builder().baseUrl(HADIR_API).client(OkHttpClient.Builder().addInterceptor(BearerInterceptor(session)).build()).addConverterFactory(MoshiConverterFactory.create()).build().create(HadirApi::class.java)
+    private val httpClient = OkHttpClient.Builder()
+        .addInterceptor(BearerInterceptor(session))
+        .build()
+    private val api = Retrofit.Builder()
+        .baseUrl(HADIR_API)
+        .client(httpClient)
+        .addConverterFactory(MoshiConverterFactory.create())
+        .build()
+        .create(HadirApi::class.java)
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     private fun authBody(username: String, password: String, deviceId: String? = null, deviceLabel: String? = null, fingerprint: String? = null): RequestBody {
-        val json = JSONObject().put("username", username.trim()).put("password", password)
+        val json = JSONObject()
+            .put("username", username.trim())
+            .put("password", password)
         if (!deviceId.isNullOrBlank()) json.put("deviceId", deviceId.trim())
         if (!deviceLabel.isNullOrBlank()) json.put("deviceLabel", deviceLabel.trim())
         if (!fingerprint.isNullOrBlank()) json.put("deviceFingerprint", fingerprint.trim())
         return json.toString().toRequestBody(jsonMediaType)
     }
 
+    private fun authRequest(body: RequestBody): Request = Request.Builder()
+        .url("${HADIR_API}api/auth/login")
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json; charset=utf-8")
+        .header("X-Device-ID", session.deviceId)
+        .post(body)
+        .build()
+
+    private fun parseAuthResponse(response: okhttp3.Response, expectedKind: String): LoginResponse<JSONObject> {
+        val raw = response.body?.string().orEmpty()
+        val json = runCatching { JSONObject(raw) }.getOrElse {
+            throw IllegalStateException("استجابة غير صالحة من الخادم (${response.code})", it)
+        }
+        if (!response.isSuccessful) {
+            val message = json.optString("error").takeIf { it.isNotBlank() }
+            throw IllegalStateException(message ?: "خطأ من الخادم (${response.code})")
+        }
+        val token = json.optString("token").trim()
+        val kind = json.optString("kind").trim()
+        val user = json.optJSONObject("user")
+        if (token.isBlank() || user == null) throw IllegalStateException("استجابة تسجيل الدخول ناقصة من الخادم")
+        if (kind != expectedKind) throw IllegalStateException(if (expectedKind == "admin") "هذا الحساب ليس حساب إدارة" else "هذا الحساب ليس حساب موظف")
+        return LoginResponse(token, user, kind)
+    }
+
+    private fun adminFromJson(user: JSONObject): Admin = Admin(
+        id = user.optString("id"),
+        username = user.optString("username"),
+        name = user.optString("name"),
+        role = user.optString("role")
+    )
+
+    private fun employeeFromJson(user: JSONObject): Employee = Employee(
+        id = user.optString("id"),
+        name = user.optString("name").takeIf { it.isNotBlank() },
+        jobNumber = user.optString("jobNumber").takeIf { it.isNotBlank() }
+    )
+
     suspend fun login(username: String, password: String): Employee = withContext(Dispatchers.IO) {
+        val normalizedUsername = username.trim()
+        if (normalizedUsername.isBlank() || password.isBlank()) throw IllegalArgumentException("اسم المستخدم وكلمة المرور مطلوبان")
         try {
-            val response = api.login(authBody(username, password, session.deviceId, "Android", session.deviceId))
-            if (response.kind != "employee") error("هذا الحساب ليس حساب موظف")
-            session.token = response.token
-            response.user
-        } catch (error: HttpException) {
-            if (error.code() !in setOf(400, 401)) throw errorWithServerMessage(error)
-            try {
-                val response = api.login(authBody(username, password, session.deviceId, "Android"))
-                if (response.kind != "employee") error("هذا الحساب ليس حساب موظف")
-                session.token = response.token
-                response.user
-            } catch (retryError: HttpException) {
-                throw errorWithServerMessage(retryError)
-            }
+            val response = httpClient.newCall(authRequest(authBody(normalizedUsername, password, session.deviceId, "Android", session.deviceId))).execute()
+            val parsed = parseAuthResponse(response, "employee")
+            session.token = parsed.token
+            employeeFromJson(parsed.user)
+        } catch (error: IllegalStateException) {
+            if (error.message?.contains("400") == true || error.message?.contains("401") == true) {
+                val response = httpClient.newCall(authRequest(authBody(normalizedUsername, password, session.deviceId, "Android"))).execute()
+                val parsed = parseAuthResponse(response, "employee")
+                session.token = parsed.token
+                employeeFromJson(parsed.user)
+            } else throw error
         }
     }
 
     suspend fun loginAdmin(username: String, password: String): Admin = withContext(Dispatchers.IO) {
-        val response = try {
-            api.loginAdminCredentials(authBody(username, password))
-        } catch (error: HttpException) {
-            if (error.code() !in setOf(400, 401)) throw errorWithServerMessage(error)
-            val deviceId = session.deviceId
-            try {
-                api.loginAdmin(authBody(username, password, deviceId, "Android", deviceId))
-            } catch (retryError: HttpException) {
-                throw errorWithServerMessage(retryError)
-            }
-        }
-        if (response.kind != "admin") error("هذا الحساب ليس حساب إدارة")
-        session.token = response.token
-        response.user
+        val normalizedUsername = username.trim()
+        if (normalizedUsername.isBlank() || password.isBlank()) throw IllegalArgumentException("اسم المستخدم وكلمة المرور مطلوبان")
+
+        val response = httpClient.newCall(authRequest(authBody(normalizedUsername, password))).execute()
+        val parsed = parseAuthResponse(response, "admin")
+        session.token = parsed.token
+        adminFromJson(parsed.user)
     }
 
     suspend fun attendance(limit: Int = 200): List<AttendanceRecord> = withContext(Dispatchers.IO) { api.attendance(limit) }
