@@ -114,8 +114,11 @@ class NativeUpdater(private val context: Context) {
             }
 
             val callbackIntent = Intent(context, NativeInstallReceiver::class.java).setPackage(context.packageName)
+            // Android 15+ rejects an immutable PendingIntent as the PackageInstaller
+            // status receiver for apps targeting API 35+. The status callback must be
+            // mutable so PackageInstaller can attach EXTRA_STATUS/EXTRA_INTENT.
             val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 INSTALL_REQUEST_CODE,
