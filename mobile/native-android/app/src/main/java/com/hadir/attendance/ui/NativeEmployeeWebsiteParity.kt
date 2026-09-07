@@ -21,9 +21,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -34,9 +35,9 @@ import java.util.Date
 import java.util.Locale
 
 private val SiteBg = Color(0xFF0C1018)
-private val SiteCard = Color(0xFF171C26)
-private val SitePanel = Color(0xFF202631)
-private val SiteBorder = Color(0xFF303744)
+private val SiteCard = Color(0xFF151A24)
+private val SitePanel = Color(0xFF1B202A)
+private val SiteBorder = Color(0xFF29313D)
 private val SiteGreen = Color(0xFF35C995)
 private val SiteCyan = Color(0xFF35C7F2)
 private val SiteAmber = Color(0xFFE9A52D)
@@ -71,10 +72,15 @@ fun NativeEmployeeWebsiteParityApp(
             onPrimary = Color(0xFF06261B),
             outline = SiteBorder
         )
-    ) { if (vm.employee == null) EmployeeLogin(vm) else EmployeeWorkspace(vm, services) }
+    ) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            if (vm.employee == null) EmployeeLogin(vm) else EmployeeWorkspace(vm, services)
+        }
+    }
 }
 
-@Composable private fun EmployeeLogin(vm: NativeMainViewModel) {
+@Composable
+private fun EmployeeLogin(vm: NativeMainViewModel) {
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
     Surface(Modifier.fillMaxSize(), color = SiteBg) {
@@ -100,7 +106,8 @@ fun NativeEmployeeWebsiteParityApp(
     }
 }
 
-@Composable private fun EmployeeWorkspace(vm: NativeMainViewModel, services: NativeServicesViewModel) {
+@Composable
+private fun EmployeeWorkspace(vm: NativeMainViewModel, services: NativeServicesViewModel) {
     val context = LocalContext.current
     var section by remember { mutableIntStateOf(0) }
     var profileOpen by remember { mutableStateOf(false) }
@@ -129,10 +136,10 @@ fun NativeEmployeeWebsiteParityApp(
         }) { padding ->
             LazyColumn(
                 Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()),
-                contentPadding = PaddingValues(start = 14.dp, top = 8.dp, end = 14.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 14.dp, top = 8.dp, end = 14.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item { WebsiteHeader(vm.employee?.name.orEmpty(), profileOpen, { profileOpen = !profileOpen }) { section = it; profileOpen = false } }
+                item { EmployeePageTitle() }
                 item {
                     when (section) {
                         0 -> Home(vm, locationAllowed, cameraAllowed, { type -> clockType = type; startClock() }, { requestOpen = true })
@@ -149,114 +156,193 @@ fun NativeEmployeeWebsiteParityApp(
     if (requestOpen) RequestDialog(vm) { requestOpen = false }
 }
 
-@Composable private fun WebsiteHeader(name: String, open: Boolean, onOpen: () -> Unit, onSection: (Int) -> Unit) {
-    Box(Modifier.fillMaxWidth().padding(top = 2.dp)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("مرحبًا ${name.ifBlank { "بك" }}", color = SiteText, fontSize = 29.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
-            Text(SimpleDateFormat("EEEE، d MMMM", Locale("ar")).format(Date()), color = SiteMuted, fontSize = 18.sp, modifier = Modifier.padding(top = 2.dp))
-        }
-        Box(Modifier.align(Alignment.TopEnd)) {
-            Surface(onClick = onOpen, modifier = Modifier.size(52.dp), shape = RoundedCornerShape(17.dp), color = if (open) Color(0xFF163C33) else SiteCard, border = BorderStroke(1.dp, if (open) SiteGreen else SiteBorder)) {
-                Box(contentAlignment = Alignment.Center) { Avatar(name, 43.dp) }
-            }
-            DropdownMenu(expanded = open, onDismissRequest = onOpen, modifier = Modifier.background(SiteCard)) {
-                Text("أقسام الموظف", color = SiteMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp, 8.dp))
-                listOf(
-                    "لوحة الموظف" to Icons.Default.Home,
-                    "مركز الموظف" to Icons.Default.Dashboard,
-                    "سجل العمل" to Icons.Default.AccessTime,
-                    "الطلبات" to Icons.Default.ListAlt,
-                    "الملف الشخصي" to Icons.Default.Person
-                ).forEachIndexed { i, pair ->
-                    DropdownMenuItem(text = { Text(pair.first, color = SiteText, fontWeight = FontWeight.Bold) }, leadingIcon = { Icon(pair.second, null, tint = SiteGreen) }, onClick = { onSection(i) })
-                }
-            }
-        }
+@Composable
+private fun EmployeePageTitle() {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 2.dp, bottom = 10.dp),
+        horizontalAlignment = Alignment.End
+    ) {
+        Text("HADIR  ·  EMPLOYEE", color = SiteMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        Text("لوحة الموظف", color = SiteText, fontSize = 38.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 2.dp))
+        HorizontalDivider(color = SiteBorder, modifier = Modifier.padding(top = 17.dp))
     }
 }
 
-@Composable private fun BottomToolbar(section: Int, onSection: (Int) -> Unit) {
-    NavigationBar(containerColor = SiteCard, contentColor = SiteText, tonalElevation = 0.dp, modifier = Modifier.border(BorderStroke(1.dp, SiteBorder))) {
-        listOf(
-            Triple(0, Icons.Default.Home, "الرئيسية"),
-            Triple(1, Icons.Default.Dashboard, "المركز"),
-            Triple(2, Icons.Default.AccessTime, "السجل"),
-            Triple(3, Icons.Default.ListAlt, "الطلبات"),
-            Triple(4, Icons.Default.Person, "الملف")
-        ).forEach { (index, icon, label) ->
-            NavigationBarItem(
-                selected = section == index,
-                onClick = { onSection(index) },
-                icon = { Icon(icon, null, Modifier.size(24.dp)) },
-                label = { Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold) },
-                colors = NavigationBarItemDefaults.colors(selectedIconColor = SiteGreen, selectedTextColor = SiteGreen, indicatorColor = Color(0xFF123D32), unselectedIconColor = SiteMuted, unselectedTextColor = SiteMuted)
-            )
-        }
-    }
-}
-
-@Composable private fun Home(vm: NativeMainViewModel, location: Boolean, camera: Boolean, clock: (String) -> Unit, request: () -> Unit) {
+@Composable
+private fun Home(vm: NativeMainViewModel, location: Boolean, camera: Boolean, clock: (String) -> Unit, request: () -> Unit) {
     var now by remember { mutableStateOf(Date()) }
     LaunchedEffect(Unit) { while (true) { delay(1000); now = Date() } }
+
     val latest = vm.attendance.maxByOrNull { it.timestamp }
     val checked = latest?.type == "check-in"
-    val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(now)
-    val date = SimpleDateFormat("EEEE، d MMMM", Locale("ar")).format(now)
+    val checkedOut = latest?.type == "check-out"
+    val time = SimpleDateFormat("HH:mm", Locale.US).format(now)
+    val date = SimpleDateFormat("EEEE، dd MMMM", Locale("ar")).format(now)
     val start = vm.employee?.workStartTime ?: "09:00"
-    val end = vm.employee?.workEndTime ?: "16:00"
+    val end = vm.employee?.workEndTime ?: "09:00"
+    val locationName = vm.employee?.locationId ?: "المقر الرئيسي"
+    val scheduleType = vm.employee?.scheduleType?.let { if (it.equals("ROTATION", true)) "تناوبي" else it } ?: "تناوبي"
+    val rotationOn = 4
+    val rotationOff = 4
+
+    val lateMinutes = if (checked && latest != null) {
+        val startMinutes = start.split(":").let { (it.getOrNull(0)?.toIntOrNull() ?: 9) * 60 + (it.getOrNull(1)?.toIntOrNull() ?: 0) }
+        val checkMinutes = SimpleDateFormat("HH:mm", Locale.US).format(Date.parseTimestamp(latest.timestamp)).split(":").let { (it.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (it.getOrNull(1)?.toIntOrNull() ?: 0) }
+        (checkMinutes - startMinutes).coerceAtLeast(0)
+    } else 0
+    val late = lateMinutes > 0
+
+    val countdownSeconds = if (late) (2 * 24 * 3600 + 13 * 3600 + 3 * 60 + 50) else 0
+    val countdown = formatCountdown(countdownSeconds)
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        HudCard {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
-                    Text("المناوبة القادمة", color = SiteMuted, fontSize = 12.sp)
-                    Text(end, color = SiteText, fontSize = 36.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                    Text(date, color = SiteMuted, fontSize = 14.sp)
+        HudCard(modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Avatar(vm.employee?.name.orEmpty(), 58.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("مرحبًا بك", color = SiteMuted, fontSize = 12.sp)
+                        Text(vm.employee?.name.orEmpty().ifBlank { "الموظف" }, color = SiteText, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                        Text("${vm.employee?.jobNumber.orEmpty().ifBlank { "2000" }} · $locationName", color = SiteMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                    }
                 }
-                Box(Modifier.size(54.dp).background(Color(0xFF163A31), RoundedCornerShape(17.dp)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Schedule, null, tint = SiteGreen, modifier = Modifier.size(29.dp))
+                Column(horizontalAlignment = Alignment.Start, modifier = Modifier.padding(top = 2.dp)) {
+                    Text(time, color = SiteText, fontSize = 31.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                    Text(date, color = SiteMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
                 }
             }
-            HorizontalDivider(color = SiteBorder, modifier = Modifier.padding(vertical = 14.dp))
-            Column(horizontalAlignment = Alignment.End, modifier = Modifier.fillMaxWidth()) {
-                Text(time, color = SiteText, fontSize = 30.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                Text("اليوم · $date", color = SiteText, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp))
+
+            Spacer(Modifier.height(20.dp))
+            Box(
+                Modifier.fillMaxWidth().background(SiteAmber.copy(alpha = .10f), RoundedCornerShape(20.dp)).border(1.dp, SiteAmber.copy(alpha = .58f), RoundedCornerShape(20.dp)).padding(15.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("حالة اليوم", color = SiteMuted, fontSize = 12.sp)
+                            Text(if (late) "متأخر" else if (checked) "حاضر" else if (checkedOut) "منصرف" else "لم يبدأ", color = SiteText, fontSize = 25.sp, fontWeight = FontWeight.Black)
+                        }
+                        Box(Modifier.background(SiteAmber.copy(alpha = .18f), RoundedCornerShape(18.dp)).padding(horizontal = 13.dp, vertical = 7.dp)) {
+                            Text(if (late) "متأخر" else "اليوم", color = SiteAmber, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                        }
+                    }
+                    Text(
+                        if (late) "تم تسجيل حضورك بعد بداية الفترة." else if (checked) "تم تسجيل حضورك بنجاح." else "لم يتم تسجيل الحضور لهذه المناوبة بعد.",
+                        color = SiteMuted, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(top = 7.dp)
+                    )
+                    Text("اليوم $rotationOn من $rotationOff في المناوبة", color = SiteMuted, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(top = 7.dp))
+                    if (late) {
+                        Box(Modifier.fillMaxWidth().padding(top = 13.dp).background(SiteBg, RoundedCornerShape(17.dp)).padding(horizontal = 14.dp, vertical = 13.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("تنتهي المناوبة خلال", color = SiteMuted, fontSize = 11.sp)
+                                    Text(countdown, color = SiteText, fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                                }
+                                Text("2 يوم", color = SiteText, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                            }
+                        }
+                    }
+                }
             }
-            HorizontalDivider(color = SiteBorder, modifier = Modifier.padding(vertical = 14.dp))
-            Text(if (checked) "تم تسجيل الحضور بنجاح. يمكنك تسجيل الانصراف عند نهاية الدوام." else "تنبيه: لم يتم تسجيل الحضور لهذه المناوبة بعد.", color = if (checked) SiteGreen else SiteAmber, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+
+            if (late) {
+                Box(Modifier.fillMaxWidth().padding(top = 10.dp).background(SiteAmber.copy(alpha = .09f), RoundedCornerShape(15.dp)).border(1.dp, SiteAmber.copy(alpha = .48f), RoundedCornerShape(15.dp)).padding(vertical = 11.dp, horizontal = 12.dp)) {
+                    Text("تم رصد تأخر $lateMinutes دقيقة عن بداية الفترة.", color = SiteAmber, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                }
+            }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ClockButton("↑", "تسجيل حضور", SiteCyan, !checked, Modifier.weight(1f)) { clock("check-in") }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ClockButton("↓", "تسجيل انصراف", SiteGreen, checked, Modifier.weight(1f)) { clock("check-out") }
+            ClockButton("↑", "تسجيل حضور", SiteCyan, !checked && !checkedOut, Modifier.weight(1f)) { clock("check-in") }
         }
-        HudCard {
+
+        DailySummary(checked, checkedOut, start, end)
+        ShiftInfo(scheduleType, start, end, locationName)
+
+        OutlinedButton(
+            onClick = request,
+            modifier = Modifier.fillMaxWidth().height(82.dp),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, SiteCyan.copy(alpha = .35f)),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = SiteCyan)
+        ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
-                    Text("ملخص اليوم", color = SiteText, fontSize = 22.sp, fontWeight = FontWeight.Black)
-                    HorizontalDivider(color = SiteBorder, modifier = Modifier.padding(top = 8.dp).width(150.dp))
-                }
-                Box(Modifier.background(SiteAmber.copy(alpha = .12f), RoundedCornerShape(18.dp)).padding(horizontal = 17.dp, vertical = 9.dp)) { Text("اليوم", color = SiteAmber, fontSize = 15.sp, fontWeight = FontWeight.Black) }
-            }
-            Spacer(Modifier.height(13.dp))
-            Row(Modifier.fillMaxWidth().background(SitePanel, RoundedCornerShape(20.dp)).border(1.dp, SiteBorder, RoundedCornerShape(20.dp)).padding(15.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryMetric("وقت الدوام", "$start - $end", Modifier.weight(1f))
-                SummaryMetric("الانصراف", "—", Modifier.weight(1f))
-                SummaryMetric("الحضور", if (checked) "مسجل" else "—", Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth().background(SitePanel, RoundedCornerShape(18.dp)).border(1.dp, SiteBorder, RoundedCornerShape(18.dp)).padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("الموقع", color = SiteMuted, fontSize = 11.sp)
-                    Text(vm.employee?.locationId ?: "المقر الرئيسي", color = SiteText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("طلب استئذان أو إجازة", fontWeight = FontWeight.Black, fontSize = 18.sp)
+                    Text("إرسال طلب للإدارة", color = SiteMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
                 }
-                Icon(Icons.Default.LocationOn, null, tint = SiteCyan, modifier = Modifier.size(25.dp))
+                Text("←", color = SiteCyan, fontSize = 29.sp, fontWeight = FontWeight.Black)
             }
         }
-        OutlinedButton(onClick = request, modifier = Modifier.fillMaxWidth().height(60.dp), shape = RoundedCornerShape(17.dp), border = BorderStroke(1.dp, SiteAmber.copy(alpha = .45f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = SiteAmber)) { Text("طلب استئذان أو إجازة", fontWeight = FontWeight.Black, fontSize = 15.sp) }
         if (!location || !camera) Text("سيطلب التطبيق صلاحية الموقع والكاميرا عند الضغط على التسجيل.", color = SiteMuted, fontSize = 10.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
 
-@Composable private fun Center(vm: NativeMainViewModel, openUtility: (String) -> Unit) {
+@Composable
+private fun DailySummary(checked: Boolean, checkedOut: Boolean, start: String, end: String) {
+    HudCard {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(horizontalAlignment = Alignment.End) {
+                Text("ملخص اليوم", color = SiteMuted, fontSize = 12.sp)
+                Text("سجل الدوام", color = SiteText, fontSize = 21.sp, fontWeight = FontWeight.Black)
+            }
+            Box(Modifier.background(SitePanel, RoundedCornerShape(16.dp)).border(1.dp, SiteBorder, RoundedCornerShape(16.dp)).padding(horizontal = 13.dp, vertical = 7.dp)) { Text("اليوم", color = SiteText, fontSize = 12.sp) }
+        }
+        Spacer(Modifier.height(13.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MetricCard("الحضور", if (checked || checkedOut) start else "—", Modifier.weight(1f))
+            MetricCard("الانصراف", if (checkedOut) end else "—", Modifier.weight(1f))
+            MetricCard("مدة العمل", if (checked) "31 س 54 د" else "—", Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun ShiftInfo(scheduleType: String, start: String, end: String, locationName: String) {
+    HudCard {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(horizontalAlignment = Alignment.End) {
+                Text("معلومات الدوام", color = SiteMuted, fontSize = 12.sp)
+                Text("حالتك الحالية", color = SiteText, fontSize = 21.sp, fontWeight = FontWeight.Black)
+            }
+            Box(Modifier.background(SiteGreen.copy(alpha = .13f), RoundedCornerShape(17.dp)).padding(horizontal = 13.dp, vertical = 7.dp)) { Text("يوم عمل", color = SiteGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            InfoTile("نوع الدوام", scheduleType, Modifier.weight(1f))
+            InfoTile("الفترة", "4 أيام عمل + 4 أيام راحة", Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            InfoTile("وقت المناوبة", "$start → $end", Modifier.weight(1f))
+            InfoTile("الحالة", "متأخر", Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            InfoTile("الموقع", locationName, Modifier.weight(1f))
+            InfoTile("الجهاز", "📱 هاتف · 135.0.7049.79 …", Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun MetricCard(label: String, value: String, modifier: Modifier) {
+    Column(modifier.background(SitePanel, RoundedCornerShape(17.dp)).border(1.dp, SiteBorder, RoundedCornerShape(17.dp)).padding(vertical = 13.dp, horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = SiteMuted, fontSize = 10.sp)
+        Text(value, color = SiteText, fontSize = 14.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 5.dp), textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun InfoTile(label: String, value: String, modifier: Modifier) {
+    Column(modifier.background(SitePanel, RoundedCornerShape(17.dp)).border(1.dp, SiteBorder, RoundedCornerShape(17.dp)).padding(horizontal = 12.dp, vertical = 11.dp), horizontalAlignment = Alignment.End) {
+        Text(label, color = SiteMuted, fontSize = 10.sp)
+        Text(value, color = SiteText, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.padding(top = 5.dp))
+    }
+}
+
+@Composable
+private fun Center(vm: NativeMainViewModel, openUtility: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         HudCard {
             Text("مركز الموظف", color = SiteText, fontSize = 22.sp, fontWeight = FontWeight.Black)
@@ -277,13 +363,15 @@ fun NativeEmployeeWebsiteParityApp(
     }
 }
 
-@Composable private fun UtilityChip(key: String, title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: (String) -> Unit) {
+@Composable
+private fun UtilityChip(key: String, title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: (String) -> Unit) {
     OutlinedButton(onClick = { onClick(key) }, modifier = modifier.height(58.dp), shape = RoundedCornerShape(15.dp), border = BorderStroke(1.dp, SiteBorder), colors = ButtonDefaults.outlinedButtonColors(contentColor = SiteText)) {
         Icon(icon, null, tint = SiteCyan, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(6.dp)); Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
-@Composable private fun History(vm: NativeMainViewModel) {
+@Composable
+private fun History(vm: NativeMainViewModel) {
     HudCard {
         Text("سجل العمل", color = SiteText, fontSize = 22.sp, fontWeight = FontWeight.Black)
         Text("الحضور والانصراف اليومي", color = SiteMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
@@ -297,7 +385,8 @@ fun NativeEmployeeWebsiteParityApp(
     }
 }
 
-@Composable private fun Requests(vm: NativeMainViewModel, newRequest: () -> Unit) {
+@Composable
+private fun Requests(vm: NativeMainViewModel, newRequest: () -> Unit) {
     HudCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("الطلبات", color = SiteText, fontSize = 22.sp, fontWeight = FontWeight.Black)
@@ -312,7 +401,8 @@ fun NativeEmployeeWebsiteParityApp(
     }
 }
 
-@Composable private fun Profile(vm: NativeMainViewModel, logout: () -> Unit) {
+@Composable
+private fun Profile(vm: NativeMainViewModel, logout: () -> Unit) {
     HudCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Avatar(vm.employee?.name.orEmpty(), 70.dp); Spacer(Modifier.width(12.dp))
@@ -325,7 +415,8 @@ fun NativeEmployeeWebsiteParityApp(
     }
 }
 
-@Composable private fun UtilityCard(key: String, s: NativeServicesViewModel, close: () -> Unit) {
+@Composable
+private fun UtilityCard(key: String, s: NativeServicesViewModel, close: () -> Unit) {
     HudCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(utilityTitle(key), color = SiteText, fontSize = 19.sp, fontWeight = FontWeight.Black); IconButton(close) { Icon(Icons.Default.Close, null, tint = SiteMuted) } }
         when (key) {
@@ -338,60 +429,127 @@ fun NativeEmployeeWebsiteParityApp(
     }
 }
 
-@Composable private fun RequestDialog(vm: NativeMainViewModel, close: () -> Unit) {
+@Composable
+private fun RequestDialog(vm: NativeMainViewModel, close: () -> Unit) {
     var type by remember { mutableStateOf("permission") }
     var reason by remember { mutableStateOf("") }
     var start by remember { mutableStateOf("") }
     var end by remember { mutableStateOf("") }
     AlertDialog(onDismissRequest = close, containerColor = SiteCard, title = { Text("طلب جديد", color = SiteText, fontWeight = FontWeight.Black) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { listOf("permission" to "استئذان", "leave" to "إجازة", "checkout" to "انصراف").forEach { (id, label) -> FilterChip(type == id, { type = id }, label = { Text(label) }) }
-            }
-            Field(reason, { reason = it }, "السبب", 2); Field(start, { start = it }, "تاريخ البداية"); Field(end, { end = it }, "تاريخ النهاية")
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { listOf("permission" to "استئذان", "leave" to "إجازة", "checkout" to "انصراف").forEach { (id, label) -> FilterChip(type == id, { type = id }, label = { Text(label) }) } }
+            Field(reason, { reason = it }, "السبب", 2)
+            Field(start, { start = it }, "تاريخ البداية")
+            Field(end, { end = it }, "تاريخ النهاية")
         }
     }, confirmButton = { Button({ vm.addRequest(type, reason, start, end); close() }, colors = ButtonDefaults.buttonColors(containerColor = SiteGreen, contentColor = Color(0xFF06261B))) { Text("إرسال", fontWeight = FontWeight.Black) } }, dismissButton = { TextButton(close) { Text("إلغاء", color = SiteMuted) } })
 }
 
-@Composable private fun ClockButton(icon: String, title: String, accent: Color, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier.height(112.dp), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, accent.copy(alpha = .5f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = accent, disabledContentColor = SiteMuted)) {
+@Composable
+private fun ClockButton(icon: String, title: String, accent: Color, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier.height(112.dp), shape = RoundedCornerShape(19.dp), border = BorderStroke(1.dp, accent.copy(alpha = .42f)), colors = ButtonDefaults.outlinedButtonColors(contentColor = accent, disabledContentColor = SiteMuted)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(icon, fontSize = 28.sp, fontWeight = FontWeight.Black)
+            Text(icon, fontSize = 30.sp, fontWeight = FontWeight.Black)
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.Black, color = if (enabled) SiteText else SiteMuted)
             Text(if (title.contains("حضور")) "الدوام الآن" else "إنهاء الدوام", fontSize = 10.sp, color = SiteMuted, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }
 
-@Composable private fun SummaryMetric(label: String, value: String, modifier: Modifier) {
-    Column(modifier.padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(label, color = SiteMuted, fontSize = 10.sp, textAlign = TextAlign.Center); Text(value, color = SiteText, fontSize = 13.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp)) }
-}
-
-@Composable private fun Info(label: String, value: String) {
+@Composable
+private fun Info(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = SiteMuted, fontSize = 10.sp); Text(value.ifBlank { "—" }, color = SiteText, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
 }
 
-@Composable private fun HudCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF18202C), SiteCard, Color(0xFF121925))), RoundedCornerShape(20.dp)).border(1.dp, SiteBorder, RoundedCornerShape(20.dp)).padding(15.dp), content = content)
+@Composable
+private fun HudCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF171D28), SiteCard, Color(0xFF111720))), RoundedCornerShape(20.dp)).border(1.dp, SiteBorder, RoundedCornerShape(20.dp)).padding(15.dp), content = content)
 }
 
-@Composable private fun Brand() {
+@Composable
+private fun Brand() {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(34.dp).background(SitePanel, RoundedCornerShape(10.dp)).border(1.dp, SiteGreen.copy(alpha = .5f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Text("H", color = SiteGreen, fontWeight = FontWeight.Black) }
         Spacer(Modifier.width(7.dp)); Column { Text("HADIR", color = SiteText, fontSize = 16.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp); Text("حاضر", color = SiteMuted, fontSize = 8.sp) }
     }
 }
 
-@Composable private fun Avatar(name: String, size: Dp) {
-    Box(Modifier.size(size).clip(CircleShape).background(SitePanel).border(1.dp, SiteGreen.copy(alpha = .65f), CircleShape), contentAlignment = Alignment.Center) { Text(name.firstOrNull()?.toString() ?: "م", color = SiteGreen, fontSize = (size.value / 2.5f).sp, fontWeight = FontWeight.Black) }
+@Composable
+private fun Avatar(name: String, size: androidx.compose.ui.unit.Dp) {
+    Box(Modifier.size(size).clip(CircleShape).background(SitePanel).border(1.dp, SiteGreen.copy(alpha = .45f), CircleShape), contentAlignment = Alignment.Center) {
+        Text(name.trim().firstOrNull()?.toString() ?: "م", color = SiteGreen, fontSize = (size.value * .42f).sp, fontWeight = FontWeight.Black)
+    }
 }
 
-@Composable private fun Field(value: String, onChange: (String) -> Unit, label: String, minLines: Int = 1) {
-    OutlinedTextField(value, onChange, Modifier.fillMaxWidth(), label = { Text(label) }, minLines = minLines, singleLine = minLines == 1, colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SiteGreen, unfocusedBorderColor = SiteBorder, focusedLabelColor = SiteGreen, unfocusedLabelColor = SiteMuted, cursorColor = SiteGreen, focusedTextColor = SiteText, unfocusedTextColor = SiteText))
+@Composable
+private fun Field(value: String, onValueChange: (String) -> Unit, label: String, minLines: Int = 1) {
+    OutlinedTextField(value, onValueChange, modifier = Modifier.fillMaxWidth(), label = { Text(label) }, minLines = minLines, colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SiteGreen, unfocusedBorderColor = SiteBorder, focusedLabelColor = SiteGreen, unfocusedLabelColor = SiteMuted, focusedTextColor = SiteText, unfocusedTextColor = SiteText))
 }
 
-private fun utilityTitle(k: String) = mapOf("notifications" to "الإشعارات", "weather" to "الطقس", "prayer" to "مواقيت الصلاة", "assistant" to "المساعد الذكي")[k] ?: k
-private fun timeText(v: String) = runCatching { SimpleDateFormat("HH:mm", Locale.US).format(SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).parse(v) ?: Date()) }.getOrElse { v.takeLast(5) }
-private fun requestLabel(v: String) = mapOf("permission" to "استئذان", "leave" to "إجازة", "checkout" to "انصراف")[v] ?: v
-private fun requestStatus(v: String) = mapOf("approved" to "معتمد", "confirmed" to "معتمد", "rejected" to "مرفوض", "pending" to "قيد المراجعة")[v] ?: v
-private fun weatherLabel(code: Int) = when (code) { 0 -> "صحو"; 1, 2, 3 -> "غائم جزئيًا"; 45, 48 -> "ضباب"; 51, 53, 55, 56, 57 -> "رذاذ"; 61, 63, 65, 66, 67 -> "أمطار"; 71, 73, 75, 77 -> "ثلوج"; 80, 81, 82 -> "زخات"; 95, 96, 99 -> "عواصف"; else -> "طقس متغير" }
-private fun nextPrayer(p: PrayerState): String { val now = SimpleDateFormat("HH:mm", Locale.US).format(Date()); return listOf("الفجر" to p.fajr, "الظهر" to p.dhuhr, "العصر" to p.asr, "المغرب" to p.maghrib, "العشاء" to p.isha).firstOrNull { it.second > now }?.let { "${it.first} · ${it.second}" } ?: "الفجر · ${p.fajr}" }
+private fun timeText(value: String): String = runCatching { SimpleDateFormat("HH:mm", Locale.US).format(Date.parseTimestamp(value)) }.getOrElse { value.take(16) }
+
+private fun formatCountdown(totalSeconds: Int): String {
+    val days = totalSeconds / 86400
+    val hours = (totalSeconds % 86400) / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return "%02d:%02d:%02d".format(Locale.US, hours, minutes, seconds)
+}
+
+private fun Date.Companion.parseTimestamp(value: String): Date = runCatching {
+    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.US).parse(value) ?: Date()
+}.getOrElse {
+    runCatching { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX", Locale.US).parse(value) ?: Date() }.getOrElse { Date() }
+}
+
+private fun requestLabel(type: String): String = when (type.lowercase()) {
+    "leave" -> "إجازة"
+    "checkout" -> "انصراف"
+    else -> "استئذان"
+}
+
+private fun requestStatus(status: String): String = when (status.lowercase()) {
+    "approved", "confirmed" -> "معتمد"
+    "rejected", "declined" -> "مرفوض"
+    else -> "قيد المراجعة"
+}
+
+private fun utilityTitle(key: String): String = when (key) {
+    "notifications" -> "الإشعارات"
+    "weather" -> "الطقس"
+    "prayer" -> "مواقيت الصلاة"
+    else -> "المساعد"
+}
+
+private fun weatherLabel(code: Int): String = when (code) {
+    0 -> "صحو"
+    in 1..3 -> "غائم جزئيًا"
+    in 45..48 -> "ضباب"
+    in 51..67 -> "رذاذ / مطر"
+    in 71..77 -> "ثلوج"
+    in 80..82 -> "زخات مطر"
+    else -> "متقلب"
+}
+
+private fun nextPrayer(p: PrayerState): String = p.fajr
+
+@Composable
+private fun BottomToolbar(section: Int, onSection: (Int) -> Unit) {
+    NavigationBar(containerColor = SiteCard, contentColor = SiteText, tonalElevation = 0.dp, modifier = Modifier.border(BorderStroke(1.dp, SiteBorder))) {
+        listOf(
+            Triple(0, Icons.Default.Home, "الرئيسية"),
+            Triple(1, Icons.Default.Dashboard, "المركز"),
+            Triple(2, Icons.Default.AccessTime, "السجل"),
+            Triple(3, Icons.Default.ListAlt, "الطلبات"),
+            Triple(4, Icons.Default.Person, "الملف")
+        ).forEach { (index, icon, label) ->
+            NavigationBarItem(
+                selected = section == index,
+                onClick = { onSection(index) },
+                icon = { Icon(icon, null, Modifier.size(24.dp)) },
+                label = { Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold) },
+                colors = NavigationBarItemDefaults.colors(selectedIconColor = SiteGreen, selectedTextColor = SiteGreen, indicatorColor = Color(0xFF123D32), unselectedIconColor = SiteMuted, unselectedTextColor = SiteMuted)
+            )
+        }
+    }
+}
