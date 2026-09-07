@@ -30,7 +30,10 @@ class SessionStore(context: Context) {
 }
 
 class BearerInterceptor(private val session: SessionStore) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response = chain.proceed(chain.request().newBuilder().apply { session.token?.let { header("Authorization", "Bearer $it") } }.build())
+    override fun intercept(chain: Interceptor.Chain): Response = chain.proceed(chain.request().newBuilder().apply {
+        session.token?.let { header("Authorization", "Bearer $it") }
+        header("X-Device-ID", session.deviceId)
+    }.build())
 }
 
 class HadirRepository(context: Context) {
@@ -38,18 +41,26 @@ class HadirRepository(context: Context) {
     private val api = Retrofit.Builder().baseUrl(HADIR_API).client(OkHttpClient.Builder().addInterceptor(BearerInterceptor(session)).build()).addConverterFactory(MoshiConverterFactory.create()).build().create(HadirApi::class.java)
 
     suspend fun login(username: String, password: String): Employee = withContext(Dispatchers.IO) {
-        val response = api.login(LoginRequest(username, password, session.deviceId, "Android", session.deviceId))
-        if (response.kind != "employee") error("هذا الحساب ليس حساب موظف")
-        session.token = response.token
-        response.user
+        try {
+            val response = api.login(LoginRequest(username, password, session.deviceId, "Android", session.deviceId))
+            if (response.kind != "employee") error("هذا الحساب ليس حساب موظف")
+            session.token = response.token
+            response.user
+        } catch (error: HttpException) {
+            throw errorWithServerMessage(error)
+        }
     }
     suspend fun loginAdmin(username: String, password: String): Admin = withContext(Dispatchers.IO) {
         val response = try {
             api.loginAdminCredentials(AdminCredentialsRequest(username, password))
         } catch (error: HttpException) {
-            if (error.code() != 400) throw error
+            if (error.code() != 400) throw errorWithServerMessage(error)
             val deviceId = session.deviceId
-            api.loginAdmin(AdminLoginRequest(username, password, deviceId, "Android", deviceId))
+            try {
+                api.loginAdmin(AdminLoginRequest(username, password, deviceId, "Android", deviceId))
+            } catch (retryError: HttpException) {
+                throw errorWithServerMessage(retryError)
+            }
         }
         if (response.kind != "admin") error("هذا الحساب ليس حساب إدارة")
         session.token = response.token
@@ -68,4 +79,10 @@ class HadirRepository(context: Context) {
     suspend fun createChallenge(type: String, lat: Double, lng: Double, qrCode: String): AttendanceChallengeResponse = withContext(Dispatchers.IO) { api.challenge(AttendanceChallengeRequest(type, lat, lng, qrCode, session.deviceId)) }
     suspend fun createAttendance(employeeId: String, type: String, timestamp: String, lat: Double, lng: Double, challengeId: String) = withContext(Dispatchers.IO) { api.createAttendance(AttendanceCreateRequest(employeeId, type, timestamp, lat, lng, challengeId)) }
     fun logout() { session.token = null }
+
+    private fun errorWithServerMessage(error: HttpException): Exception {
+        val body = runCatching { error.response()?.errorBody()?.string() }.getOrNull().orEmpty()
+        val serverMessage = Regex("\\\"error\\\"\\s*:\\s*\\\"([^\\\"]+)").find(body)?.groupValues?.getOrNull(1)
+        return IllegalStateException(serverMessage ?: "خطأ من الخادم (${error.code()})", error)
+    }
 }
