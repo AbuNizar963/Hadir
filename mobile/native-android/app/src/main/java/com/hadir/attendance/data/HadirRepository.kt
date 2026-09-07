@@ -2,6 +2,8 @@ package com.hadir.attendance.data
 
 import android.content.Context
 import android.provider.Settings
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
@@ -49,10 +51,13 @@ class HadirRepository(context: Context) {
     private val httpClient = OkHttpClient.Builder()
         .addInterceptor(BearerInterceptor(session))
         .build()
+    private val moshi = Moshi.Builder()
+        .add(KotlinJsonAdapterFactory())
+        .build()
     private val api = Retrofit.Builder()
         .baseUrl(HADIR_API)
         .client(httpClient)
-        .addConverterFactory(MoshiConverterFactory.create())
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
         .create(HadirApi::class.java)
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
