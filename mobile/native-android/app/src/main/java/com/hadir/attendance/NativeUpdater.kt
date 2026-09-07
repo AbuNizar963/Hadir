@@ -1,5 +1,6 @@
 package com.hadir.attendance
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -104,10 +105,14 @@ class NativeUpdater(private val context: Context) {
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                if (installIntent.resolveActivity(context.packageManager) == null) {
-                    error("لا يوجد تطبيق على الجهاز يستطيع تثبيت ملف APK")
+                try {
+                    // Do not call resolveActivity() here: Android 11+ package-visibility
+                    // rules can make the system package installer appear unavailable even
+                    // though startActivity() can resolve the APK installation intent.
+                    context.startActivity(installIntent)
+                } catch (_: ActivityNotFoundException) {
+                    throw IllegalStateException("لا يوجد تطبيق على الجهاز يستطيع تثبيت ملف APK")
                 }
-                context.startActivity(installIntent)
             }
         }
     }
