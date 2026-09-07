@@ -16,6 +16,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import com.hadir.attendance.ui.NativeNotificationCenter
 import com.hadir.attendance.ui.NativeRoleEntry
 import com.hadir.attendance.ui.theme.HadirTheme
 import kotlinx.coroutines.launch
+import kotlin.math.max
 
 class MainActivity : ComponentActivity() {
     private var resumeNonce by mutableIntStateOf(0)
@@ -59,6 +61,7 @@ class MainActivity : ComponentActivity() {
                 var updateInfo by remember { mutableStateOf<NativeUpdateInfo?>(null) }
                 var updating by remember { mutableStateOf(false) }
                 var updateError by remember { mutableStateOf<String?>(null) }
+                var downloadProgress by remember { mutableStateOf<NativeDownloadProgress?>(null) }
 
                 LaunchedEffect(Unit) {
                     workspace = when (repository.savedRole()) {
@@ -121,34 +124,70 @@ class MainActivity : ComponentActivity() {
                         onDismissRequest = { if (!updating) updateInfo = null },
                         title = { Text("تحديث جديد لحاضر") },
                         text = {
-                            Text(
-                                if (info.releaseNotes.isBlank()) {
-                                    "الإصدار ${info.versionName} متاح الآن."
-                                } else {
-                                    "الإصدار ${info.versionName} متاح الآن.\n\n${info.releaseNotes}"
+                            if (updating) {
+                                val progress = downloadProgress
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text("جاري تنزيل الإصدار ${info.versionName}…")
+                                    if (progress != null) {
+                                        if (progress.percent >= 0) {
+                                            LinearProgressIndicator(
+                                                progress = { progress.percent / 100f },
+                                                modifier = Modifier.padding(vertical = 4.dp)
+                                            )
+                                            Text("${progress.percent}%")
+                                        } else {
+                                            LinearProgressIndicator(modifier = Modifier.padding(vertical = 4.dp))
+                                            Text("جارٍ حساب حجم الملف…")
+                                        }
+                                        Text(
+                                            "تم تنزيل ${formatBytes(progress.downloadedBytes)}" +
+                                                if (progress.totalBytes > 0) " من ${formatBytes(progress.totalBytes)}" else ""
+                                        )
+                                        progress.etaSeconds?.let { eta ->
+                                            Text("الوقت المتبقي التقريبي: ${formatDuration(eta)}")
+                                        }
+                                        Text("المدة المنقضية: ${formatDuration(max(0L, progress.elapsedSeconds))}")
+                                    }
+                                    Text("يرجى إبقاء التطبيق مفتوحًا حتى يكتمل التنزيل.")
                                 }
-                            )
+                            } else {
+                                Text(
+                                    if (info.releaseNotes.isBlank()) {
+                                        "الإصدار ${info.versionName} متاح الآن."
+                                    } else {
+                                        "الإصدار ${info.versionName} متاح الآن.\n\n${info.releaseNotes}"
+                                    }
+                                )
+                            }
                         },
                         confirmButton = {
-                            Button(
-                                enabled = !updating,
-                                onClick = {
-                                    scope.launch {
-                                        updating = true
-                                        updateError = null
-                                        val result = updater.downloadAndInstall(info)
-                                        updating = false
-                                        result.exceptionOrNull()?.let { error ->
-                                            if (error is InstallPermissionRequiredException) {
-                                                updater.openInstallPermissionSettings()
-                                            } else {
-                                                updateError = error.message ?: "تعذر تثبيت التحديث"
+                            if (!updating) {
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            updating = true
+                                            updateError = null
+                                            downloadProgress = null
+                                            val result = updater.downloadAndInstall(info) { progress ->
+                                                downloadProgress = progress
                                             }
-                                        } ?: run { updateInfo = null }
+                                            updating = false
+                                            result.exceptionOrNull()?.let { error ->
+                                                if (error is InstallPermissionRequiredException) {
+                                                    updateInfo = null
+                                                    updater.openInstallPermissionSettings()
+                                                } else {
+                                                    updateError = error.message ?: "تعذر تثبيت التحديث"
+                                                }
+                                            } ?: run {
+                                                downloadProgress = null
+                                                updateInfo = null
+                                            }
+                                        }
                                     }
+                                ) {
+                                    Text("تحديث الآن")
                                 }
-                            ) {
-                                Text(if (updating) "جاري التنزيل…" else "تحديث الآن")
                             }
                         },
                         dismissButton = {
@@ -170,4 +209,20 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+private fun formatBytes(bytes: Long): String {
+    if (bytes < 1024L) return "$bytes B"
+    val kb = bytes / 1024.0
+    if (kb < 1024.0) return "%.1f KB".format(kb)
+    val mb = kb / 1024.0
+    if (mb < 1024.0) return "%.1f MB".format(mb)
+    return "%.2f GB".format(mb / 1024.0)
+}
+
+private fun formatDuration(seconds: Long): String {
+    if (seconds < 60L) return "${seconds}ث"
+    val minutes = seconds / 60L
+    val remainingSeconds = seconds % 60L
+    return if (minutes < 60L) "${minutes}د ${remainingSeconds}ث" else "${minutes / 60L}س ${minutes % 60L}د"
 }
