@@ -75,8 +75,7 @@ class MainActivity : ComponentActivity() {
                     if (workspace == 1) {
                         while (true) {
                             val role = repository.savedRole()
-                            val token = repository.sessionStore.getToken()
-                            if (role == "employee" && !token.isNullOrBlank()) {
+                            if (role == "employee") {
                                 val employee = repository.restoreEmployee()
                                 if (employee != null) {
                                     employeeAuthenticated = true
