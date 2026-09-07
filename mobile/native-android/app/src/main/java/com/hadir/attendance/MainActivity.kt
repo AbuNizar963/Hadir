@@ -8,14 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,10 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.hadir.attendance.data.HadirRepository
 import com.hadir.attendance.ui.NativeAdminApp
-import com.hadir.attendance.ui.NativeAttendanceAnalytics
-import com.hadir.attendance.ui.NativeEmployeeStableApp
-import com.hadir.attendance.ui.NativeMainFeatures
-import com.hadir.attendance.ui.NativeNotificationCenter
+import com.hadir.attendance.ui.NativeMainApp
 import com.hadir.attendance.ui.NativeRoleEntry
 import com.hadir.attendance.ui.theme.HadirTheme
 import kotlinx.coroutines.launch
@@ -54,10 +45,6 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 var workspace by remember { mutableIntStateOf(0) }
                 var restoringSession by remember { mutableStateOf(true) }
-                var employeeAuthenticated by remember { mutableStateOf(false) }
-                var features by remember { mutableStateOf(false) }
-                var analytics by remember { mutableStateOf(false) }
-                var notifications by remember { mutableStateOf(false) }
                 var updateInfo by remember { mutableStateOf<NativeUpdateInfo?>(null) }
                 var updating by remember { mutableStateOf(false) }
                 var updateError by remember { mutableStateOf<String?>(null) }
@@ -83,37 +70,14 @@ class MainActivity : ComponentActivity() {
                         }
                     } else {
                         when (workspace) {
-                            0 -> NativeRoleEntry(onEmployee = { workspace = 1 }, onAdmin = { workspace = 2 })
-                            1 -> when {
-                                analytics -> NativeAttendanceAnalytics(onBack = { analytics = false })
-                                features -> NativeMainFeatures(onBack = { features = false })
-                                notifications -> NativeNotificationCenter(onBack = { notifications = false })
-                                else -> Box(Modifier.fillMaxSize()) {
-                                    NativeEmployeeStableApp(
-                                        onEmployeeAuthenticated = { employeeAuthenticated = true },
-                                        onEmployeeLoggedOut = {
-                                            employeeAuthenticated = false
-                                            workspace = 0
-                                        }
-                                    )
-                                    if (employeeAuthenticated) {
-                                        Column(
-                                            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
-                                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            FloatingActionButton(onClick = { notifications = true }) {
-                                                Icon(Icons.Default.Notifications, contentDescription = "مركز الإشعارات")
-                                            }
-                                            FloatingActionButton(onClick = { analytics = true }) {
-                                                Icon(Icons.Default.BarChart, contentDescription = "تحليلات الحضور")
-                                            }
-                                            FloatingActionButton(onClick = { features = true }) {
-                                                Icon(Icons.Default.AutoAwesome, contentDescription = "ميزات حاضر")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            0 -> NativeRoleEntry(
+                                onEmployee = { workspace = 1 },
+                                onAdmin = { workspace = 2 }
+                            )
+                            1 -> NativeMainApp(
+                                onEmployeeAuthenticated = {},
+                                onEmployeeLoggedOut = { workspace = 0 }
+                            )
                             else -> NativeAdminApp(onBack = { workspace = 0 })
                         }
                     }
