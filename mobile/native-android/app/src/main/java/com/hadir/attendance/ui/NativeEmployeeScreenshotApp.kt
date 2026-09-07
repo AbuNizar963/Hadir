@@ -9,7 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -87,19 +86,79 @@ private fun ScreenshotWorkspace(vm: NativeMainViewModel) {
     var profileOpen by remember { mutableStateOf(false) }
     var requestOpen by remember { mutableStateOf(false) }
     var scanner by remember { mutableStateOf(false) }
+    var locating by remember { mutableStateOf(false) }
     var clockType by remember { mutableStateOf("check-in") }
-    val locationAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    val cameraAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-    val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result -> if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true && result[Manifest.permission.CAMERA] == true) scanner = true }
+    var pendingQr by remember { mutableStateOf<String?>(null) }
+    var locationAllowed by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) }
+    var cameraAllowed by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        cameraAllowed = granted
+        if (granted) scanner = true
+    }
+    val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        locationAllowed = granted
+        val qr = pendingQr
+        if (granted && !qr.isNullOrBlank()) {
+            locating = true
+            vm.clock(clockType, qr, true)
+        } else if (!granted) {
+            locating = false
+            pendingQr = null
+        }
+    }
+
     LaunchedEffect(Unit) { vm.refresh() }
     LaunchedEffect(section) { if (section == 3) vm.refreshRequests() }
-    if (scanner) { QrScanner(onResult = { code -> scanner = false; vm.clock(clockType, code, true) }, onCancel = { scanner = false }); return }
-    val startClock: (String) -> Unit = { type -> clockType = type; if (locationAllowed && cameraAllowed) scanner = true else permissions.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.CAMERA)) }
+    LaunchedEffect(vm.working, vm.error) {
+        if (!vm.working && locating) locating = false
+    }
+
+    if (scanner) {
+        QrScanner(
+            onResult = { code ->
+                scanner = false
+                pendingQr = code
+                locating = true
+                if (locationAllowed) {
+                    vm.clock(clockType, code, true)
+                } else {
+                    locationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            },
+            onCancel = { scanner = false }
+        )
+        return
+    }
+
+    val startClock: (String) -> Unit = { type ->
+        clockType = type
+        if (cameraAllowed) {
+            scanner = true
+        } else {
+            cameraLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
     Surface(Modifier.fillMaxSize(), color = ShotBg) {
-        Scaffold(containerColor = ShotBg, bottomBar = { ScreenshotBottomBar(section) { section = it; profileOpen = false } }) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()), contentPadding = PaddingValues(start = 14.dp, top = 9.dp, end = 14.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item { ScreenshotTopBar(vm.employee?.name.orEmpty(), profileOpen, { profileOpen = !profileOpen }) { section = it; profileOpen = false } }
-                item { when (section) { 0 -> ScreenshotHome(vm, startClock, request = { requestOpen = true }, locationAllowed = locationAllowed, cameraAllowed = cameraAllowed); 1 -> ScreenshotCenter(vm); 2 -> ScreenshotHistory(vm); 3 -> ScreenshotRequests(vm) { requestOpen = true }; else -> ScreenshotProfile(vm) { vm.logout() } } }
+        Box(Modifier.fillMaxSize()) {
+            Scaffold(containerColor = ShotBg, bottomBar = { ScreenshotBottomBar(section) { section = it; profileOpen = false } }) { padding ->
+                LazyColumn(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()), contentPadding = PaddingValues(start = 14.dp, top = 9.dp, end = 14.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    item { ScreenshotTopBar(vm.employee?.name.orEmpty(), profileOpen, { profileOpen = !profileOpen }) { section = it; profileOpen = false } }
+                    item { when (section) { 0 -> ScreenshotHome(vm, startClock, request = { requestOpen = true }, locationAllowed = locationAllowed, cameraAllowed = cameraAllowed); 1 -> ScreenshotCenter(vm); 2 -> ScreenshotHistory(vm); 3 -> ScreenshotRequests(vm) { requestOpen = true }; else -> ScreenshotProfile(vm) { vm.logout() } } }
+                }
+            }
+
+            if (locating || vm.working) {
+                HudShotCard(Modifier.align(Alignment.Center).widthIn(min = 270.dp, max = 330.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                            Text("جاري تحديد الموقع…", color = ShotText, fontSize = 17.sp, fontWeight = FontWeight.Black)
+                            Text("يتم التحقق من موقعك قبل تسجيل الحضور", color = ShotMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                        }
+                        CircularProgressIndicator(color = ShotGreen, strokeWidth = 2.5.dp, modifier = Modifier.size(27.dp).padding(start = 9.dp))
+                    }
+                }
             }
         }
     }
