@@ -102,7 +102,15 @@ class HadirRepository(context: Context) {
     private fun employeeFromJson(user: JSONObject): Employee = Employee(
         id = user.optString("id"),
         name = user.optString("name").takeIf { it.isNotBlank() },
-        jobNumber = user.optString("jobNumber").takeIf { it.isNotBlank() }
+        jobNumber = user.optString("jobNumber").takeIf { it.isNotBlank() },
+        status = user.optString("status").takeIf { it.isNotBlank() },
+        role = user.optString("role").takeIf { it.isNotBlank() },
+        scheduleType = user.optString("scheduleType").takeIf { it.isNotBlank() },
+        rotationStartDate = user.optString("rotationStartDate").takeIf { it.isNotBlank() },
+        workStartTime = user.optString("workStartTime").takeIf { it.isNotBlank() },
+        workEndTime = user.optString("workEndTime").takeIf { it.isNotBlank() },
+        gracePeriodMinutes = user.optInt("gracePeriodMinutes", 0).takeIf { user.has("gracePeriodMinutes") },
+        locationId = user.optString("locationId").takeIf { it.isNotBlank() }
     )
 
     suspend fun login(username: String, password: String): Employee = withContext(Dispatchers.IO) {
