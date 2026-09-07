@@ -32,6 +32,7 @@ import com.hadir.attendance.ui.NativeMainFeatures
 import com.hadir.attendance.ui.NativeNotificationCenter
 import com.hadir.attendance.ui.NativeRoleEntry
 import com.hadir.attendance.ui.theme.HadirTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 var workspace by remember { mutableIntStateOf(0) }
                 var restoringSession by remember { mutableStateOf(true) }
+                var employeeAuthenticated by remember { mutableStateOf(false) }
                 var features by remember { mutableStateOf(false) }
                 var analytics by remember { mutableStateOf(false) }
                 var notifications by remember { mutableStateOf(false) }
@@ -66,6 +68,28 @@ class MainActivity : ComponentActivity() {
                         else -> 0
                     }
                     restoringSession = false
+                }
+
+                LaunchedEffect(workspace) {
+                    employeeAuthenticated = false
+                    if (workspace == 1) {
+                        while (true) {
+                            val role = repository.savedRole()
+                            val token = repository.sessionStore.getToken()
+                            if (role == "employee" && !token.isNullOrBlank()) {
+                                val employee = repository.restoreEmployee()
+                                if (employee != null) {
+                                    employeeAuthenticated = true
+                                    break
+                                }
+                                if (repository.savedRole() != "employee") {
+                                    workspace = 0
+                                    break
+                                }
+                            }
+                            delay(300)
+                        }
+                    }
                 }
 
                 LaunchedEffect(resumeNonce) {
@@ -86,18 +110,20 @@ class MainActivity : ComponentActivity() {
                                 notifications -> NativeNotificationCenter(onBack = { notifications = false })
                                 else -> Box(Modifier.fillMaxSize()) {
                                     NativeMainApp()
-                                    Column(
-                                        modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        FloatingActionButton(onClick = { notifications = true }) {
-                                            Icon(Icons.Default.Notifications, contentDescription = "مركز الإشعارات")
-                                        }
-                                        FloatingActionButton(onClick = { analytics = true }) {
-                                            Icon(Icons.Default.BarChart, contentDescription = "تحليلات الحضور")
-                                        }
-                                        FloatingActionButton(onClick = { features = true }) {
-                                            Icon(Icons.Default.AutoAwesome, contentDescription = "ميزات حاضر")
+                                    if (employeeAuthenticated) {
+                                        Column(
+                                            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            FloatingActionButton(onClick = { notifications = true }) {
+                                                Icon(Icons.Default.Notifications, contentDescription = "مركز الإشعارات")
+                                            }
+                                            FloatingActionButton(onClick = { analytics = true }) {
+                                                Icon(Icons.Default.BarChart, contentDescription = "تحليلات الحضور")
+                                            }
+                                            FloatingActionButton(onClick = { features = true }) {
+                                                Icon(Icons.Default.AutoAwesome, contentDescription = "ميزات حاضر")
+                                            }
                                         }
                                     }
                                 }
