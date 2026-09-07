@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.dp
+import androidx.compose.ui.unit.dp
 import com.hadir.attendance.data.HadirRepository
 import com.hadir.attendance.ui.NativeAdminApp
 import com.hadir.attendance.ui.NativeEmployeeScreenshotApp
