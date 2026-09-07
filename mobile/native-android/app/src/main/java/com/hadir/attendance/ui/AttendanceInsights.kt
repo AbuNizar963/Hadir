@@ -17,6 +17,8 @@ data class AttendanceDaySummary(
     val checkIn: Instant?,
     val checkOut: Instant?,
     val workedMinutes: Long,
+    val scheduledMinutes: Long,
+    val overtimeMinutes: Long,
     val lateMinutes: Long,
     val earlyLeaveMinutes: Long,
     val complete: Boolean
@@ -27,6 +29,8 @@ data class AttendancePeriodSummary(
     val completeDays: Int,
     val openDays: Int,
     val workedMinutes: Long,
+    val scheduledMinutes: Long,
+    val overtimeMinutes: Long,
     val lateMinutes: Long,
     val earlyLeaveMinutes: Long
 )
@@ -45,6 +49,14 @@ fun summarizeAttendanceDay(
     val workedMinutes = if (checkIn != null && checkOut != null) Duration.between(checkIn, checkOut).toMinutes().coerceAtLeast(0) else 0
     val start = parseLocalTime(workStartTime)
     val end = parseLocalTime(workEndTime)
+    val scheduledMinutes = if (start != null && end != null) {
+        val scheduledStart = date.atTime(start).atZone(zoneId).toInstant()
+        val scheduledEnd = date.atTime(end).atZone(zoneId).toInstant()
+        Duration.between(scheduledStart, scheduledEnd).toMinutes().coerceAtLeast(0)
+    } else 0
+    val overtimeMinutes = if (checkIn != null && checkOut != null && scheduledMinutes > 0) {
+        (workedMinutes - scheduledMinutes).coerceAtLeast(0)
+    } else 0
     val lateMinutes = if (checkIn != null && start != null) {
         val scheduled = date.atTime(start).atZone(zoneId).toInstant().plusSeconds(gracePeriodMinutes.coerceAtLeast(0) * 60L)
         Duration.between(scheduled, checkIn).toMinutes().coerceAtLeast(0)
@@ -53,7 +65,17 @@ fun summarizeAttendanceDay(
         val scheduled = date.atTime(end).atZone(zoneId).toInstant()
         Duration.between(checkOut, scheduled).toMinutes().coerceAtLeast(0)
     } else 0
-    return AttendanceDaySummary(date, checkIn, checkOut, workedMinutes, lateMinutes, earlyLeaveMinutes, checkIn != null && checkOut != null)
+    return AttendanceDaySummary(
+        date = date,
+        checkIn = checkIn,
+        checkOut = checkOut,
+        workedMinutes = workedMinutes,
+        scheduledMinutes = scheduledMinutes,
+        overtimeMinutes = overtimeMinutes,
+        lateMinutes = lateMinutes,
+        earlyLeaveMinutes = earlyLeaveMinutes,
+        complete = checkIn != null && checkOut != null
+    )
 }
 
 fun summarizeAttendancePeriod(days: List<AttendanceDaySummary>): AttendancePeriodSummary = AttendancePeriodSummary(
@@ -61,6 +83,8 @@ fun summarizeAttendancePeriod(days: List<AttendanceDaySummary>): AttendancePerio
     completeDays = days.count { it.complete },
     openDays = days.count { !it.complete },
     workedMinutes = days.sumOf { it.workedMinutes },
+    scheduledMinutes = days.sumOf { it.scheduledMinutes },
+    overtimeMinutes = days.sumOf { it.overtimeMinutes },
     lateMinutes = days.sumOf { it.lateMinutes },
     earlyLeaveMinutes = days.sumOf { it.earlyLeaveMinutes }
 )
@@ -74,6 +98,11 @@ fun buildAttendanceDaySummaries(
 ): List<AttendanceDaySummary> {
     val dates = records.mapNotNull { parseInstant(it.timestamp)?.atZone(zoneId)?.toLocalDate() }.distinct().sortedDescending()
     return dates.map { summarizeAttendanceDay(it, records, workStartTime, workEndTime, gracePeriodMinutes, zoneId) }
+}
+
+fun formatAttendanceMinutes(minutes: Long): String {
+    val safe = minutes.coerceAtLeast(0)
+    return "${safe / 60}س ${safe % 60}د"
 }
 
 private fun isCheckIn(type: String): Boolean = type.equals("check-in", true) || type.equals("in", true)
