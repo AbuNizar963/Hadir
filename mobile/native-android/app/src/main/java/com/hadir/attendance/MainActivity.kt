@@ -73,20 +73,16 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(workspace) {
                     employeeAuthenticated = false
                     if (workspace == 1) {
-                        while (true) {
-                            val role = repository.savedRole()
-                            if (role == "employee") {
-                                val employee = repository.restoreEmployee()
-                                if (employee != null) {
-                                    employeeAuthenticated = true
-                                    break
-                                }
-                                if (repository.savedRole() != "employee") {
-                                    workspace = 0
-                                    break
-                                }
+                        delay(1000)
+                        if (repository.savedRole() == "employee") {
+                            val employee = repository.restoreEmployee()
+                            if (employee != null) {
+                                employeeAuthenticated = true
+                            } else if (repository.savedRole() != "employee") {
+                                workspace = 0
                             }
-                            delay(300)
+                        } else {
+                            workspace = 0
                         }
                     }
                 }
