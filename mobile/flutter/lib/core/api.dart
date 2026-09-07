@@ -62,6 +62,9 @@ class HadirApi {
   Future<Map<String, dynamic>> confirmRequest(String id) async => Map<String, dynamic>.from((await dio.post('/api/requests/$id/confirm')).data as Map);
   Future<void> logout() async { try { await dio.post('/api/auth/logout', data: {}); } catch (_) {} }
 
+  Future<Map<String, dynamic>> settings() async => Map<String, dynamic>.from((await dio.get('/api/settings')).data as Map);
+  Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> settings) async => Map<String, dynamic>.from((await dio.put('/api/settings', data: settings)).data as Map);
+
   Future<Map<String, dynamic>> professionalAttendanceReport({required String from, required String to, String? employeeId}) async => Map<String, dynamic>.from((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': from, 'to': to, if (employeeId != null && employeeId.isNotEmpty) 'employeeId': employeeId})).data as Map);
   Future<Map<String, dynamic>> professionalAttendanceDrilldown({required String attendanceDay, required String employeeId}) async => Map<String, dynamic>.from((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': attendanceDay, 'to': attendanceDay, 'employeeId': employeeId, 'drilldown': '1'})).data as Map);
   Future<List<dynamic>> archivedReports({int limit = 25}) async { final data = Map<String, dynamic>.from((await dio.get('/api/reports/archive', queryParameters: {'limit': limit.clamp(1, 100)})).data as Map); return data['reports'] is List ? List<dynamic>.from(data['reports'] as List) : <dynamic>[]; }
