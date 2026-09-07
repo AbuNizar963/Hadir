@@ -41,6 +41,7 @@ jobs:
           if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
             flutter create --platforms=android --project-name hadir .
           fi
+          rm -f android/build.gradle.kts android/settings.gradle.kts android/app/build.gradle.kts
       - name: Verify Flutter Android project
         shell: bash
         run: |
@@ -91,12 +92,17 @@ jobs:
           HADIR_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           HADIR_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           HADIR_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
         run: |
-          flutter build apk --release \
-            --build-number=${{ github.run_number }} \
-            --build-name=1.0.${{ github.run_number }} \
-            --target-platform=android-arm,android-arm64,android-x64
-          test -f build/app/outputs/flutter-apk/app-release.apk
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease \
+            -PhadirVersionCode=${{ github.run_number }} \
+            -PhadirVersionName=1.0.${{ github.run_number }} \
+            --stacktrace
+          test -f app/build/outputs/apk/release/app-release.apk
+          mkdir -p ../build/app/outputs/flutter-apk
+          cp app/build/outputs/apk/release/app-release.apk ../build/app/outputs/flutter-apk/app-release.apk
       - name: Verify target SDK, package name and version
         shell: bash
         run: |
