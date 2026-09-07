@@ -2,6 +2,8 @@ package com.hadir.attendance.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.hadir.attendance.security.LocationIntegrityChecker
 
 @Composable
 fun NativeEmployeeStableApp(
@@ -78,6 +82,8 @@ private fun NativeEmployeeStableHome(vm: NativeMainViewModel) {
     var start by remember { mutableStateOf("") }
     var end by remember { mutableStateOf("") }
     var clockType by remember { mutableStateOf("check-in") }
+    var mockLocationDetected by remember { mutableStateOf(false) }
+    var locationCheckInProgress by remember { mutableStateOf(false) }
     val locationAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     val cameraAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 
@@ -121,9 +127,15 @@ private fun NativeEmployeeStableHome(vm: NativeMainViewModel) {
             }
         }
         when (tab) {
-            0 -> EmployeeHomeTab(vm, locationAllowed, cameraAllowed) { type ->
+            0 -> EmployeeHomeTab(vm, locationAllowed, cameraAllowed, mockLocationDetected, locationCheckInProgress) { type ->
                 clockType = type
-                if (locationAllowed && cameraAllowed) scanner = true
+                if (!locationAllowed || !cameraAllowed) return@EmployeeHomeTab
+                locationCheckInProgress = true
+                inspectCurrentLocation(context) { result ->
+                    locationCheckInProgress = false
+                    mockLocationDetected = result?.isMock == true
+                    if (!mockLocationDetected) scanner = true
+                }
             }
             1 -> EmployeeAttendanceTab(vm)
             2 -> EmployeeRequestsTab(vm) { requestDialog = true }
@@ -133,7 +145,14 @@ private fun NativeEmployeeStableHome(vm: NativeMainViewModel) {
 }
 
 @Composable
-private fun EmployeeHomeTab(vm: NativeMainViewModel, locationAllowed: Boolean, cameraAllowed: Boolean, onClock: (String) -> Unit) {
+private fun EmployeeHomeTab(
+    vm: NativeMainViewModel,
+    locationAllowed: Boolean,
+    cameraAllowed: Boolean,
+    mockLocationDetected: Boolean,
+    locationCheckInProgress: Boolean,
+    onClock: (String) -> Unit
+) {
     val latest = vm.attendance.maxByOrNull { it.timestamp }
     val checkedIn = latest?.type == "check-in" || latest?.type == "in"
     Card(Modifier.fillMaxWidth()) {
@@ -141,8 +160,15 @@ private fun EmployeeHomeTab(vm: NativeMainViewModel, locationAllowed: Boolean, c
             Text(if (checkedIn) "الحالة: حاضر" else "الحالة: غير مسجل")
             Text("عدد سجلات الحضور: ${vm.attendance.size}")
             Text("الطلبات المعلقة: ${vm.requests.count { it.status == "pending" }}")
-            Button(onClick = { onClock(if (checkedIn) "check-out" else "check-in") }, enabled = !vm.working && locationAllowed && cameraAllowed, modifier = Modifier.fillMaxWidth()) {
-                Text(if (checkedIn) "تسجيل الانصراف" else "تسجيل الحضور")
+            Button(
+                onClick = { onClock(if (checkedIn) "check-out" else "check-in") },
+                enabled = !vm.working && !locationCheckInProgress && locationAllowed && cameraAllowed && !mockLocationDetected,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (locationCheckInProgress) "جارٍ فحص الموقع…" else if (checkedIn) "تسجيل الانصراف" else "تسجيل الحضور")
+            }
+            if (mockLocationDetected) {
+                Text("تم اكتشاف موقع وهمي/معدّل. أوقف تطبيقات تعديل الموقع ثم حاول مرة أخرى.")
             }
             if (!locationAllowed) Text("يلزم السماح بالموقع لتسجيل الحضور.")
             if (!cameraAllowed) Text("يلزم السماح بالكاميرا لمسح رمز QR.")
@@ -196,5 +222,25 @@ private fun EmployeeAccountTab(vm: NativeMainViewModel) {
         Text("الاسم: ${vm.employee?.name.orEmpty()}")
         Text("المعرف: ${vm.employee?.id.orEmpty()}")
         Button(onClick = vm::logout, modifier = Modifier.fillMaxWidth()) { Text("تسجيل الخروج") }
+    }
+}
+
+private fun inspectCurrentLocation(
+    context: android.content.Context,
+    onResult: (LocationIntegrityChecker.Result?) -> Unit
+) {
+    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        onResult(null)
+        return
+    }
+    val manager = context.getSystemService(LocationManager::class.java)
+    val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+    val location = providers.asSequence()
+        .mapNotNull { provider -> runCatching { manager?.getLastKnownLocation(provider) }.getOrNull() }
+        .minByOrNull { it.time.let { timestamp -> -timestamp } }
+    if (location == null) {
+        onResult(null)
+    } else {
+        onResult(LocationIntegrityChecker.inspect(location))
     }
 }
