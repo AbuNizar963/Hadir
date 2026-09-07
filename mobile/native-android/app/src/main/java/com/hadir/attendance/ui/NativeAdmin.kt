@@ -47,9 +47,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
@@ -60,9 +62,16 @@ import com.hadir.attendance.data.EmployeeRequest
 import com.hadir.attendance.data.HadirRepository
 import kotlinx.coroutines.launch
 
-private val AdminGreen = Color(0xFF0B6B5A)
-private val AdminInk = Color(0xFF17322C)
-private val AdminMuted = Color(0xFF70817B)
+private val AdminBg = Color(0xFF0C1018)
+private val AdminCard = Color(0xFF171C26)
+private val AdminPanel = Color(0xFF202631)
+private val AdminBorder = Color(0xFF303744)
+private val AdminGreen = Color(0xFF35C995)
+private val AdminCyan = Color(0xFF35C7F2)
+private val AdminAmber = Color(0xFFE9A52D)
+private val AdminText = Color(0xFFF0F3F7)
+private val AdminMuted = Color(0xFFACB4C1)
+private val AdminRed = Color(0xFFE35D6A)
 
 class NativeAdminViewModel(application: Application) : AndroidViewModel(application) {
     private val repo = HadirRepository(application)
@@ -123,23 +132,15 @@ class NativeAdminViewModel(application: Application) : AndroidViewModel(applicat
 
 @Composable
 fun NativeRoleEntry(onEmployee: () -> Unit, onAdmin: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val repo = remember(context) { HadirRepository(context) }
-    LaunchedEffect(Unit) {
-        when (repo.savedRole()) {
-            "employee" -> onEmployee()
-            "admin" -> onAdmin()
-        }
-    }
-    Box(Modifier.fillMaxSize().background(Color(0xFFF7F9F8)), contentAlignment = Alignment.Center) {
-        Card(Modifier.fillMaxWidth().padding(22.dp), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+    Box(Modifier.fillMaxSize().background(AdminBg), contentAlignment = Alignment.Center) {
+        AdminCard {
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Brand()
-                Text("حاضر Native", fontSize = 30.sp, fontWeight = FontWeight.Black, color = AdminInk, modifier = Modifier.padding(top = 16.dp))
+                AdminBrand()
+                Text("حاضر", fontSize = 30.sp, fontWeight = FontWeight.Black, color = AdminText, modifier = Modifier.padding(top = 16.dp))
                 Text("اختر مساحة العمل", color = AdminMuted, modifier = Modifier.padding(top = 6.dp, bottom = 24.dp))
-                Button(onClick = onEmployee, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp)) { Text("مساحة الموظف", fontWeight = FontWeight.Bold) }
+                Button(onClick = onEmployee, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp), colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = AdminGreen, contentColor = AdminBg)) { Text("مساحة الموظف", fontWeight = FontWeight.Black) }
                 Spacer(Modifier.height(10.dp))
-                TextButton(onClick = onAdmin, modifier = Modifier.fillMaxWidth()) { Text("دخول المدير / المشرف") }
+                TextButton(onClick = onAdmin, modifier = Modifier.fillMaxWidth()) { Text("دخول المدير / المشرف", color = AdminCyan) }
             }
         }
     }
@@ -155,18 +156,23 @@ fun NativeAdminApp(vm: NativeAdminViewModel = viewModel(), onBack: () -> Unit) {
 private fun NativeAdminLogin(vm: NativeAdminViewModel, onBack: () -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    Scaffold { p ->
-        Box(Modifier.fillMaxSize().padding(p).padding(20.dp), contentAlignment = Alignment.Center) {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                Column(Modifier.padding(24.dp)) {
-                    Brand()
-                    Text("مساحة الإدارة", fontSize = 26.sp, fontWeight = FontWeight.Black, color = AdminInk, modifier = Modifier.padding(top = 18.dp))
-                    Text("للمدير والمالك والمشرف، بصلاحيات الخادم الفعلية.", color = AdminMuted, modifier = Modifier.padding(top = 6.dp, bottom = 22.dp))
-                    OutlinedTextField(username, { username = it }, Modifier.fillMaxWidth(), label = { Text("اسم المستخدم") }, singleLine = true)
+    AdminSurface {
+        Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+            AdminCard {
+                Column(Modifier.padding(22.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                            Text("HADIR · ADMIN", color = AdminMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                            Text("مساحة الإدارة", fontSize = 28.sp, fontWeight = FontWeight.Black, color = AdminText, modifier = Modifier.padding(top = 5.dp), textAlign = TextAlign.Right)
+                            Text("للمدير والمالك والمشرف، بصلاحيات الخادم الفعلية.", color = AdminMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp), textAlign = TextAlign.Right)
+                        }
+                        AdminBrand(50.dp)
+                    }
+                    OutlinedTextField(username, { username = it }, Modifier.fillMaxWidth().padding(top = 20.dp), label = { Text("اسم المستخدم") }, singleLine = true)
                     OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth().padding(top = 12.dp), label = { Text("كلمة المرور") }, visualTransformation = PasswordVisualTransformation(), singleLine = true)
-                    vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 10.dp)) }
-                    Button(onClick = { vm.login(username, password) }, enabled = username.isNotBlank() && password.isNotBlank() && !vm.loading, modifier = Modifier.fillMaxWidth().padding(top = 18.dp).height(52.dp), shape = RoundedCornerShape(16.dp)) { Text(if (vm.loading) "جارٍ الدخول…" else "دخول الإدارة", fontWeight = FontWeight.Bold) }
-                    TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("العودة لاختيار مساحة العمل") }
+                    vm.error?.let { Text(it, color = AdminRed, modifier = Modifier.padding(top = 10.dp)) }
+                    Button(onClick = { vm.login(username, password) }, enabled = username.isNotBlank() && password.isNotBlank() && !vm.loading, modifier = Modifier.fillMaxWidth().padding(top = 18.dp).height(52.dp), shape = RoundedCornerShape(16.dp), colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = AdminGreen, contentColor = AdminBg)) { Text(if (vm.loading) "جارٍ الدخول…" else "دخول الإدارة", fontWeight = FontWeight.Black) }
+                    TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("العودة لاختيار مساحة العمل", color = AdminMuted) }
                 }
             }
         }
@@ -177,93 +183,136 @@ private fun NativeAdminLogin(vm: NativeAdminViewModel, onBack: () -> Unit) {
 private fun NativeAdminShell(vm: NativeAdminViewModel, onBack: () -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { vm.refresh() }
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
+    AdminSurface {
+        Scaffold(containerColor = AdminBg, bottomBar = {
+            NavigationBar(containerColor = AdminCard, tonalElevation = 0.dp) {
                 val items = listOf("الرئيسية" to Icons.Default.Home, "الموظفون" to Icons.Default.People, "الطلبات" to Icons.Default.AssignmentTurnedIn, "التدقيق" to Icons.Default.Settings)
-                items.forEachIndexed { i, item -> NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = { Icon(item.second, null) }, label = { Text(item.first) }) }
+                items.forEachIndexed { i, item -> NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = { Icon(item.second, null) }, label = { Text(item.first, fontSize = 9.sp, fontWeight = FontWeight.Bold) }, colors = androidx.compose.material3.NavigationBarItemDefaults.colors(selectedIconColor = AdminGreen, selectedTextColor = AdminGreen, indicatorColor = Color(0xFF12372E), unselectedIconColor = AdminMuted, unselectedTextColor = AdminMuted)) }
+            }
+        }) { p ->
+            when (tab) {
+                0 -> AdminDashboard(vm, p)
+                1 -> AdminEmployees(vm, p)
+                2 -> AdminRequests(vm, p)
+                else -> AdminAudit(vm, p)
             }
         }
-    ) { p ->
-        when (tab) {
-            0 -> AdminDashboard(vm, p)
-            1 -> AdminEmployees(vm, p)
-            2 -> AdminRequests(vm, p)
-            else -> AdminAudit(vm, p)
+    }
+}
+
+@Composable
+private fun AdminHeader(title: String, subtitle: String, logout: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+            Text("HADIR · ADMIN", color = AdminMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, textAlign = TextAlign.Right)
+            Text(title, color = AdminText, fontSize = 30.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 4.dp), textAlign = TextAlign.Right)
+            Text(subtitle, color = AdminMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp), textAlign = TextAlign.Right)
         }
+        logout?.let { IconButton(onClick = it) { Icon(Icons.Default.Logout, "تسجيل الخروج", tint = AdminMuted) } }
     }
 }
 
 @Composable
 private fun AdminDashboard(vm: NativeAdminViewModel, p: PaddingValues) {
-    LazyColumn(Modifier.fillMaxSize().padding(p), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { AdminHeader("لوحة القيادة", "نظرة مباشرة على حالة النظام والقوى العاملة", vm::logout) }
         item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("لوحة الإدارة", fontSize = 13.sp, color = AdminMuted); Text(vm.admin?.name ?: "الإدارة", fontSize = 23.sp, fontWeight = FontWeight.Black, color = AdminInk) }
-                IconButton(onClick = vm::logout) { Icon(Icons.Default.Logout, "تسجيل الخروج") }
+            AdminCard {
+                Column(Modifier.padding(18.dp)) {
+                    Text("الحالة التشغيلية الحالية", color = AdminMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth())
+                    Text("مركز التحكم في حاضر", color = AdminText, fontSize = 25.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 4.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                    Text("بيانات مباشرة من HADIR API", color = AdminMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                    Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) { AdminMetric("الموظفون", vm.employees.size, AdminGreen, Modifier.weight(1f)); AdminMetric("الحضور", vm.attendanceCount, AdminCyan, Modifier.weight(1f)) }
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) { AdminMetric("الطلبات", vm.requests.size, AdminAmber, Modifier.weight(1f)); AdminMetric("المواقع", vm.locationsCount, AdminCyan, Modifier.weight(1f)) }
+                }
             }
         }
-        item { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = AdminGreen)) { Column(Modifier.padding(20.dp)) { Text("مركز التحكم في حاضر", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black); Text("الصلاحية: ${vm.admin?.role.orEmpty()}", color = Color.White.copy(alpha = .82f), modifier = Modifier.padding(top = 6.dp)); Text("بيانات مباشرة من HADIR API", color = Color.White.copy(alpha = .82f), modifier = Modifier.padding(top = 4.dp)) } } }
-        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { AdminMetric("الموظفون", vm.employees.size, Modifier.weight(1f)); AdminMetric("الحضور", vm.attendanceCount, Modifier.weight(1f)) } }
-        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { AdminMetric("الطلبات", vm.requests.size, Modifier.weight(1f)); AdminMetric("المواقع", vm.locationsCount, Modifier.weight(1f)) } }
-        if (vm.error != null) item { Text(vm.error!!, color = MaterialTheme.colorScheme.error) }
-        item { Text("التشغيل", fontSize = 19.sp, fontWeight = FontWeight.Black, color = AdminInk) }
-        item { AdminAction(Icons.Default.Groups, "القوى العاملة", "${vm.employees.size} موظفًا في النظام") }
-        item { AdminAction(Icons.Default.Place, "مواقع العمل", "${vm.locationsCount} موقعًا متاحًا للعمليات") }
-        item { AdminAction(Icons.Default.Badge, "صلاحية الإدارة", "${vm.admin?.role.orEmpty()} — الصلاحيات يحددها الخادم") }
+        vm.error?.let { msg -> item { AdminError(msg) } }
+        item { Text("التشغيل", color = AdminText, fontSize = 19.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 4.dp).fillMaxWidth(), textAlign = TextAlign.Right) }
+        item { AdminAction(Icons.Default.Groups, "القوى العاملة", "${vm.employees.size} موظفًا في النظام", AdminGreen) }
+        item { AdminAction(Icons.Default.Place, "مواقع العمل", "${vm.locationsCount} موقعًا متاحًا للعمليات", AdminCyan) }
+        item { AdminAction(Icons.Default.Badge, "صلاحية الإدارة", "${vm.admin?.role.orEmpty()} — الصلاحيات يحددها الخادم", AdminAmber) }
     }
 }
 
 @Composable
 private fun AdminEmployees(vm: NativeAdminViewModel, p: PaddingValues) {
-    LazyColumn(Modifier.fillMaxSize().padding(p), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { Text("الموظفون", fontSize = 25.sp, fontWeight = FontWeight.Black, color = AdminInk); Text("بيانات الموظفين من قاعدة النظام", color = AdminMuted, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)) }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { AdminHeader("الموظفون", "إدارة ومراجعة بيانات القوى العاملة") }
+        vm.error?.let { msg -> item { AdminError(msg) } }
         items(vm.employees) { e ->
             val name = "${e["name"] ?: "بدون اسم"}"
             val job = "${e["jobNumber"] ?: "—"}"
             val status = "${e["status"] ?: "—"}"
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.width(46.dp).height(46.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) { Text(name.firstOrNull()?.toString() ?: "م", fontWeight = FontWeight.Black, color = AdminGreen) }; Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(name, fontWeight = FontWeight.Bold); Text("$job · $status", color = AdminMuted, fontSize = 12.sp) } } }
+            AdminEmployeeRow(name, job, status)
         }
-        if (vm.employees.isEmpty()) item { Text("لا توجد بيانات موظفين.", color = AdminMuted) }
+        if (vm.employees.isEmpty()) item { AdminEmpty("لا توجد بيانات موظفين.") }
     }
 }
 
 @Composable
 private fun AdminRequests(vm: NativeAdminViewModel, p: PaddingValues) {
-    LazyColumn(Modifier.fillMaxSize().padding(p), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { Text("طلبات الفريق", fontSize = 25.sp, fontWeight = FontWeight.Black, color = AdminInk); Text("الموافقة والرفض تتم عبر API بصلاحية الحساب الحالي.", color = AdminMuted, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)) }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { AdminHeader("إدارة الطلبات", "الموافقة والرفض عبر API بصلاحية الحساب الحالي") }
+        vm.error?.let { msg -> item { AdminError(msg) } }
         items(vm.requests.sortedByDescending { it.createdAt }) { r ->
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(19.dp)) { Column(Modifier.padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("${r.employeeName ?: r.employeeId} · ${requestLabel(r.type)}", fontWeight = FontWeight.Bold); Text(statusLabel(r.status), color = statusColor(r.status), fontSize = 12.sp) }
-                if (!r.reason.isNullOrBlank()) Text(r.reason!!, color = AdminMuted, modifier = Modifier.padding(top = 7.dp))
-                if (r.status == "pending") Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
-                    FilterChip(selected = false, onClick = { vm.updateRequest(r.id, "rejected") }, label = { Text("رفض") })
-                    Spacer(Modifier.width(8.dp))
-                    FilterChip(selected = false, onClick = { vm.updateRequest(r.id, "approved") }, label = { Text("موافقة") })
+            AdminCard {
+                Column(Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(statusLabel(r.status), color = statusColor(r.status), fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.background(statusColor(r.status).copy(alpha = .12f), RoundedCornerShape(20.dp)).padding(horizontal = 9.dp, vertical = 5.dp))
+                        Text("${r.employeeName ?: r.employeeId} · ${requestLabel(r.type)}", color = AdminText, fontWeight = FontWeight.Bold, textAlign = TextAlign.Right, modifier = Modifier.weight(1f).padding(start = 10.dp))
+                    }
+                    if (!r.reason.isNullOrBlank()) Text(r.reason!!, color = AdminMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 9.dp).fillMaxWidth(), textAlign = TextAlign.Right)
+                    if (r.status == "pending") Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { FilterChip(selected = false, onClick = { vm.updateRequest(r.id, "rejected") }, label = { Text("رفض", fontWeight = FontWeight.Bold) }); Spacer(Modifier.width(8.dp)); FilterChip(selected = false, onClick = { vm.updateRequest(r.id, "approved") }, label = { Text("موافقة", fontWeight = FontWeight.Bold) }) }
                 }
-            } }
+            }
         }
-        if (vm.requests.isEmpty()) item { Text("لا توجد طلبات.", color = AdminMuted) }
+        if (vm.requests.isEmpty()) item { AdminEmpty("لا توجد طلبات.") }
     }
 }
 
 @Composable
 private fun AdminAudit(vm: NativeAdminViewModel, p: PaddingValues) {
-    LazyColumn(Modifier.fillMaxSize().padding(p), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { Text("سجل التدقيق", fontSize = 25.sp, fontWeight = FontWeight.Black, color = AdminInk); Text("آخر العمليات المسجلة من الخادم", color = AdminMuted, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)) }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { AdminHeader("سجل التدقيق", "آخر العمليات المسجلة من الخادم") }
+        vm.error?.let { msg -> item { AdminError(msg) } }
         items(vm.audit.take(120)) { a ->
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(17.dp)) { Column(Modifier.padding(14.dp)) { Text("${a["action"] ?: "حدث"} · ${a["actorName"] ?: a["jobNumber"] ?: "—"}", fontWeight = FontWeight.Bold); Text("${a["timestamp"] ?: ""} · ${a["result"] ?: ""}", color = AdminMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)) } }
+            AdminCard { Column(Modifier.padding(14.dp)) { Text("${a["action"] ?: "حدث"} · ${a["actorName"] ?: a["jobNumber"] ?: "—"}", color = AdminText, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Right); Text("${a["timestamp"] ?: ""} · ${a["result"] ?: ""}", color = AdminMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp).fillMaxWidth(), textAlign = TextAlign.Right) } }
         }
-        if (vm.audit.isEmpty()) item { Text("لا توجد أحداث تدقيق.", color = AdminMuted) }
+        if (vm.audit.isEmpty()) item { AdminEmpty("لا توجد أحداث تدقيق.") }
     }
 }
 
 @Composable
-private fun AdminMetric(label: String, value: Int, modifier: Modifier) { Card(modifier, shape = RoundedCornerShape(19.dp)) { Column(Modifier.padding(15.dp)) { Text(label, color = AdminMuted, fontSize = 12.sp); Text(value.toString(), fontSize = 24.sp, fontWeight = FontWeight.Black, color = AdminInk, modifier = Modifier.padding(top = 4.dp)) } } }
+private fun AdminCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = AdminCard), border = androidx.compose.foundation.BorderStroke(1.dp, AdminBorder), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+        Column(Modifier.background(Brush.linearGradient(listOf(AdminCard, Color(0xFF11161F)))).padding(18.dp), content = content)
+    }
+}
+
 @Composable
-private fun AdminAction(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String) { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(19.dp)) { Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = AdminGreen); Spacer(Modifier.width(12.dp)); Column { Text(title, fontWeight = FontWeight.Bold, color = AdminInk); Text(subtitle, color = AdminMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp)) } } } }
+private fun AdminMetric(label: String, value: Int, accent: Color, modifier: Modifier) {
+    Box(modifier.background(accent.copy(alpha = .06f), RoundedCornerShape(18.dp)).padding(13.dp)) { Column(horizontalAlignment = Alignment.End, modifier = Modifier.fillMaxWidth()) { Text(label, color = AdminMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold); Text(value.toString(), color = AdminText, fontSize = 26.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 3.dp)) } }
+}
+
 @Composable
-private fun Brand() { Box(Modifier.width(54.dp).height(54.dp).background(AdminGreen, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) { Text("ح", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black) } }
+private fun AdminAction(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, accent: Color) {
+    AdminCard { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.width(44.dp).height(44.dp).background(accent.copy(alpha = .10f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) { Icon(icon, null, tint = accent) }; Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) { Text(title, color = AdminText, fontWeight = FontWeight.Black, textAlign = TextAlign.Right); Text(subtitle, color = AdminMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp), textAlign = TextAlign.Right) } } }
+}
+
+@Composable
+private fun AdminEmployeeRow(name: String, job: String, status: String) {
+    AdminCard { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.width(46.dp).height(46.dp).background(AdminGreen.copy(alpha = .10f), RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) { Text(name.firstOrNull()?.toString() ?: "م", color = AdminGreen, fontSize = 20.sp, fontWeight = FontWeight.Black) }; Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) { Text(name, color = AdminText, fontWeight = FontWeight.Black, textAlign = TextAlign.Right); Text("$job · $status", color = AdminMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp), textAlign = TextAlign.Right) } } }
+}
+
+@Composable
+private fun AdminError(message: String) { Box(Modifier.fillMaxWidth().background(AdminRed.copy(alpha = .08f), RoundedCornerShape(18.dp)).padding(14.dp)) { Text(message, color = AdminRed, fontSize = 12.sp, textAlign = TextAlign.Right, modifier = Modifier.fillMaxWidth()) } }
+@Composable
+private fun AdminEmpty(message: String) { Box(Modifier.fillMaxWidth().padding(vertical = 26.dp), contentAlignment = Alignment.Center) { Text(message, color = AdminMuted, fontSize = 13.sp) } }
+@Composable
+private fun AdminSurface(content: @Composable () -> Unit) { Box(Modifier.fillMaxSize().background(AdminBg)) { content() } }
+@Composable
+private fun AdminBrand(size: androidx.compose.ui.unit.Dp = 54.dp) { Box(Modifier.width(size).height(size).background(AdminGreen, RoundedCornerShape(size / 3)), contentAlignment = Alignment.Center) { Text("ح", color = AdminBg, fontSize = (size.value * .48f).sp, fontWeight = FontWeight.Black) } }
 private fun requestLabel(type: String) = when (type) { "leave" -> "إجازة"; "checkout" -> "انصراف"; else -> "استئذان" }
 private fun statusLabel(status: String) = when (status) { "approved" -> "مقبول"; "rejected" -> "مرفوض"; "confirmed" -> "مؤكد"; else -> "قيد المراجعة" }
-private fun statusColor(status: String) = when (status) { "approved", "confirmed" -> Color(0xFF2E7D32); "rejected" -> Color(0xFFB3261E); else -> AdminGreen }
+private fun statusColor(status: String) = when (status) { "approved", "confirmed" -> AdminGreen; "rejected" -> AdminRed; else -> AdminAmber }
