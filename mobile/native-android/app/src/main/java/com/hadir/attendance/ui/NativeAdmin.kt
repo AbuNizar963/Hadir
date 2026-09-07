@@ -75,6 +75,16 @@ class NativeAdminViewModel(application: Application) : AndroidViewModel(applicat
     var loading by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
 
+    fun restoreSession() {
+        if (loading || admin != null) return
+        loading = true; error = null
+        viewModelScope.launch {
+            try { admin = repo.restoreAdmin(); if (admin != null) refresh() }
+            catch (e: Exception) { error = e.message ?: "تعذر استعادة الجلسة" }
+            finally { loading = false }
+        }
+    }
+
     fun login(username: String, password: String) {
         loading = true; error = null
         viewModelScope.launch {
@@ -113,6 +123,14 @@ class NativeAdminViewModel(application: Application) : AndroidViewModel(applicat
 
 @Composable
 fun NativeRoleEntry(onEmployee: () -> Unit, onAdmin: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val repo = remember(context) { HadirRepository(context) }
+    LaunchedEffect(Unit) {
+        when (repo.savedRole()) {
+            "employee" -> onEmployee()
+            "admin" -> onAdmin()
+        }
+    }
     Box(Modifier.fillMaxSize().background(Color(0xFFF7F9F8)), contentAlignment = Alignment.Center) {
         Card(Modifier.fillMaxWidth().padding(22.dp), shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -129,6 +147,7 @@ fun NativeRoleEntry(onEmployee: () -> Unit, onAdmin: () -> Unit) {
 
 @Composable
 fun NativeAdminApp(vm: NativeAdminViewModel = viewModel(), onBack: () -> Unit) {
+    LaunchedEffect(Unit) { vm.restoreSession() }
     if (vm.admin == null) NativeAdminLogin(vm, onBack) else NativeAdminShell(vm, onBack)
 }
 
