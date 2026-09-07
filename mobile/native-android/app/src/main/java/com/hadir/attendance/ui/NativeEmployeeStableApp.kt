@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -87,8 +86,6 @@ private fun NativeEmployeeStableHome(vm: NativeMainViewModel) {
     val locationAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     val cameraAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 
-    LaunchedEffect(Unit) { vm.refresh() }
-
     if (scanner) {
         QrScanner(
             onResult = { code -> scanner = false; vm.clock(clockType, code, locationAllowed) },
@@ -104,8 +101,8 @@ private fun NativeEmployeeStableHome(vm: NativeMainViewModel) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FilterChip(requestType == "permission", { requestType = "permission" }, label = { Text("استئذان") })
-                        FilterChip(requestType == "leave", { requestType = "leave" }, label = { Text("إجازة") })
+                        Button(onClick = { requestType = "permission" }) { Text("استئذان") }
+                        Button(onClick = { requestType = "leave" }) { Text("إجازة") }
                     }
                     OutlinedTextField(reason, { reason = it }, Modifier.fillMaxWidth(), label = { Text("السبب") }, minLines = 2)
                     OutlinedTextField(start, { start = it }, Modifier.fillMaxWidth(), label = { Text("تاريخ البداية (اختياري)") }, singleLine = true)
@@ -119,12 +116,17 @@ private fun NativeEmployeeStableHome(vm: NativeMainViewModel) {
         )
     }
 
+    // Deliberately uses only basic Compose primitives on the first employee frame.
+    // Network refresh and feature-heavy UI are entered by explicit user actions.
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("حاضر — ${vm.employee?.name.orEmpty()}")
+        Text("حاضر")
+        Text("الموظف: ${vm.employee?.name.orEmpty()}")
+        Text("واجهة الموظف جاهزة")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("الرئيسية", "الحضور", "الطلبات", "الحساب").forEachIndexed { index, title ->
-                Button(onClick = { tab = index }, modifier = Modifier.weight(1f)) { Text(title) }
-            }
+            Button(onClick = { tab = 0 }, modifier = Modifier.weight(1f)) { Text("الرئيسية") }
+            Button(onClick = { tab = 1 }, modifier = Modifier.weight(1f)) { Text("الحضور") }
+            Button(onClick = { tab = 2 }, modifier = Modifier.weight(1f)) { Text("الطلبات") }
+            Button(onClick = { tab = 3 }, modifier = Modifier.weight(1f)) { Text("الحساب") }
         }
         when (tab) {
             0 -> EmployeeHomeTab(vm, locationAllowed, cameraAllowed, mockLocationDetected, locationCheckInProgress) { type ->
@@ -167,9 +169,7 @@ private fun EmployeeHomeTab(
             ) {
                 Text(if (locationCheckInProgress) "جارٍ فحص الموقع…" else if (checkedIn) "تسجيل الانصراف" else "تسجيل الحضور")
             }
-            if (mockLocationDetected) {
-                Text("تم اكتشاف موقع وهمي/معدّل. أوقف تطبيقات تعديل الموقع ثم حاول مرة أخرى.")
-            }
+            if (mockLocationDetected) Text("تم اكتشاف موقع وهمي/معدّل. أوقف تطبيقات تعديل الموقع ثم حاول مرة أخرى.")
             if (!locationAllowed) Text("يلزم السماح بالموقع لتسجيل الحضور.")
             if (!cameraAllowed) Text("يلزم السماح بالكاميرا لمسح رمز QR.")
             vm.error?.let { Text(it) }
