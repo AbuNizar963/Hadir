@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/session.dart';
-import 'pages/admin_home_page.dart';
 import 'pages/admin_login_page.dart';
 import 'pages/admin_management_page.dart';
 import 'pages/admin_operations_page.dart';
