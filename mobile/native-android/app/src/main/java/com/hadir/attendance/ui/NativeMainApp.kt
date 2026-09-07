@@ -62,7 +62,6 @@ class NativeMainViewModel(application: Application) : AndroidViewModel(applicati
             finally { loading = false }
         }
     }
-
     fun login(username: String, password: String) {
         loading = true; error = null
         viewModelScope.launch {
@@ -106,27 +105,17 @@ class NativeMainViewModel(application: Application) : AndroidViewModel(applicati
 }
 
 @Composable
-fun NativeMainApp(
-    vm: NativeMainViewModel = viewModel(),
-    onEmployeeAuthenticated: () -> Unit = {},
-    onEmployeeLoggedOut: () -> Unit = {}
-) {
+fun NativeMainApp(vm: NativeMainViewModel = viewModel(), onEmployeeAuthenticated: () -> Unit = {}, onEmployeeLoggedOut: () -> Unit = {}) {
     var wasAuthenticated by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.restoreSession() }
     LaunchedEffect(vm.employee) {
-        if (vm.employee != null) {
-            wasAuthenticated = true
-            onEmployeeAuthenticated()
-        } else if (wasAuthenticated) {
-            wasAuthenticated = false
-            onEmployeeLoggedOut()
-        }
+        if (vm.employee != null) { wasAuthenticated = true; onEmployeeAuthenticated() }
+        else if (wasAuthenticated) { wasAuthenticated = false; onEmployeeLoggedOut() }
     }
     if (vm.employee == null) NativeLogin(vm) else NativeShell(vm)
 }
 
-@Composable
-private fun NativeLogin(vm: NativeMainViewModel) {
+@Composable private fun NativeLogin(vm: NativeMainViewModel) {
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
     Scaffold { p ->
@@ -146,8 +135,7 @@ private fun NativeLogin(vm: NativeMainViewModel) {
     }
 }
 
-@Composable
-private fun NativeShell(vm: NativeMainViewModel) {
+@Composable private fun NativeShell(vm: NativeMainViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var tab by remember { mutableIntStateOf(0) }
     var scanner by remember { mutableStateOf(false) }
@@ -159,15 +147,13 @@ private fun NativeShell(vm: NativeMainViewModel) {
     var pendingType by remember { mutableStateOf("check-in") }
     val locationAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     val cameraAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-
     LaunchedEffect(Unit) { vm.refresh() }
     LaunchedEffect(tab) { if (tab == 3) vm.refreshRequests() }
-
     if (scanner) { QrScanner(onResult = { code -> scanner = false; vm.clock(pendingType, code, true) }, onCancel = { scanner = false }); return }
     if (requestDialog) AlertDialog(onDismissRequest = { requestDialog = false }, title = { Text("طلب جديد") }, text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("اختر نوع الطلب"); Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("permission" to "استئذان", "leave" to "إجازة", "checkout" to "انصراف").forEach { (id, label) -> FilterChip(selected = requestType == id, onClick = { requestType = id }, label = { Text(label) }) } }; OutlinedTextField(value = requestReason, onValueChange = { requestReason = it }, modifier = Modifier.fillMaxWidth(), label = { Text("السبب") }, minLines = 2); OutlinedTextField(value = requestStart, onValueChange = { requestStart = it }, modifier = Modifier.fillMaxWidth(), label = { Text("تاريخ البداية (اختياري)") }, singleLine = true); OutlinedTextField(value = requestEnd, onValueChange = { requestEnd = it }, modifier = Modifier.fillMaxWidth(), label = { Text("تاريخ النهاية (اختياري)") }, singleLine = true) } }, confirmButton = { Button(onClick = { vm.addRequest(requestType, requestReason, requestStart, requestEnd); requestDialog = false; requestReason = ""; requestStart = ""; requestEnd = "" }) { Text("إرسال") } }, dismissButton = { TextButton(onClick = { requestDialog = false }) { Text("إلغاء") } })
     Scaffold(bottomBar = { NavigationBar { listOf("الرئيسية" to Icons.Default.Home, "ساعاتي" to Icons.Default.CalendarMonth, "مركزي" to Icons.Default.Badge, "الطلبات" to Icons.Default.ListAlt, "حسابي" to Icons.Default.Person).forEachIndexed { i, pair -> NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = { Icon(pair.second, null) }, label = { Text(pair.first) }) } } }) { p ->
         when (tab) {
-            0 -> HomeTab(vm, p, locationAllowed) { pendingType = it; if (locationAllowed && cameraAllowed) scanner = true else vm.errorMessage("يرجى السماح للكاميرا والموقع من إعدادات التطبيق أولًا.") }
+            0 -> HomeTab(vm, p, locationAllowed) { pendingType = it; if (locationAllowed && cameraAllowed) scanner = true }
             1 -> HoursTab(vm, p)
             2 -> CenterTab(vm, p)
             3 -> RequestsTab(vm, p) { requestDialog = true }
@@ -215,33 +201,21 @@ private fun NativeShell(vm: NativeMainViewModel) {
 
 @Composable private fun RequestsTab(vm: NativeMainViewModel, p: PaddingValues, add: () -> Unit) {
     var filter by remember { mutableStateOf("all") }
-    val filtered = remember(vm.requests, filter) {
-        vm.requests.asSequence().filter { filter == "all" || it.status.equals(filter, ignoreCase = true) }.sortedByDescending { it.createdAt }.toList()
-    }
+    val filtered = remember(vm.requests, filter) { vm.requests.asSequence().filter { filter == "all" || it.status.equals(filter, ignoreCase = true) }.sortedByDescending { it.createdAt }.toList() }
     val pending = vm.requests.count { it.status.equals("pending", ignoreCase = true) }
     val approved = vm.requests.count { it.status.equals("approved", ignoreCase = true) || it.status.equals("confirmed", ignoreCase = true) }
     val rejected = vm.requests.count { it.status.equals("rejected", ignoreCase = true) }
     LazyColumn(Modifier.fillMaxSize().padding(p), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("الطلبات", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black); Text("الإجازات والاستئذانات وطلبات الانصراف", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { IconButton(onClick = vm::refreshRequests) { Icon(Icons.Default.Refresh, contentDescription = "تحديث الطلبات") }; Button(onClick = add) { Text("طلب جديد") } }
-            }
-        }
+        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("الطلبات", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black); Text("الإجازات والاستئذانات وطلبات الانصراف", color = MaterialTheme.colorScheme.onSurfaceVariant) }; Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { IconButton(onClick = vm::refreshRequests) { Icon(Icons.Default.Refresh, contentDescription = "تحديث الطلبات") }; Button(onClick = add) { Text("طلب جديد") } } } }
         item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { Metric("الكل", vm.requests.size, Modifier.weight(1f)); Metric("معلقة", pending, Modifier.weight(1f)); Metric("معتمدة", approved, Modifier.weight(1f)) } }
         item { SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) { listOf("all" to "الكل", "pending" to "معلقة", "approved" to "معتمدة", "rejected" to "مرفوضة").forEachIndexed { index, (id, label) -> SegmentedButton(selected = filter == id, onClick = { filter = id }, shape = SegmentedButtonDefaults.itemShape(index, 4)) { Text(label, fontSize = 12.sp) } } } }
-        items(filtered) { r ->
-            val reason = r.reason.orEmpty().trim()
-            val created = r.createdAt.trim()
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(15.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(requestLabel(r.type), fontWeight = FontWeight.Bold); Text(statusLabel(r.status), color = statusColor(r.status)) }; if (reason.isNotBlank()) Text(reason, modifier = Modifier.padding(top = 7.dp)); Text(if (created.length >= 10) created.take(10) else "—", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp)) } }
-        }
+        items(filtered) { r -> val reason = r.reason.orEmpty().trim(); val created = r.createdAt.trim(); Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(15.dp)) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(requestLabel(r.type), fontWeight = FontWeight.Bold); Text(statusLabel(r.status), color = statusColor(r.status)) }; if (reason.isNotBlank()) Text(reason, modifier = Modifier.padding(top = 7.dp)); Text(if (created.length >= 10) created.take(10) else "—", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp)) } } }
         if (filtered.isEmpty()) item { Empty(if (vm.requests.isEmpty()) "لا توجد طلبات" else "لا توجد طلبات بهذا التصنيف") }
         if (rejected > 0 && filter == "all") item { Text("المرفوضة: $rejected", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 4.dp)) }
     }
 }
 
 @Composable private fun AccountTab(vm: NativeMainViewModel, p: PaddingValues) { Column(Modifier.fillMaxSize().padding(p).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("حسابي", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black); Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) { Column(Modifier.padding(18.dp)) { Text(vm.employee?.name.orEmpty(), fontSize = 21.sp, fontWeight = FontWeight.Bold); Text(vm.employee?.jobNumber.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp)); HorizontalDivider(Modifier.padding(vertical = 15.dp)); Text("الأمان والجلسة", fontWeight = FontWeight.Bold); Text("الحضور يستخدم QR + GPS للتحقق قبل التسجيل.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp)) } }; Button(onClick = vm::logout, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)) { Text("تسجيل الخروج") } } }
-
 @Composable private fun Avatar(name: String?) { Box(Modifier.size(50.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) { Text(name?.firstOrNull()?.toString() ?: "ح", color = MaterialTheme.colorScheme.primary, fontSize = 21.sp, fontWeight = FontWeight.Black) } }
 @Composable private fun Brand() { Box(Modifier.size(54.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) { Text("ح", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black) } }
 @Composable private fun Metric(label: String, value: Int, modifier: Modifier) { Card(modifier, shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(15.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp); Text(value.toString(), fontSize = 22.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 4.dp)) } } }
