@@ -190,3 +190,5 @@ jobs:
               --target "${{ github.sha }}" \
               --notes "تحديث تلقائي لتطبيق حاضر Android. versionCode=${{ github.run_number }}."
           fi
+
+# CI retrigger: keep the native release workflow attached to android-native.
