@@ -55,6 +55,16 @@ class NativeMainViewModel(application: Application) : AndroidViewModel(applicati
     var working by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
 
+    fun restoreSession() {
+        if (loading || employee != null) return
+        loading = true; error = null
+        viewModelScope.launch {
+            try { employee = repo.restoreEmployee(); if (employee != null) refresh() }
+            catch (e: Exception) { error = e.message ?: "تعذر استعادة الجلسة" }
+            finally { loading = false }
+        }
+    }
+
     fun login(username: String, password: String) {
         loading = true; error = null
         viewModelScope.launch {
@@ -99,6 +109,7 @@ class NativeMainViewModel(application: Application) : AndroidViewModel(applicati
 
 @Composable
 fun NativeMainApp(vm: NativeMainViewModel = viewModel()) {
+    LaunchedEffect(Unit) { vm.restoreSession() }
     if (vm.employee == null) NativeLogin(vm) else NativeShell(vm)
 }
 
@@ -249,8 +260,10 @@ private fun NativeShell(vm: NativeMainViewModel) {
 
 @Composable private fun AccountTab(vm: NativeMainViewModel, p: PaddingValues) { Column(Modifier.fillMaxSize().padding(p).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("حسابي", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black); Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) { Column(Modifier.padding(18.dp)) { Text(vm.employee?.name.orEmpty(), fontSize = 21.sp, fontWeight = FontWeight.Bold); Text(vm.employee?.jobNumber.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp)); HorizontalDivider(Modifier.padding(vertical = 15.dp)); Text("الأمان والجلسة", fontWeight = FontWeight.Bold); Text("الحضور يستخدم QR + GPS للتحقق قبل التسجيل.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp)) } }; Button(onClick = vm::logout, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)) { Text("تسجيل الخروج") } } }
 
-@Composable private fun Avatar(name: String?) { Box(Modifier.size(50.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) { Text(name?.firstOrNull()?.toString() ?: "ح", color = MaterialTheme.colorScheme.primary, fontSize = 21.sp, fontWeight = FontWeight.Black) } }
-@Composable private fun Brand() { Box(Modifier.size(54.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) { Text("ح", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black) } }
+@Composable private fun Avatar(name: String?) { Box(Modifier.size(50.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) { Text(name?.firstOrNull()?.toString() ?: "ح", color = MaterialTheme.colorScheme.primary, fontSize = 21.sp, fontWeight = FontWeight.Black) }
+}
+@Composable private fun Brand() { Box(Modifier.size(54.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) { Text("ح", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black) }
+}
 @Composable private fun Metric(label: String, value: Int, modifier: Modifier) { Card(modifier, shape = RoundedCornerShape(18.dp)) { Column(Modifier.padding(15.dp)) { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp); Text(value.toString(), fontSize = 22.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 4.dp)) } } }
 @Composable private fun SectionCard(title: String, a: String, b: String) { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) { Column(Modifier.padding(17.dp)) { Text(title, fontWeight = FontWeight.Bold, fontSize = 17.sp); Text(a, modifier = Modifier.padding(top = 9.dp)); Text(b, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 3.dp)) } } }
 @Composable private fun ActivityItem(r: AttendanceRecord) { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(if (r.type == "check-in") Icons.Default.Login else Icons.Default.Logout, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(10.dp)); Column { Text(if (r.type == "check-in") "تسجيل حضور" else "تسجيل انصراف", fontWeight = FontWeight.Bold); Text(time(r.timestamp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp) } } } }
