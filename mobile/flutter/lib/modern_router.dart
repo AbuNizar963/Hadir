@@ -67,6 +67,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/employee', builder: (_, __) => const HadirWorkspacePage()),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
+    GoRoute(path: '/employee/premium', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
@@ -78,6 +79,10 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
     GoRoute(path: '/employee/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
     GoRoute(path: '/services', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
+    // The web exposes these as dedicated pages; Flutter keeps them in the unified services hub.
+    GoRoute(path: '/weather', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
+    GoRoute(path: '/prayer', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
+    GoRoute(path: '/ai', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
   ],
 );
 
