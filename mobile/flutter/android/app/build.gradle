@@ -34,8 +34,6 @@ android {
     if (releaseKeystore && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
         signingConfigs {
             release {
-                // Resolve CI/production keystores from the Android project root,
-                // not from android/app (Gradle's project directory).
                 storeFile rootProject.file(releaseKeystore)
                 storePassword releaseStorePassword
                 keyAlias releaseKeyAlias
@@ -45,6 +43,8 @@ android {
         buildTypes {
             release {
                 signingConfig signingConfigs.release
+                minifyEnabled true
+                shrinkResources true
             }
         }
     }
