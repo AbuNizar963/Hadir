@@ -27,6 +27,12 @@ class _AdminHomePageState extends State<AdminHomePage> {
   int requestCount = 0;
   int notificationCount = 0;
   int locationCount = 0;
+  int employeeCount = 0;
+  int presentCount = 0;
+  int lateCount = 0;
+  int absentCount = 0;
+  int restCount = 0;
+  int leaveCount = 0;
 
   @override
   void initState() {
@@ -34,11 +40,16 @@ class _AdminHomePageState extends State<AdminHomePage> {
     _load();
   }
 
+  String _todayKey() {
+    final now = DateTime.now().toUtc().add(const Duration(hours: 3));
+    final y = now.year.toString().padLeft(4, '0');
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
   Future<void> _load() async {
-    setState(() {
-      loading = true;
-      error = null;
-    });
+    if (mounted) setState(() { loading = true; error = null; });
     try {
       final token = await _session.adminToken();
       if (token == null || token.isEmpty) {
@@ -52,9 +63,14 @@ class _AdminHomePageState extends State<AdminHomePage> {
         api.requests(),
         api.notifications(),
         api.locations(),
+        api.dailyStatus(date: _todayKey()),
       ]);
       final me = Map<String, dynamic>.from(results[0] as Map);
       final user = me['user'];
+      final daily = Map<String, dynamic>.from(results[5] as Map);
+      final rawEmployees = daily['employees'];
+      final employees = rawEmployees is List ? rawEmployees : const <dynamic>[];
+      int count(String status) => employees.where((raw) => raw is Map && '${raw['status'] ?? ''}' == status).length;
       if (!mounted) return;
       setState(() {
         name = user is Map ? '${user['name'] ?? 'الإدارة'}' : 'الإدارة';
@@ -63,6 +79,12 @@ class _AdminHomePageState extends State<AdminHomePage> {
         requestCount = (results[2] as List).length;
         notificationCount = (results[3] as List).length;
         locationCount = (results[4] as List).length;
+        employeeCount = employees.length;
+        presentCount = count('PRESENT');
+        lateCount = count('LATE');
+        absentCount = count('ABSENT');
+        restCount = count('REST') + count('NOT_STARTED');
+        leaveCount = count('LEAVE');
         loading = false;
       });
     } catch (e) {
@@ -112,6 +134,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 _overviewCard(),
                 if (error != null) ...[const SizedBox(height: 12), _errorCard()],
                 const SizedBox(height: 22),
+                const Text('حالة الدوام اليوم', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: _adminInk)),
+                const SizedBox(height: 10),
+                _attendanceGrid(),
+                const SizedBox(height: 22),
                 const Text('نظرة سريعة', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: _adminInk)),
                 const SizedBox(height: 10),
                 _statsGrid(),
@@ -143,9 +169,18 @@ class _AdminHomePageState extends State<AdminHomePage> {
       const SizedBox(height: 18),
       Text(loading ? 'جارٍ تحديث لوحة الإدارة...' : 'مركز التحكم في حاضر', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
       const SizedBox(height: 7),
-      const Text('كل أدوات الإدارة الأساسية في مكان واحد، مع بيانات مباشرة من خادم حاضر.', style: TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.45)),
+      Text(loading ? 'جارٍ مزامنة حالة الدوام الحالية...' : 'بيانات اليوم: $employeeCount موظفًا · $presentCount حاضر · $lateCount متأخر · $absentCount غائب', style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.45)),
     ]),
   );
+
+  Widget _attendanceGrid() => GridView.count(crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.75, children: [
+    _StatusCard(icon: Icons.groups_rounded, title: 'إجمالي الموظفين', value: '$employeeCount', tone: _adminBrand),
+    _StatusCard(icon: Icons.check_circle_outline_rounded, title: 'الحضور', value: '$presentCount', tone: const Color(0xFF18865F)),
+    _StatusCard(icon: Icons.schedule_rounded, title: 'المتأخرون', value: '$lateCount', tone: const Color(0xFFB06A00)),
+    _StatusCard(icon: Icons.person_off_outlined, title: 'الغياب', value: '$absentCount', tone: const Color(0xFFB94A3D)),
+    _StatusCard(icon: Icons.free_breakfast_outlined, title: 'الراحة', value: '$restCount', tone: const Color(0xFF28749B)),
+    _StatusCard(icon: Icons.event_available_outlined, title: 'الإجازات', value: '$leaveCount', tone: const Color(0xFF7352A5)),
+  ]);
 
   Widget _statsGrid() => GridView.count(crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.75, children: [
     _StatCard(icon: Icons.fingerprint_rounded, title: 'سجلات الحضور', value: '$attendanceCount', subtitle: 'آخر البيانات المتاحة'),
@@ -155,6 +190,13 @@ class _AdminHomePageState extends State<AdminHomePage> {
   ]);
 
   Widget _errorCard() => Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: const Color(0xFFFFF4F2), borderRadius: BorderRadius.circular(18)), child: Row(children: [const Icon(Icons.cloud_off_rounded, color: Color(0xFFB94A3D)), const SizedBox(width: 10), Expanded(child: Text(error!, style: const TextStyle(color: Color(0xFF8D332C), fontSize: 12))), TextButton(onPressed: _load, child: const Text('إعادة'))]));
+}
+
+class _StatusCard extends StatelessWidget {
+  final IconData icon; final String title; final String value; final Color tone;
+  const _StatusCard({required this.icon, required this.title, required this.value, required this.tone});
+  @override
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _adminSurface, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E9E6))), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: tone.withValues(alpha: .09), borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: tone, size: 21)), const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: _adminMuted)), const SizedBox(height: 2), Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _adminInk)), const Text('اليوم', style: TextStyle(fontSize: 9, color: _adminMuted))]))]));
 }
 
 class _StatCard extends StatelessWidget {
