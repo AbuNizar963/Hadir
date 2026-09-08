@@ -78,8 +78,9 @@ class AdminMobileShell extends StatelessWidget {
   }
 
   Widget _header(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 390;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 9),
+      padding: EdgeInsets.fromLTRB(compact ? 12 : 14, 10, compact ? 12 : 14, 9),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: _border)),
@@ -90,22 +91,51 @@ class AdminMobileShell extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: compact ? 40 : 44,
+                  height: compact ? 40 : 44,
                   decoration: BoxDecoration(
-                    color: _soft,
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(color: const Color(0xFFB8DFD2)),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                      colors: [_brand, Color(0xFF064B40)],
+                    ),
+                    borderRadius: BorderRadius.circular(compact ? 13 : 15),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x220B6B5A),
+                        blurRadius: 18,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.how_to_reg_rounded, color: _brand, size: 25),
+                  child: Icon(
+                    Icons.how_to_reg_rounded,
+                    color: Colors.white,
+                    size: compact ? 23 : 25,
+                  ),
                 ),
                 const SizedBox(width: 9),
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('حاضر', style: TextStyle(color: _ink, fontSize: 22, height: 1, fontWeight: FontWeight.w900)),
+                    Text(
+                      'حاضر',
+                      style: TextStyle(
+                        color: _ink,
+                        fontSize: 22,
+                        height: 1,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                     SizedBox(height: 4),
-                    Text('HADIR  •  v1.1', style: TextStyle(color: _muted, fontSize: 9.5, letterSpacing: 1.1, fontWeight: FontWeight.w700)),
+                    Text(
+                      'نظام حضور وانصراف موثّق',
+                      style: TextStyle(
+                        color: _muted,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -115,6 +145,7 @@ class AdminMobileShell extends StatelessWidget {
             context,
             icon: Icons.notifications_none_rounded,
             label: 'الإشعارات',
+            compact: compact,
             onTap: () => context.push('/notifications'),
           ),
           const SizedBox(width: 7),
@@ -122,6 +153,7 @@ class AdminMobileShell extends StatelessWidget {
             context,
             icon: Icons.menu_rounded,
             label: 'الخيارات',
+            compact: compact,
             onTap: () => _showOptions(context),
           ),
         ],
@@ -129,19 +161,40 @@ class AdminMobileShell extends StatelessWidget {
     );
   }
 
-  Widget _headerButton(BuildContext context, {required IconData icon, required String label, required VoidCallback onTap}) {
-    return OutlinedButton.icon(
+  Widget _headerButton(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required bool compact,
+    required VoidCallback onTap,
+  }) {
+    return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         foregroundColor: _ink,
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 9 : 11,
+          vertical: compact ? 9 : 10,
+        ),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         side: const BorderSide(color: _border),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      icon: Icon(icon, size: 21),
-      label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: compact ? 20 : 21),
+          if (!compact) ...[
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -158,7 +211,10 @@ class AdminMobileShell extends StatelessWidget {
             children: [
               const Align(
                 alignment: Alignment.centerRight,
-                child: Text('الخيارات', style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900)),
+                child: Text(
+                  'الخيارات',
+                  style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900),
+                ),
               ),
               const SizedBox(height: 10),
               _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
