@@ -18,12 +18,11 @@ class AdminMobileShell extends StatelessWidget {
   final Widget child;
 
   int _selectedIndex(BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
-    final queryTab = GoRouterState.of(context).uri.queryParameters['tab'];
-    if (location == '/admin') return 0;
-    if (location == '/admin/manage' && queryTab == 'requests') return 1;
-    if (location == '/admin/manage' && queryTab == 'employees') return 2;
-    if (location == '/admin/reports' || location == '/admin/reports/archive') return 3;
+    final uri = GoRouterState.of(context).uri;
+    if (uri.path == '/admin') return 0;
+    if (uri.path == '/manager/requests') return 1;
+    if (uri.path == '/admin/manage') return 2;
+    if (uri.path == '/admin/reports' || uri.path == '/admin/reports/archive') return 3;
     return 4;
   }
 
@@ -32,9 +31,9 @@ class AdminMobileShell extends StatelessWidget {
       case 0:
         context.go('/admin');
       case 1:
-        context.go('/admin/manage?tab=requests');
+        context.go('/manager/requests');
       case 2:
-        context.go('/admin/manage?tab=employees');
+        context.go('/admin/manage');
       case 3:
         context.go('/admin/reports');
       case 4:
@@ -67,7 +66,7 @@ class AdminMobileShell extends StatelessWidget {
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: const [
             NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded, color: _brand), label: 'لوحة القيادة'),
-            NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment_rounded, color: _brand), label: 'الطلبات'),
+            NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment_rounded, color: _brand), label: 'إدارة الطلبات'),
             NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups_rounded, color: _brand), label: 'الموظفون'),
             NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart_rounded, color: _brand), label: 'التقارير'),
             NavigationDestination(icon: Icon(Icons.more_horiz_rounded), selectedIcon: Icon(Icons.more_horiz_rounded, color: _brand), label: 'المزيد'),
@@ -185,12 +184,8 @@ class AdminMobileShell extends StatelessWidget {
       trailing: const Icon(Icons.chevron_left_rounded, color: _muted),
       onTap: () {
         Navigator.of(context).pop();
-        this._goTo(context, route);
+        context.push(route);
       },
     );
-  }
-
-  void _goTo(BuildContext context, String route) {
-    context.push(route);
   }
 }
