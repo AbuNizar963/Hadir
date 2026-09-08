@@ -76,31 +76,42 @@ GoRouter buildModernRouter() => GoRouter(
 
     final currentEmployeeToken = await _modernSession.token();
     final currentAdminToken = await _modernSession.adminToken();
+
     if (currentEmployeeToken == null && currentAdminToken == null && !publicLocations.contains(location)) return '/';
-    if (currentAdminToken != null && publicLocations.contains(location)) return '/admin';
-    if (currentEmployeeToken != null && publicLocations.contains(location)) return '/home';
-    if (currentAdminToken == null && (
-      location == '/admin' || location == '/admin/roles' || location == '/admin/manage' || location == '/admin/operations' ||
-      location == '/admin/reports' || location == '/admin/reports/archive' || location == '/admin/audit' || location == '/admin/settings' ||
-      location == '/manager' || location == '/manager/employees' || location == '/manager/workforce' || location == '/manager/requests' ||
-      location == '/manager/audit' || location == '/manager/reports' || location == '/manager/report-archive' || location == '/manager/settings'
-    )) return '/admin-login';
-    if (currentEmployeeToken == null &&
-        location != '/' && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' &&
-        location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/audit' && location != '/admin/settings' &&
-        location != '/manager' && location != '/manager/employees' && location != '/manager/workforce' && location != '/manager/requests' &&
-        location != '/manager/audit' && location != '/manager/reports' && location != '/manager/report-archive' && location != '/manager/settings' &&
-        location != '/admin-login' && location != '/manager/login' && location != '/login') return '/login';
+
+    // Role-specific login pages must stay independent. A saved admin session
+    // must not redirect an employee login request, and an employee session
+    // must not redirect an admin login request.
+    if (currentAdminToken != null && (location == '/admin-login' || location == '/manager/login')) return '/admin';
+    if (currentEmployeeToken != null && location == '/employee-login') return '/home';
+
+    final adminPaths = <String>{
+      '/admin', '/admin/roles', '/admin/manage', '/admin/operations',
+      '/admin/reports', '/admin/reports/archive', '/admin/audit', '/admin/settings',
+      '/manager', '/manager/employees', '/manager/workforce', '/manager/requests',
+      '/manager/audit', '/manager/reports', '/manager/report-archive', '/manager/settings',
+    };
+    if (currentAdminToken == null && adminPaths.contains(location)) return '/admin-login';
+
+    // /employee-login is intentionally public; it must never fall through to
+    // the generic /login selector screen.
+    final employeePaths = <String>{
+      '/home', '/employee', '/center', '/employee/center', '/employee/premium',
+      '/attendance', '/history', '/employee/history', '/insights', '/requests',
+      '/notifications', '/employee/notifications', '/profile', '/employee/profile',
+      '/services', '/weather', '/prayer', '/ai',
+    };
+    if (currentEmployeeToken == null && employeePaths.contains(location)) return '/login';
+
     return null;
   },
-  errorBuilder: (context, state) => const _NotFoundPage(),
+  errorBuilder: (_, __) => const _NotFoundPage(),
   routes: [
     GoRoute(path: '/', builder: (_, __) => const LandingPage()),
     GoRoute(path: '/login', builder: (_, __) => const LoginEntryPage()),
     GoRoute(path: '/employee-login', builder: (_, __) => const EmployeeLoginPage()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
     GoRoute(path: '/manager/login', builder: (_, __) => const AdminLoginPage()),
-
     GoRoute(path: '/admin', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
     GoRoute(path: '/admin/roles', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
     GoRoute(path: '/admin/manage', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
@@ -118,7 +129,6 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/manager/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/manager/report-archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
     GoRoute(path: '/manager/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
-
     GoRoute(path: '/home', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
     GoRoute(path: '/employee', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
@@ -182,11 +192,7 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
     final path = GoRouterState.of(context).uri.path;
     final isAdminArea = path == '/admin' || path.startsWith('/admin/') || path == '/manager' || path.startsWith('/manager/');
     final isEmployeeArea = path == '/home' || path == '/employee' || path.startsWith('/employee/');
-    final content = isAdminArea
-        ? AdminMobileShell(child: widget.child)
-        : isEmployeeArea
-            ? EmployeeMobileShell(child: widget.child)
-            : widget.child;
+    final content = isAdminArea ? AdminMobileShell(child: widget.child) : isEmployeeArea ? EmployeeMobileShell(child: widget.child) : widget.child;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onHorizontalDragStart: _start,
@@ -206,43 +212,22 @@ class _NotFoundPage extends StatelessWidget {
     child: Scaffold(
       backgroundColor: const Color(0xFFF4F7F6),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(mainAxisAlignment: MainAxisAlignment.start, children: [
-                const Icon(Icons.how_to_reg_rounded, color: Color(0xFF0B6B5A), size: 28),
-                const SizedBox(width: 8),
-                const Text('حاضر', style: TextStyle(color: Color(0xFF142D27), fontSize: 22, fontWeight: FontWeight.w900)),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 420),
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFDCE6E2)), boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 24, offset: Offset(0, 10))]),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.error_outline_rounded, color: Color(0xFF0B6B5A), size: 40),
+                const SizedBox(height: 12),
+                const Text('الصفحة غير موجودة', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF142D27), fontSize: 27, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 18),
+                FilledButton.icon(onPressed: () => context.go('/'), icon: const Icon(Icons.home_rounded), label: const Text('العودة للرئيسية')),
               ]),
             ),
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    padding: const EdgeInsets.all(30),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFDCE6E2)),
-                      boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 24, offset: Offset(0, 10))],
-                    ),
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      const Text('ERROR · 404', style: TextStyle(color: Color(0xFF73827E), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
-                      const SizedBox(height: 8),
-                      const Text('الصفحة غير موجودة', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF142D27), fontSize: 27, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 8),
-                      const Text('الرابط الذي حاولت الوصول إليه غير متاح.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF73827E), fontSize: 13, height: 1.5)),
-                      const SizedBox(height: 22),
-                      SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: () => context.go('/'), icon: const Icon(Icons.home_rounded), label: const Text('العودة للرئيسية'))),
-                    ]),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     ),
@@ -256,42 +241,29 @@ class LoginEntryPage extends StatelessWidget {
     textDirection: TextDirection.rtl,
     child: Scaffold(
       backgroundColor: const Color(0xFFF4F7F6),
-      body: Stack(children: [
-        Positioned(top: -100, left: -80, child: Container(width: 260, height: 260, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF0B6B5A).withValues(alpha: .09)))),
-        Positioned(bottom: -130, right: -90, child: Container(width: 300, height: 300, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF0B6B5A).withValues(alpha: .06)))),
-        SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(22, 24, 22, 28), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 460), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [Container(width: 58, height: 58, decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF0B6B5A), Color(0xFF064B40)]), borderRadius: BorderRadius.circular(19), boxShadow: const [BoxShadow(color: Color(0x220B6B5A), blurRadius: 22, offset: Offset(0, 10))]), child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 30))]),
-          const SizedBox(height: 18),
-          const Text('حاضر', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF142D27), fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -.8)),
-          const SizedBox(height: 7),
-          const Text('منصة العمل اليومية للموظف والإدارة', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF73827E), fontSize: 13, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 30),
-          Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(27), border: Border.all(color: const Color(0xFFDCE6E2)), boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 24, offset: Offset(0, 10))]), child: Column(children: [
-            _EntryCard(icon: Icons.badge_outlined, title: 'مساحة الموظف', subtitle: 'الحضور، السجل، الطلبات والخدمات', accent: const Color(0xFF0B6B5A), onTap: () => context.go('/employee-login')),
-            const SizedBox(height: 4),
-            _EntryCard(icon: Icons.admin_panel_settings_outlined, title: 'مساحة الإدارة', subtitle: 'التشغيل، الموظفون والتقارير', accent: const Color(0xFF344B65), onTap: () => context.go('/admin-login')),
-          ])),
-          const SizedBox(height: 18),
-          Container(padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13), decoration: BoxDecoration(color: const Color(0xFFEAF4F0), borderRadius: BorderRadius.circular(17), border: Border.all(color: const Color(0xFFD3E8E0))), child: const Row(children: [Icon(Icons.shield_outlined, color: Color(0xFF0B6B5A), size: 19), SizedBox(width: 9), Expanded(child: Text('تجربة موحدة، مع فصل كامل بين صلاحيات الموظف والإدارة.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF064B40), fontSize: 10.5, height: 1.4, fontWeight: FontWeight.w600)))])),
-          const SizedBox(height: 20),
-          const Text('بعض المزايا المتقدمة ستظهر داخل التطبيق بعلامة «قريباً» حتى يتم ربطها بالواجهة الخلفية.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF899691), fontSize: 9.5, height: 1.45)),
-        ]))))),
-      ]),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: .94), borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFDCE6E2)), boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 24, offset: Offset(0, 10))]),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Row(children: [IconButton.filledTonal(onPressed: () => context.go('/'), icon: const Icon(Icons.arrow_forward_rounded)), const SizedBox(width: 10), const Expanded(child: Text('اختيار مساحة الدخول', style: TextStyle(color: Color(0xFF142D27), fontSize: 21, fontWeight: FontWeight.w900)))]),
+                  const SizedBox(height: 18),
+                  // Generic /login remains only a selector. The employee-specific
+                  // route is now protected from falling into this screen.
+                  FilledButton.icon(onPressed: () => context.go('/employee-login'), icon: const Icon(Icons.person_rounded), label: const Text('مساحة الموظف')),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(onPressed: () => context.go('/manager/login'), icon: const Icon(Icons.admin_panel_settings_rounded), label: const Text('مساحة الإدارة')),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
     ),
   );
-}
-
-class _EntryCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color accent;
-  final VoidCallback onTap;
-  const _EntryCard({required this.icon, required this.title, required this.subtitle, required this.accent, required this.onTap});
-  @override
-  Widget build(BuildContext context) => Material(color: Colors.transparent, borderRadius: BorderRadius.circular(21), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(21), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13), child: Row(children: [
-    Container(width: 48, height: 48, decoration: BoxDecoration(color: accent.withValues(alpha: .09), borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: accent, size: 23)),
-    const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Color(0xFF142D27), fontSize: 14, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: Color(0xFF73827E), fontSize: 10.5))])),
-    Icon(Icons.arrow_back_ios_new_rounded, color: accent, size: 15),
-  ]))));
 }
