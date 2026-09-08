@@ -40,7 +40,7 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
-      - name: Build Android APK
+      - name: Build Android debug APK
         run: |
           cd android
           chmod +x gradlew
@@ -59,23 +59,30 @@ jobs:
             -keysize 2048 \
             -validity 3650 \
             -dname "CN=HADIR CI, OU=Build, O=HADIR, L=NA, ST=NA, C=US"
-      - name: Build Android release AAB
+      - name: Build Android release APK and AAB
         env:
-          HADIR_RELEASE_KEYSTORE: ../ci-release.keystore
+          HADIR_RELEASE_KEYSTORE: ci-release.keystore
           HADIR_RELEASE_STORE_PASSWORD: changeit
           HADIR_RELEASE_KEY_ALIAS: hadir-ci
           HADIR_RELEASE_KEY_PASSWORD: changeit
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew bundleRelease --stacktrace
+          ./gradlew assembleRelease bundleRelease --stacktrace
+          test -f app/build/outputs/apk/release/app-release.apk
           test -f app/build/outputs/bundle/release/app-release.aab
+          mkdir -p ../build/app/outputs/flutter-apk
           mkdir -p ../build/app/outputs/bundle/release
+          cp app/build/outputs/apk/release/app-release.apk ../build/app/outputs/flutter-apk/app-release.apk
           cp app/build/outputs/bundle/release/app-release.aab ../build/app/outputs/bundle/release/app-release.aab
       - uses: actions/upload-artifact@v4
         with:
           name: hadir-android-debug
           path: mobile/flutter/build/app/outputs/flutter-apk/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hadir-android-release-apk
+          path: mobile/flutter/build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: hadir-android-release-aab
