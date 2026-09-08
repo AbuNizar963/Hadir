@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../core/api.dart';
-import '../core/hadir_brand.dart';
-import '../core/session.dart';
+import '../lib/core/api.dart';
+import '../lib/core/hadir_brand.dart';
+import '../lib/core/session.dart';
 
 class AdminSettingsPage extends StatefulWidget {
   const AdminSettingsPage({super.key});
