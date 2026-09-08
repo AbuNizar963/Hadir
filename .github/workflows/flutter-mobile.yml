@@ -1,22 +1,31 @@
-name: Flutter Mobile
+name: Flutter App
 
 on:
   push:
     branches: [Apps]
     paths:
-      - 'mobile/flutter/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'lib/**'
+      - 'test/**'
+      - 'third_party/**'
+      - 'pubspec.yaml'
+      - 'analysis_options.yaml'
       - '.github/workflows/flutter-mobile.yml'
   pull_request:
     paths:
-      - 'mobile/flutter/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'lib/**'
+      - 'test/**'
+      - 'third_party/**'
+      - 'pubspec.yaml'
+      - 'analysis_options.yaml'
       - '.github/workflows/flutter-mobile.yml'
 
 jobs:
   android:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile/flutter
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -29,10 +38,7 @@ jobs:
         shell: bash
         run: |
           if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
-            git ls-files 'mobile/flutter/android/**' > "$RUNNER_TEMP/hadir-android-tracked.txt"
-            tar -C "$GITHUB_WORKSPACE" -cf "$RUNNER_TEMP/hadir-android-tracked.tar" -T "$RUNNER_TEMP/hadir-android-tracked.txt"
             flutter create --platforms=android --project-name hadir .
-            tar -C "$GITHUB_WORKSPACE" -xf "$RUNNER_TEMP/hadir-android-tracked.tar"
           fi
           rm -f android/build.gradle.kts android/settings.gradle.kts android/app/build.gradle.kts
           test -x android/gradlew
@@ -79,24 +85,21 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: hadir-android-debug
-          path: mobile/flutter/build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: hadir-android-release-apks
           path: |
-            mobile/flutter/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            mobile/flutter/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            mobile/flutter/build/app/outputs/flutter-apk/app-x86_64-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: hadir-android-release-aab
-          path: mobile/flutter/android/app/build/outputs/bundle/release/app-release.aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
 
   ios:
     runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: mobile/flutter
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2

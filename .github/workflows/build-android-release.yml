@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: 'Git ref containing the Flutter mobile project to build'
+        description: 'Git ref containing the Flutter project to build'
         required: true
         default: 'Apps'
         type: string
@@ -19,9 +19,6 @@ jobs:
   build-android-release:
     name: Build signed Flutter Android APK
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile/flutter
     steps:
       - name: Checkout source ref
         uses: actions/checkout@v6
@@ -39,10 +36,7 @@ jobs:
         shell: bash
         run: |
           if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
-            git ls-files 'mobile/flutter/android/**' > "$RUNNER_TEMP/hadir-android-tracked.txt"
-            tar -C "$GITHUB_WORKSPACE" -cf "$RUNNER_TEMP/hadir-android-tracked.tar" -T "$RUNNER_TEMP/hadir-android-tracked.txt"
             flutter create --platforms=android --project-name hadir .
-            tar -C "$GITHUB_WORKSPACE" -xf "$RUNNER_TEMP/hadir-android-tracked.tar"
           fi
           rm -f android/build.gradle.kts android/settings.gradle.kts android/app/build.gradle.kts
           test -x android/gradlew
@@ -143,7 +137,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hadir-android-flutter-production-api36-apk
-          path: mobile/flutter/build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
       - name: Publish production APK release for in-app updater
