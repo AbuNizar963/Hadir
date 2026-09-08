@@ -36,7 +36,21 @@ jobs:
         shell: bash
         run: |
           if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            # flutter create may rewrite the root Flutter scaffold. Keep the
+            # real application sources intact while generating only the
+            # missing Android wrapper files.
+            HADIR_LIB_BACKUP="$RUNNER_TEMP/hadir-lib"
+            HADIR_TEST_BACKUP="$RUNNER_TEMP/hadir-test"
+            rm -rf "$HADIR_LIB_BACKUP" "$HADIR_TEST_BACKUP"
+            cp -a lib "$HADIR_LIB_BACKUP"
+            if [ -d test ]; then cp -a test "$HADIR_TEST_BACKUP"; fi
             flutter create --platforms=android --project-name hadir .
+            rm -rf lib
+            mv "$HADIR_LIB_BACKUP" lib
+            if [ -d "$HADIR_TEST_BACKUP" ]; then
+              rm -rf test
+              mv "$HADIR_TEST_BACKUP" test
+            fi
           fi
           rm -f android/build.gradle.kts android/settings.gradle.kts android/app/build.gradle.kts
           test -x android/gradlew
@@ -46,6 +60,8 @@ jobs:
         run: |
           test -f pubspec.yaml
           test -f lib/main.dart
+          test -f lib/core/api.dart
+          test -f lib/core/session.dart
           test -f android/app/build.gradle
           grep -q "applicationId 'com.hadir.attendance'" android/app/build.gradle
           echo "Flutter Android source is present at commit $(git rev-parse HEAD)"
