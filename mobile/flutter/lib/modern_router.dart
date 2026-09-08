@@ -20,6 +20,7 @@ import 'pages/requests_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/services_page.dart';
+import 'pages/ai_assistant_page.dart';
 import 'pages/landing_page.dart';
 
 final _modernSession = HadirSession();
@@ -41,44 +42,17 @@ GoRouter buildModernRouter() => GoRouter(
     if (adminToken != null && publicLocations.contains(location)) return '/admin';
     if (employeeToken != null && publicLocations.contains(location)) return '/home';
     if (adminToken == null && (
-      location == '/admin' ||
-      location == '/admin/roles' ||
-      location == '/admin/manage' ||
-      location == '/admin/operations' ||
-      location == '/admin/reports' ||
-      location == '/admin/reports/archive' ||
-      location == '/admin/audit' ||
-      location == '/admin/settings' ||
-      location == '/manager' ||
-      location == '/manager/employees' ||
-      location == '/manager/workforce' ||
-      location == '/manager/requests' ||
-      location == '/manager/audit' ||
-      location == '/manager/reports' ||
-      location == '/manager/report-archive' ||
-      location == '/manager/settings'
+      location == '/admin' || location == '/admin/roles' || location == '/admin/manage' || location == '/admin/operations' ||
+      location == '/admin/reports' || location == '/admin/reports/archive' || location == '/admin/audit' || location == '/admin/settings' ||
+      location == '/manager' || location == '/manager/employees' || location == '/manager/workforce' || location == '/manager/requests' ||
+      location == '/manager/audit' || location == '/manager/reports' || location == '/manager/report-archive' || location == '/manager/settings'
     )) return '/admin-login';
     if (employeeToken == null &&
-        location != '/' &&
-        location != '/admin' &&
-        location != '/admin/roles' &&
-        location != '/admin/manage' &&
-        location != '/admin/operations' &&
-        location != '/admin/reports' &&
-        location != '/admin/reports/archive' &&
-        location != '/admin/audit' &&
-        location != '/admin/settings' &&
-        location != '/manager' &&
-        location != '/manager/employees' &&
-        location != '/manager/workforce' &&
-        location != '/manager/requests' &&
-        location != '/manager/audit' &&
-        location != '/manager/reports' &&
-        location != '/manager/report-archive' &&
-        location != '/manager/settings' &&
-        location != '/admin-login' &&
-        location != '/manager/login' &&
-        location != '/login') return '/login';
+        location != '/' && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' &&
+        location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/audit' && location != '/admin/settings' &&
+        location != '/manager' && location != '/manager/employees' && location != '/manager/workforce' && location != '/manager/requests' &&
+        location != '/manager/audit' && location != '/manager/reports' && location != '/manager/report-archive' && location != '/manager/settings' &&
+        location != '/admin-login' && location != '/manager/login' && location != '/login') return '/login';
     return null;
   },
   routes: [
@@ -88,7 +62,6 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
     GoRoute(path: '/manager/login', builder: (_, __) => const AdminLoginPage()),
 
-    // Admin workspace and web-compatible manager aliases.
     GoRoute(path: '/admin', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
     GoRoute(path: '/admin/roles', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
     GoRoute(path: '/admin/manage', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
@@ -107,7 +80,6 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/manager/report-archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
     GoRoute(path: '/manager/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
 
-    // Employee workspace and web-compatible employee aliases.
     GoRoute(path: '/home', builder: (_, __) => const HadirWorkspacePage()),
     GoRoute(path: '/employee', builder: (_, __) => const HadirWorkspacePage()),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
@@ -124,10 +96,9 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
     GoRoute(path: '/employee/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
     GoRoute(path: '/services', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
-    // The web exposes these as dedicated pages; Flutter keeps them in the unified services hub.
     GoRoute(path: '/weather', builder: (_, __) => const SwipeBackPage(child: ServicesPage(initialTab: 0))),
     GoRoute(path: '/prayer', builder: (_, __) => const SwipeBackPage(child: ServicesPage(initialTab: 1))),
-    GoRoute(path: '/ai', builder: (_, __) => const SwipeBackPage(child: ServicesPage(initialTab: 2))),
+    GoRoute(path: '/ai', builder: (_, __) => const SwipeBackPage(child: AIAssistantPage())),
   ],
 );
 
@@ -149,15 +120,8 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
     if (!context.canPop()) return;
     final width = MediaQuery.sizeOf(context).width;
     final x = details.globalPosition.dx;
-    if (x <= _edgeWidth) {
-      _tracking = true;
-      _fromLeft = true;
-      _dragDistance = 0;
-    } else if (x >= width - _edgeWidth) {
-      _tracking = true;
-      _fromLeft = false;
-      _dragDistance = 0;
-    }
+    if (x <= _edgeWidth) { _tracking = true; _fromLeft = true; _dragDistance = 0; }
+    else if (x >= width - _edgeWidth) { _tracking = true; _fromLeft = false; _dragDistance = 0; }
   }
   void _update(DragUpdateDetails details) {
     if (!_tracking) return;
@@ -170,14 +134,10 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
     final velocity = details.primaryVelocity ?? 0;
     final effectiveVelocity = _fromLeft ? velocity : -velocity;
     final shouldPop = _dragDistance >= _triggerDistance || effectiveVelocity > 700;
-    _tracking = false;
-    _dragDistance = 0;
+    _tracking = false; _dragDistance = 0;
     if (shouldPop && mounted && context.canPop()) context.pop();
   }
-  void _cancel() {
-    _tracking = false;
-    _dragDistance = 0;
-  }
+  void _cancel() { _tracking = false; _dragDistance = 0; }
   @override
   Widget build(BuildContext context) => GestureDetector(
     behavior: HitTestBehavior.translucent,
