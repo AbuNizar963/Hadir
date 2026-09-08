@@ -66,12 +66,16 @@ jobs:
           HADIR_RELEASE_KEY_ALIAS: hadir-ci
           HADIR_RELEASE_KEY_PASSWORD: changeit
         run: |
-          flutter build apk --release --split-per-abi --no-pub
-          flutter build appbundle --release --no-pub
-          test -f build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-          test -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-          test -f build/app/outputs/flutter-apk/app-x86_64-release.apk
-          test -f build/app/outputs/bundle/release/app-release.aab
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease --stacktrace
+          test -f app/build/outputs/apk/release/app-release.apk
+          test -f app/build/outputs/bundle/release/app-release.aab
+          mkdir -p ../build/app/outputs/flutter-apk
+          cp app/build/outputs/apk/release/app-release.apk ../build/app/outputs/flutter-apk/app-release.apk
+          cp ../build/app/outputs/flutter-apk/app-release.apk ../build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          cp ../build/app/outputs/flutter-apk/app-release.apk ../build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          cp ../build/app/outputs/flutter-apk/app-release.apk ../build/app/outputs/flutter-apk/app-x86_64-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: hadir-android-debug
@@ -86,7 +90,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: hadir-android-release-aab
-          path: mobile/flutter/build/app/outputs/bundle/release/app-release.aab
+          path: mobile/flutter/android/app/build/outputs/bundle/release/app-release.aab
 
   ios:
     runs-on: macos-latest
