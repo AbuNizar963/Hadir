@@ -3,7 +3,7 @@ name: Deploy Hadir API
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, Apps]
 
 permissions:
   contents: read
@@ -75,7 +75,6 @@ jobs:
           printf '%s\n' "$schema"
           python - "$schema" <<'PY'
           import json, subprocess, sys
-
           raw = sys.argv[1]
           data = json.loads(raw)
           rows = []
