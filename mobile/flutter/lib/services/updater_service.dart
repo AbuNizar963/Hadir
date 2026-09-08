@@ -86,12 +86,15 @@ class UpdaterService {
 
         final assets = (release['assets'] as List<dynamic>?) ?? const [];
         String? downloadUrl;
-        for (final item in assets) {
-          final asset = Map<String, dynamic>.from(item as Map);
-          if (asset['name'] == 'app-release-signed.apk') {
-            downloadUrl = asset['browser_download_url']?.toString();
-            break;
+        for (final preferredName in const ['app-release.apk', 'app-release-signed.apk']) {
+          for (final item in assets) {
+            final asset = Map<String, dynamic>.from(item as Map);
+            if (asset['name'] == preferredName) {
+              downloadUrl = asset['browser_download_url']?.toString();
+              break;
+            }
           }
+          if (downloadUrl != null && downloadUrl.isNotEmpty) break;
         }
         if (downloadUrl == null || downloadUrl.isEmpty) return null;
 
