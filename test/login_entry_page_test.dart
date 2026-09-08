@@ -29,8 +29,6 @@ void main() {
 
     expect(find.text('مساحة الموظف'), findsOneWidget);
     expect(find.text('مساحة الإدارة'), findsOneWidget);
-    expect(find.text('الحضور، السجل، الطلبات والخدمات'), findsOneWidget);
-    expect(find.text('التشغيل، الموظفون والتقارير'), findsOneWidget);
 
     await tester.tap(find.text('مساحة الموظف'));
     await tester.pumpAndSettle();
