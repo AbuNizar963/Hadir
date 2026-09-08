@@ -2,10 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/hadir_brand.dart';
 import '../core/session.dart';
-
-const _green = Color(0xFF0B6B5A);
-const _ink = Color(0xFF17322C);
 
 class AdminManagementPage extends StatefulWidget {
   const AdminManagementPage({super.key});
@@ -22,6 +20,11 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   int _tab = 0;
   bool _loading = true;
   String? _error;
+  String _employeeQuery = '';
+  String _employeeStatus = 'all';
+  String _requestQuery = '';
+  String _requestStatus = 'all';
+  String _adminQuery = '';
   List<dynamic> _employees = [];
   List<dynamic> _requests = [];
   List<dynamic> _audit = [];
@@ -126,14 +129,8 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(labelText: 'الاسم'),
-              ),
-              TextField(
-                controller: job,
-                decoration: const InputDecoration(labelText: 'الرقم الوظيفي'),
-              ),
+              TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
+              TextField(controller: job, decoration: const InputDecoration(labelText: 'الرقم الوظيفي')),
               TextField(
                 controller: pin,
                 keyboardType: TextInputType.number,
@@ -143,14 +140,8 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('حفظ'),
-            ),
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('حفظ')),
           ],
         );
       },
@@ -193,19 +184,9 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(labelText: 'الاسم'),
-                  ),
-                  TextField(
-                    controller: username,
-                    decoration: const InputDecoration(labelText: 'اسم المستخدم'),
-                  ),
-                  TextField(
-                    controller: password,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'كلمة المرور'),
-                  ),
+                  TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
+                  TextField(controller: username, decoration: const InputDecoration(labelText: 'اسم المستخدم')),
+                  TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'كلمة المرور')),
                   DropdownButtonFormField<String>(
                     initialValue: role,
                     decoration: const InputDecoration(labelText: 'الصلاحية'),
@@ -213,21 +194,13 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
                       DropdownMenuItem(value: 'manager', child: Text('مدير')),
                       DropdownMenuItem(value: 'supervisor', child: Text('مشرف')),
                     ],
-                    onChanged: (value) {
-                      setDialogState(() => role = value ?? 'manager');
-                    },
+                    onChanged: (value) => setDialogState(() => role = value ?? 'manager'),
                   ),
                 ],
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('إلغاء'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(true),
-                  child: const Text('حفظ'),
-                ),
+                TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')),
+                FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('حفظ')),
               ],
             );
           },
@@ -236,9 +209,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     );
 
     if (result != true) return;
-    if (name.text.trim().isEmpty || username.text.trim().isEmpty || password.text.isEmpty) {
-      return;
-    }
+    if (name.text.trim().isEmpty || username.text.trim().isEmpty || password.text.isEmpty) return;
 
     await _request(
       'POST',
@@ -260,374 +231,308 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
           title: const Text('حذف الموظف؟'),
           content: Text('سيتم حذف حساب «$name». لا يمكن التراجع عن العملية.'),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton.tonal(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('حذف'),
-            ),
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')),
+            FilledButton.tonal(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('حذف')),
           ],
         );
       },
     );
 
-    if (confirmed == true) {
-      await _request('DELETE', '/api/employees/$id');
-    }
+    if (confirmed == true) await _request('DELETE', '/api/employees/$id');
   }
 
   Widget _card(Widget child) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: child,
+    return Card(margin: const EdgeInsets.only(bottom: 10), child: child);
+  }
+
+  Widget _metric(String label, String value, IconData icon) {
+    return Expanded(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
+          child: Column(
+            children: [
+              Icon(icon, color: HadirBrand.primary),
+              const SizedBox(height: 6),
+              Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+              Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _searchBox({required String hint, required ValueChanged<String> onChanged}) {
+    return TextField(
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        prefixIcon: const Icon(Icons.search_rounded),
+        hintText: hint,
+        isDense: true,
+      ),
     );
   }
 
   Widget _employeesView() {
-    final children = <Widget>[
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              '${_employees.length} موظف',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink),
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: _addEmployee,
-            icon: const Icon(Icons.person_add_alt_1),
-            label: const Text('إضافة'),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-    ];
-
-    for (final raw in _employees) {
+    final filtered = _employees.where((raw) {
       final employee = Map<String, dynamic>.from(raw as Map);
-      final id = '${employee['id'] ?? ''}';
-      final name = '${employee['name'] ?? 'بدون اسم'}'.trim();
-      children.add(
-        _card(
-          ListTile(
+      final query = _employeeQuery.trim().toLowerCase();
+      final name = '${employee['name'] ?? ''}'.toLowerCase();
+      final job = '${employee['jobNumber'] ?? ''}'.toLowerCase();
+      final status = '${employee['status'] ?? 'active'}'.toLowerCase();
+      return (query.isEmpty || name.contains(query) || job.contains(query)) &&
+          (_employeeStatus == 'all' || status == _employeeStatus);
+    }).toList();
+    final active = _employees.where((raw) => '${(raw as Map)['status'] ?? 'active'}' == 'active').length;
+    final inactive = _employees.length - active;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(children: [
+          _metric('إجمالي الموظفين', '${_employees.length}', Icons.groups_rounded),
+          const SizedBox(width: 8),
+          _metric('نشط', '$active', Icons.check_circle_outline_rounded),
+          const SizedBox(width: 8),
+          _metric('غير نشط', '$inactive', Icons.pause_circle_outline_rounded),
+        ]),
+        const SizedBox(height: 8),
+        _searchBox(hint: 'ابحث بالاسم أو الرقم الوظيفي', onChanged: (v) => setState(() => _employeeQuery = v)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            _filterChip('الكل', 'all', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
+            _filterChip('نشط', 'active', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
+            _filterChip('غير نشط', 'inactive', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: Text('${filtered.length} نتيجة', style: const TextStyle(fontWeight: FontWeight.w800))),
+          FilledButton.icon(onPressed: _addEmployee, icon: const Icon(Icons.person_add_alt_1), label: const Text('إضافة')),
+        ]),
+        const SizedBox(height: 10),
+        if (filtered.isEmpty) _empty('لا توجد موظفون مطابقون للبحث.')
+        else ...filtered.map((raw) {
+          final employee = Map<String, dynamic>.from(raw as Map);
+          final id = '${employee['id'] ?? ''}';
+          final name = '${employee['name'] ?? 'بدون اسم'}'.trim();
+          final status = '${employee['status'] ?? 'active'}';
+          return _card(ListTile(
             leading: CircleAvatar(
-              backgroundColor: const Color(0xFFEAF4F0),
+              backgroundColor: HadirBrand.soft,
               child: Text(name.isEmpty ? 'م' : name.substring(0, 1)),
             ),
             title: Text(name, style: const TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: Text('${employee['jobNumber'] ?? '—'} · ${employee['status'] ?? 'active'}'),
+            subtitle: Text('${employee['jobNumber'] ?? '—'} · $status · ${employee['scheduleType'] ?? '—'}'),
             trailing: PopupMenuButton<String>(
               onSelected: (value) {
-                if (value == 'reset') {
-                  _request('DELETE', '/api/employees/$id/device');
-                } else if (value == 'delete') {
-                  _deleteEmployee(id, name);
-                }
+                if (value == 'reset') _request('DELETE', '/api/employees/$id/device');
+                if (value == 'delete') _deleteEmployee(id, name);
               },
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'reset', child: Text('إعادة ربط الجهاز')),
                 PopupMenuItem(value: 'delete', child: Text('حذف الموظف')),
               ],
             ),
-          ),
-        ),
-      );
-    }
+          ));
+        }),
+      ],
+    );
+  }
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+  Widget _filterChip(String label, String value, String current, ValueChanged<String> onSelected) {
+    return ChoiceChip(label: Text(label), selected: current == value, onSelected: (_) => onSelected(value));
   }
 
   Widget _requestsView() {
-    final children = <Widget>[
-      Text(
-        '${_requests.length} طلب',
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink),
-      ),
-      const SizedBox(height: 12),
-    ];
-
-    for (final raw in _requests) {
+    final filtered = _requests.where((raw) {
       final request = Map<String, dynamic>.from(raw as Map);
-      final id = '${request['id'] ?? ''}';
-      final status = '${request['status'] ?? 'pending'}';
-      children.add(
-        _card(
-          ListTile(
-            title: Text(
-              '${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-            subtitle: Text('${request['reason'] ?? ''}\nالحالة: $status'),
-            isThreeLine: true,
-            trailing: status == 'pending'
-                ? PopupMenuButton<String>(
-                    onSelected: (value) => _request(
-                      'PATCH',
-                      '/api/requests/$id',
-                      data: {'status': value},
-                    ),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'approved', child: Text('موافقة')),
-                      PopupMenuItem(value: 'rejected', child: Text('رفض')),
-                    ],
-                  )
-                : null,
-          ),
-        ),
-      );
-    }
+      final query = _requestQuery.trim().toLowerCase();
+      final status = '${request['status'] ?? 'pending'}'.toLowerCase();
+      final text = '${request['type'] ?? ''} ${request['employeeName'] ?? ''} ${request['employeeId'] ?? ''} ${request['reason'] ?? ''}'.toLowerCase();
+      return (query.isEmpty || text.contains(query)) && (_requestStatus == 'all' || status == _requestStatus);
+    }).toList();
+    final pending = _requests.where((raw) => '${(raw as Map)['status'] ?? 'pending'}' == 'pending').length;
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        _metric('إجمالي الطلبات', '${_requests.length}', Icons.inbox_rounded),
+        const SizedBox(width: 8),
+        _metric('قيد المراجعة', '$pending', Icons.pending_actions_rounded),
+      ]),
+      const SizedBox(height: 8),
+      _searchBox(hint: 'ابحث في نوع الطلب أو الموظف أو السبب', onChanged: (v) => setState(() => _requestQuery = v)),
+      const SizedBox(height: 8),
+      Wrap(spacing: 8, children: [
+        _filterChip('الكل', 'all', _requestStatus, (v) => setState(() => _requestStatus = v)),
+        _filterChip('معلق', 'pending', _requestStatus, (v) => setState(() => _requestStatus = v)),
+        _filterChip('مقبول', 'approved', _requestStatus, (v) => setState(() => _requestStatus = v)),
+        _filterChip('مرفوض', 'rejected', _requestStatus, (v) => setState(() => _requestStatus = v)),
+      ]),
+      const SizedBox(height: 12),
+      if (filtered.isEmpty) _empty('لا توجد طلبات مطابقة.')
+      else ...filtered.map((raw) {
+        final request = Map<String, dynamic>.from(raw as Map);
+        final id = '${request['id'] ?? ''}';
+        final status = '${request['status'] ?? 'pending'}';
+        return _card(ListTile(
+          title: Text('${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text('${request['reason'] ?? ''}\nالحالة: $status'),
+          isThreeLine: true,
+          trailing: status == 'pending'
+              ? PopupMenuButton<String>(
+                  onSelected: (value) => _request('PATCH', '/api/requests/$id', data: {'status': value}),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'approved', child: Text('موافقة')),
+                    PopupMenuItem(value: 'rejected', child: Text('رفض')),
+                  ],
+                )
+              : null,
+        ));
+      }),
+    ]);
   }
 
   Widget _reportsView() {
     final successful = _audit.where((raw) {
       final item = Map<String, dynamic>.from(raw as Map);
-      return item['result'] == 'success' &&
-          (item['action'] == 'check-in' || item['action'] == 'check-out');
+      return item['result'] == 'success' && (item['action'] == 'check-in' || item['action'] == 'check-out');
     }).toList();
     final checkIns = successful.where((raw) => (raw as Map)['action'] == 'check-in').length;
     final checkOuts = successful.where((raw) => (raw as Map)['action'] == 'check-out').length;
 
-    final children = <Widget>[
-      Row(
-        children: [
-          Expanded(child: _stat('سجلات ناجحة', '${successful.length}', Icons.fact_check_rounded)),
-          const SizedBox(width: 10),
-          Expanded(child: _stat('حضور', '$checkIns', Icons.login_rounded)),
-          const SizedBox(width: 10),
-          Expanded(child: _stat('انصراف', '$checkOuts', Icons.logout_rounded)),
-        ],
-      ),
-      const SizedBox(height: 16),
-      _card(
-        const ListTile(
-          title: Text('التقرير التفصيلي', style: TextStyle(fontWeight: FontWeight.w900)),
-          subtitle: Text('عمليات الحضور والانصراف المستخرجة من سجل التدقيق.'),
-        ),
-      ),
-    ];
-
-    for (final raw in successful.take(80)) {
-      final item = Map<String, dynamic>.from(raw as Map);
-      children.add(
-        _card(
-          ListTile(
-            title: Text(
-              '${item['actorName'] ?? item['jobNumber'] ?? 'موظف'} · ${item['action']}',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-            subtitle: Text('${item['timestamp'] ?? ''} · ${item['distanceMeters'] ?? 0} متر'),
-          ),
-        ),
-      );
-    }
-
-    return Column(children: children);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        _metric('سجلات ناجحة', '${successful.length}', Icons.fact_check_rounded),
+        const SizedBox(width: 8),
+        _metric('حضور', '$checkIns', Icons.login_rounded),
+        const SizedBox(width: 8),
+        _metric('انصراف', '$checkOuts', Icons.logout_rounded),
+      ]),
+      const SizedBox(height: 12),
+      _card(const ListTile(title: Text('التقرير التفصيلي', style: TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('عمليات الحضور والانصراف المستخرجة من سجل التدقيق.'))),
+      ...successful.take(80).map((raw) {
+        final item = Map<String, dynamic>.from(raw as Map);
+        return _card(ListTile(
+          title: Text('${item['actorName'] ?? item['jobNumber'] ?? 'موظف'} · ${item['action']}', style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text('${item['timestamp'] ?? ''} · ${item['distanceMeters'] ?? 0} متر'),
+        ));
+      }),
+    ]);
   }
 
   Widget _auditView() {
-    final children = <Widget>[
-      Text(
-        '${_audit.length} حدث مسجل',
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink),
-      ),
+    if (_audit.isEmpty) return _empty('لا توجد أحداث تدقيق.');
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        _metric('إجمالي الأحداث', '${_audit.length}', Icons.security_rounded),
+        const SizedBox(width: 8),
+        _metric('ناجح', '${_audit.where((raw) => (raw as Map)['result'] == 'success').length}', Icons.verified_rounded),
+      ]),
       const SizedBox(height: 12),
-    ];
-
-    for (final raw in _audit.take(120)) {
-      final item = Map<String, dynamic>.from(raw as Map);
-      children.add(
-        _card(
-          ListTile(
-            dense: true,
-            title: Text(
-              '${item['action'] ?? 'حدث'} · ${item['actorName'] ?? item['jobNumber'] ?? ''}',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-            subtitle: Text('${item['timestamp'] ?? ''} · ${item['result'] ?? ''}'),
-          ),
-        ),
-      );
-    }
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+      ..._audit.take(120).map((raw) {
+        final item = Map<String, dynamic>.from(raw as Map);
+        return _card(ListTile(
+          dense: true,
+          title: Text('${item['action'] ?? 'حدث'} · ${item['actorName'] ?? item['jobNumber'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text('${item['timestamp'] ?? ''} · ${item['result'] ?? ''}'),
+        ));
+      }),
+    ]);
   }
 
   Widget _adminsView() {
-    final children = <Widget>[
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              '${_admins.length} حساب إداري',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink),
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: _addAdmin,
-            icon: const Icon(Icons.person_add),
-            label: const Text('إضافة'),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-    ];
-
-    for (final raw in _admins) {
+    final filtered = _admins.where((raw) {
       final admin = Map<String, dynamic>.from(raw as Map);
-      final id = '${admin['id'] ?? ''}';
-      children.add(
-        _card(
-          ListTile(
-            leading: const Icon(Icons.admin_panel_settings_rounded, color: _green),
-            title: Text('${admin['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: Text('@${admin['username'] ?? ''} · ${admin['role'] ?? ''}'),
-            trailing: Switch(
-              value: admin['active'] != false,
-              onChanged: (value) => _request(
-                'PATCH',
-                '/api/admins/$id',
-                data: {'active': value},
-              ),
-            ),
-          ),
-        ),
-      );
-    }
+      final query = _adminQuery.trim().toLowerCase();
+      return query.isEmpty || '${admin['name'] ?? ''} ${admin['username'] ?? ''} ${admin['role'] ?? ''}'.toLowerCase().contains(query);
+    }).toList();
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        _metric('الحسابات', '${_admins.length}', Icons.admin_panel_settings_rounded),
+        const Spacer(),
+        FilledButton.icon(onPressed: _addAdmin, icon: const Icon(Icons.person_add), label: const Text('إضافة')),
+      ]),
+      const SizedBox(height: 8),
+      _searchBox(hint: 'ابحث بالاسم أو اسم المستخدم أو الصلاحية', onChanged: (v) => setState(() => _adminQuery = v)),
+      const SizedBox(height: 12),
+      if (filtered.isEmpty) _empty('لا توجد حسابات مطابقة.')
+      else ...filtered.map((raw) {
+        final admin = Map<String, dynamic>.from(raw as Map);
+        final id = '${admin['id'] ?? ''}';
+        return _card(ListTile(
+          leading: const Icon(Icons.admin_panel_settings_rounded, color: HadirBrand.primary),
+          title: Text('${admin['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text('@${admin['username'] ?? ''} · ${admin['role'] ?? ''}'),
+          trailing: Switch(value: admin['active'] != false, onChanged: (value) => _request('PATCH', '/api/admins/$id', data: {'active': value})),
+        ));
+      }),
+    ]);
   }
 
   Widget _settingsView() {
-    final rows = <Widget>[];
-    for (final entry in _settings.entries) {
-      rows.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  entry.key,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              Flexible(
-                child: Text(
-                  '${entry.value}',
-                  textAlign: TextAlign.left,
-                  style: const TextStyle(color: Colors.black54),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    if (_settings.isEmpty) return _empty('لا توجد إعدادات متاحة.');
+    final rows = _settings.entries.map((entry) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(children: [
+        Expanded(child: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w700))),
+        Flexible(child: Text('${entry.value}', textAlign: TextAlign.left, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))),
+      ]),
+    )).toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'إعدادات النظام',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink),
-        ),
-        const SizedBox(height: 12),
-        _card(Padding(padding: const EdgeInsets.all(16), child: Column(children: rows))),
-      ],
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Text('إعدادات النظام', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 8),
+      _card(Padding(padding: const EdgeInsets.all(16), child: Column(children: rows))),
+    ]);
   }
 
-  Widget _stat(String label, String value, IconData icon) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          children: [
-            Icon(icon, color: _green),
-            const SizedBox(height: 7),
-            Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-            Text(label, style: const TextStyle(fontSize: 10, color: Colors.black54)),
-          ],
-        ),
-      ),
-    );
+  Widget _empty(String message) {
+    return Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(children: [
+      const Icon(Icons.inbox_outlined, size: 42),
+      const SizedBox(height: 10),
+      Text(message, textAlign: TextAlign.center),
+    ])));
   }
 
   @override
   Widget build(BuildContext context) {
-    final views = [
-      _employeesView(),
-      _requestsView(),
-      _reportsView(),
-      _auditView(),
-      _adminsView(),
-      _settingsView(),
-    ];
+    final views = [_employeesView(), _requestsView(), _reportsView(), _auditView(), _adminsView(), _settingsView()];
     const labels = ['الموظفون', 'الطلبات', 'التقارير', 'التدقيق', 'الإدارة', 'الإعدادات'];
-    const icons = [
-      Icons.groups_rounded,
-      Icons.event_note_rounded,
-      Icons.bar_chart_rounded,
-      Icons.security_rounded,
-      Icons.admin_panel_settings_rounded,
-      Icons.settings_rounded,
-    ];
+    const icons = [Icons.groups_rounded, Icons.event_note_rounded, Icons.bar_chart_rounded, Icons.security_rounded, Icons.admin_panel_settings_rounded, Icons.settings_rounded];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('إدارة حاضر', style: TextStyle(fontWeight: FontWeight.w900)),
-        leading: IconButton(
-          onPressed: () => context.go('/admin'),
-          icon: const Icon(Icons.arrow_back),
-        ),
+        leading: IconButton(onPressed: () => context.go('/admin'), icon: const Icon(Icons.arrow_back)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.cloud_off_rounded, size: 48),
-                        const SizedBox(height: 12),
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        FilledButton(onPressed: _load, child: const Text('إعادة المحاولة')),
-                      ],
-                    ),
-                  ),
-                )
+              ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.cloud_off_rounded, size: 48),
+                  const SizedBox(height: 12),
+                  Text(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  FilledButton(onPressed: _load, child: const Text('إعادة المحاولة')),
+                ])))
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                    children: [
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: List.generate(labels.length, (index) {
-                            return Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: ChoiceChip(
-                                selected: _tab == index,
-                                avatar: Icon(icons[index], size: 17),
-                                label: Text(labels[index]),
-                                onSelected: (_) => setState(() => _tab = index),
-                              ),
-                            );
-                          }),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      views[_tab],
-                    ],
-                  ),
+                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(children: List.generate(labels.length, (index) => Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index)),
+                      ))),
+                    ),
+                    const SizedBox(height: 18),
+                    views[_tab],
+                  ]),
                 ),
     );
   }
