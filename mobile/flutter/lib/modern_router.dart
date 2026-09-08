@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/session.dart';
+import 'pages/admin_audit_page.dart';
 import 'pages/admin_login_page.dart';
 import 'pages/admin_management_page.dart';
 import 'pages/admin_operations_page.dart';
@@ -32,8 +33,8 @@ GoRouter buildModernRouter() => GoRouter(
     if (employeeToken == null && adminToken == null && !publicLocations.contains(location)) return '/login';
     if (adminToken != null && publicLocations.contains(location)) return '/admin';
     if (employeeToken != null && publicLocations.contains(location)) return '/home';
-    if (adminToken == null && (location == '/admin' || location == '/admin/roles' || location == '/admin/manage' || location == '/admin/operations' || location == '/admin/reports' || location == '/admin/reports/archive' || location == '/admin/settings')) return '/admin-login';
-    if (employeeToken == null && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' && location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/settings' && location != '/admin-login' && location != '/login') return '/login';
+    if (adminToken == null && (location == '/admin' || location == '/admin/roles' || location == '/admin/manage' || location == '/admin/operations' || location == '/admin/reports' || location == '/admin/reports/archive' || location == '/admin/audit' || location == '/admin/settings')) return '/admin-login';
+    if (employeeToken == null && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' && location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/audit' && location != '/admin/settings' && location != '/admin-login' && location != '/login') return '/login';
     return null;
   },
   routes: [
@@ -46,6 +47,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin/operations', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
     GoRoute(path: '/admin/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/admin/reports/archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
+    GoRoute(path: '/admin/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
     GoRoute(path: '/admin/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
     GoRoute(path: '/home', builder: (_, __) => const HadirWorkspacePage()),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
