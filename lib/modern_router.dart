@@ -6,6 +6,7 @@ import 'core/api.dart';
 import 'core/session.dart';
 import 'features/administration/pages/admin_mobile_home_page.dart';
 import 'features/administration/widgets/admin_mobile_shell.dart';
+import 'features/employee/widgets/employee_mobile_shell.dart';
 import 'pages/admin_audit_page.dart';
 import 'pages/admin_login_page.dart';
 import 'pages/admin_management_page.dart';
@@ -118,8 +119,8 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/manager/report-archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
     GoRoute(path: '/manager/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
 
-    GoRoute(path: '/home', builder: (_, __) => const HadirWorkspacePage()),
-    GoRoute(path: '/employee', builder: (_, __) => const HadirWorkspacePage()),
+    GoRoute(path: '/home', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
+    GoRoute(path: '/employee', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/premium', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
@@ -180,7 +181,12 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
     final isAdminArea = path == '/admin' || path.startsWith('/admin/') || path == '/manager' || path.startsWith('/manager/');
-    final content = isAdminArea ? AdminMobileShell(child: widget.child) : widget.child;
+    final isEmployeeArea = path == '/home' || path == '/employee' || path.startsWith('/employee/');
+    final content = isAdminArea
+        ? AdminMobileShell(child: widget.child)
+        : isEmployeeArea
+            ? EmployeeMobileShell(child: widget.child)
+            : widget.child;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onHorizontalDragStart: _start,
