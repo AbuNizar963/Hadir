@@ -91,6 +91,7 @@ GoRouter buildModernRouter() => GoRouter(
         location != '/admin-login' && location != '/manager/login' && location != '/login') return '/login';
     return null;
   },
+  errorBuilder: (context, state) => const _NotFoundPage(),
   routes: [
     GoRoute(path: '/', builder: (_, __) => const LandingPage()),
     GoRoute(path: '/login', builder: (_, __) => const LoginEntryPage()),
@@ -182,6 +183,57 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
     onHorizontalDragEnd: _end,
     onHorizontalDragCancel: _cancel,
     child: widget.child,
+  );
+}
+
+class _NotFoundPage extends StatelessWidget {
+  const _NotFoundPage();
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      backgroundColor: const Color(0xFFF4F7F6),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(mainAxisAlignment: MainAxisAlignment.start, children: [
+                const Icon(Icons.how_to_reg_rounded, color: Color(0xFF0B6B5A), size: 28),
+                const SizedBox(width: 8),
+                const Text('حاضر', style: TextStyle(color: Color(0xFF142D27), fontSize: 22, fontWeight: FontWeight.w900)),
+              ]),
+            ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    padding: const EdgeInsets.all(30),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFDCE6E2)),
+                      boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 24, offset: Offset(0, 10))],
+                    ),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const Text('ERROR · 404', style: TextStyle(color: Color(0xFF73827E), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
+                      const SizedBox(height: 8),
+                      const Text('الصفحة غير موجودة', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF142D27), fontSize: 27, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 8),
+                      const Text('الرابط الذي حاولت الوصول إليه غير متاح.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF73827E), fontSize: 13, height: 1.5)),
+                      const SizedBox(height: 22),
+                      SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: () => context.go('/'), icon: const Icon(Icons.home_rounded), label: const Text('العودة للرئيسية'))),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
   );
 }
 
