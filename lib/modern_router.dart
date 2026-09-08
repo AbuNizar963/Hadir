@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'core/api.dart';
 import 'core/session.dart';
+import 'features/administration/pages/admin_mobile_home_page.dart';
 import 'pages/admin_audit_page.dart';
 import 'pages/admin_login_page.dart';
 import 'pages/admin_management_page.dart';
@@ -99,15 +100,15 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
     GoRoute(path: '/manager/login', builder: (_, __) => const AdminLoginPage()),
 
-    GoRoute(path: '/admin', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
-    GoRoute(path: '/admin/roles', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
+    GoRoute(path: '/admin', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
+    GoRoute(path: '/admin/roles', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
     GoRoute(path: '/admin/manage', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
     GoRoute(path: '/admin/operations', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
     GoRoute(path: '/admin/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/admin/reports/archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
     GoRoute(path: '/admin/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
     GoRoute(path: '/admin/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
-    GoRoute(path: '/manager', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
+    GoRoute(path: '/manager', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
     GoRoute(path: '/manager-home', redirect: (_, __) => '/manager'),
     GoRoute(path: '/manager/employees', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
     GoRoute(path: '/manager/workforce', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
