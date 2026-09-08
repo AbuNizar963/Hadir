@@ -218,7 +218,7 @@ class _ManagerRequestsPageState extends State<ManagerRequestsPage> {
         Text(_error!, textAlign: TextAlign.center),
         const SizedBox(height: 12),
         FilledButton(onPressed: _load, child: const Text('إعادة المحاولة')),
-      ]));
+      ])));
 }
 
 class _Empty extends StatelessWidget {
