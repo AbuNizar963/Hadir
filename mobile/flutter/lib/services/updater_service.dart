@@ -38,19 +38,22 @@ class InstallPermissionRequiredException implements Exception {}
 class UpdaterService {
   static const _channel = MethodChannel('hadir/updater');
   static const _progressChannel = EventChannel('hadir/updater_progress');
+  static const _latestReleaseUrl =
+      'https://api.github.com/repos/AbuNizar963/Hadir/releases/latest';
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 20),
+    receiveTimeout: const Duration(seconds: 30),
     headers: {
       'Accept': 'application/vnd.github+json',
       'User-Agent': 'Hadir-Flutter-Updater',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-store, max-age=0',
       'Pragma': 'no-cache',
     },
   ));
 
-  Stream<UpdateProgress> get progress => _progressChannel.receiveBroadcastStream().map((event) {
+  Stream<UpdateProgress> get progress =>
+      _progressChannel.receiveBroadcastStream().map((event) {
         final map = Map<Object?, Object?>.from(event as Map);
         return UpdateProgress(
           downloadedBytes: (map['downloadedBytes'] as num?)?.toInt() ?? 0,
@@ -71,7 +74,8 @@ class UpdaterService {
       try {
         final currentCode = await currentVersionCode();
         final response = await _dio.get<dynamic>(
-          'https://api.github.com/repos/AbuNizar963/Hadir/releases/latest',
+          _latestReleaseUrl,
+          queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
           options: Options(responseType: ResponseType.json),
         );
         final release = response.data is String
@@ -79,22 +83,20 @@ class UpdaterService {
             : Map<String, dynamic>.from(response.data as Map);
         if (release['draft'] == true || release['prerelease'] == true) return null;
 
-        final tag = (release['tag_name'] ?? '').toString();
+        final tag = (release['tag_name'] ?? '').toString().trim();
         final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
         final code = int.tryParse(match?.group(1) ?? '');
         if (code == null || code <= currentCode) return null;
 
         final assets = (release['assets'] as List<dynamic>?) ?? const [];
         String? downloadUrl;
-        for (final preferredName in const ['app-release.apk', 'app-release-signed.apk']) {
-          for (final item in assets) {
-            final asset = Map<String, dynamic>.from(item as Map);
-            if (asset['name'] == preferredName) {
-              downloadUrl = asset['browser_download_url']?.toString();
-              break;
-            }
+        for (final item in assets) {
+          final asset = Map<String, dynamic>.from(item as Map);
+          final name = (asset['name'] ?? '').toString();
+          if (name == 'app-release.apk' || name == 'app-release-signed.apk') {
+            downloadUrl = asset['browser_download_url']?.toString();
+            if (downloadUrl != null && downloadUrl.isNotEmpty) break;
           }
-          if (downloadUrl != null && downloadUrl.isNotEmpty) break;
         }
         if (downloadUrl == null || downloadUrl.isEmpty) return null;
 
