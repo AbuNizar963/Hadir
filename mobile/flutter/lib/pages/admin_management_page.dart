@@ -57,6 +57,27 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     return error.toString().replaceFirst('Exception: ', '');
   }
 
+  List<dynamic> _asList(dynamic data) {
+    if (data is List) return List<dynamic>.from(data);
+    if (data is Map) {
+      for (final key in const ['data', 'items', 'results', 'employees', 'requests', 'audit', 'admins']) {
+        final value = data[key];
+        if (value is List) return List<dynamic>.from(value);
+      }
+    }
+    return <dynamic>[];
+  }
+
+  Map<String, dynamic> _asMap(dynamic data) {
+    if (data is Map) {
+      final direct = Map<String, dynamic>.from(data);
+      final nested = direct['data'];
+      if (nested is Map) return Map<String, dynamic>.from(nested);
+      return direct;
+    }
+    return <String, dynamic>{};
+  }
+
   Future<void> _load() async {
     if (mounted) {
       setState(() {
@@ -81,11 +102,11 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
 
       if (!mounted) return;
       setState(() {
-        _employees = List<dynamic>.from(results[0].data as List);
-        _requests = List<dynamic>.from(results[1].data as List);
-        _audit = List<dynamic>.from(results[2].data as List);
-        _admins = List<dynamic>.from(results[3].data as List);
-        _settings = Map<String, dynamic>.from(results[4].data as Map);
+        _employees = _asList(results[0].data);
+        _requests = _asList(results[1].data);
+        _audit = _asList(results[2].data);
+        _admins = _asList(results[3].data);
+        _settings = _asMap(results[4].data);
         _loading = false;
       });
     } catch (error) {
