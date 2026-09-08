@@ -52,6 +52,14 @@ class HadirApi {
   Future<Map<String, dynamic>> employeeDeviceStatus() async => Map<String, dynamic>.from((await dio.get('/api/device/status')).data as Map);
   Future<List<dynamic>> locations() async => List<dynamic>.from((await dio.get('/api/locations')).data as List);
   Future<dynamic> attendance({int limit = 500}) async => List<dynamic>.from((await dio.get('/api/attendance', queryParameters: {'limit': limit.clamp(1, 2000)})).data as List);
+  Future<List<dynamic>> audit({int limit = 500}) async {
+    final data = await dio.get('/api/audit', queryParameters: {'limit': limit.clamp(1, 2000)});
+    final value = data.data;
+    if (value is List) return List<dynamic>.from(value);
+    if (value is Map && value['audit'] is List) return List<dynamic>.from(value['audit'] as List);
+    if (value is Map && value['entries'] is List) return List<dynamic>.from(value['entries'] as List);
+    return <dynamic>[];
+  }
   Future<Map<String, dynamic>> createChallenge({required String type, required double lat, required double lng, required String qrCode, required String deviceId}) async => Map<String, dynamic>.from((await dio.post('/api/attendance/challenge', data: {'type': type, 'lat': lat, 'lng': lng, 'qrCode': qrCode, 'deviceId': deviceId})).data as Map);
   Future<Map<String, dynamic>> createAttendance(Map<String, dynamic> record) async => Map<String, dynamic>.from((await dio.post('/api/attendance', data: record)).data as Map);
   Future<List<dynamic>> requests() async => List<dynamic>.from((await dio.get('/api/requests')).data as List);
