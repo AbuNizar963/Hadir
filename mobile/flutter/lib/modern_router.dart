@@ -1,6 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/api.dart';
 import 'core/session.dart';
 import 'pages/admin_audit_page.dart';
 import 'pages/admin_login_page.dart';
@@ -25,6 +27,23 @@ import 'pages/manager_requests_page.dart';
 import 'pages/landing_page.dart';
 
 final _modernSession = HadirSession();
+String? _validatedEmployeeToken;
+String? _validatedAdminToken;
+
+Future<bool> _isTokenValid(String token) async {
+  try {
+    await HadirApi(token: token).me();
+    return true;
+  } on DioException catch (error) {
+    final status = error.response?.statusCode;
+    if (status == 401 || status == 403) return false;
+    // Preserve the website's offline-friendly behavior: transient/network
+    // failures must not sign the user out or strand them at the landing page.
+    return true;
+  } catch (_) {
+    return true;
+  }
+}
 
 GoRouter buildModernRouter() => GoRouter(
   initialLocation: '/',
@@ -33,16 +52,42 @@ GoRouter buildModernRouter() => GoRouter(
     final adminToken = await _modernSession.adminToken();
     final location = state.matchedLocation;
     const publicLocations = {'/', '/login', '/employee-login', '/admin-login', '/manager/login'};
-    if (employeeToken == null && adminToken == null && !publicLocations.contains(location)) return '/';
-    if (adminToken != null && publicLocations.contains(location)) return '/admin';
-    if (employeeToken != null && publicLocations.contains(location)) return '/home';
-    if (adminToken == null && (
+
+    // Mirror the web LaunchGateway: validate a stored session when it is first
+    // observed, and revalidate automatically when the stored token changes.
+    if (employeeToken != null && employeeToken.isNotEmpty && employeeToken != _validatedEmployeeToken) {
+      final valid = await _isTokenValid(employeeToken);
+      if (!valid) {
+        _validatedEmployeeToken = null;
+        await _modernSession.clear();
+        if (!publicLocations.contains(location)) return '/';
+      } else {
+        _validatedEmployeeToken = employeeToken;
+      }
+    }
+    if (adminToken != null && adminToken.isNotEmpty && adminToken != _validatedAdminToken) {
+      final valid = await _isTokenValid(adminToken);
+      if (!valid) {
+        _validatedAdminToken = null;
+        await _modernSession.clearAdmin();
+        if (!publicLocations.contains(location)) return '/';
+      } else {
+        _validatedAdminToken = adminToken;
+      }
+    }
+
+    final currentEmployeeToken = await _modernSession.token();
+    final currentAdminToken = await _modernSession.adminToken();
+    if (currentEmployeeToken == null && currentAdminToken == null && !publicLocations.contains(location)) return '/';
+    if (currentAdminToken != null && publicLocations.contains(location)) return '/admin';
+    if (currentEmployeeToken != null && publicLocations.contains(location)) return '/home';
+    if (currentAdminToken == null && (
       location == '/admin' || location == '/admin/roles' || location == '/admin/manage' || location == '/admin/operations' ||
       location == '/admin/reports' || location == '/admin/reports/archive' || location == '/admin/audit' || location == '/admin/settings' ||
       location == '/manager' || location == '/manager/employees' || location == '/manager/workforce' || location == '/manager/requests' ||
       location == '/manager/audit' || location == '/manager/reports' || location == '/manager/report-archive' || location == '/manager/settings'
     )) return '/admin-login';
-    if (employeeToken == null &&
+    if (currentEmployeeToken == null &&
         location != '/' && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' &&
         location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/audit' && location != '/admin/settings' &&
         location != '/manager' && location != '/manager/employees' && location != '/manager/workforce' && location != '/manager/requests' &&
@@ -80,8 +125,8 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/premium', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
-    GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
-    GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in'))),
+    GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in')),
+    GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in')),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
     GoRoute(path: '/employee/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
     GoRoute(path: '/insights', builder: (_, __) => const SwipeBackPage(child: AttendanceInsightsPage())),
