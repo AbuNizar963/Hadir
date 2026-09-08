@@ -2,6 +2,8 @@
 ///
 /// Implementations remain untouched during this migration to guarantee that
 /// existing administration behavior and routes stay stable.
+library;
+
 export '../../pages/admin_audit_page.dart';
 export '../../pages/admin_login_page.dart';
 export '../../pages/admin_management_page.dart';
