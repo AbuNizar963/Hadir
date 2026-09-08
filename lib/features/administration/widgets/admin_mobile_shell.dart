@@ -81,10 +81,7 @@ class AdminMobileShell extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 390;
     return Container(
       padding: EdgeInsets.fromLTRB(compact ? 12 : 14, 10, compact ? 12 : 14, 9),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: _border)),
-      ),
+      decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: _border))),
       child: Row(
         children: [
           Expanded(
@@ -94,107 +91,45 @@ class AdminMobileShell extends StatelessWidget {
                   width: compact ? 40 : 44,
                   height: compact ? 40 : 44,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topRight,
-                      end: Alignment.bottomLeft,
-                      colors: [_brand, Color(0xFF064B40)],
-                    ),
+                    gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_brand, Color(0xFF064B40)]),
                     borderRadius: BorderRadius.circular(compact ? 13 : 15),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x220B6B5A),
-                        blurRadius: 18,
-                        offset: Offset(0, 8),
-                      ),
-                    ],
+                    boxShadow: const [BoxShadow(color: Color(0x220B6B5A), blurRadius: 18, offset: Offset(0, 8))],
                   ),
-                  child: Icon(
-                    Icons.how_to_reg_rounded,
-                    color: Colors.white,
-                    size: compact ? 23 : 25,
-                  ),
+                  child: Icon(Icons.how_to_reg_rounded, color: Colors.white, size: compact ? 23 : 25),
                 ),
                 const SizedBox(width: 9),
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'حاضر',
-                      style: TextStyle(
-                        color: _ink,
-                        fontSize: 22,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                    Text('حاضر', style: TextStyle(color: _ink, fontSize: 22, height: 1, fontWeight: FontWeight.w900)),
                     SizedBox(height: 4),
-                    Text(
-                      'نظام حضور وانصراف موثّق',
-                      style: TextStyle(
-                        color: _muted,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text('نظام حضور وانصراف موثّق', style: TextStyle(color: _muted, fontSize: 9.5, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ],
             ),
           ),
-          _headerButton(
-            context,
-            icon: Icons.notifications_none_rounded,
-            label: 'الإشعارات',
-            compact: compact,
-            onTap: () => context.push('/notifications'),
-          ),
+          _headerButton(context, icon: Icons.notifications_none_rounded, label: 'الإشعارات', compact: compact, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()))),
           const SizedBox(width: 7),
-          _headerButton(
-            context,
-            icon: Icons.menu_rounded,
-            label: 'الخيارات',
-            compact: compact,
-            onTap: () => _showOptions(context),
-          ),
+          _headerButton(context, icon: Icons.menu_rounded, label: 'الخيارات', compact: compact, onTap: () => _showOptions(context)),
         ],
       ),
     );
   }
 
-  Widget _headerButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required bool compact,
-    required VoidCallback onTap,
-  }) {
+  Widget _headerButton(BuildContext context, {required IconData icon, required String label, required bool compact, required VoidCallback onTap}) {
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         foregroundColor: _ink,
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 9 : 11,
-          vertical: compact ? 9 : 10,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 9 : 11, vertical: compact ? 9 : 10),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         side: const BorderSide(color: _border),
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: compact ? 20 : 21),
-          if (!compact) ...[
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
-            ),
-          ],
-        ],
-      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: compact ? 20 : 21), if (!compact) ...[const SizedBox(width: 6), Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))]],),
     );
   }
 
@@ -206,22 +141,13 @@ class AdminMobileShell extends StatelessWidget {
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  'الخيارات',
-                  style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900),
-                ),
-              ),
-              const SizedBox(height: 10),
-              _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
-              _optionTile(sheetContext, Icons.explore_outlined, 'القبلة', 'اتجاه القبلة والخدمات المكانية', '/prayer'),
-              _optionTile(sheetContext, Icons.settings_outlined, 'الإعدادات', 'إعدادات النظام والإدارة', '/admin/settings'),
-            ],
-          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Align(alignment: Alignment.centerRight, child: Text('الخيارات', style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900))),
+            const SizedBox(height: 10),
+            _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
+            _optionTile(sheetContext, Icons.explore_outlined, 'القبلة', 'اتجاه القبلة والخدمات المكانية', '/prayer'),
+            _optionTile(sheetContext, Icons.settings_outlined, 'الإعدادات', 'إعدادات النظام والإدارة', '/admin/settings'),
+          ]),
         ),
       ),
     );
@@ -230,19 +156,20 @@ class AdminMobileShell extends StatelessWidget {
   Widget _optionTile(BuildContext context, IconData icon, String title, String subtitle, String route) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(14)),
-        child: Icon(icon, color: _brand),
-      ),
+      leading: Container(width: 44, height: 44, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: _brand)),
       title: Text(title, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900)),
       subtitle: Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5)),
       trailing: const Icon(Icons.chevron_left_rounded, color: _muted),
-      onTap: () {
-        Navigator.of(context).pop();
-        context.push(route);
-      },
+      onTap: () { Navigator.of(context).pop(); context.push(route); },
     );
+  }
+}
+
+class _AdminNotificationsPage extends StatelessWidget {
+  const _AdminNotificationsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const NotificationsPage();
   }
 }
