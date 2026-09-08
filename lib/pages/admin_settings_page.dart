@@ -202,7 +202,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _header('ساعات العمل', 'إعدادات الدوام والمهل المستخدمة في الحضور والانصراف.', Icons.schedule_rounded),
       const SizedBox(height: 12),
-      _section('الدوام والمهل', rows.isEmpty ? [const Text('لا توجد إعدادات دوام إضافية من الخادم.')] : rows),
+      _section('الدوام والمهل', Icons.schedule_rounded, rows.isEmpty ? [const Text('لا توجد إعدادات دوام إضافية من الخادم.')] : rows),
     ]);
   }
 
@@ -212,9 +212,9 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _header('الأمان والنظام والمتقدم', 'كل مفاتيح الإعدادات التي يرسلها الخادم تظهر هنا دون حذف الخيارات غير المعروفة للتطبيق.', Icons.security_rounded),
       const SizedBox(height: 12),
-      _section('إعدادات الخادم الإضافية', extras.isEmpty ? [const Text('لا توجد مفاتيح إضافية من الخادم.')] : extras.map((e) => _settingTile(e.key, e.value)).toList()),
+      _section('إعدادات الخادم الإضافية', Icons.tune_rounded, extras.isEmpty ? [const Text('لا توجد مفاتيح إضافية من الخادم.')] : extras.map((e) => _settingTile(e.key, e.value)).toList()),
       const SizedBox(height: 12),
-      _section('التشخيص', [
+      _section('التشخيص', Icons.health_and_safety_outlined, [
         ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.health_and_safety_outlined, color: _brand), title: const Text('فحص اتصال الخادم', style: TextStyle(fontWeight: FontWeight.w800)), subtitle: const Text('يتحقق من استجابة واجهة الصحة بدون تغيير البيانات.'), trailing: IconButton(onPressed: _checkHealth, icon: const Icon(Icons.refresh_rounded))),
         const Divider(height: 1),
         ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.refresh_rounded, color: _brand), title: const Text('إعادة تحميل الإعدادات'), subtitle: const Text('يجلب أحدث نسخة من الإعدادات والمواقع.'), trailing: IconButton(onPressed: _load, icon: const Icon(Icons.sync_rounded))),
