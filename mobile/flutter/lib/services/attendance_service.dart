@@ -8,10 +8,7 @@ class AttendanceService {
   AttendanceService(this.api, this.session);
 
   Future<Map<String, dynamic>> workplace() async {
-    final results = await Future.wait([
-      api.employeeProfile(),
-      api.locations(),
-    ]);
+    final results = await Future.wait([api.employeeProfile(), api.locations()]);
     final profile = Map<String, dynamic>.from(results[0] as Map);
     final locations = List<dynamic>.from(results[1] as List);
     final profileMap = Map<String, dynamic>.from(profile['employee'] is Map ? profile['employee'] : profile);
@@ -44,12 +41,17 @@ class AttendanceService {
     if (permission == LocationPermission.deniedForever) {
       throw Exception('إذن الموقع محظور. افتح إعدادات التطبيق واسمح بالموقع.');
     }
-    return Geolocator.getCurrentPosition(
+    final position = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         timeLimit: Duration(seconds: 25),
       ),
     );
+    // Preserve the native Android integrity check: mocked locations are not accepted.
+    if (position.isMocked) {
+      throw Exception('تم اكتشاف موقع وهمي. عطّل أدوات تغيير الموقع ثم حاول مرة أخرى.');
+    }
+    return position;
   }
 
   double distanceMeters(double lat1, double lon1, double lat2, double lon2) {
@@ -59,7 +61,6 @@ class AttendanceService {
   Future<AttendanceChallenge> prepareChallenge({required String type, required String qrCode}) async {
     final code = qrCode.trim();
     if (code.isEmpty) throw Exception('امسح رمز QR أو أدخله يدويًا.');
-
     final place = await workplace();
     final lat = double.tryParse('${place['lat']}');
     final lng = double.tryParse('${place['lng']}');
@@ -67,15 +68,11 @@ class AttendanceService {
     if (lat == null || lng == null || radius == null || radius <= 0) {
       throw Exception('بيانات موقع العمل غير صالحة.');
     }
-
     final position = await currentPosition();
     final distance = distanceMeters(position.latitude, position.longitude, lat, lng);
     if (distance > radius) {
-      throw Exception(
-        'أنت خارج نطاق العمل. المسافة الحالية ${distance.toStringAsFixed(1)} م، والحد ${radius.toStringAsFixed(0)} م.',
-      );
+      throw Exception('أنت خارج نطاق العمل. المسافة الحالية ${distance.toStringAsFixed(1)} م، والحد ${radius.toStringAsFixed(0)} م.');
     }
-
     final deviceId = await session.deviceId();
     final challenge = await api.createChallenge(
       type: type,
@@ -89,7 +86,6 @@ class AttendanceService {
     if (challengeId == null || challengeId.isEmpty || expiresAt == null) {
       throw Exception('لم يكتمل التحقق من الحضور على الخادم.');
     }
-
     return AttendanceChallenge(
       challengeId: challengeId,
       expiresAt: expiresAt.toUtc(),
@@ -103,11 +99,7 @@ class AttendanceService {
     );
   }
 
-  Future<AttendanceResult> completeChallenge({
-    required String type,
-    required String qrCode,
-    required AttendanceChallenge challenge,
-  }) async {
+  Future<AttendanceResult> completeChallenge({required String type, required String qrCode, required AttendanceChallenge challenge}) async {
     if (DateTime.now().toUtc().isAfter(challenge.expiresAt)) {
       throw Exception('انتهت مهلة التحقق. أعد مسح رمز QR ثم أكّد العملية مرة أخرى.');
     }
@@ -127,11 +119,7 @@ class AttendanceService {
       'locationId': challenge.locationId,
       'challengeId': challenge.challengeId,
     });
-    return AttendanceResult(
-      DateTime.now(),
-      challenge.distance,
-      accuracyMeters: challenge.accuracyMeters,
-    );
+    return AttendanceResult(DateTime.now(), challenge.distance, accuracyMeters: challenge.accuracyMeters);
   }
 
   Future<AttendanceResult> record({required String type, required String qrCode}) async {
@@ -169,9 +157,5 @@ class AttendanceResult {
   final double distance;
   final double accuracyMeters;
 
-  const AttendanceResult(
-    this.time,
-    this.distance, {
-    this.accuracyMeters = 0,
-  });
+  const AttendanceResult(this.time, this.distance, {this.accuracyMeters = 0});
 }
