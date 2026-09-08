@@ -146,7 +146,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
       ])),
       actions: [
         if (!_downloading && !_permissionHint) TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('لاحقًا')),
-        if (_permissionHint) FilledButton(onPressed: () async { await widget.updater.openInstallPermissionSettings(); if (!context.mounted) return; Navigator.of(context).pop(); }, child: const Text('السماح بالتثبيت')),
+        if (_permissionHint) FilledButton(onPressed: () async { final navigator = Navigator.of(context); await widget.updater.openInstallPermissionSettings(); if (!mounted) return; navigator.pop(); }, child: const Text('السماح بالتثبيت')),
         if (!_downloading && !_permissionHint) FilledButton(onPressed: _install, child: const Text('تحديث الآن')),
       ],
     );
