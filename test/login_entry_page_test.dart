@@ -18,7 +18,7 @@ void main() {
           builder: (_, __) => const Scaffold(body: Text('employee')),
         ),
         GoRoute(
-          path: '/admin-login',
+          path: '/manager/login',
           builder: (_, __) => const Scaffold(body: Text('admin')),
         ),
       ],
