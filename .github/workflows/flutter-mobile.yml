@@ -26,11 +26,17 @@ jobs:
           cache: true
       - run: flutter --version
       - name: Generate Android wrapper when incomplete
+        shell: bash
         run: |
           if [ ! -f android/gradlew ] || [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            git ls-files 'mobile/flutter/android/**' > "$RUNNER_TEMP/hadir-android-tracked.txt"
+            tar -cf "$RUNNER_TEMP/hadir-android-tracked.tar" -T "$RUNNER_TEMP/hadir-android-tracked.txt"
             flutter create --platforms=android --project-name hadir .
+            tar -xf "$RUNNER_TEMP/hadir-android-tracked.tar"
           fi
           rm -f android/build.gradle.kts android/settings.gradle.kts android/app/build.gradle.kts
+          test -x android/gradlew
+          test -f android/gradle/wrapper/gradle-wrapper.properties
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
