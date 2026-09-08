@@ -97,8 +97,9 @@ class EmployeeMobileShell extends StatelessWidget {
   }
 
   Widget _header(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 430;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 9),
+      padding: EdgeInsets.fromLTRB(compact ? 10 : 14, 10, compact ? 10 : 14, 9),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: _line)),
@@ -109,8 +110,8 @@ class EmployeeMobileShell extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: compact ? 40 : 42,
+                  height: compact ? 40 : 42,
                   decoration: BoxDecoration(
                     color: _soft,
                     borderRadius: BorderRadius.circular(13),
@@ -134,31 +135,39 @@ class EmployeeMobileShell extends StatelessWidget {
             Icons.notifications_none_rounded,
             'الإشعارات',
             () => context.push('/employee/notifications'),
+            compact: compact,
           ),
-          const SizedBox(width: 7),
+          SizedBox(width: compact ? 5 : 7),
           _headerButton(
             Icons.menu_rounded,
             'الخيارات',
             () => _showOptions(context),
+            compact: compact,
           ),
         ],
       ),
     );
   }
 
-  Widget _headerButton(IconData icon, String label, VoidCallback onTap) {
-    return OutlinedButton.icon(
+  Widget _headerButton(
+    IconData icon,
+    String label,
+    VoidCallback onTap, {
+    required bool compact,
+  }) {
+    return IconButton(
       onPressed: onTap,
-      style: OutlinedButton.styleFrom(
+      tooltip: label,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 42, minHeight: 42),
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(
         foregroundColor: _ink,
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        side: const BorderSide(color: Color(0xFFDCE6E2)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        backgroundColor: compact ? _soft : Colors.transparent,
+        side: compact ? const BorderSide(color: Color(0xFFDCE6E2)) : null,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
       ),
       icon: Icon(icon, size: 21),
-      label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
     );
   }
 
