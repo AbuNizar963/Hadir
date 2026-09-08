@@ -71,13 +71,13 @@ class LandingPage extends StatelessWidget {
           const SizedBox(height: 22),
           Wrap(spacing: 9, runSpacing: 9, children: [
             FilledButton.icon(
-              onPressed: () => context.go('/employee-login'),
+              onPressed: () => context.go('/login'),
               style: FilledButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
               icon: const Icon(Icons.arrow_back_rounded, size: 17),
               label: const Text('دخول الموظفين'),
             ),
             OutlinedButton(
-              onPressed: () => context.go('/admin-login'),
+              onPressed: () => context.go('/manager/login'),
               style: OutlinedButton.styleFrom(foregroundColor: _ink, side: const BorderSide(color: _border), backgroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
               child: const Text('لوحة المدير'),
             ),
