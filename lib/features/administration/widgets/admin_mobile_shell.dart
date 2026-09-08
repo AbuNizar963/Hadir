@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../pages/notifications_page.dart';
+
 const _brand = Color(0xFF0B6B5A);
 const _ink = Color(0xFF142D27);
 const _muted = Color(0xFF73827E);
@@ -8,11 +10,6 @@ const _soft = Color(0xFFEAF4F0);
 const _bg = Color(0xFFF4F7F6);
 const _border = Color(0xFFDCE6E2);
 
-/// Android-first administration shell.
-///
-/// Keeps the existing admin routes intact while providing one consistent
-/// mobile navigation surface: brand header, options/notifications, and a
-/// bottom navigation bar for the primary administration areas.
 class AdminMobileShell extends StatelessWidget {
   const AdminMobileShell({super.key, required this.child});
 
@@ -51,12 +48,7 @@ class AdminMobileShell extends StatelessWidget {
         backgroundColor: _bg,
         body: SafeArea(
           bottom: false,
-          child: Column(
-            children: [
-              _header(context),
-              Expanded(child: child),
-            ],
-          ),
+          child: Column(children: [_header(context), Expanded(child: child)]),
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: selected,
@@ -82,38 +74,29 @@ class AdminMobileShell extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(compact ? 12 : 14, 10, compact ? 12 : 14, 9),
       decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: _border))),
-      child: Row(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: compact ? 40 : 44,
-                  height: compact ? 40 : 44,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_brand, Color(0xFF064B40)]),
-                    borderRadius: BorderRadius.circular(compact ? 13 : 15),
-                    boxShadow: const [BoxShadow(color: Color(0x220B6B5A), blurRadius: 18, offset: Offset(0, 8))],
-                  ),
-                  child: Icon(Icons.how_to_reg_rounded, color: Colors.white, size: compact ? 23 : 25),
-                ),
-                const SizedBox(width: 9),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('حاضر', style: TextStyle(color: _ink, fontSize: 22, height: 1, fontWeight: FontWeight.w900)),
-                    SizedBox(height: 4),
-                    Text('نظام حضور وانصراف موثّق', style: TextStyle(color: _muted, fontSize: 9.5, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ],
+      child: Row(children: [
+        Expanded(child: Row(children: [
+          Container(
+            width: compact ? 40 : 44,
+            height: compact ? 40 : 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_brand, Color(0xFF064B40)]),
+              borderRadius: BorderRadius.circular(compact ? 13 : 15),
+              boxShadow: const [BoxShadow(color: Color(0x220B6B5A), blurRadius: 18, offset: Offset(0, 8))],
             ),
+            child: Icon(Icons.how_to_reg_rounded, color: Colors.white, size: compact ? 23 : 25),
           ),
-          _headerButton(context, icon: Icons.notifications_none_rounded, label: 'الإشعارات', compact: compact, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()))),
-          const SizedBox(width: 7),
-          _headerButton(context, icon: Icons.menu_rounded, label: 'الخيارات', compact: compact, onTap: () => _showOptions(context)),
-        ],
-      ),
+          const SizedBox(width: 9),
+          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('حاضر', style: TextStyle(color: _ink, fontSize: 22, height: 1, fontWeight: FontWeight.w900)),
+            SizedBox(height: 4),
+            Text('نظام حضور وانصراف موثّق', style: TextStyle(color: _muted, fontSize: 9.5, fontWeight: FontWeight.w600)),
+          ]),
+        ])),
+        _headerButton(context, icon: Icons.notifications_none_rounded, label: 'الإشعارات', compact: compact, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()))),
+        const SizedBox(width: 7),
+        _headerButton(context, icon: Icons.menu_rounded, label: 'الخيارات', compact: compact, onTap: () => _showOptions(context)),
+      ]),
     );
   }
 
@@ -129,7 +112,7 @@ class AdminMobileShell extends StatelessWidget {
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: compact ? 20 : 21), if (!compact) ...[const SizedBox(width: 6), Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))]],),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: compact ? 20 : 21), if (!compact) ...[const SizedBox(width: 6), Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))]]),
     );
   }
 
@@ -138,18 +121,16 @@ class AdminMobileShell extends StatelessWidget {
       context: context,
       showDragHandle: true,
       backgroundColor: Colors.white,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Align(alignment: Alignment.centerRight, child: Text('الخيارات', style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900))),
-            const SizedBox(height: 10),
-            _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
-            _optionTile(sheetContext, Icons.explore_outlined, 'القبلة', 'اتجاه القبلة والخدمات المكانية', '/prayer'),
-            _optionTile(sheetContext, Icons.settings_outlined, 'الإعدادات', 'إعدادات النظام والإدارة', '/admin/settings'),
-          ]),
-        ),
-      ),
+      builder: (sheetContext) => SafeArea(child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Align(alignment: Alignment.centerRight, child: Text('الخيارات', style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900))),
+          const SizedBox(height: 10),
+          _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
+          _optionTile(sheetContext, Icons.explore_outlined, 'القبلة', 'اتجاه القبلة والخدمات المكانية', '/prayer'),
+          _optionTile(sheetContext, Icons.settings_outlined, 'الإعدادات', 'إعدادات النظام والإدارة', '/admin/settings'),
+        ]),
+      )),
     );
   }
 
@@ -167,9 +148,6 @@ class AdminMobileShell extends StatelessWidget {
 
 class _AdminNotificationsPage extends StatelessWidget {
   const _AdminNotificationsPage();
-
   @override
-  Widget build(BuildContext context) {
-    return const NotificationsPage();
-  }
+  Widget build(BuildContext context) => const NotificationsPage();
 }
