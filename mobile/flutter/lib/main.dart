@@ -46,22 +46,11 @@ class _UpdaterBootstrap extends StatefulWidget {
   State<_UpdaterBootstrap> createState() => _UpdaterBootstrapState();
 }
 
-class _UpdaterBootstrapState extends State<_UpdaterBootstrap>
-    with WidgetsBindingObserver {
-  static const _checkInterval = Duration(minutes: 30);
-
+class _UpdaterBootstrapState extends State<_UpdaterBootstrap> {
   final _updater = UpdaterService();
-  Timer? _timer;
   bool _started = false;
   bool _dialogVisible = false;
   bool _checking = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _timer = Timer.periodic(_checkInterval, (_) => unawaited(_checkForUpdate()));
-  }
 
   @override
   void didChangeDependencies() {
@@ -72,13 +61,6 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap>
       if (!mounted) return;
       unawaited(_checkForUpdate());
     });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(_checkForUpdate());
-    }
   }
 
   Future<void> _checkForUpdate() async {
@@ -99,13 +81,6 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap>
       _checking = false;
       _dialogVisible = false;
     }
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _timer?.cancel();
-    super.dispose();
   }
 
   @override
