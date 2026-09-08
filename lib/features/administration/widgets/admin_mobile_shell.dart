@@ -3,9 +3,10 @@ import 'package:go_router/go_router.dart';
 
 const _brand = Color(0xFF0B6B5A);
 const _ink = Color(0xFF142D27);
-const _muted = Color(0xFF71817C);
-const _soft = Color(0xFFE8F5F0);
-const _bg = Color(0xFFF6F8F7);
+const _muted = Color(0xFF73827E);
+const _soft = Color(0xFFEAF4F0);
+const _bg = Color(0xFFF4F7F6);
+const _border = Color(0xFFDCE6E2);
 
 /// Android-first administration shell.
 ///
@@ -81,7 +82,7 @@ class AdminMobileShell extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 9),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE0E8E5))),
+        border: Border(bottom: BorderSide(color: _border)),
       ),
       child: Row(
         children: [
@@ -136,7 +137,7 @@ class AdminMobileShell extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        side: const BorderSide(color: Color(0xFFDCE6E2)),
+        side: const BorderSide(color: _border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       ),
       icon: Icon(icon, size: 21),
