@@ -122,6 +122,34 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     return checkIn != null;
   }
 
+  List<_DaySummary> _dailySummaries(List<Map<String, dynamic>> records) {
+    final grouped = <DateTime, List<Map<String, dynamic>>>{};
+    for (final record in records) {
+      final time = DateTime.tryParse('${record['timestamp']}')?.toLocal();
+      if (time == null) continue;
+      final day = DateTime(time.year, time.month, time.day);
+      grouped.putIfAbsent(day, () => <Map<String, dynamic>>[]).add(record);
+    }
+    final result = grouped.entries.map((entry) {
+      final rows = entry.value..sort((a, b) {
+        final at = DateTime.tryParse('${a['timestamp']}') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bt = DateTime.tryParse('${b['timestamp']}') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return at.compareTo(bt);
+      });
+      return _DaySummary(
+        day: entry.key,
+        duration: _durationFor(rows),
+        checkIns: _countType(rows, 'check-in'),
+        checkOuts: _countType(rows, 'check-out'),
+        open: _hasOpenShift(rows),
+      );
+    }).toList();
+    result.sort((a, b) => b.day.compareTo(a.day));
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -141,6 +169,7 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     final checkIns = _countType(month, 'check-in');
     final checkOuts = _countType(month, 'check-out');
     final openShift = _hasOpenShift(month);
+    final daily = _dailySummaries(month);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -214,6 +243,10 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
                   checkOuts: checkOuts,
                   openShift: openShift,
                 ),
+                const SizedBox(height: 18),
+                _section('النشاط اليومي'),
+                const SizedBox(height: 9),
+                _DailyActivity(summaries: daily, hours: _hours),
                 const SizedBox(height: 18),
                 _section('آخر حركة مسجلة'),
                 const SizedBox(height: 9),
@@ -322,6 +355,140 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
       ),
     );
   }
+}
+
+class _DaySummary {
+  final DateTime day;
+  final Duration duration;
+  final int checkIns;
+  final int checkOuts;
+  final bool open;
+
+  const _DaySummary({
+    required this.day,
+    required this.duration,
+    required this.checkIns,
+    required this.checkOuts,
+    required this.open,
+  });
+}
+
+class _DailyActivity extends StatelessWidget {
+  final List<_DaySummary> summaries;
+  final String Function(Duration) hours;
+
+  const _DailyActivity({required this.summaries, required this.hours});
+
+  @override
+  Widget build(BuildContext context) {
+    if (summaries.isEmpty) {
+      return const _MessageCard(
+        'لا توجد أيام نشطة هذا الشهر.',
+        Icons.calendar_today_rounded,
+      );
+    }
+    final visible = summaries.take(10).toList();
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _line),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < visible.length; i++) ...[
+            _DailyRow(summary: visible[i], hours: hours),
+            if (i != visible.length - 1)
+              const Divider(height: 1, indent: 16, endIndent: 16, color: _line),
+          ],
+          if (summaries.length > visible.length)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Text(
+                'يظهر آخر 10 أيام نشطة من أصل ${summaries.length}.',
+                style: const TextStyle(color: _muted, fontSize: 10),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailyRow extends StatelessWidget {
+  final _DaySummary summary;
+  final String Function(Duration) hours;
+
+  const _DailyRow({required this.summary, required this.hours});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: summary.open ? const Color(0xFFFFF7E6) : _soft,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(
+                summary.open
+                    ? Icons.access_time_filled_rounded
+                    : Icons.calendar_today_rounded,
+                color: summary.open ? const Color(0xFF9A6A18) : _green,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    intl.DateFormat('EEEE، d MMMM', 'ar').format(summary.day),
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${summary.checkIns} حضور · ${summary.checkOuts} انصراف',
+                    style: const TextStyle(color: _muted, fontSize: 9.5),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  hours(summary.duration),
+                  style: const TextStyle(
+                    color: _green,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (summary.open) ...[
+                  const SizedBox(height: 3),
+                  const Text(
+                    'دوام مفتوح',
+                    style: TextStyle(
+                      color: Color(0xFF9A6A18),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      );
 }
 
 class _SummaryCard extends StatelessWidget {
