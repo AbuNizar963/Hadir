@@ -4,29 +4,29 @@ import 'package:flutter/material.dart';
 /// Mirrors the main web application's core colors, typography and geometry.
 class HadirBrand {
   // Web light theme: --background 210 25% 98%, --foreground 222 30% 12%.
-  static const primary = Color(0xFF229F76);
+  static const primary = Color(0xFF22A072);
   static const primaryDark = Color(0xFF167A59);
-  static const accent = Color(0xFF1F9FC1);
-  static const cyan = Color(0xFF1F9FC1);
-  static const surface = Color(0xFFF7F9FB);
+  static const accent = Color(0xFF2BBDEE);
+  static const cyan = Color(0xFF2BBDEE);
+  static const surface = Color(0xFFF9FAFB);
   static const card = Color(0xFFFFFFFF);
-  static const panel = Color(0xFFEFF2F4);
+  static const panel = Color(0xFFEDEFF3);
   static const soft = Color(0xFFE7F4EF);
-  static const text = Color(0xFF151A20);
-  static const muted = Color(0xFF5B636C);
-  static const border = Color(0xFFD1D6DC);
-  static const danger = Color(0xFFD93030);
-  static const warning = Color(0xFFDE8D0A);
+  static const text = Color(0xFF151B28);
+  static const muted = Color(0xFF5C697A);
+  static const border = Color(0xFFCED5DE);
+  static const danger = Color(0xFFDF3A3A);
+  static const warning = Color(0xFFF6A823);
 
   // Web dark theme: --background 222 32% 7%, --card 222 26% 11%.
-  static const darkBackground = Color(0xFF0C1017);
-  static const darkCard = Color(0xFF151A22);
-  static const darkPanel = Color(0xFF202630);
+  static const darkBackground = Color(0xFF0C1018);
+  static const darkCard = Color(0xFF151923);
+  static const darkPanel = Color(0xFF1F232E);
   static const darkText = Color(0xFFF1F5F9);
-  static const darkMuted = Color(0xFFA6AFBC);
-  static const darkBorder = Color(0xFF2B323D);
-  static const darkPrimary = Color(0xFF2BD39A);
-  static const darkAccent = Color(0xFF42C5E7);
+  static const darkMuted = Color(0xFFA4AAB7);
+  static const darkBorder = Color(0xFF292F3D);
+  static const darkPrimary = Color(0xFF2BCA90);
+  static const darkAccent = Color(0xFF2BBDEE);
 
   static const radiusSm = 12.0;
   static const radiusMd = 16.0;
