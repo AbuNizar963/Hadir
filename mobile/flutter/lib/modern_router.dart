@@ -20,24 +20,26 @@ import 'pages/requests_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/services_page.dart';
+import 'pages/landing_page.dart';
 
 final _modernSession = HadirSession();
 
 GoRouter buildModernRouter() => GoRouter(
-  initialLocation: '/login',
+  initialLocation: '/',
   redirect: (_, state) async {
     final employeeToken = await _modernSession.token();
     final adminToken = await _modernSession.adminToken();
     final location = state.matchedLocation;
-    const publicLocations = {'/login', '/employee-login', '/admin-login'};
-    if (employeeToken == null && adminToken == null && !publicLocations.contains(location)) return '/login';
+    const publicLocations = {'/', '/login', '/employee-login', '/admin-login'};
+    if (employeeToken == null && adminToken == null && !publicLocations.contains(location)) return '/';
     if (adminToken != null && publicLocations.contains(location)) return '/admin';
     if (employeeToken != null && publicLocations.contains(location)) return '/home';
     if (adminToken == null && (location == '/admin' || location == '/admin/roles' || location == '/admin/manage' || location == '/admin/operations' || location == '/admin/reports' || location == '/admin/reports/archive' || location == '/admin/audit' || location == '/admin/settings')) return '/admin-login';
-    if (employeeToken == null && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' && location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/audit' && location != '/admin/settings' && location != '/admin-login' && location != '/login') return '/login';
+    if (employeeToken == null && location != '/' && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' && location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/audit' && location != '/admin/settings' && location != '/admin-login' && location != '/login') return '/login';
     return null;
   },
   routes: [
+    GoRoute(path: '/', builder: (_, __) => const LandingPage()),
     GoRoute(path: '/login', builder: (_, __) => const LoginEntryPage()),
     GoRoute(path: '/employee-login', builder: (_, __) => const EmployeeLoginPage()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
@@ -51,7 +53,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
     GoRoute(path: '/home', builder: (_, __) => const HadirWorkspacePage()),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
-    GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
+    GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in')),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
     GoRoute(path: '/insights', builder: (_, __) => const SwipeBackPage(child: AttendanceInsightsPage())),
     GoRoute(path: '/requests', builder: (_, __) => const SwipeBackPage(child: RequestsPage())),
