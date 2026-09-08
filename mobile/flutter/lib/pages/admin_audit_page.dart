@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:cross_file/cross_file.dart';
+import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -17,6 +21,7 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
   final _search = TextEditingController();
   List<Map<String, dynamic>> _rows = [];
   bool _loading = true;
+  bool _exporting = false;
   String? _error;
   String _result = 'all';
   String _action = 'all';
@@ -114,27 +119,23 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
     return '"$text"';
   }
 
-  Future<void> _export() async {
-    final rows = _filtered;
-    final buffer = StringBuffer('\ufeff');
-    buffer.writeln([
-      'م',
-      'الوقت',
-      'الموظف',
-      'الرقم الوظيفي',
-      'العملية',
-      'النتيجة',
-      'السبب',
-      'الجهاز',
-      'IP',
-      'خط العرض',
-      'خط الطول',
-      'المسافة (م)',
-    ].map(_csvCell).join(','));
-    for (var i = 0; i < rows.length; i++) {
-      final row = rows[i];
-      buffer.writeln([
-        i + 1,
+  List<String> _headers() => [
+        'م',
+        'الوقت',
+        'الموظف',
+        'الرقم الوظيفي',
+        'العملية',
+        'النتيجة',
+        'السبب',
+        'الجهاز',
+        'IP',
+        'خط العرض',
+        'خط الطول',
+        'المسافة (م)',
+      ];
+
+  List<dynamic> _exportValues(int number, Map<String, dynamic> row) => [
+        number,
         _date(row['timestamp']),
         row['actorName'] ?? '',
         row['jobNumber'] ?? '',
@@ -146,11 +147,71 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
         row['lat'] ?? '',
         row['lng'] ?? '',
         row['distanceMeters'] ?? '',
-      ].map(_csvCell).join(','));
+      ];
+
+  Future<void> _exportCsv() async {
+    final rows = _filtered;
+    final buffer = StringBuffer('\ufeff');
+    buffer.writeln(_headers().map(_csvCell).join(','));
+    for (var i = 0; i < rows.length; i++) {
+      buffer.writeln(
+        _exportValues(i + 1, rows[i]).map(_csvCell).join(','),
+      );
     }
     await SharePlus.instance.share(
-      ShareParams(text: buffer.toString(), subject: 'سجل التدقيق - حاضر'),
+      ShareParams(
+        text: buffer.toString(),
+        subject: 'سجل التدقيق - حاضر',
+      ),
     );
+  }
+
+  Future<void> _exportExcel() async {
+    if (_exporting) return;
+    final rows = _filtered;
+    if (rows.isEmpty) return;
+    setState(() => _exporting = true);
+    try {
+      final workbook = Excel.createExcel();
+      final sheet = workbook['سجل التدقيق'];
+      sheet.appendRow(
+        _headers().map((value) => TextCellValue(value)).toList(),
+      );
+      for (var i = 0; i < rows.length; i++) {
+        final values = _exportValues(i + 1, rows[i]);
+        sheet.appendRow(
+          values.map((value) {
+            if (value is int) return IntCellValue(value);
+            if (value is double) return DoubleCellValue(value);
+            return TextCellValue('$value');
+          }).toList(),
+        );
+      }
+      final bytes = workbook.encode();
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('تعذر إنشاء ملف Excel.');
+      }
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              Uint8List.fromList(bytes),
+              mimeType:
+                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              name: 'hadir-audit.xlsx',
+            ),
+          ],
+          subject: 'سجل التدقيق - حاضر',
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تصدير Excel: ${HadirApi.errorMessage(error)}')),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   @override
@@ -172,10 +233,41 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
               tooltip: 'تحديث',
               icon: const Icon(Icons.refresh_rounded),
             ),
-            IconButton(
-              onPressed: rows.isEmpty ? null : _export,
-              tooltip: 'تصدير CSV',
-              icon: const Icon(Icons.ios_share_rounded),
+            PopupMenuButton<String>(
+              enabled: rows.isNotEmpty && !_exporting,
+              tooltip: 'تصدير',
+              onSelected: (value) {
+                if (value == 'csv') {
+                  _exportCsv();
+                } else {
+                  _exportExcel();
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'excel',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.table_view_rounded),
+                    title: Text('تصدير Excel'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'csv',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.description_outlined),
+                    title: Text('تصدير CSV'),
+                  ),
+                ),
+              ],
+              icon: _exporting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.ios_share_rounded),
             ),
           ],
         ),
