@@ -23,17 +23,22 @@ jobs:
           REPO: ${{ github.repository }}
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           cutoff=$(date -u -d '60 minutes ago' +%s)
           page=1
           retried=0
+          skipped=0
 
           while [ "$page" -le 5 ]; do
-            json=$(gh api \
+            if ! json=$(gh api \
               -H 'Accept: application/vnd.github+json' \
               "/repos/${REPO}/actions/runs?branch=Apps&status=failure&per_page=100&page=${page}" \
-              --paginate=false)
+              --paginate=false); then
+              echo "Could not read failed Apps workflow runs on page ${page}; continuing."
+              page=$((page + 1))
+              continue
+            fi
 
             count=$(jq '.workflow_runs | length' <<< "$json")
             [ "$count" -gt 0 ] || break
@@ -45,13 +50,18 @@ jobs:
               [ "$name" != "Auto Retry Failed Apps Actions" ] || continue
 
               echo "Retrying all failed jobs: ${name} (${run_id})"
-              gh api --method POST \
+              if gh api --method POST \
                 -H 'Accept: application/vnd.github+json' \
-                "/repos/${REPO}/actions/runs/${run_id}/rerun-failed-jobs"
-              retried=$((retried + 1))
+                "/repos/${REPO}/actions/runs/${run_id}/rerun-failed-jobs"; then
+                retried=$((retried + 1))
+              else
+                echo "Run ${run_id} could not be retried now; it may already be running. Continuing."
+                skipped=$((skipped + 1))
+              fi
             done < <(jq -r '.workflow_runs[] | [.id,.name,.created_at] | @tsv' <<< "$json")
 
             page=$((page + 1))
           done
 
-          echo "Retried failed Apps workflow runs: ${retried}"
+          echo "Retried failed Apps workflow runs: ${retried}; skipped for retry conflict/error: ${skipped}"
+          exit 0
