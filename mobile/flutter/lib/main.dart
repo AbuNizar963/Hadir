@@ -159,7 +159,6 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap> {
   final _updater = UpdaterService();
   bool _started = false;
   bool _dialogVisible = false;
-  Timer? _updateTimer;
 
   @override
   void didChangeDependencies() {
@@ -168,14 +167,8 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap> {
     _started = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _updateTimer = Timer(const Duration(seconds: 2), _checkForUpdate);
+      unawaited(_checkForUpdate());
     });
-  }
-
-  @override
-  void dispose() {
-    _updateTimer?.cancel();
-    super.dispose();
   }
 
   Future<void> _checkForUpdate() async {
