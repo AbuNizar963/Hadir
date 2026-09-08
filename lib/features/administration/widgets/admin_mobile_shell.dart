@@ -19,8 +19,8 @@ class AdminMobileShell extends StatelessWidget {
     final uri = GoRouterState.of(context).uri;
     if (uri.path == '/admin') return 0;
     if (uri.path == '/manager/requests') return 1;
-    if (uri.path == '/admin/manage') return 2;
-    if (uri.path == '/admin/reports' || uri.path == '/admin/reports/archive') return 3;
+    if (uri.path == '/admin/manage' || uri.path == '/manager/employees') return 2;
+    if (uri.path == '/admin/reports' || uri.path == '/admin/reports/archive' || uri.path == '/manager/reports' || uri.path == '/manager/report-archive') return 3;
     return 4;
   }
 
@@ -35,7 +35,7 @@ class AdminMobileShell extends StatelessWidget {
       case 3:
         context.go('/admin/reports');
       case 4:
-        context.go('/admin/settings');
+        _showOptions(context);
     }
   }
 
@@ -126,6 +126,10 @@ class AdminMobileShell extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Align(alignment: Alignment.centerRight, child: Text('الخيارات', style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900))),
           const SizedBox(height: 10),
+          _optionTile(sheetContext, Icons.notifications_none_rounded, 'الإشعارات', 'الإشعارات الإدارية والتنبيهات', '/notifications'),
+          _optionTile(sheetContext, Icons.fact_check_outlined, 'سجل التدقيق', 'مراجعة العمليات والأحداث الإدارية', '/admin/audit'),
+          _optionTile(sheetContext, Icons.archive_outlined, 'أرشيف التقارير', 'التقارير المحفوظة والأرشيف', '/admin/reports/archive'),
+          _optionTile(sheetContext, Icons.psychology_outlined, 'المساعد الذكي', 'المساعد والتحليلات الذكية', '/ai'),
           _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
           _optionTile(sheetContext, Icons.explore_outlined, 'القبلة', 'اتجاه القبلة والخدمات المكانية', '/prayer'),
           _optionTile(sheetContext, Icons.settings_outlined, 'الإعدادات', 'إعدادات النظام والإدارة', '/admin/settings'),
