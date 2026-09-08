@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/notifications_service.dart';
 
-const _brand = Color(0xFF0B6B5A);
-const _canvas = Color(0xFFF5F8F7);
-const _ink = Color(0xFF142D27);
-const _muted = Color(0xFF72827D);
-const _line = Color(0xFFDCE6E2);
+import '../core/hadir_brand.dart';
+import '../services/notifications_service.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -19,6 +15,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   List<HadirNotification> rows = [];
   bool loading = true;
   String? error;
+  String _filter = 'all';
+  String _query = '';
 
   @override
   void initState() {
@@ -29,25 +27,42 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _load() async {
     if (mounted) setState(() { loading = true; error = null; });
     try {
-      final r = await service.list();
-      if (mounted) setState(() => rows = r);
+      final result = await service.list();
+      if (mounted) setState(() => rows = result);
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted) setState(() => error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => loading = false);
     }
   }
 
   Future<void> _read(HadirNotification n) async {
-    if (!n.read) {
+    if (n.read) return;
+    try {
       await service.markRead(n.id);
       await _load();
+    } catch (e) {
+      _snack(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
   Future<void> _allRead() async {
-    await service.markAllRead();
-    await _load();
+    try {
+      await service.markAllRead();
+      await _load();
+    } catch (e) {
+      _snack(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  List<HadirNotification> get _visible {
+    final q = _query.trim().toLowerCase();
+    return rows.where((n) {
+      if (_filter == 'unread' && n.read) return false;
+      if (_filter == 'read' && !n.read) return false;
+      if (q.isEmpty) return true;
+      return '${n.title} ${n.body}'.toLowerCase().contains(q);
+    }).toList();
   }
 
   @override
@@ -56,129 +71,105 @@ class _NotificationsPageState extends State<NotificationsPage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: _canvas,
         appBar: AppBar(
-          backgroundColor: _canvas,
-          elevation: 0,
-          title: const Text('الإشعارات', style: TextStyle(fontWeight: FontWeight.w900, color: _ink)),
+          title: const Text('الإشعارات', style: TextStyle(fontWeight: FontWeight.w900)),
           actions: [
             if (unread > 0)
-              IconButton(
-                onPressed: _allRead,
-                icon: const Icon(Icons.done_all_rounded, color: _brand),
-                tooltip: 'تحديد الكل كمقروء',
-              ),
+              IconButton(onPressed: _allRead, icon: const Icon(Icons.done_all_rounded), tooltip: 'تحديد الكل كمقروء'),
           ],
         ),
         body: loading
-            ? const Center(child: CircularProgressIndicator(color: _brand))
+            ? const Center(child: CircularProgressIndicator())
             : error != null
                 ? _Error(message: error!, retry: _load)
                 : RefreshIndicator(
-                    color: _brand,
                     onRefresh: _load,
-                    child: rows.isEmpty
-                        ? ListView(children: const [SizedBox(height: 130), _EmptyNotifications()])
-                        : ListView.separated(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.fromLTRB(18, 10, 18, 30),
-                            itemCount: rows.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 10),
-                            itemBuilder: (_, i) => _card(rows[i]),
-                          ),
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
+                      children: [
+                        _UnreadBanner(unread: unread),
+                        const SizedBox(height: 12),
+                        TextField(
+                          onChanged: (value) => setState(() => _query = value),
+                          decoration: const InputDecoration(hintText: 'بحث في الإشعارات…', prefixIcon: Icon(Icons.search_rounded)),
+                        ),
+                        const SizedBox(height: 10),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(children: [
+                            _chip('all', 'الكل'),
+                            _chip('unread', 'غير المقروءة'),
+                            _chip('read', 'المقروءة'),
+                          ]),
+                        ),
+                        const SizedBox(height: 14),
+                        if (_visible.isEmpty)
+                          const _EmptyNotifications()
+                        else
+                          ..._visible.map(_card),
+                      ],
+                    ),
                   ),
       ),
     );
   }
+
+  Widget _chip(String value, String text) => Padding(
+        padding: const EdgeInsets.only(left: 7),
+        child: ChoiceChip(selected: _filter == value, label: Text(text), onSelected: (_) => setState(() => _filter = value)),
+      );
 
   Widget _card(HadirNotification n) {
-    final accent = n.read ? _muted : _brand;
-    return InkWell(
-      onTap: () => _read(n),
-      borderRadius: BorderRadius.circular(21),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: n.read ? Colors.white : _brand.withValues(alpha: .055),
-          borderRadius: BorderRadius.circular(21),
-          border: Border.all(color: n.read ? _line : _brand.withValues(alpha: .18)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(color: accent.withValues(alpha: .10), borderRadius: BorderRadius.circular(15)),
-              child: Icon(n.read ? Icons.notifications_none_rounded : Icons.notifications_active_rounded, color: accent),
-            ),
+    final accent = n.read ? HadirBrand.muted : Theme.of(context).colorScheme.primary;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: () => _read(n),
+        borderRadius: BorderRadius.circular(HadirBrand.radiusLg),
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(width: 46, height: 46, decoration: BoxDecoration(color: accent.withValues(alpha: .10), borderRadius: BorderRadius.circular(HadirBrand.radiusMd)), child: Icon(n.read ? Icons.notifications_none_rounded : Icons.notifications_active_rounded, color: accent)),
             const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: Text(n.title, style: TextStyle(fontWeight: n.read ? FontWeight.w700 : FontWeight.w900, color: _ink, fontSize: 15))),
-                      if (!n.read) Container(width: 8, height: 8, decoration: const BoxDecoration(color: _brand, shape: BoxShape.circle)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(n.body, style: const TextStyle(color: _muted, height: 1.45)),
-                  const SizedBox(height: 8),
-                  Text(_date(n.createdAt), style: const TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
-          ],
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [Expanded(child: Text(n.title, style: TextStyle(fontWeight: n.read ? FontWeight.w700 : FontWeight.w900, fontSize: 15))), if (!n.read) Container(width: 8, height: 8, decoration: BoxDecoration(color: accent, shape: BoxShape.circle))]),
+              const SizedBox(height: 6),
+              Text(n.body, style: const TextStyle(height: 1.45)),
+              const SizedBox(height: 8),
+              Text(_date(n.createdAt), style: Theme.of(context).textTheme.bodySmall),
+            ])),
+          ]),
         ),
       ),
     );
   }
 
-  String _date(DateTime d) => '${d.toLocal().year}/${d.toLocal().month.toString().padLeft(2, '0')}/${d.toLocal().day.toString().padLeft(2, '0')} • ${d.toLocal().hour.toString().padLeft(2, '0')}:${d.toLocal().minute.toString().padLeft(2, '0')}';
+  String _date(DateTime d) {
+    final local = d.toLocal();
+    return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} • ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _snack(String text) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text))); }
+}
+
+class _UnreadBanner extends StatelessWidget {
+  final int unread;
+  const _UnreadBanner({required this.unread});
+  @override
+  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(15), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(HadirBrand.radiusMd)), child: Icon(Icons.mark_email_unread_rounded, color: Theme.of(context).colorScheme.primary)), const SizedBox(width: 12), Expanded(child: Text(unread == 0 ? 'لا توجد إشعارات جديدة' : '$unread إشعار غير مقروء', style: const TextStyle(fontWeight: FontWeight.w900)))])));
 }
 
 class _EmptyNotifications extends StatelessWidget {
   const _EmptyNotifications();
-
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(width: 76, height: 76, decoration: BoxDecoration(color: _brand.withValues(alpha: .08), shape: BoxShape.circle), child: const Icon(Icons.notifications_none_rounded, size: 38, color: _brand)),
-        const SizedBox(height: 16),
-        const Text('لا توجد إشعارات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _ink)),
-        const SizedBox(height: 5),
-        const Text('سنخبرك هنا بآخر المستجدات.', style: TextStyle(color: _muted)),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 70), child: Column(children: [Icon(Icons.notifications_none_rounded, size: 54, color: Theme.of(context).colorScheme.primary), const SizedBox(height: 14), const Text('لا توجد إشعارات مطابقة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(height: 5), const Text('جرّب تغيير البحث أو الفلتر.') ]));
 }
 
 class _Error extends StatelessWidget {
   final String message;
   final VoidCallback retry;
-
   const _Error({required this.message, required this.retry});
-
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off_rounded, size: 48, color: _muted),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: _muted)),
-            const SizedBox(height: 14),
-            FilledButton(onPressed: retry, child: const Text('إعادة المحاولة')),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off_rounded, size: 48), const SizedBox(height: 12), Text(message, textAlign: TextAlign.center), const SizedBox(height: 14), FilledButton(onPressed: retry, child: const Text('إعادة المحاولة'))])));
 }
