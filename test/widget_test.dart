@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hadir/main.dart';
+import 'package:hadir/app/hadir_app.dart';
 
 void main() {
   testWidgets('HADIR app renders', (tester) async {
