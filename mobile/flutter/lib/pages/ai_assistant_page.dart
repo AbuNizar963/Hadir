@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../core/session.dart';
 
 const _brand = Color(0xFF0B6B5A);
-const _brandDark = Color(0xFF064B40);
 const _canvas = Color(0xFFF5F8F7);
 const _ink = Color(0xFF142D27);
 const _muted = Color(0xFF73827E);
@@ -99,11 +98,15 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
         'https://hadir-api.abunizar963.workers.dev/api/ai',
         data: {'question': text},
         options: Options(
-          headers: token == null ? <String, dynamic>{} : {'Authorization': 'Bearer $token'},
+          headers: token == null
+              ? <String, dynamic>{}
+              : {'Authorization': 'Bearer $token'},
         ),
       );
       final data = Map<String, dynamic>.from(response.data as Map);
-      if (data['ok'] != true && data['text'] == null) throw Exception('AI request failed');
+      if (data['ok'] != true && data['text'] == null) {
+        throw Exception('AI request failed');
+      }
       final provider = '${data['provider'] ?? 'cloudflare-workers-ai'}';
       if (!mounted) return;
       setState(() {
@@ -118,7 +121,9 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
       if (!mounted) return;
       setState(() {
         _provider = 'محلي';
-        _messages.add(_Message(user: false, text: _localFallback(text), provider: 'local'));
+        _messages.add(
+          _Message(user: false, text: _localFallback(text), provider: 'local'),
+        );
       });
     } finally {
       if (mounted) {
@@ -151,7 +156,11 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
   void _jumpToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -166,30 +175,105 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
           backgroundColor: _canvas,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_forward_rounded)),
+          leading: IconButton(
+            onPressed: () => Navigator.maybePop(context),
+            icon: const Icon(Icons.arrow_forward_rounded),
+          ),
           titleSpacing: 0,
-          title: Row(children: [
-            Container(width: 44, height: 44, decoration: BoxDecoration(color: _brand, borderRadius: BorderRadius.circular(15), boxShadow: const [BoxShadow(color: Color(0x220B6B5A), blurRadius: 16, offset: Offset(0, 7))]), child: const Center(child: Text('AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)))),
-            const SizedBox(width: 11),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [const Text('Hadir AI', style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 18)), const SizedBox(width: 7), _pill(_provider)]),
-              const SizedBox(height: 2),
-              Text(_manager ? 'مساعد المدير' : 'مساعد الموظف', style: const TextStyle(color: _muted, fontSize: 11)),
-            ])),
-          ]),
+          title: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _brand,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x220B6B5A),
+                      blurRadius: 16,
+                      offset: Offset(0, 7),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    'AI',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Hadir AI',
+                          style: TextStyle(
+                            color: _ink,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        _pill(_provider),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _manager ? 'مساعد المدير' : 'مساعد الموظف',
+                      style: const TextStyle(color: _muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        body: LayoutBuilder(builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 760;
-          return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (wide) SizedBox(width: 280, child: _sidePanel()),
-            Expanded(child: Padding(padding: EdgeInsets.fromLTRB(wide ? 12 : 12, 4, 12, 10), child: _chatPanel())),
-          ]);
-        }),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 760;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (wide) SizedBox(width: 280, child: _sidePanel()),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(12, 4, 12, 10),
+                    child: _chatPanel(),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _pill(String text) => Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: _brand.withValues(alpha: .10), borderRadius: BorderRadius.circular(30)), child: Text(text, style: const TextStyle(color: _brand, fontSize: 9, fontWeight: FontWeight.w800)));
+  Widget _pill(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: _brand.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: _brand,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
 
   Widget _sidePanel() {
     return Padding(
@@ -198,16 +282,50 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
         margin: EdgeInsets.zero,
         elevation: 0,
         color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26), side: const BorderSide(color: _line)),
-        child: ListView(padding: const EdgeInsets.all(16), children: [
-          const Text('المساعد الشخصي', style: TextStyle(color: _brand, fontSize: 11, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 5),
-          Text(_manager ? 'لوحة المدير' : 'مساعدك', style: const TextStyle(color: _ink, fontSize: 20, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 5),
-          Text(_manager ? 'تحليل بيانات الموظفين ضمن الصلاحيات الممنوحة لك.' : 'معلومات حضورك وخدماتك دون كشف بيانات الآخرين.', style: const TextStyle(color: _muted, height: 1.6, fontSize: 11)),
-          const SizedBox(height: 18),
-          ..._examples.map((x) => Padding(padding: const EdgeInsets.only(bottom: 8), child: OutlinedButton(onPressed: _busy ? null : () => _ask(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12), side: const BorderSide(color: _line), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: Text(x, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _ink))))),
-        ]),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(26),
+          side: const BorderSide(color: _line),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const Text(
+              'المساعد الشخصي',
+              style: TextStyle(color: _brand, fontSize: 11, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              _manager ? 'لوحة المدير' : 'مساعدك',
+              style: const TextStyle(color: _ink, fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              _manager
+                  ? 'تحليل بيانات الموظفين ضمن الصلاحيات الممنوحة لك.'
+                  : 'معلومات حضورك وخدماتك دون كشف بيانات الآخرين.',
+              style: const TextStyle(color: _muted, height: 1.6, fontSize: 11),
+            ),
+            const SizedBox(height: 18),
+            ..._examples.map(
+              (x) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: OutlinedButton(
+                  onPressed: _busy ? null : () => _ask(x),
+                  style: OutlinedButton.styleFrom(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    side: const BorderSide(color: _line),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: Text(
+                    x,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _ink),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -217,30 +335,235 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
       margin: EdgeInsets.zero,
       elevation: 0,
       color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28), side: const BorderSide(color: _line)),
-      child: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 12), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_manager ? 'مساعد المدير' : 'مساعد الموظف', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 14)), const SizedBox(height: 3), const Text('اسأل بلغة طبيعية، وسأستخدم بيانات حاضر المسموح بها.', style: TextStyle(color: _muted, fontSize: 10))])), Row(children: [Container(width: 7, height: 7, decoration: BoxDecoration(color: _provider == 'محلي' ? Colors.orange : Colors.green, shape: BoxShape.circle)), const SizedBox(width: 6), Text(_provider, style: const TextStyle(color: _muted, fontSize: 9, fontWeight: FontWeight.w700))])])),
-        const Divider(height: 1, color: _line),
-        Expanded(child: _messages.length <= 1 ? _emptyChat() : ListView.builder(controller: _scroll, padding: const EdgeInsets.fromLTRB(14, 18, 14, 14), itemCount: _messages.length, itemBuilder: (_, i) => _bubble(_messages[i]))),
-        if (_busy) const Padding(padding: EdgeInsets.only(bottom: 7), child: Align(alignment: Alignment.centerRight, child: Padding(padding: EdgeInsets.symmetric(horizontal: 18), child: Text('Hadir AI يفكر…', style: TextStyle(color: _muted, fontSize: 10))))),
-        _composer(),
-      ]),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: const BorderSide(color: _line),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _manager ? 'مساعد المدير' : 'مساعد الموظف',
+                        style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 14),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'اسأل بلغة طبيعية، وسأستخدم بيانات حاضر المسموح بها.',
+                        style: TextStyle(color: _muted, fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: _provider == 'محلي' ? Colors.orange : Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _provider,
+                      style: const TextStyle(color: _muted, fontSize: 9, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: _line),
+          Expanded(
+            child: _messages.length <= 1
+                ? _emptyChat()
+                : ListView.builder(
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(14, 18, 14, 14),
+                    itemCount: _messages.length,
+                    itemBuilder: (_, i) => _bubble(_messages[i]),
+                  ),
+          ),
+          if (_busy)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 7),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 18),
+                  child: Text('Hadir AI يفكر…', style: TextStyle(color: _muted, fontSize: 10)),
+                ),
+              ),
+            ),
+          _composer(),
+        ],
+      ),
     );
   }
 
   Widget _emptyChat() {
-    return ListView(padding: const EdgeInsets.fromLTRB(16, 28, 16, 18), children: [
-      Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: _brand.withValues(alpha: .035), borderRadius: BorderRadius.circular(26), border: Border.all(color: _brand.withValues(alpha: .10))), child: Column(children: [Container(width: 56, height: 56, decoration: BoxDecoration(color: _brand.withValues(alpha: .10), borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.auto_awesome_rounded, color: _brand)), const SizedBox(height: 14), const Text('كيف يمكنني مساعدتك؟', style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900)), const SizedBox(height: 7), const Text('تحدث معي بشكل طبيعي عن الحضور والغياب والإحصاءات والخدمات المتاحة لك.', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 11, height: 1.6))])),
-      const SizedBox(height: 14),
-      ..._examples.take(2).map((x) => Padding(padding: const EdgeInsets.only(bottom: 9), child: OutlinedButton.icon(onPressed: _busy ? null : () => _ask(x), icon: const Icon(Icons.arrow_back_rounded, size: 17), label: Text(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.all(14), side: const BorderSide(color: _line), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17))))))
-    ];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 28, 16, 18),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: _brand.withValues(alpha: .035),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: _brand.withValues(alpha: .10)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: _brand.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: const Icon(Icons.auto_awesome_rounded, color: _brand),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'كيف يمكنني مساعدتك؟',
+                style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 7),
+              const Text(
+                'تحدث معي بشكل طبيعي عن الحضور والغياب والإحصاءات والخدمات المتاحة لك.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _muted, fontSize: 11, height: 1.6),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        ..._examples.take(2).map(
+          (x) => Padding(
+            padding: const EdgeInsets.only(bottom: 9),
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : () => _ask(x),
+              icon: const Icon(Icons.arrow_back_rounded, size: 17),
+              label: Text(x),
+              style: OutlinedButton.styleFrom(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.all(14),
+                side: const BorderSide(color: _line),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
-  Widget _bubble(_Message m) {
-    return Align(alignment: m.user ? Alignment.centerLeft : Alignment.centerRight, child: Container(constraints: const BoxConstraints(maxWidth: 560), margin: const EdgeInsets.only(bottom: 11), padding: const EdgeInsets.fromLTRB(15, 12, 15, 13), decoration: BoxDecoration(color: m.user ? _brand : const Color(0xFFF0F4F2), borderRadius: BorderRadius.only(topLeft: const Radius.circular(22), topRight: const Radius.circular(22), bottomLeft: Radius.circular(m.user ? 6 : 22), bottomRight: Radius.circular(m.user ? 22 : 6)), border: m.user ? null : Border.all(color: _line)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(m.user ? 'أنت' : 'Hadir AI${m.provider == null ? '' : ' · ${_providerLabel(m.provider!)}'}', style: TextStyle(color: m.user ? Colors.white70 : _muted, fontSize: 9, fontWeight: FontWeight.w800)), const SizedBox(height: 4), Text(m.text, style: TextStyle(color: m.user ? Colors.white : _ink, height: 1.65, fontSize: 13))])));
+  Widget _bubble(_Message message) {
+    return Align(
+      alignment: message.user ? Alignment.centerLeft : Alignment.centerRight,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 560),
+        margin: const EdgeInsets.only(bottom: 11),
+        padding: const EdgeInsets.fromLTRB(15, 12, 15, 13),
+        decoration: BoxDecoration(
+          color: message.user ? _brand : const Color(0xFFF0F4F2),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(22),
+            topRight: const Radius.circular(22),
+            bottomLeft: Radius.circular(message.user ? 6 : 22),
+            bottomRight: Radius.circular(message.user ? 22 : 6),
+          ),
+          border: message.user ? null : Border.all(color: _line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message.user
+                  ? 'أنت'
+                  : 'Hadir AI${message.provider == null ? '' : ' · ${_providerLabel(message.provider!)}'}',
+              style: TextStyle(
+                color: message.user ? Colors.white70 : _muted,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              message.text,
+              style: TextStyle(
+                color: message.user ? Colors.white : _ink,
+                height: 1.65,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _composer() {
-    return SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(10, 7, 10, 11), child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [Expanded(child: TextField(controller: _question, minLines: 1, maxLines: 4, textDirection: TextDirection.rtl, decoration: InputDecoration(hintText: 'اكتب سؤالك…', hintStyle: const TextStyle(color: _muted, fontSize: 12), prefixIcon: const Icon(Icons.chat_bubble_outline_rounded, color: _muted), filled: true, fillColor: _canvas, border: OutlineInputBorder(borderRadius: BorderRadius.circular(19), borderSide: const BorderSide(color: _line)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(19), borderSide: const BorderSide(color: _line)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(19), borderSide: const BorderSide(color: _brand, width: 1.4))), onSubmitted: _busy ? null : (_) => _ask())), const SizedBox(width: 8), SizedBox(width: 50, height: 50, child: IconButton.filled(onPressed: _busy ? null : () => _ask(), icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.arrow_upward_rounded)))]));
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 7, 10, 11),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _question,
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.newline,
+                onSubmitted: (_) => _ask(),
+                decoration: InputDecoration(
+                  hintText: 'اكتب سؤالك هنا…',
+                  hintStyle: const TextStyle(color: _muted, fontSize: 11),
+                  filled: true,
+                  fillColor: _canvas,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(color: _line),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(color: _line),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(color: _brand),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: FilledButton(
+                onPressed: _busy ? null : () => _ask(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _brand,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
+                  padding: EdgeInsets.zero,
+                ),
+                child: const Icon(Icons.arrow_upward_rounded),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
