@@ -58,9 +58,14 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
     });
     try {
       final token = await _session.adminToken();
-      if (token == null || token.isEmpty) throw Exception('انتهت جلسة الإدارة. سجّل الدخول مرة أخرى.');
+      if (token == null || token.isEmpty) {
+        throw Exception('انتهت جلسة الإدارة. سجّل الدخول مرة أخرى.');
+      }
       final raw = await HadirApi(token: token).audit(limit: 2000);
-      final rows = raw.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList();
+      final rows = raw
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -86,7 +91,13 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
       if (_result == 'rejected' && result == 'success') return false;
       if (_action != 'all' && action != _action) return false;
       if (q.isEmpty) return true;
-      final haystack = [row['actorName'], row['jobNumber'], row['reason'], row['deviceId'], row['ip']].map((v) => '$v').join(' ').toLowerCase();
+      final haystack = [
+        row['actorName'],
+        row['jobNumber'],
+        row['reason'],
+        row['deviceId'],
+        row['ip'],
+      ].map((v) => '$v').join(' ').toLowerCase();
       return haystack.contains(q);
     }).toList();
   }
@@ -94,7 +105,8 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
   String _date(dynamic value) {
     final parsed = DateTime.tryParse('$value');
     if (parsed == null) return '—';
-    return '${parsed.toLocal().year}/${parsed.toLocal().month.toString().padLeft(2, '0')}/${parsed.toLocal().day.toString().padLeft(2, '0')} ${parsed.toLocal().hour.toString().padLeft(2, '0')}:${parsed.toLocal().minute.toString().padLeft(2, '0')}';
+    final local = parsed.toLocal();
+    return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
   String _csvCell(dynamic value) {
@@ -105,7 +117,20 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
   Future<void> _export() async {
     final rows = _filtered;
     final buffer = StringBuffer('\ufeff');
-    buffer.writeln(['م', 'الوقت', 'الموظف', 'الرقم الوظيفي', 'العملية', 'النتيجة', 'السبب', 'الجهاز', 'IP', 'خط العرض', 'خط الطول', 'المسافة (م)'].map(_csvCell).join(','));
+    buffer.writeln([
+      'م',
+      'الوقت',
+      'الموظف',
+      'الرقم الوظيفي',
+      'العملية',
+      'النتيجة',
+      'السبب',
+      'الجهاز',
+      'IP',
+      'خط العرض',
+      'خط الطول',
+      'المسافة (م)',
+    ].map(_csvCell).join(','));
     for (var i = 0; i < rows.length; i++) {
       final row = rows[i];
       buffer.writeln([
@@ -123,7 +148,9 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
         row['distanceMeters'] ?? '',
       ].map(_csvCell).join(','));
     }
-    await SharePlus.instance.share(ShareParams(text: buffer.toString(), subject: 'سجل التدقيق - حاضر'));
+    await SharePlus.instance.share(
+      ShareParams(text: buffer.toString(), subject: 'سجل التدقيق - حاضر'),
+    );
   }
 
   @override
@@ -135,10 +162,21 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('سجل التدقيق', style: TextStyle(fontWeight: FontWeight.w900)),
+          title: const Text(
+            'سجل التدقيق',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
           actions: [
-            IconButton(onPressed: _loading ? null : _load, tooltip: 'تحديث', icon: const Icon(Icons.refresh_rounded)),
-            IconButton(onPressed: rows.isEmpty ? null : _export, tooltip: 'تصدير CSV', icon: const Icon(Icons.ios_share_rounded)),
+            IconButton(
+              onPressed: _loading ? null : _load,
+              tooltip: 'تحديث',
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+            IconButton(
+              onPressed: rows.isEmpty ? null : _export,
+              tooltip: 'تصدير CSV',
+              icon: const Icon(Icons.ios_share_rounded),
+            ),
           ],
         ),
         body: RefreshIndicator(
@@ -151,10 +189,17 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
               const SizedBox(height: 14),
               _filters(),
               const SizedBox(height: 14),
-              if (_loading) const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator())),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
               if (_error != null) _errorCard(),
               if (!_loading && _error == null && rows.isEmpty) _empty(),
-              if (!_loading && _error == null) ...rows.asMap().entries.map((entry) => _rowCard(entry.key + 1, entry.value)),
+              if (!_loading && _error == null)
+                ...rows.asMap().entries.map(
+                  (entry) => _rowCard(entry.key + 1, entry.value),
+                ),
             ],
           ),
         ),
@@ -165,29 +210,118 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
   Widget _hero(int total, int success, int rejected) => Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [HadirBrand.primaryDark, HadirBrand.primary]),
+          gradient: const LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [HadirBrand.primaryDark, HadirBrand.primary],
+          ),
           borderRadius: BorderRadius.circular(HadirBrand.radiusLg),
-          boxShadow: [BoxShadow(color: HadirBrand.primary.withValues(alpha: .16), blurRadius: 24, offset: const Offset(0, 10))],
+          boxShadow: [
+            BoxShadow(
+              color: HadirBrand.primary.withValues(alpha: .16),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-        child: Row(children: [
-          Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.fact_check_outlined, color: Colors.white)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('سجل العمليات', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text('$total سجل • $success نجاح • $rejected رفض', style: const TextStyle(color: Colors.white70))])),
-        ]),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: const Icon(Icons.fact_check_outlined, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'سجل العمليات',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$total سجل • $success نجاح • $rejected رفض',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
 
   Widget _filters() => Card(
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Column(children: [
-            TextField(controller: _search, decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'بحث بالاسم / الرقم / السبب / الجهاز')),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: DropdownButtonFormField<String>(initialValue: _result, decoration: const InputDecoration(labelText: 'النتيجة'), items: const [DropdownMenuItem(value: 'all', child: Text('كل النتائج')), DropdownMenuItem(value: 'success', child: Text('ناجحة فقط')), DropdownMenuItem(value: 'rejected', child: Text('مرفوضة فقط'))], onChanged: (value) => setState(() => _result = value ?? 'all'))),
-              const SizedBox(width: 10),
-              Expanded(child: DropdownButtonFormField<String>(initialValue: _action, decoration: const InputDecoration(labelText: 'العملية'), items: [const DropdownMenuItem(value: 'all', child: Text('كل العمليات')), ..._actions.entries.map((entry) => DropdownMenuItem(value: entry.key, child: Text(entry.value)))], onChanged: (value) => setState(() => _action = value ?? 'all'))),
-            ]),
-          ]),
+          child: Column(
+            children: [
+              TextField(
+                controller: _search,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search_rounded),
+                  hintText: 'بحث بالاسم / الرقم / السبب / الجهاز',
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _result,
+                      decoration: const InputDecoration(labelText: 'النتيجة'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'all',
+                          child: Text('كل النتائج'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'success',
+                          child: Text('ناجحة فقط'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'rejected',
+                          child: Text('مرفوضة فقط'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _result = value ?? 'all'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _action,
+                      decoration: const InputDecoration(labelText: 'العملية'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: 'all',
+                          child: Text('كل العمليات'),
+                        ),
+                        ..._actions.entries.map(
+                          (entry) => DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _action = value ?? 'all'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       );
 
@@ -199,26 +333,150 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [Text('#$number', style: const TextStyle(fontWeight: FontWeight.w900, color: HadirBrand.muted)), const SizedBox(width: 10), Expanded(child: Text('${row['actorName'] ?? 'غير معروف'}', style: const TextStyle(fontWeight: FontWeight.w900))), _badge(ok)]),
-          const SizedBox(height: 7),
-          Text('${row['jobNumber'] ?? '—'}  •  ${_actions[row['action']] ?? row['action'] ?? 'عملية غير معروفة'}', style: const TextStyle(color: HadirBrand.muted, fontSize: 12, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Text(_date(row['timestamp']), style: const TextStyle(fontSize: 11, color: HadirBrand.muted)),
-          if ('${row['reason'] ?? ''}'.isNotEmpty) ...[const SizedBox(height: 8), Text('${row['reason']}', style: const TextStyle(height: 1.35))],
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 6, children: [
-            if (lat != null && lng != null) _meta(Icons.location_on_outlined, '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}'),
-            if (row['distanceMeters'] != null) _meta(Icons.straighten_rounded, '${row['distanceMeters']} م'),
-            if ('${row['deviceId'] ?? ''}'.isNotEmpty) _meta(Icons.phone_android_outlined, '${row['deviceId']}'),
-          ]),
-        ]),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  '#$number',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: HadirBrand.muted,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '${row['actorName'] ?? 'غير معروف'}',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                _badge(ok),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Text(
+              '${row['jobNumber'] ?? '—'}  •  ${_actions[row['action']] ?? row['action'] ?? 'عملية غير معروفة'}',
+              style: const TextStyle(
+                color: HadirBrand.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _date(row['timestamp']),
+              style: const TextStyle(fontSize: 11, color: HadirBrand.muted),
+            ),
+            if ('${row['reason'] ?? ''}'.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('${row['reason']}', style: const TextStyle(height: 1.35)),
+            ],
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (lat != null && lng != null)
+                  _meta(
+                    Icons.location_on_outlined,
+                    '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+                  ),
+                if (row['distanceMeters'] != null)
+                  _meta(
+                    Icons.straighten_rounded,
+                    '${row['distanceMeters']} م',
+                  ),
+                if ('${row['deviceId'] ?? ''}'.isNotEmpty)
+                  _meta(
+                    Icons.phone_android_outlined,
+                    '${row['deviceId']}',
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _badge(bool ok) => Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5), decoration: BoxDecoration(color: (ok ? HadirBrand.primary : HadirBrand.danger).withValues(alpha: .1), borderRadius: BorderRadius.circular(99)), child: Text(ok ? 'نجاح' : 'رفض', style: TextStyle(color: ok ? HadirBrand.primary : HadirBrand.danger, fontWeight: FontWeight.w900, fontSize: 11)));
-  Widget _meta(IconData icon, String text) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), decoration: BoxDecoration(color: HadirBrand.panel, borderRadius: BorderRadius.circular(10)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 14, color: HadirBrand.muted), const SizedBox(width: 5), ConstrainedBox(constraints: const BoxConstraints(maxWidth: 210), child: Text(text, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: HadirBrand.muted)))]));
-  Widget _errorCard() => Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(children: [const Icon(Icons.error_outline_rounded, color: HadirBrand.danger, size: 34), const SizedBox(height: 8), Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 10), FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة'))])));
-  Widget _empty() => const Card(child: Padding(padding: EdgeInsets.all(30), child: Center(child: Text('لا توجد سجلات مطابقة للفلاتر الحالية.', textAlign: TextAlign.center, style: TextStyle(color: HadirBrand.muted))));
+  Widget _badge(bool ok) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: (ok ? HadirBrand.primary : HadirBrand.danger)
+              .withValues(alpha: .1),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Text(
+          ok ? 'نجاح' : 'رفض',
+          style: TextStyle(
+            color: ok ? HadirBrand.primary : HadirBrand.danger,
+            fontWeight: FontWeight.w900,
+            fontSize: 11,
+          ),
+        ),
+      );
+
+  Widget _meta(IconData icon, String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: HadirBrand.panel,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: HadirBrand.muted),
+            const SizedBox(width: 5),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 210),
+              child: Text(
+                text,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: HadirBrand.muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _errorCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: HadirBrand.danger,
+                size: 34,
+              ),
+              const SizedBox(height: 8),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _empty() => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(30),
+          child: Center(
+            child: Text(
+              'لا توجد سجلات مطابقة للفلاتر الحالية.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: HadirBrand.muted),
+            ),
+          ),
+        ),
+      );
 }
