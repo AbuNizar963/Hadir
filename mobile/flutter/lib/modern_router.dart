@@ -30,12 +30,55 @@ GoRouter buildModernRouter() => GoRouter(
     final employeeToken = await _modernSession.token();
     final adminToken = await _modernSession.adminToken();
     final location = state.matchedLocation;
-    const publicLocations = {'/', '/login', '/employee-login', '/admin-login'};
+    const publicLocations = {
+      '/',
+      '/login',
+      '/employee-login',
+      '/admin-login',
+      '/manager/login',
+    };
     if (employeeToken == null && adminToken == null && !publicLocations.contains(location)) return '/';
     if (adminToken != null && publicLocations.contains(location)) return '/admin';
     if (employeeToken != null && publicLocations.contains(location)) return '/home';
-    if (adminToken == null && (location == '/admin' || location == '/admin/roles' || location == '/admin/manage' || location == '/admin/operations' || location == '/admin/reports' || location == '/admin/reports/archive' || location == '/admin/audit' || location == '/admin/settings' || location == '/manager' || location == '/manager/employees' || location == '/manager/workforce' || location == '/manager/requests' || location == '/manager/audit' || location == '/manager/reports' || location == '/manager/report-archive' || location == '/manager/settings')) return '/admin-login';
-    if (employeeToken == null && location != '/' && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' && location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/audit' && location != '/admin/settings' && location != '/manager' && location != '/manager/employees' && location != '/manager/workforce' && location != '/manager/requests' && location != '/manager/audit' && location != '/manager/reports' && location != '/manager/report-archive' && location != '/manager/settings' && location != '/admin-login' && location != '/login') return '/login';
+    if (adminToken == null && (
+      location == '/admin' ||
+      location == '/admin/roles' ||
+      location == '/admin/manage' ||
+      location == '/admin/operations' ||
+      location == '/admin/reports' ||
+      location == '/admin/reports/archive' ||
+      location == '/admin/audit' ||
+      location == '/admin/settings' ||
+      location == '/manager' ||
+      location == '/manager/employees' ||
+      location == '/manager/workforce' ||
+      location == '/manager/requests' ||
+      location == '/manager/audit' ||
+      location == '/manager/reports' ||
+      location == '/manager/report-archive' ||
+      location == '/manager/settings'
+    )) return '/admin-login';
+    if (employeeToken == null &&
+        location != '/' &&
+        location != '/admin' &&
+        location != '/admin/roles' &&
+        location != '/admin/manage' &&
+        location != '/admin/operations' &&
+        location != '/admin/reports' &&
+        location != '/admin/reports/archive' &&
+        location != '/admin/audit' &&
+        location != '/admin/settings' &&
+        location != '/manager' &&
+        location != '/manager/employees' &&
+        location != '/manager/workforce' &&
+        location != '/manager/requests' &&
+        location != '/manager/audit' &&
+        location != '/manager/reports' &&
+        location != '/manager/report-archive' &&
+        location != '/manager/settings' &&
+        location != '/admin-login' &&
+        location != '/manager/login' &&
+        location != '/login') return '/login';
     return null;
   },
   routes: [
@@ -43,6 +86,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/login', builder: (_, __) => const LoginEntryPage()),
     GoRoute(path: '/employee-login', builder: (_, __) => const EmployeeLoginPage()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
+    GoRoute(path: '/manager/login', builder: (_, __) => const AdminLoginPage()),
 
     // Admin workspace and web-compatible manager aliases.
     GoRoute(path: '/admin', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
@@ -54,6 +98,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
     GoRoute(path: '/admin/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
     GoRoute(path: '/manager', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
+    GoRoute(path: '/manager-home', redirect: (_, __) => '/manager'),
     GoRoute(path: '/manager/employees', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
     GoRoute(path: '/manager/workforce', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
     GoRoute(path: '/manager/requests', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
