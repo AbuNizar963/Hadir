@@ -34,8 +34,8 @@ GoRouter buildModernRouter() => GoRouter(
     if (employeeToken == null && adminToken == null && !publicLocations.contains(location)) return '/';
     if (adminToken != null && publicLocations.contains(location)) return '/admin';
     if (employeeToken != null && publicLocations.contains(location)) return '/home';
-    if (adminToken == null && (location == '/admin' || location == '/admin/roles' || location == '/admin/manage' || location == '/admin/operations' || location == '/admin/reports' || location == '/admin/reports/archive' || location == '/admin/audit' || location == '/admin/settings')) return '/admin-login';
-    if (employeeToken == null && location != '/' && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' && location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/audit' && location != '/admin/settings' && location != '/admin-login' && location != '/login') return '/login';
+    if (adminToken == null && (location == '/admin' || location == '/admin/roles' || location == '/admin/manage' || location == '/admin/operations' || location == '/admin/reports' || location == '/admin/reports/archive' || location == '/admin/audit' || location == '/admin/settings' || location == '/manager' || location == '/manager/employees' || location == '/manager/workforce' || location == '/manager/requests' || location == '/manager/audit' || location == '/manager/reports' || location == '/manager/report-archive' || location == '/manager/settings')) return '/admin-login';
+    if (employeeToken == null && location != '/' && location != '/admin' && location != '/admin/roles' && location != '/admin/manage' && location != '/admin/operations' && location != '/admin/reports' && location != '/admin/reports/archive' && location != '/admin/audit' && location != '/admin/settings' && location != '/manager' && location != '/manager/employees' && location != '/manager/workforce' && location != '/manager/requests' && location != '/manager/audit' && location != '/manager/reports' && location != '/manager/report-archive' && location != '/manager/settings' && location != '/admin-login' && location != '/login') return '/login';
     return null;
   },
   routes: [
@@ -43,6 +43,8 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/login', builder: (_, __) => const LoginEntryPage()),
     GoRoute(path: '/employee-login', builder: (_, __) => const EmployeeLoginPage()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
+
+    // Admin workspace and web-compatible manager aliases.
     GoRoute(path: '/admin', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
     GoRoute(path: '/admin/roles', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
     GoRoute(path: '/admin/manage', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
@@ -51,14 +53,30 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin/reports/archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
     GoRoute(path: '/admin/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
     GoRoute(path: '/admin/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
+    GoRoute(path: '/manager', builder: (_, __) => const SwipeBackPage(child: AdminRoleWorkspacePage())),
+    GoRoute(path: '/manager/employees', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
+    GoRoute(path: '/manager/workforce', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
+    GoRoute(path: '/manager/requests', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
+    GoRoute(path: '/manager/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
+    GoRoute(path: '/manager/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
+    GoRoute(path: '/manager/report-archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
+    GoRoute(path: '/manager/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
+
+    // Employee workspace and web-compatible employee aliases.
     GoRoute(path: '/home', builder: (_, __) => const HadirWorkspacePage()),
+    GoRoute(path: '/employee', builder: (_, __) => const HadirWorkspacePage()),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
+    GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
+    GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
+    GoRoute(path: '/employee/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
     GoRoute(path: '/insights', builder: (_, __) => const SwipeBackPage(child: AttendanceInsightsPage())),
     GoRoute(path: '/requests', builder: (_, __) => const SwipeBackPage(child: RequestsPage())),
     GoRoute(path: '/notifications', builder: (_, __) => const SwipeBackPage(child: NotificationsPage())),
+    GoRoute(path: '/employee/notifications', builder: (_, __) => const SwipeBackPage(child: NotificationsPage())),
     GoRoute(path: '/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
+    GoRoute(path: '/employee/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
     GoRoute(path: '/services', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
   ],
 );
