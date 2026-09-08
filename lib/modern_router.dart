@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'core/api.dart';
 import 'core/session.dart';
 import 'features/administration/pages/admin_mobile_home_page.dart';
+import 'features/administration/widgets/admin_mobile_shell.dart';
 import 'pages/admin_audit_page.dart';
 import 'pages/admin_login_page.dart';
 import 'pages/admin_management_page.dart';
@@ -176,14 +177,19 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
   }
   void _cancel() { _tracking = false; _dragDistance = 0; }
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    behavior: HitTestBehavior.translucent,
-    onHorizontalDragStart: _start,
-    onHorizontalDragUpdate: _update,
-    onHorizontalDragEnd: _end,
-    onHorizontalDragCancel: _cancel,
-    child: widget.child,
-  );
+  Widget build(BuildContext context) {
+    final path = GoRouterState.of(context).uri.path;
+    final isAdminArea = path == '/admin' || path.startsWith('/admin/') || path == '/manager' || path.startsWith('/manager/');
+    final content = isAdminArea ? AdminMobileShell(child: widget.child) : widget.child;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: _start,
+      onHorizontalDragUpdate: _update,
+      onHorizontalDragEnd: _end,
+      onHorizontalDragCancel: _cancel,
+      child: content,
+    );
+  }
 }
 
 class _NotFoundPage extends StatelessWidget {
