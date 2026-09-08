@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:cross_file/cross_file.dart';
 import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -207,7 +206,11 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تصدير Excel: ${HadirApi.errorMessage(error)}')),
+        SnackBar(
+          content: Text(
+            'تعذر تصدير Excel: ${HadirApi.errorMessage(error)}',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _exporting = false);
