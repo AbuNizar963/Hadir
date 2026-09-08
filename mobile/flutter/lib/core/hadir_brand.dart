@@ -9,10 +9,12 @@ class HadirBrand {
   static const surface = Color(0xFFF9FAFB);
   static const card = Color(0xFFFFFFFF);
   static const panel = Color(0xFFEDEFF3);
+  static const soft = Color(0xFFEFF7F3);
   static const text = Color(0xFF151B28);
   static const muted = Color(0xFF5C697A);
   static const border = Color(0xFFCED5DE);
   static const danger = Color(0xFFDF3A3A);
+  static const warning = Color(0xFFF59E0B);
 
   static const darkBackground = Color(0xFF0C1018);
   static const darkCard = Color(0xFF151923);
@@ -21,6 +23,8 @@ class HadirBrand {
   static const darkMuted = Color(0xFFA4AAB7);
   static const darkBorder = Color(0xFF292F3D);
   static const darkPrimary = Color(0xFF2BCA90);
+  static const darkSoft = Color(0xFF123226);
+  static const darkWarning = Color(0xFFFBBF24);
 
   static const radiusSm = 12.0;
   static const radiusMd = 16.0;
@@ -42,7 +46,7 @@ class HadirBrand {
       seedColor: primaryColor,
       brightness: brightness,
       primary: primaryColor,
-      secondary: dark ? accent : accent,
+      secondary: accent,
       surface: surfaceCard,
       onSurface: foreground,
       onPrimary: dark ? darkBackground : Colors.white,
