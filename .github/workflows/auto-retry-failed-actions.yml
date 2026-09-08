@@ -1,11 +1,8 @@
 name: Auto Retry Failed Apps Actions
 
 on:
-  workflow_run:
-    workflows: ["Flutter App", "Build Hadir Android Flutter Release", "Deploy Hadir API", "Backend Check", "Apply Company Specialties"]
-    types: [completed]
-  schedule:
-    - cron: "*/10 * * * *"
+  push:
+    branches: [Apps]
   workflow_dispatch:
 
 permissions:
@@ -18,10 +15,9 @@ concurrency:
 
 jobs:
   retry-failed:
-    if: github.ref == 'refs/heads/Apps' || github.event_name != 'workflow_run'
     runs-on: ubuntu-latest
     steps:
-      - name: Retry failed jobs from Apps runs in the last hour
+      - name: Retry all failed jobs from recent Apps runs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -33,36 +29,29 @@ jobs:
           page=1
           retried=0
 
-          while :; do
-            runs=$(gh api --paginate \
+          while [ "$page" -le 5 ]; do
+            json=$(gh api \
               -H 'Accept: application/vnd.github+json' \
-              "/repos/${REPO}/actions/runs?branch=Apps&per_page=100&page=${page}" \
-              --jq '.workflow_runs[] | [.id,.name,.status,.conclusion,.created_at] | @tsv' || true)
+              "/repos/${REPO}/actions/runs?branch=Apps&status=failure&per_page=100&page=${page}" \
+              --paginate=false)
 
-            [ -n "$runs" ] || break
+            count=$(jq '.workflow_runs | length' <<< "$json")
+            [ "$count" -gt 0 ] || break
 
-            while IFS=$'\t' read -r run_id name status conclusion created_at; do
+            while IFS=$'\t' read -r run_id name created_at; do
               [ -n "${run_id:-}" ] || continue
               created_epoch=$(date -u -d "$created_at" +%s)
-              if [ "$created_epoch" -lt "$cutoff" ]; then
-                continue
-              fi
-              if [ "$status" != "completed" ] || [ "$conclusion" != "failure" ]; then
-                continue
-              fi
-              if [ "$name" = "Auto Retry Failed Apps Actions" ]; then
-                continue
-              fi
+              [ "$created_epoch" -ge "$cutoff" ] || continue
+              [ "$name" != "Auto Retry Failed Apps Actions" ] || continue
 
-              echo "Retrying all failed jobs for ${name} run ${run_id}"
+              echo "Retrying all failed jobs: ${name} (${run_id})"
               gh api --method POST \
                 -H 'Accept: application/vnd.github+json' \
                 "/repos/${REPO}/actions/runs/${run_id}/rerun-failed-jobs"
               retried=$((retried + 1))
-            done <<< "$runs"
+            done < <(jq -r '.workflow_runs[] | [.id,.name,.created_at] | @tsv' <<< "$json")
 
             page=$((page + 1))
-            [ "$page" -le 5 ] || break
           done
 
-          echo "Retried failed workflow runs: ${retried}"
+          echo "Retried failed Apps workflow runs: ${retried}"
