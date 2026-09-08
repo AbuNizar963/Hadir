@@ -78,16 +78,15 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
-          child: Stack(children: [
-            Positioned(top: -150, left: -100, child: _glow(330, scheme.primary.withValues(alpha: .08))),
-            Positioned(bottom: -180, right: -120, child: _glow(360, scheme.secondary.withValues(alpha: .06))),
-            SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 760),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     _header(context),
                     const SizedBox(height: 18),
                     LayoutBuilder(builder: (context, constraints) {
@@ -101,11 +100,11 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                     _flowCard(context),
                     const SizedBox(height: 22),
                     Text('حاضر · نظام حضور وانصراف موثّق', textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
-                  ]),
+                  ],
                 ),
               ),
             ),
-          ]),
+          ),
         ),
       ),
     );
@@ -116,7 +115,7 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
     return Row(children: [
       IconButton.filledTonal(onPressed: _back, icon: const Icon(Icons.arrow_forward_rounded), tooltip: 'رجوع'),
       const SizedBox(width: 10),
-      Container(width: 46, height: 46, decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [theme.colorScheme.primary, HadirBrand.primaryDark]), borderRadius: BorderRadius.circular(14), boxShadow: [BoxShadow(color: theme.colorScheme.primary.withValues(alpha: .22), blurRadius: 18, offset: const Offset(0, 8))]), child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 25)),
+      Container(width: 46, height: 46, decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [theme.colorScheme.primary, HadirBrand.primaryDark]), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.how_to_reg_rounded, color: Colors.white, size: 25)),
       const SizedBox(width: 11),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('حاضر', style: theme.textTheme.titleLarge), Text('دخول الموظفين', style: theme.textTheme.bodySmall)])),
       if (MediaQuery.sizeOf(context).width >= 520) Text('نظام آمن · تحقق متعدد الطبقات', style: theme.textTheme.bodySmall),
@@ -164,7 +163,30 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
       const SizedBox(height: 10),
       LayoutBuilder(builder: (context, constraints) {
         final columns = constraints.maxWidth < 520 ? 2 : 3;
-        return GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: items.length, gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, crossAxisSpacing: 7, mainAxisSpacing: 7, childAspectRatio: columns == 2 ? 2.45 : 2.9), itemBuilder: (_, index) => Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .5), borderRadius: BorderRadius.circular(11), border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: .5))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('STEP ${('${index + 1}').padLeft(2, '0')}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 8.5, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(items[index], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700))])));
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, crossAxisSpacing: 7, mainAxisSpacing: 7, childAspectRatio: columns == 2 ? 2.45 : 2.9),
+          itemBuilder: (_, index) {
+            return Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .5),
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: .5)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('STEP ${('${index + 1}').padLeft(2, '0')}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 8.5, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 3),
+                  Text(items[index], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            );
+          },
+        );
       }),
     ]));
   }
@@ -178,8 +200,6 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
     final scheme = Theme.of(context).colorScheme;
     return Container(padding: padding, decoration: BoxDecoration(color: scheme.surface.withValues(alpha: .94), borderRadius: BorderRadius.circular(HadirBrand.radiusLg), border: Border.all(color: scheme.outline.withValues(alpha: .7)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .08), blurRadius: 24, offset: const Offset(0, 10))]), child: child);
   }
-
-  Widget _glow(double size, Color color) => Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, color: color));
 }
 
 class _Layer extends StatelessWidget {
