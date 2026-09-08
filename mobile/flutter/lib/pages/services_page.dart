@@ -13,7 +13,8 @@ const _muted = Color(0xFF72827D);
 const _line = Color(0xFFDCE6E2);
 
 class ServicesPage extends StatefulWidget {
-  const ServicesPage({super.key});
+  const ServicesPage({super.key, this.initialTab = 0});
+  final int initialTab;
 
   @override
   State<ServicesPage> createState() => _ServicesPageState();
@@ -42,6 +43,7 @@ class _ServicesPageState extends State<ServicesPage> {
   @override
   void initState() {
     super.initState();
+    _tab = widget.initialTab.clamp(0, 2);
     _loadLocationServices();
   }
 
