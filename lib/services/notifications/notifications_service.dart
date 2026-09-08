@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../core/api.dart';
-import '../core/session.dart';
+import '../../core/api.dart';
+import '../../core/session.dart';
 
 class HadirNotification {
   final String id;

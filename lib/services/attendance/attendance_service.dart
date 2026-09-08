@@ -1,6 +1,6 @@
 import 'package:geolocator/geolocator.dart';
-import '../core/api.dart';
-import '../core/session.dart';
+import '../../core/api.dart';
+import '../../core/session.dart';
 
 class AttendanceService {
   final HadirApi api;

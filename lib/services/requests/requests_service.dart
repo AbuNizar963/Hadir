@@ -1,4 +1,4 @@
-import '../core/api.dart';
+import '../../core/api.dart';
 
 class RequestsService {
   final HadirApi api;
