@@ -1,5 +1,12 @@
-node_modules/
-dist/
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+build/
+coverage/
+
+# Backend / Cloudflare
 .wrangler/
 .env
 .env.*
@@ -7,5 +14,7 @@ dist/
 backend/.dev.vars
 backend/.dev.vars.*
 !backend/.dev.vars.example
+
+# General
 *.log
 .DS_Store
