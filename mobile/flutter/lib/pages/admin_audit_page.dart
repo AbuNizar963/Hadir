@@ -467,16 +467,18 @@ class _AdminAuditPageState extends State<AdminAuditPage> {
         ),
       );
 
-  Widget _empty() => const Card(
-        child: Padding(
-          padding: EdgeInsets.all(30),
-          child: Center(
-            child: Text(
-              'لا توجد سجلات مطابقة للفلاتر الحالية.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: HadirBrand.muted),
-            ),
+  Widget _empty() {
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(30),
+        child: Center(
+          child: Text(
+            'لا توجد سجلات مطابقة للفلاتر الحالية.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: HadirBrand.muted),
           ),
         ),
-      );
+      ),
+    );
+  }
 }
