@@ -71,7 +71,7 @@ class LandingPage extends StatelessWidget {
           const SizedBox(height: 22),
           Wrap(spacing: 9, runSpacing: 9, children: [
             FilledButton.icon(
-              onPressed: () => context.go('/login'),
+              onPressed: () => context.go('/employee-login'),
               style: FilledButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
               icon: const Icon(Icons.arrow_back_rounded, size: 17),
               label: const Text('دخول الموظفين'),
