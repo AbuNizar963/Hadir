@@ -46,10 +46,22 @@ class _UpdaterBootstrap extends StatefulWidget {
   State<_UpdaterBootstrap> createState() => _UpdaterBootstrapState();
 }
 
-class _UpdaterBootstrapState extends State<_UpdaterBootstrap> {
+class _UpdaterBootstrapState extends State<_UpdaterBootstrap>
+    with WidgetsBindingObserver {
+  static const _checkInterval = Duration(minutes: 30);
+
   final _updater = UpdaterService();
+  Timer? _timer;
   bool _started = false;
   bool _dialogVisible = false;
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _timer = Timer.periodic(_checkInterval, (_) => unawaited(_checkForUpdate()));
+  }
 
   @override
   void didChangeDependencies() {
@@ -62,8 +74,16 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap> {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_checkForUpdate());
+    }
+  }
+
   Future<void> _checkForUpdate() async {
-    if (!mounted || _dialogVisible) return;
+    if (!mounted || _dialogVisible || _checking) return;
+    _checking = true;
     try {
       final update = await _updater.check();
       if (!mounted || update == null || _dialogVisible) return;
@@ -76,8 +96,16 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap> {
     } catch (_) {
       // Update checks are non-blocking: the app remains usable if the service is offline.
     } finally {
+      _checking = false;
       _dialogVisible = false;
     }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
