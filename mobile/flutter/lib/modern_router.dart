@@ -80,9 +80,9 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/employee/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
     GoRoute(path: '/services', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
     // The web exposes these as dedicated pages; Flutter keeps them in the unified services hub.
-    GoRoute(path: '/weather', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
-    GoRoute(path: '/prayer', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
-    GoRoute(path: '/ai', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
+    GoRoute(path: '/weather', builder: (_, __) => const SwipeBackPage(child: ServicesPage(initialTab: 0))),
+    GoRoute(path: '/prayer', builder: (_, __) => const SwipeBackPage(child: ServicesPage(initialTab: 1))),
+    GoRoute(path: '/ai', builder: (_, __) => const SwipeBackPage(child: ServicesPage(initialTab: 2))),
   ],
 );
 
