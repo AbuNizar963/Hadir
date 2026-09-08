@@ -13,39 +13,42 @@ class LandingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _background,
-      body: Stack(children: [
-        Positioned(top: -100, left: -80, child: _glow(260, _primary.withValues(alpha: .09))),
-        Positioned(bottom: -130, right: -90, child: _glow(300, _primary.withValues(alpha: .06))),
-        SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const _Header(),
-                  const SizedBox(height: 18),
-                  LayoutBuilder(builder: (context, constraints) {
-                    final compact = constraints.maxWidth < 620;
-                    final hero = _hero(context);
-                    final security = const _SecurityCard();
-                    if (compact) return Column(children: [hero, const SizedBox(height: 12), security]);
-                    return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Expanded(flex: 3, child: hero), const SizedBox(width: 12), Expanded(flex: 2, child: security)]);
-                  }),
-                  const SizedBox(height: 12),
-                  _metrics(),
-                  const SizedBox(height: 12),
-                  const _FlowCard(),
-                  const SizedBox(height: 22),
-                  const Text('Developed by AbuNizar963', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 10.5)),
-                ]),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: _background,
+        body: Stack(children: [
+          Positioned(top: -100, left: -80, child: _glow(260, _primary.withValues(alpha: .09))),
+          Positioned(bottom: -130, right: -90, child: _glow(300, _primary.withValues(alpha: .06))),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    const _Header(),
+                    const SizedBox(height: 18),
+                    LayoutBuilder(builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 620;
+                      final hero = _hero(context);
+                      const security = _SecurityCard();
+                      if (compact) return Column(children: [hero, const SizedBox(height: 12), security]);
+                      return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Expanded(flex: 3, child: hero), const SizedBox(width: 12), const Expanded(flex: 2, child: security)]);
+                    }),
+                    const SizedBox(height: 12),
+                    _metrics(),
+                    const SizedBox(height: 12),
+                    const _FlowCard(),
+                    const SizedBox(height: 22),
+                    const Text('Developed by AbuNizar963', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 10.5)),
+                  ]),
+                ),
               ),
             ),
           ),
-        ),
-      ]),
+        ]),
+      ),
     );
   }
 
@@ -83,13 +86,13 @@ class LandingPage extends StatelessWidget {
       );
 
   Widget _metrics() => LayoutBuilder(builder: (context, constraints) {
-        const items = [
-          _Metric(label: 'سرعة العملية', value: '< 5 ث', hint: 'من فتح الرابط حتى تأكيد الحضور'),
-          _Metric(label: 'دقة الموقع', value: '~10 م', hint: 'عبر GPS عالي الدقة في المتصفح'),
-          _Metric(label: 'طبقات الحماية', value: '4', hint: 'جهاز · موقع · QR · سجل'),
+        final items = [
+          const _Metric(label: 'سرعة العملية', value: '< 5 ث', hint: 'من فتح الرابط حتى تأكيد الحضور'),
+          const _Metric(label: 'دقة الموقع', value: '~10 م', hint: 'عبر GPS عالي الدقة في المتصفح'),
+          const _Metric(label: 'طبقات الحماية', value: '4', hint: 'جهاز · موقع · QR · سجل'),
         ];
-        if (constraints.maxWidth < 520) return const Column(children: [items[0], SizedBox(height: 8), items[1], SizedBox(height: 8), items[2]]);
-        return const Row(children: [Expanded(child: items[0]), SizedBox(width: 9), Expanded(child: items[1]), SizedBox(width: 9), Expanded(child: items[2])]);
+        if (constraints.maxWidth < 520) return Column(children: [items[0], const SizedBox(height: 8), items[1], const SizedBox(height: 8), items[2]]);
+        return Row(children: [Expanded(child: items[0]), const SizedBox(width: 9), Expanded(child: items[1]), const SizedBox(width: 9), Expanded(child: items[2])]);
       });
 
   Widget _glow(double size, Color color) => Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, color: color));
