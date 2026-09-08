@@ -31,8 +31,10 @@ class NotificationsService {
     try { final value = jsonDecode(raw); if (value is! List) return []; return value.map((e) => HadirNotification.fromJson(Map<String, dynamic>.from(e as Map))).toList(); } catch (_) { return []; }
   }
 
+  Future<String?> _token() async => await session.token() ?? await session.adminToken();
+
   Future<List<HadirNotification>> list() async {
-    final token = await session.token();
+    final token = await _token();
     if (token == null || token.isEmpty) return _local();
     try {
       final remote = await HadirApi(token: token).notifications();
@@ -43,21 +45,21 @@ class NotificationsService {
   }
 
   Future<void> markRead(String id) async {
-    final token = await session.token();
+    final token = await _token();
     if (token != null && token.isNotEmpty) { try { await HadirApi(token: token).markNotificationRead(id: id); } catch (_) {} }
     final rows = await _local();
     await storage.write(key: _key, value: jsonEncode(rows.map((e) => e.id == id ? HadirNotification(id:e.id,title:e.title,body:e.body,createdAt:e.createdAt,read:true).toJson() : e.toJson()).toList()));
   }
 
   Future<void> markAllRead() async {
-    final token = await session.token();
+    final token = await _token();
     if (token != null && token.isNotEmpty) { try { await HadirApi(token: token).markNotificationRead(); } catch (_) {} }
     final rows = await _local();
     await storage.write(key: _key, value: jsonEncode(rows.map((e) => HadirNotification(id:e.id,title:e.title,body:e.body,createdAt:e.createdAt,read:true).toJson()).toList()));
   }
 
   Future<void> delete(String id) async {
-    final token = await session.token();
+    final token = await _token();
     if (token != null && token.isNotEmpty) { try { await HadirApi(token: token).deleteNotification(id:id); } catch (_) {} }
     final rows = await _local();
     await storage.write(key: _key, value: jsonEncode(rows.where((e) => e.id != id).map((e) => e.toJson()).toList()));
