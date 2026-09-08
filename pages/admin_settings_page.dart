@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../lib/core/api.dart';
-import '../lib/core/hadir_brand.dart';
-import '../lib/core/session.dart';
+import 'package:hadir/core/api.dart';
+import 'package:hadir/core/hadir_brand.dart';
+import 'package:hadir/core/session.dart';
 
 class AdminSettingsPage extends StatefulWidget {
   const AdminSettingsPage({super.key});
@@ -61,7 +61,9 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     });
     try {
       final token = await _session.adminToken();
-      if (token == null || token.isEmpty) throw Exception('انتهت جلسة الإدارة. سجّل الدخول مرة أخرى.');
+      if (token == null || token.isEmpty) {
+        throw Exception('انتهت جلسة الإدارة. سجّل الدخول مرة أخرى.');
+      }
       final settings = await HadirApi(token: token).settings();
       _setText(_brandName, settings['brandName']);
       _setText(_qrCode, settings['qrCode']);
@@ -102,7 +104,9 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     });
     try {
       final token = await _session.adminToken();
-      if (token == null || token.isEmpty) throw Exception('انتهت جلسة الإدارة. سجّل الدخول مرة أخرى.');
+      if (token == null || token.isEmpty) {
+        throw Exception('انتهت جلسة الإدارة. سجّل الدخول مرة أخرى.');
+      }
       final payload = <String, dynamic>{
         'brandName': _brandName.text.trim(),
         'qrCode': _qrCode.text.trim(),
@@ -138,7 +142,11 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         appBar: AppBar(
           title: const Text('إعدادات النظام'),
           actions: [
-            IconButton(onPressed: _loading || _saving ? null : _load, tooltip: 'تحديث الإعدادات', icon: const Icon(Icons.refresh_rounded)),
+            IconButton(
+              onPressed: _loading || _saving ? null : _load,
+              tooltip: 'تحديث الإعدادات',
+              icon: const Icon(Icons.refresh_rounded),
+            ),
           ],
         ),
         body: _loading
@@ -185,11 +193,17 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                       const SizedBox(height: 18),
                       FilledButton.icon(
                         onPressed: _saving ? null : _save,
-                        icon: _saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save_rounded),
+                        icon: _saving
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.save_rounded),
                         label: Text(_saving ? 'جارٍ الحفظ…' : 'حفظ الإعدادات'),
                       ),
                       const SizedBox(height: 8),
-                      Text('التغييرات تطبق على إعدادات النظام الحالية ولا تغيّر سجلات الحضور السابقة.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        'التغييرات تطبق على إعدادات النظام الحالية ولا تغيّر سجلات الحضور السابقة.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
@@ -201,7 +215,11 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   Widget _hero(BuildContext context) => Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [HadirBrand.primary, HadirBrand.primaryDark]),
+          gradient: const LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [HadirBrand.primary, HadirBrand.primaryDark],
+          ),
           borderRadius: BorderRadius.circular(HadirBrand.radiusXl),
           boxShadow: const [BoxShadow(color: Color(0x220B6B5A), blurRadius: 22, offset: Offset(0, 10))],
         ),
@@ -218,10 +236,19 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
 
   Widget _section(BuildContext context, String title, String subtitle, IconData icon, List<Widget> children) => Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(HadirBrand.radiusLg), border: Border.all(color: Theme.of(context).colorScheme.outline)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(HadirBrand.radiusLg),
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Container(width: 42, height: 42, decoration: BoxDecoration(color: HadirBrand.soft, borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: Theme.of(context).colorScheme.primary)),
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(color: HadirBrand.soft, borderRadius: BorderRadius.circular(14)),
+              child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+            ),
             const SizedBox(width: 11),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(title, style: Theme.of(context).textTheme.titleMedium),
@@ -247,8 +274,16 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     final background = success ? HadirBrand.soft : Theme.of(context).colorScheme.error.withValues(alpha: .08);
     return Container(
       padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(HadirBrand.radiusMd), border: Border.all(color: color.withValues(alpha: .25))),
-      child: Row(children: [Icon(success ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded, color: color), const SizedBox(width: 9), Expanded(child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))]),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(HadirBrand.radiusMd),
+        border: Border.all(color: color.withValues(alpha: .25)),
+      ),
+      child: Row(children: [
+        Icon(success ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded, color: color),
+        const SizedBox(width: 9),
+        Expanded(child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+      ]),
     );
   }
 }
