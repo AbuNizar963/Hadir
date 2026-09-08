@@ -21,6 +21,7 @@ import 'pages/notifications_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/services_page.dart';
 import 'pages/ai_assistant_page.dart';
+import 'pages/manager_requests_page.dart';
 import 'pages/landing_page.dart';
 
 final _modernSession = HadirSession();
@@ -31,13 +32,7 @@ GoRouter buildModernRouter() => GoRouter(
     final employeeToken = await _modernSession.token();
     final adminToken = await _modernSession.adminToken();
     final location = state.matchedLocation;
-    const publicLocations = {
-      '/',
-      '/login',
-      '/employee-login',
-      '/admin-login',
-      '/manager/login',
-    };
+    const publicLocations = {'/', '/login', '/employee-login', '/admin-login', '/manager/login'};
     if (employeeToken == null && adminToken == null && !publicLocations.contains(location)) return '/';
     if (adminToken != null && publicLocations.contains(location)) return '/admin';
     if (employeeToken != null && publicLocations.contains(location)) return '/home';
@@ -74,7 +69,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/manager-home', redirect: (_, __) => '/manager'),
     GoRoute(path: '/manager/employees', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
     GoRoute(path: '/manager/workforce', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
-    GoRoute(path: '/manager/requests', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
+    GoRoute(path: '/manager/requests', builder: (_, __) => const SwipeBackPage(child: ManagerRequestsPage())),
     GoRoute(path: '/manager/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
     GoRoute(path: '/manager/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/manager/report-archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
