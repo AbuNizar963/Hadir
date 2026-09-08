@@ -65,7 +65,7 @@ class _HomePageState extends State<HomePage> {
       body: Center(
         child: loading
             ? const CircularProgressIndicator()
-            : Text('مرحباً ' + name),
+            : Text('مرحباً $name'),
       ),
     );
   }
