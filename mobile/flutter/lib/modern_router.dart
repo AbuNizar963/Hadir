@@ -37,8 +37,6 @@ Future<bool> _isTokenValid(String token) async {
   } on DioException catch (error) {
     final status = error.response?.statusCode;
     if (status == 401 || status == 403) return false;
-    // Preserve the website's offline-friendly behavior: transient/network
-    // failures must not sign the user out or strand them at the landing page.
     return true;
   } catch (_) {
     return true;
@@ -53,8 +51,6 @@ GoRouter buildModernRouter() => GoRouter(
     final location = state.matchedLocation;
     const publicLocations = {'/', '/login', '/employee-login', '/admin-login', '/manager/login'};
 
-    // Mirror the web LaunchGateway: validate a stored session when it is first
-    // observed, and revalidate automatically when the stored token changes.
     if (employeeToken != null && employeeToken.isNotEmpty && employeeToken != _validatedEmployeeToken) {
       final valid = await _isTokenValid(employeeToken);
       if (!valid) {
@@ -125,8 +121,8 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/premium', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
-    GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in')),
-    GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in')),
+    GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
+    GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
     GoRoute(path: '/employee/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
     GoRoute(path: '/insights', builder: (_, __) => const SwipeBackPage(child: AttendanceInsightsPage())),
