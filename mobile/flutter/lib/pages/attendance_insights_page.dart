@@ -11,6 +11,7 @@ const _bg = Color(0xFFF6F8F7);
 const _ink = Color(0xFF142D27);
 const _muted = Color(0xFF71817C);
 const _line = Color(0xFFE0E8E5);
+const _danger = Color(0xFFB94A3D);
 
 class AttendanceInsightsPage extends StatefulWidget {
   const AttendanceInsightsPage({super.key});
@@ -37,7 +38,10 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
       final records = await api.attendance(limit: 100);
       if (!mounted) return;
       setState(() {
-        _records = records.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        _records = records
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
         _loading = false;
         _error = null;
       });
@@ -58,8 +62,10 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
       return !local.isBefore(from) && local.isBefore(to);
     }).toList()
       ..sort((a, b) {
-        final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final at = DateTime.tryParse('${a['timestamp']}') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bt = DateTime.tryParse('${b['timestamp']}') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
         return at.compareTo(bt);
       });
   }
@@ -73,7 +79,9 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
       final type = record['type'];
       if (type == 'check-in') {
         checkIn = time;
-      } else if (type == 'check-out' && checkIn != null && !time.isBefore(checkIn)) {
+      } else if (type == 'check-out' &&
+          checkIn != null &&
+          !time.isBefore(checkIn)) {
         total += time.difference(checkIn);
         checkIn = null;
       }
@@ -97,6 +105,23 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
       .toSet()
       .length;
 
+  int _countType(List<Map<String, dynamic>> records, String type) =>
+      records.where((record) => record['type'] == type).length;
+
+  bool _hasOpenShift(List<Map<String, dynamic>> records) {
+    DateTime? checkIn;
+    for (final record in records) {
+      final time = DateTime.tryParse('${record['timestamp']}')?.toLocal();
+      if (time == null) continue;
+      if (record['type'] == 'check-in') {
+        checkIn = time;
+      } else if (record['type'] == 'check-out' && checkIn != null) {
+        checkIn = null;
+      }
+    }
+    return checkIn != null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -110,7 +135,12 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     final month = _recordsIn(monthStart, nextMonth);
     final monthDuration = _durationFor(month);
     final activeDays = _daysWithActivity(month);
-    final average = activeDays == 0 ? Duration.zero : Duration(minutes: monthDuration.inMinutes ~/ activeDays);
+    final average = activeDays == 0
+        ? Duration.zero
+        : Duration(minutes: monthDuration.inMinutes ~/ activeDays);
+    final checkIns = _countType(month, 'check-in');
+    final checkOuts = _countType(month, 'check-out');
+    final openShift = _hasOpenShift(month);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -120,9 +150,15 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
           elevation: 0,
           backgroundColor: _bg,
           foregroundColor: _ink,
-          title: const Text('ملخص الحضور', style: TextStyle(fontWeight: FontWeight.w900)),
+          title: const Text(
+            'ملخص الحضور',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
           actions: [
-            IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded)),
+            IconButton(
+              onPressed: _loading ? null : _load,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
           ],
         ),
         body: RefreshIndicator(
@@ -134,12 +170,20 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
             children: [
               Text(
                 intl.DateFormat('MMMM yyyy', 'ar').format(now),
-                style: const TextStyle(color: _muted, fontSize: 12, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: _muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 6),
               const Text(
                 'صورة سريعة عن ساعات دوامك وحركاتك',
-                style: TextStyle(color: _ink, fontSize: 22, fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(height: 18),
               if (_loading) ...[
@@ -164,6 +208,12 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
                 ),
                 const SizedBox(height: 10),
                 _AverageCard(value: _hours(average)),
+                const SizedBox(height: 12),
+                _MovementBreakdown(
+                  checkIns: checkIns,
+                  checkOuts: checkOuts,
+                  openShift: openShift,
+                ),
                 const SizedBox(height: 18),
                 _section('آخر حركة مسجلة'),
                 const SizedBox(height: 9),
@@ -183,7 +233,12 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
                       Expanded(
                         child: Text(
                           'الأرقام مبنية على حركات الحضور الفعلية التي يعيدها النظام، وليست تقديرات من الواجهة.',
-                          style: TextStyle(color: _greenDark, fontSize: 10.5, height: 1.5, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: _greenDark,
+                            fontSize: 10.5,
+                            height: 1.5,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -197,25 +252,72 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     );
   }
 
-  Widget _section(String text) => Text(text, style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w900));
+  Widget _section(String text) => Text(
+        text,
+        style: const TextStyle(
+          color: _ink,
+          fontSize: 14,
+          fontWeight: FontWeight.w900,
+        ),
+      );
 
   Widget _lastActivity(List<Map<String, dynamic>> month) {
-    if (month.isEmpty) return const _MessageCard('لا توجد حركات مسجلة لهذا الشهر.', Icons.event_available_rounded);
+    if (month.isEmpty) {
+      return const _MessageCard(
+        'لا توجد حركات مسجلة لهذا الشهر.',
+        Icons.event_available_rounded,
+      );
+    }
     final latest = month.last;
     final time = DateTime.tryParse('${latest['timestamp']}')?.toLocal();
     final checkout = latest['type'] == 'check-out';
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _line),
+      ),
       child: Row(
         children: [
-          Container(width: 42, height: 42, decoration: BoxDecoration(color: checkout ? const Color(0xFFFFEFED) : _soft, borderRadius: BorderRadius.circular(14)), child: Icon(checkout ? Icons.logout_rounded : Icons.login_rounded, color: checkout ? const Color(0xFFB94A3D) : _green)),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: checkout ? const Color(0xFFFFEFED) : _soft,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              checkout ? Icons.logout_rounded : Icons.login_rounded,
+              color: checkout ? _danger : _green,
+            ),
+          ),
           const SizedBox(width: 11),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(checkout ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)),
-            const SizedBox(height: 4),
-            Text(time == null ? 'وقت غير معروف' : intl.DateFormat('EEEE، d MMMM · HH:mm', 'ar').format(time), style: const TextStyle(color: _muted, fontSize: 10.5)),
-          ])),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  checkout ? 'تسجيل الانصراف' : 'تسجيل الحضور',
+                  style: const TextStyle(
+                    color: _ink,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  time == null
+                      ? 'وقت غير معروف'
+                      : intl.DateFormat(
+                          'EEEE، d MMMM · HH:mm',
+                          'ar',
+                        ).format(time),
+                  style: const TextStyle(color: _muted, fontSize: 10.5),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -228,28 +330,77 @@ class _SummaryCard extends StatelessWidget {
   final String days;
   final String movements;
 
-  const _SummaryCard({required this.title, required this.hours, required this.days, required this.movements});
+  const _SummaryCard({
+    required this.title,
+    required this.hours,
+    required this.days,
+    required this.movements,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(17),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_green, _greenDark]),
+          gradient: const LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [_green, _greenDark],
+          ),
           borderRadius: BorderRadius.circular(22),
-          boxShadow: const [BoxShadow(color: Color(0x1C0B6B5A), blurRadius: 22, offset: Offset(0, 9))],
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1C0B6B5A),
+              blurRadius: 22,
+              offset: Offset(0, 9),
+            ),
+          ],
         ),
-        child: Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(hours, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900)),
-          ])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(days, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 5),
-            Text(movements, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-          ]),
-        ]),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    hours,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  days,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  movements,
+                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                ),
+              ],
+            ),
+          ],
+        ),
       );
 }
 
@@ -260,13 +411,188 @@ class _AverageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
-        child: Row(children: [
-          Container(width: 38, height: 38, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.insights_rounded, color: _green, size: 20)),
-          const SizedBox(width: 10),
-          const Expanded(child: Text('متوسط ساعات اليوم النشط', style: TextStyle(color: _ink, fontSize: 11.5, fontWeight: FontWeight.w800))),
-          Text(value, style: const TextStyle(color: _green, fontSize: 14, fontWeight: FontWeight.w900)),
-        ]),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _line),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: _soft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.insights_rounded,
+                color: _green,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'متوسط ساعات اليوم النشط',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              value,
+              style: const TextStyle(
+                color: _green,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _MovementBreakdown extends StatelessWidget {
+  final int checkIns;
+  final int checkOuts;
+  final bool openShift;
+
+  const _MovementBreakdown({
+    required this.checkIns,
+    required this.checkOuts,
+    required this.openShift,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _line),
+        ),
+        child: Column(
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.swap_vert_rounded, color: _green, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'تفصيل الحركات هذا الشهر',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 13),
+            Row(
+              children: [
+                Expanded(
+                  child: _MovementStat(
+                    icon: Icons.login_rounded,
+                    label: 'حضور',
+                    value: '$checkIns',
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: _MovementStat(
+                    icon: Icons.logout_rounded,
+                    label: 'انصراف',
+                    value: '$checkOuts',
+                    danger: true,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: openShift ? const Color(0xFFFFF7E6) : _soft,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    openShift
+                        ? Icons.access_time_filled_rounded
+                        : Icons.check_circle_rounded,
+                    size: 18,
+                    color: openShift ? const Color(0xFF9A6A18) : _green,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      openShift
+                          ? 'يوجد دوام مفتوح لم يُسجّل انصرافه بعد.'
+                          : 'لا يوجد دوام مفتوح حاليًا.',
+                      style: TextStyle(
+                        color: openShift ? const Color(0xFF795515) : _greenDark,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _MovementStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool danger;
+
+  const _MovementStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: danger ? const Color(0xFFFFF5F3) : _soft,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: danger ? _danger : _green, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: _muted,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                color: danger ? _danger : _green,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
       );
 }
 
@@ -274,16 +600,44 @@ class _MessageCard extends StatelessWidget {
   final String text;
   final IconData icon;
   const _MessageCard(this.text, this.icon);
+
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
-        child: Row(children: [Icon(icon, color: _green), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(color: _muted, fontSize: 11, height: 1.4)))]),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _line),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: _green),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: _muted,
+                  fontSize: 11,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 }
 
 class _InsightSkeleton extends StatelessWidget {
   const _InsightSkeleton();
+
   @override
-  Widget build(BuildContext context) => Container(height: 96, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)));
+  Widget build(BuildContext context) => Container(
+        height: 96,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: _line),
+        ),
+      );
 }
