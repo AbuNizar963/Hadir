@@ -35,15 +35,13 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   @override
   void initState() {
     super.initState();
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: _baseUrl,
-        connectTimeout: const Duration(seconds: 20),
-        receiveTimeout: const Duration(seconds: 20),
-        sendTimeout: const Duration(seconds: 20),
-        headers: const {'Accept': 'application/json'},
-      ),
-    );
+    _dio = Dio(BaseOptions(
+      baseUrl: _baseUrl,
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 20),
+      sendTimeout: const Duration(seconds: 20),
+      headers: const {'Accept': 'application/json'},
+    ));
     _load();
   }
 
@@ -90,17 +88,11 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   }
 
   Future<void> _load() async {
-    if (mounted) {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-    }
+    if (mounted) setState(() { _loading = true; _error = null; });
     try {
       final token = await _session.adminToken();
       if (token == null || token.isEmpty) throw Exception('انتهت جلسة الإدارة.');
       _dio.options.headers['Authorization'] = 'Bearer $token';
-
       final results = await Future.wait<Response<dynamic>>([
         _dio.get('/api/employees'),
         _dio.get('/api/requests'),
@@ -109,7 +101,6 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         _dio.get('/api/settings'),
         _dio.get('/api/manager/workforce-controls'),
       ]);
-
       if (!mounted) return;
       setState(() {
         _employees = _asList(results[0].data);
@@ -122,10 +113,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = _errorMessage(error);
-      });
+      setState(() { _loading = false; _error = _errorMessage(error); });
     }
   }
 
@@ -164,54 +152,24 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     var isVip = current['isVip'] == true;
     var autoCheckIn = current['autoCheckIn'] == true;
     var autoCheckOut = current['autoCheckOut'] == true;
-
     final result = await showDialog<Map<String, bool>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text('قوى العمل · $name'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: isVip,
-                title: const Text('موظف VIP'),
-                subtitle: const Text('تمييز الموظف كحالة أولوية في نظام الحضور.'),
-                onChanged: (value) => setDialogState(() => isVip = value),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: autoCheckIn,
-                title: const Text('الحضور التلقائي'),
-                subtitle: const Text('السماح بمحرك الحضور التلقائي لهذا الموظف.'),
-                onChanged: (value) => setDialogState(() => autoCheckIn = value),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: autoCheckOut,
-                title: const Text('الانصراف التلقائي'),
-                subtitle: const Text('السماح بمحرك الانصراف التلقائي لهذا الموظف.'),
-                onChanged: (value) => setDialogState(() => autoCheckOut = value),
-              ),
-            ],
-          ),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            SwitchListTile(contentPadding: EdgeInsets.zero, value: isVip, title: const Text('موظف VIP'), subtitle: const Text('تمييز الموظف كحالة أولوية في نظام الحضور.'), onChanged: (value) => setDialogState(() => isVip = value)),
+            SwitchListTile(contentPadding: EdgeInsets.zero, value: autoCheckIn, title: const Text('الحضور التلقائي'), subtitle: const Text('السماح بمحرك الحضور التلقائي لهذا الموظف.'), onChanged: (value) => setDialogState(() => autoCheckIn = value)),
+            SwitchListTile(contentPadding: EdgeInsets.zero, value: autoCheckOut, title: const Text('الانصراف التلقائي'), subtitle: const Text('السماح بمحرك الانصراف التلقائي لهذا الموظف.'), onChanged: (value) => setDialogState(() => autoCheckOut = value)),
+          ]),
           actions: [
             TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('إلغاء')),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop({
-                'isVip': isVip,
-                'autoCheckIn': autoCheckIn,
-                'autoCheckOut': autoCheckOut,
-              }),
-              child: const Text('حفظ'),
-            ),
+            FilledButton(onPressed: () => Navigator.of(dialogContext).pop({'isVip': isVip, 'autoCheckIn': autoCheckIn, 'autoCheckOut': autoCheckOut}), child: const Text('حفظ')),
           ],
         ),
       ),
     );
-    if (result == null) return;
-    await _updateWorkforce(id, result);
+    if (result != null) await _updateWorkforce(id, result);
   }
 
   Future<void> _addEmployee() async {
@@ -233,19 +191,12 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         ],
       ),
     );
-    if (result != true) return;
-    if (name.text.trim().isEmpty || job.text.trim().isEmpty) return;
+    if (result != true || name.text.trim().isEmpty || job.text.trim().isEmpty) return;
     await _request('POST', '/api/employees', data: {
       'id': 'mobile-${DateTime.now().microsecondsSinceEpoch}',
-      'name': name.text.trim(),
-      'jobNumber': job.text.trim(),
-      'pin': pin.text.trim(),
-      'status': 'active',
-      'scheduleType': 'ADMIN',
-      'workStartTime': '08:00',
-      'workEndTime': '16:00',
-      'workDays': [0, 1, 2, 3, 4],
-      'specialties': ['general'],
+      'name': name.text.trim(), 'jobNumber': job.text.trim(), 'pin': pin.text.trim(),
+      'status': 'active', 'scheduleType': 'ADMIN', 'workStartTime': '08:00', 'workEndTime': '16:00',
+      'workDays': [0, 1, 2, 3, 4], 'specialties': ['general'],
     });
   }
 
@@ -263,15 +214,9 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
             TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
             TextField(controller: username, decoration: const InputDecoration(labelText: 'اسم المستخدم')),
             TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'كلمة المرور')),
-            DropdownButtonFormField<String>(
-              initialValue: role,
-              decoration: const InputDecoration(labelText: 'الصلاحية'),
-              items: const [
-                DropdownMenuItem(value: 'manager', child: Text('مدير')),
-                DropdownMenuItem(value: 'supervisor', child: Text('مشرف')),
-              ],
-              onChanged: (value) => setDialogState(() => role = value ?? 'manager'),
-            ),
+            DropdownButtonFormField<String>(initialValue: role, decoration: const InputDecoration(labelText: 'الصلاحية'), items: const [
+              DropdownMenuItem(value: 'manager', child: Text('مدير')), DropdownMenuItem(value: 'supervisor', child: Text('مشرف')),
+            ], onChanged: (value) => setDialogState(() => role = value ?? 'manager')),
           ]),
           actions: [
             TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')),
@@ -280,8 +225,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         ),
       ),
     );
-    if (result != true) return;
-    if (name.text.trim().isEmpty || username.text.trim().isEmpty || password.text.isEmpty) return;
+    if (result != true || name.text.trim().isEmpty || username.text.trim().isEmpty || password.text.isEmpty) return;
     await _request('POST', '/api/admins', data: {'name': name.text.trim(), 'username': username.text.trim(), 'password': password.text, 'role': role});
   }
 
@@ -303,11 +247,16 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   Widget _card(Widget child) => Card(margin: const EdgeInsets.only(bottom: 10), child: child);
 
   Widget _metric(String label, String value, IconData icon) => Expanded(
-    child: Card(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13), child: Column(children: [
-      Icon(icon, color: HadirBrand.primary), const SizedBox(height: 6),
-      Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-      Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10)),
-    ])),
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
+        child: Column(children: [
+          Icon(icon, color: HadirBrand.primary), const SizedBox(height: 6),
+          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10)),
+        ]),
+      ),
+    ),
   );
 
   Widget _searchBox({required String hint, required ValueChanged<String> onChanged}) => TextField(
@@ -318,8 +267,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   Map<String, dynamic> _employeeWithControls(Map<String, dynamic> employee) {
     final id = '${employee['id'] ?? ''}';
     final controls = _workforceControls[id];
-    if (controls == null) return employee;
-    return {...employee, ...controls};
+    return controls == null ? employee : {...employee, ...controls};
   }
 
   Widget _employeesView() {
@@ -334,13 +282,8 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     }).toList();
     final active = _employees.where((raw) => raw is Map && '${raw['status'] ?? 'active'}' == 'active').length;
     final inactive = _employees.length - active;
-
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [
-        _metric('إجمالي الموظفين', '${_employees.length}', Icons.groups_rounded), const SizedBox(width: 8),
-        _metric('نشط', '$active', Icons.check_circle_outline_rounded), const SizedBox(width: 8),
-        _metric('غير نشط', '$inactive', Icons.pause_circle_outline_rounded),
-      ]),
+      Row(children: [_metric('إجمالي الموظفين', '${_employees.length}', Icons.groups_rounded), const SizedBox(width: 8), _metric('نشط', '$active', Icons.check_circle_outline_rounded), const SizedBox(width: 8), _metric('غير نشط', '$inactive', Icons.pause_circle_outline_rounded)]),
       const SizedBox(height: 8),
       _searchBox(hint: 'ابحث بالاسم أو الرقم الوظيفي', onChanged: (v) => setState(() => _employeeQuery = v)),
       const SizedBox(height: 8),
@@ -350,10 +293,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         _filterChip('غير نشط', 'inactive', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
       ]),
       const SizedBox(height: 12),
-      Row(children: [
-        Expanded(child: Text('${filtered.length} نتيجة', style: const TextStyle(fontWeight: FontWeight.w800))),
-        FilledButton.icon(onPressed: _addEmployee, icon: const Icon(Icons.person_add_alt_1), label: const Text('إضافة')),
-      ]),
+      Row(children: [Expanded(child: Text('${filtered.length} نتيجة', style: const TextStyle(fontWeight: FontWeight.w800))), FilledButton.icon(onPressed: _addEmployee, icon: const Icon(Icons.person_add_alt_1), label: const Text('إضافة'))]),
       const SizedBox(height: 10),
       if (filtered.isEmpty) _empty('لا توجد موظفون مطابقون للبحث.')
       else ...filtered.map((raw) {
@@ -367,18 +307,11 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         final flags = [if (isVip) 'VIP', if (autoIn) 'حضور تلقائي', if (autoOut) 'انصراف تلقائي'];
         return _card(ListTile(
           leading: CircleAvatar(backgroundColor: HadirBrand.soft, child: Text(name.isEmpty ? 'م' : name.substring(0, 1))),
-          title: Row(children: [
-            Flexible(child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800))),
-            if (isVip) const Padding(padding: EdgeInsets.only(right: 6), child: Text('⭐', style: TextStyle(fontSize: 15))),
-          ]),
+          title: Row(children: [Flexible(child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800))), if (isVip) const Padding(padding: EdgeInsets.only(right: 6), child: Text('⭐', style: TextStyle(fontSize: 15)))]),
           subtitle: Text('${employee['jobNumber'] ?? '—'} · $status · ${employee['scheduleType'] ?? '—'}${flags.isEmpty ? '' : '\n${flags.join(' · ')}'}'),
           isThreeLine: flags.isNotEmpty,
           trailing: PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'controls') _showWorkforceControls(id, name);
-              if (value == 'reset') _request('DELETE', '/api/employees/$id/device');
-              if (value == 'delete') _deleteEmployee(id, name);
-            },
+            onSelected: (value) { if (value == 'controls') _showWorkforceControls(id, name); if (value == 'reset') _request('DELETE', '/api/employees/$id/device'); if (value == 'delete') _deleteEmployee(id, name); },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'controls', child: Text('قوى العمل والأتمتة')),
               PopupMenuItem(value: 'reset', child: Text('إعادة ربط الجهاز')),
@@ -407,26 +340,14 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
       const SizedBox(height: 8),
       _searchBox(hint: 'ابحث في نوع الطلب أو الموظف أو السبب', onChanged: (v) => setState(() => _requestQuery = v)),
       const SizedBox(height: 8),
-      Wrap(spacing: 8, children: [
-        _filterChip('الكل', 'all', _requestStatus, (v) => setState(() => _requestStatus = v)),
-        _filterChip('معلق', 'pending', _requestStatus, (v) => setState(() => _requestStatus = v)),
-        _filterChip('مقبول', 'approved', _requestStatus, (v) => setState(() => _requestStatus = v)),
-        _filterChip('مرفوض', 'rejected', _requestStatus, (v) => setState(() => _requestStatus = v)),
-      ]),
+      Wrap(spacing: 8, children: [_filterChip('الكل', 'all', _requestStatus, (v) => setState(() => _requestStatus = v)), _filterChip('معلق', 'pending', _requestStatus, (v) => setState(() => _requestStatus = v)), _filterChip('مقبول', 'approved', _requestStatus, (v) => setState(() => _requestStatus = v)), _filterChip('مرفوض', 'rejected', _requestStatus, (v) => setState(() => _requestStatus = v))]),
       const SizedBox(height: 12),
       if (filtered.isEmpty) _empty('لا توجد طلبات مطابقة.')
       else ...filtered.map((raw) {
         final request = Map<String, dynamic>.from(raw as Map);
         final id = '${request['id'] ?? ''}';
         final status = '${request['status'] ?? 'pending'}';
-        return _card(ListTile(
-          title: Text('${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: Text('${request['reason'] ?? ''}\nالحالة: $status'), isThreeLine: true,
-          trailing: status == 'pending' ? PopupMenuButton<String>(
-            onSelected: (value) => _request('PATCH', '/api/requests/$id', data: {'status': value}),
-            itemBuilder: (_) => const [PopupMenuItem(value: 'approved', child: Text('موافقة')), PopupMenuItem(value: 'rejected', child: Text('رفض'))],
-          ) : null,
-        ));
+        return _card(ListTile(title: Text('${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${request['reason'] ?? ''}\nالحالة: $status'), isThreeLine: true, trailing: status == 'pending' ? PopupMenuButton<String>(onSelected: (value) => _request('PATCH', '/api/requests/$id', data: {'status': value}), itemBuilder: (_) => const [PopupMenuItem(value: 'approved', child: Text('موافقة')), PopupMenuItem(value: 'rejected', child: Text('رفض'))]) : null));
       }),
     ]);
   }
@@ -443,10 +364,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
       Row(children: [_metric('سجلات ناجحة', '${successful.length}', Icons.fact_check_rounded), const SizedBox(width: 8), _metric('حضور', '$checkIns', Icons.login_rounded), const SizedBox(width: 8), _metric('انصراف', '$checkOuts', Icons.logout_rounded)]),
       const SizedBox(height: 12),
       _card(const ListTile(title: Text('التقرير التفصيلي', style: TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('عمليات الحضور والانصراف المستخرجة من سجل التدقيق.'))),
-      ...successful.take(80).map((raw) {
-        final item = Map<String, dynamic>.from(raw as Map);
-        return _card(ListTile(title: Text('${item['actorName'] ?? item['jobNumber'] ?? 'موظف'} · ${item['action']}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['timestamp'] ?? ''} · ${item['distanceMeters'] ?? 0} متر')));
-      }),
+      ...successful.take(80).map((raw) { final item = Map<String, dynamic>.from(raw as Map); return _card(ListTile(title: Text('${item['actorName'] ?? item['jobNumber'] ?? 'موظف'} · ${item['action']}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['timestamp'] ?? ''} · ${item['distanceMeters'] ?? 0} متر'))); }),
     ]);
   }
 
@@ -455,10 +373,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [_metric('إجمالي الأحداث', '${_audit.length}', Icons.security_rounded), const SizedBox(width: 8), _metric('ناجح', '${_audit.where((raw) => raw is Map && raw['result'] == 'success').length}', Icons.verified_rounded)]),
       const SizedBox(height: 12),
-      ..._audit.take(120).map((raw) {
-        final item = Map<String, dynamic>.from(raw as Map);
-        return _card(ListTile(dense: true, title: Text('${item['action'] ?? 'حدث'} · ${item['actorName'] ?? item['jobNumber'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['timestamp'] ?? ''} · ${item['result'] ?? ''}')));
-      }),
+      ..._audit.take(120).map((raw) { final item = Map<String, dynamic>.from(raw as Map); return _card(ListTile(dense: true, title: Text('${item['action'] ?? 'حدث'} · ${item['actorName'] ?? item['jobNumber'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['timestamp'] ?? ''} · ${item['result'] ?? ''}'))); }),
     ]);
   }
 
@@ -486,10 +401,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   Widget _settingsView() {
     if (_settings.isEmpty) return _empty('لا توجد إعدادات متاحة.');
     final rows = _settings.entries.map((entry) => Padding(padding: const EdgeInsets.symmetric(vertical: 7), child: Row(children: [Expanded(child: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w700))), Flexible(child: Text('${entry.value}', textAlign: TextAlign.left, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)))]))).toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('إعدادات النظام', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8),
-      _card(Padding(padding: const EdgeInsets.all(16), child: Column(children: rows))),
-    ]);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Text('إعدادات النظام', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), _card(Padding(padding: const EdgeInsets.all(16), child: Column(children: rows)))]);
   }
 
   Widget _empty(String message) => Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(children: [const Icon(Icons.inbox_outlined, size: 42), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center)])));
@@ -505,10 +417,20 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off_rounded, size: 48), const SizedBox(height: 12), Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 12), FilledButton(onPressed: _load, child: const Text('إعادة المحاولة'))])))
-              : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [
-                  SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: List.generate(labels.length, (index) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index))))),
-                  const SizedBox(height: 18), views[_tab],
-                ])),
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(children: List.generate(labels.length, (index) => Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index)),
+                      ))),
+                    ),
+                    const SizedBox(height: 18),
+                    views[_tab],
+                  ]),
+                ),
     );
   }
 }
