@@ -567,7 +567,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         final admin = Map<String, dynamic>.from(raw as Map);
         final id = '${admin['id'] ?? ''}';
         final color = _statusColor(admin['active'] == false ? 'inactive' : 'active');
-        return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 3)), borderRadius: BorderRadius.circular(12)), child: ListTile(leading: Icon(Icons.admin_panel_settings_rounded, color: color), title: Text('${admin['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('@${admin['username'] ?? ''} · ${admin['role'] ?? ''}'), trailing: Switch(value: admin['active'] != false, onChanged: (value) => _request('PATCH', '/api/admins/$id', data: {'active': value}))));
+        return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 3)), borderRadius: BorderRadius.circular(12)), child: ListTile(leading: Icon(Icons.admin_panel_settings_rounded, color: color), title: Text('${admin['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('@${admin['username'] ?? ''} · ${admin['role'] ?? ''}'), trailing: Switch(value: admin['active'] != false, onChanged: (value) => _request('PATCH', '/api/admins/$id', data: {'active': value})))));
       }),
     ]);
   }
@@ -578,7 +578,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Text('إعدادات النظام', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), _card(Padding(padding: const EdgeInsets.all(16), child: Column(children: rows))) ]);
   }
 
-  Widget _empty(String message) => Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(children: [const Icon(Icons.inbox_outlined, size: 42), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center)])));
+  Widget _empty(String message) => Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(children: [const Icon(Icons.inbox_outlined, size: 42), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center)]));
 
   @override
   Widget build(BuildContext context) {
@@ -591,7 +591,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off_rounded, size: 48), const SizedBox(height: 12), Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 12), FilledButton(onPressed: _load, child: const Text('إعادة المحاولة'))])))
-              : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: List.generate(labels.length, (index) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index))))), const SizedBox(height: 18), views[_tab]]))),
+              : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: List.generate(labels.length, (index) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index))))), const SizedBox(height: 18), views[_tab]])),
     );
   }
 }
