@@ -7,7 +7,6 @@ class LandingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
