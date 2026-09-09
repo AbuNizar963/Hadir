@@ -17,7 +17,6 @@ import 'pages/admin_settings_page.dart';
 import 'pages/attendance_page.dart';
 import 'pages/attendance_insights_page.dart';
 import 'pages/employee_center_page.dart';
-import 'pages/employee_home_parity_page.dart';
 import 'pages/employee_login_page.dart';
 import 'pages/hadir_workspace_page.dart';
 import 'pages/jibble_history_page.dart';
@@ -128,8 +127,8 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/manager/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/manager/report-archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
     GoRoute(path: '/manager/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
-    GoRoute(path: '/home', builder: (_, __) => const SwipeBackPage(child: EmployeeHomeParityPage())),
-    GoRoute(path: '/employee', builder: (_, __) => const SwipeBackPage(child: EmployeeHomeParityPage())),
+    GoRoute(path: '/home', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
+    GoRoute(path: '/employee', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/premium', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
