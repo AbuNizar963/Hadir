@@ -11,11 +11,13 @@ class AdminMobileShell extends StatelessWidget {
 
   int _selectedIndex(BuildContext context) {
     final uri = GoRouterState.of(context).uri;
-    if (uri.path == '/admin') return 0;
+    if (uri.path == '/admin' || uri.path == '/manager') return 0;
     if (uri.path == '/manager/requests') return 1;
     if (uri.path == '/admin/manage' || uri.path == '/manager/employees') return 2;
-    if (uri.path == '/admin/reports' || uri.path == '/admin/reports/archive' || uri.path == '/manager/reports' || uri.path == '/manager/report-archive') return 3;
-    return 4;
+    if (uri.path == '/admin/reports' || uri.path == '/admin/reports/archive' || uri.path == '/manager/reports' || uri.path == '/manager/report-archive') return 4;
+    if (uri.path == '/admin/audit' || uri.path == '/manager/audit') return 3;
+    if (uri.path == '/admin/settings' || uri.path == '/manager/settings') return 5;
+    return -1;
   }
 
   void _go(BuildContext context, int index) {
@@ -27,9 +29,11 @@ class AdminMobileShell extends StatelessWidget {
       case 2:
         context.go('/admin/manage');
       case 3:
-        context.go('/admin/reports');
+        context.go('/admin/audit');
       case 4:
-        _showOptions(context);
+        context.go('/admin/reports');
+      case 5:
+        context.go('/admin/settings');
     }
   }
 
@@ -37,29 +41,19 @@ class AdminMobileShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final selected = _selectedIndex(context);
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
           bottom: false,
-          child: Column(children: [_header(context), Expanded(child: child)]),
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: selected,
-          onDestinationSelected: (index) => _go(context, index),
-          backgroundColor: scheme.surface,
-          indicatorColor: scheme.primary.withValues(alpha: .12),
-          height: 74,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: [
-            NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded, color: scheme.primary), label: 'لوحة القيادة'),
-            NavigationDestination(icon: const Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment_rounded, color: scheme.primary), label: 'إدارة الطلبات'),
-            NavigationDestination(icon: const Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups_rounded, color: scheme.primary), label: 'الموظفون'),
-            NavigationDestination(icon: const Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart_rounded, color: scheme.primary), label: 'التقارير'),
-            NavigationDestination(icon: const Icon(Icons.more_horiz_rounded), selectedIcon: Icon(Icons.more_horiz_rounded, color: scheme.primary), label: 'المزيد'),
-          ],
+          child: Column(
+            children: [
+              _header(context),
+              _navigation(context, selected),
+              Expanded(child: child),
+            ],
+          ),
         ),
       ),
     );
@@ -70,7 +64,10 @@ class AdminMobileShell extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: EdgeInsets.fromLTRB(compact ? 12 : 14, 10, compact ? 12 : 14, 9),
-      decoration: BoxDecoration(color: scheme.surface, border: Border(bottom: BorderSide(color: scheme.outlineVariant))),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
       child: Row(children: [
         Expanded(child: Row(children: [
           Container(
@@ -92,8 +89,64 @@ class AdminMobileShell extends StatelessWidget {
         ])),
         _headerButton(context, icon: Icons.notifications_none_rounded, label: 'الإشعارات', compact: compact, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()))),
         const SizedBox(width: 7),
-        _headerButton(context, icon: Icons.menu_rounded, label: 'الخيارات', compact: compact, onTap: () => _showOptions(context)),
+        _headerButton(context, icon: Icons.menu_rounded, label: 'القائمة', compact: compact, onTap: () => _showOptions(context)),
       ]),
+    );
+  }
+
+  Widget _navigation(BuildContext context, int selected) {
+    final scheme = Theme.of(context).colorScheme;
+    final items = const [
+      (Icons.dashboard_outlined, Icons.dashboard_rounded, 'لوحة القيادة'),
+      (Icons.assignment_outlined, Icons.assignment_rounded, 'إدارة الطلبات'),
+      (Icons.groups_outlined, Icons.groups_rounded, 'الموظفون'),
+      (Icons.fact_check_outlined, Icons.fact_check_rounded, 'سجل التدقيق'),
+      (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'التقارير'),
+      (Icons.settings_outlined, Icons.settings_rounded, 'الإعدادات'),
+    ];
+    return Container(
+      height: 78,
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 4),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final active = selected == index;
+          return InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => _go(context, index),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              constraints: const BoxConstraints(minWidth: 88),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: active ? scheme.primary.withValues(alpha: .13) : Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: active ? scheme.primary.withValues(alpha: .28) : Colors.transparent),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 23),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.$3,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 10.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
