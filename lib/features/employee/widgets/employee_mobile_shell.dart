@@ -92,45 +92,15 @@ class EmployeeMobileShell extends StatelessWidget {
               ],
             ),
           ),
-          _headerButton(
-            context,
-            Icons.menu_rounded,
-            'القائمة',
-            () => _showOptions(context),
-            compact: compact,
-          ),
+          _headerButton(context, Icons.menu_rounded, 'القائمة', () => _showOptions(context), compact: compact),
           SizedBox(width: compact ? 5 : 7),
-          _headerButton(
-            context,
-            Icons.notifications_none_rounded,
-            'الإشعارات',
-            () => context.push('/employee/notifications'),
-            compact: compact,
-          ),
+          _headerButton(context, Icons.notifications_none_rounded, 'الإشعارات', () => context.push('/employee/notifications'), compact: compact),
           SizedBox(width: compact ? 5 : 7),
-          _headerButton(
-            context,
-            Icons.wb_sunny_outlined,
-            'الطقس',
-            () => context.push('/weather'),
-            compact: compact,
-          ),
+          _headerButton(context, Icons.wb_sunny_outlined, 'الطقس', () => context.push('/weather'), compact: compact),
           SizedBox(width: compact ? 5 : 7),
-          _headerButton(
-            context,
-            Icons.explore_outlined,
-            'القبلة',
-            () => context.push('/prayer'),
-            compact: compact,
-          ),
+          _headerButton(context, Icons.explore_outlined, 'القبلة', () => context.push('/prayer'), compact: compact),
           SizedBox(width: compact ? 5 : 7),
-          _headerButton(
-            context,
-            Icons.auto_awesome_rounded,
-            'المساعد',
-            () => context.push('/ai'),
-            compact: compact,
-          ),
+          _headerButton(context, Icons.auto_awesome_rounded, 'المساعد', () => context.push('/ai'), compact: compact),
         ],
       ),
     );
@@ -168,25 +138,14 @@ class EmployeeMobileShell extends StatelessWidget {
               decoration: BoxDecoration(
                 color: active ? scheme.primary.withValues(alpha: .13) : Colors.transparent,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: active ? scheme.primary.withValues(alpha: .28) : Colors.transparent,
-                ),
+                border: Border.all(color: active ? scheme.primary.withValues(alpha: .28) : Colors.transparent),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 23),
                   const SizedBox(height: 3),
-                  Text(
-                    item.$3,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: active ? scheme.primary : scheme.onSurfaceVariant,
-                      fontSize: 10.5,
-                      fontWeight: active ? FontWeight.w900 : FontWeight.w700,
-                    ),
-                  ),
+                  Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 10.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700)),
                 ],
               ),
             ),
@@ -196,13 +155,7 @@ class EmployeeMobileShell extends StatelessWidget {
     );
   }
 
-  Widget _headerButton(
-    BuildContext context,
-    IconData icon,
-    String label,
-    VoidCallback onTap, {
-    required bool compact,
-  }) {
+  Widget _headerButton(BuildContext context, IconData icon, String label, VoidCallback onTap, {required bool compact}) {
     final scheme = Theme.of(context).colorScheme;
     return IconButton(
       onPressed: onTap,
@@ -237,10 +190,17 @@ class EmployeeMobileShell extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               _themeSelector(sheetContext),
-              _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
-              _optionTile(sheetContext, Icons.explore_outlined, 'القبلة', 'اتجاه القبلة والخدمات المكانية', '/prayer'),
-              _optionTile(sheetContext, Icons.auto_awesome_rounded, 'Hadir AI', 'المساعد الذكي داخل HADIR', '/ai'),
-              _optionTile(sheetContext, Icons.settings_outlined, 'الإعدادات', 'إعدادات حساب الموظف', '/employee/center'),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: Theme.of(sheetContext).colorScheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14)),
+                  child: Icon(Icons.logout_rounded, color: Theme.of(sheetContext).colorScheme.error),
+                ),
+                title: Text('تسجيل خروج', style: TextStyle(color: Theme.of(sheetContext).colorScheme.error, fontWeight: FontWeight.w900)),
+                onTap: () => _logout(context),
+              ),
             ],
           ),
         ),
@@ -270,9 +230,7 @@ class EmployeeMobileShell extends StatelessWidget {
               DropdownMenuItem(value: ThemeMode.dark, child: Text('الوضع الداكن')),
             ],
             onChanged: (mode) {
-              if (mode != null) {
-                controller.setMode(mode);
-              }
+              if (mode != null) controller.setMode(mode);
             },
           ),
         );
@@ -280,23 +238,8 @@ class EmployeeMobileShell extends StatelessWidget {
     );
   }
 
-  Widget _optionTile(BuildContext context, IconData icon, String title, String subtitle, String route) {
-    final scheme = Theme.of(context).colorScheme;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14)),
-        child: Icon(icon, color: scheme.primary),
-      ),
-      title: Text(title, style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w900)),
-      subtitle: Text(subtitle, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5)),
-      trailing: Icon(Icons.chevron_left_rounded, color: scheme.onSurfaceVariant),
-      onTap: () {
-        Navigator.of(context).pop();
-        context.push(route);
-      },
-    );
+  Future<void> _logout(BuildContext context) async {
+    Navigator.of(context).pop();
+    await HadirThemeController.instance.logout(context);
   }
 }
