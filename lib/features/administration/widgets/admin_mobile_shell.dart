@@ -14,9 +14,10 @@ class AdminMobileShell extends StatelessWidget {
     if (uri.path == '/admin' || uri.path == '/manager') return 0;
     if (uri.path == '/manager/requests') return 1;
     if (uri.path == '/admin/manage' || uri.path == '/manager/employees') return 2;
-    if (uri.path == '/admin/reports' || uri.path == '/admin/reports/archive' || uri.path == '/manager/reports' || uri.path == '/manager/report-archive') return 4;
+    if (uri.path == '/admin/reports' || uri.path == '/manager/reports') return 4;
+    if (uri.path == '/admin/reports/archive' || uri.path == '/manager/report-archive') return 5;
     if (uri.path == '/admin/audit' || uri.path == '/manager/audit') return 3;
-    if (uri.path == '/admin/settings' || uri.path == '/manager/settings') return 5;
+    if (uri.path == '/admin/settings' || uri.path == '/manager/settings') return 6;
     return -1;
   }
 
@@ -33,6 +34,8 @@ class AdminMobileShell extends StatelessWidget {
       case 4:
         context.go('/admin/reports');
       case 5:
+        context.go('/admin/reports/archive');
+      case 6:
         context.go('/admin/settings');
     }
   }
@@ -102,6 +105,7 @@ class AdminMobileShell extends StatelessWidget {
       (Icons.groups_outlined, Icons.groups_rounded, 'الموظفون'),
       (Icons.fact_check_outlined, Icons.fact_check_rounded, 'سجل التدقيق'),
       (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'التقارير'),
+      (Icons.archive_outlined, Icons.archive_rounded, 'أرشيف التقارير'),
       (Icons.settings_outlined, Icons.settings_rounded, 'الإعدادات'),
     ];
     return Container(
