@@ -294,10 +294,9 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
                 padding: const EdgeInsets.all(14),
                 child: Column(children: [
                   Align(alignment: Alignment.centerRight, child: Wrap(spacing: 7, runSpacing: 7, children: [
-                    _periodChip('اليوم', 'today'),
-                    _periodChip('هذا الأسبوع', 'week'),
-                    _periodChip('هذا الشهر', 'month'),
-                    _periodChip('السنة', 'year'),
+                    _periodChip('يومي', 'today'),
+                    _periodChip('شهري', 'month'),
+                    _periodChip('سنوي', 'year'),
                   ])),
                   const SizedBox(height: 12),
                   Row(children: [Expanded(child: _dateButton('من', _from, true)), const SizedBox(width: 8), Expanded(child: _dateButton('إلى', _to, false))]),
