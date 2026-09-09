@@ -32,6 +32,29 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   Map<String, dynamic> _settings = {};
   Map<String, Map<String, dynamic>> _workforceControls = {};
 
+  Color _statusColor(String status, {bool escaped = false, bool hasDevice = false}) {
+    if (escaped) return const Color(0xFFDC2626);
+    switch (status.toLowerCase()) {
+      case 'active':
+      case 'online':
+        return const Color(0xFF16A34A);
+      case 'suspended':
+      case 'inactive':
+        return const Color(0xFFDC2626);
+      case 'pending':
+        return const Color(0xFFD97706);
+      case 'approved':
+      case 'returned':
+        return const Color(0xFF16A34A);
+      case 'rejected':
+        return const Color(0xFFDC2626);
+      default:
+        return hasDevice ? const Color(0xFF16A34A) : const Color(0xFFD97706);
+    }
+  }
+
+  Color _statusSoft(Color color) => Color.alphaBlend(color.withValues(alpha: 0.09), Theme.of(context).colorScheme.surface);
+
   @override
   void initState() {
     super.initState();
@@ -304,19 +327,31 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         final isVip = employee['isVip'] == true;
         final autoIn = employee['autoCheckIn'] == true;
         final autoOut = employee['autoCheckOut'] == true;
+        final escapeStatus = '${employee['escapeStatus'] ?? employee['fieldStatus'] ?? 'none'}'.toLowerCase();
+        final isEscaped = escapeStatus == 'escaped' || escapeStatus == 'escape';
+        final hasDevice = '${employee['deviceId'] ?? ''}'.trim().isNotEmpty;
+        final stateColor = _statusColor(status, escaped: isEscaped, hasDevice: hasDevice);
+        final stateLabel = isEscaped ? 'هارب' : status.toLowerCase() == 'active' ? (hasDevice ? 'نشط ومرتبط' : 'نشط غير مرتبط') : status.toLowerCase() == 'suspended' || status.toLowerCase() == 'inactive' ? 'موقوف' : status;
         final flags = [if (isVip) 'VIP', if (autoIn) 'حضور تلقائي', if (autoOut) 'انصراف تلقائي'];
-        return _card(ListTile(
-          leading: CircleAvatar(backgroundColor: HadirBrand.soft, child: Text(name.isEmpty ? 'م' : name.substring(0, 1))),
-          title: Row(children: [Flexible(child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800))), if (isVip) const Padding(padding: EdgeInsets.only(right: 6), child: Text('⭐', style: TextStyle(fontSize: 15)))]),
-          subtitle: Text('${employee['jobNumber'] ?? '—'} · $status · ${employee['scheduleType'] ?? '—'}${flags.isEmpty ? '' : '\n${flags.join(' · ')}'}'),
-          isThreeLine: flags.isNotEmpty,
-          trailing: PopupMenuButton<String>(
-            onSelected: (value) { if (value == 'controls') _showWorkforceControls(id, name); if (value == 'reset') _request('DELETE', '/api/employees/$id/device'); if (value == 'delete') _deleteEmployee(id, name); },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'controls', child: Text('قوى العمل والأتمتة')),
-              PopupMenuItem(value: 'reset', child: Text('إعادة ربط الجهاز')),
-              PopupMenuItem(value: 'delete', child: Text('حذف الموظف')),
-            ],
+        return _card(Container(
+          decoration: BoxDecoration(border: Border(right: BorderSide(color: stateColor, width: 4)), borderRadius: BorderRadius.circular(12)),
+          child: ListTile(
+            leading: CircleAvatar(backgroundColor: _statusSoft(stateColor), foregroundColor: stateColor, child: Text(name.isEmpty ? 'م' : name.substring(0, 1))),
+            title: Row(children: [Flexible(child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800))), if (isVip) const Padding(padding: EdgeInsets.only(right: 6), child: Text('⭐', style: TextStyle(fontSize: 15)))]),
+            subtitle: Padding(padding: const EdgeInsets.only(top: 5), child: Wrap(spacing: 6, runSpacing: 5, children: [
+              Text('${employee['jobNumber'] ?? '—'} · ${employee['scheduleType'] ?? '—'}'),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: _statusSoft(stateColor), borderRadius: BorderRadius.circular(20)), child: Text(stateLabel, style: TextStyle(color: stateColor, fontWeight: FontWeight.w800, fontSize: 11))),
+              if (flags.isNotEmpty) Text(flags.join(' · ')),
+            ])),
+            isThreeLine: true,
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) { if (value == 'controls') _showWorkforceControls(id, name); if (value == 'reset') _request('DELETE', '/api/employees/$id/device'); if (value == 'delete') _deleteEmployee(id, name); },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'controls', child: Text('قوى العمل والأتمتة')),
+                PopupMenuItem(value: 'reset', child: Text('إعادة ربط الجهاز')),
+                PopupMenuItem(value: 'delete', child: Text('حذف الموظف')),
+              ],
+            ),
           ),
         ));
       }),
@@ -347,7 +382,11 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         final request = Map<String, dynamic>.from(raw as Map);
         final id = '${request['id'] ?? ''}';
         final status = '${request['status'] ?? 'pending'}';
-        return _card(ListTile(title: Text('${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${request['reason'] ?? ''}\nالحالة: $status'), isThreeLine: true, trailing: status == 'pending' ? PopupMenuButton<String>(onSelected: (value) => _request('PATCH', '/api/requests/$id', data: {'status': value}), itemBuilder: (_) => const [PopupMenuItem(value: 'approved', child: Text('موافقة')), PopupMenuItem(value: 'rejected', child: Text('رفض'))]) : null));
+        final color = _statusColor(status);
+        return _card(Container(
+          decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 4)), borderRadius: BorderRadius.circular(12)),
+          child: ListTile(title: Text('${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Wrap(spacing: 8, children: [Text('${request['reason'] ?? ''}'), Text('الحالة: $status', style: TextStyle(color: color, fontWeight: FontWeight.w800))]), isThreeLine: true, trailing: status == 'pending' ? PopupMenuButton<String>(onSelected: (value) => _request('PATCH', '/api/requests/$id', data: {'status': value}), itemBuilder: (_) => const [PopupMenuItem(value: 'approved', child: Text('موافقة')), PopupMenuItem(value: 'rejected', child: Text('رفض'))]) : null),
+        ));
       }),
     ]);
   }
@@ -364,7 +403,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
       Row(children: [_metric('سجلات ناجحة', '${successful.length}', Icons.fact_check_rounded), const SizedBox(width: 8), _metric('حضور', '$checkIns', Icons.login_rounded), const SizedBox(width: 8), _metric('انصراف', '$checkOuts', Icons.logout_rounded)]),
       const SizedBox(height: 12),
       _card(const ListTile(title: Text('التقرير التفصيلي', style: TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('عمليات الحضور والانصراف المستخرجة من سجل التدقيق.'))),
-      ...successful.take(80).map((raw) { final item = Map<String, dynamic>.from(raw as Map); return _card(ListTile(title: Text('${item['actorName'] ?? item['jobNumber'] ?? 'موظف'} · ${item['action']}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['timestamp'] ?? ''} · ${item['distanceMeters'] ?? 0} متر'))); }),
+      ...successful.take(80).map((raw) { final item = Map<String, dynamic>.from(raw as Map); final color = _statusColor(item['action'] == 'check-in' ? 'active' : 'approved'); return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 3)), borderRadius: BorderRadius.circular(12)), child: ListTile(title: Text('${item['actorName'] ?? item['jobNumber'] ?? 'موظف'} · ${item['action']}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['timestamp'] ?? ''} · ${item['distanceMeters'] ?? 0} متر')))); }),
     ]);
   }
 
@@ -373,7 +412,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [_metric('إجمالي الأحداث', '${_audit.length}', Icons.security_rounded), const SizedBox(width: 8), _metric('ناجح', '${_audit.where((raw) => raw is Map && raw['result'] == 'success').length}', Icons.verified_rounded)]),
       const SizedBox(height: 12),
-      ..._audit.take(120).map((raw) { final item = Map<String, dynamic>.from(raw as Map); return _card(ListTile(dense: true, title: Text('${item['action'] ?? 'حدث'} · ${item['actorName'] ?? item['jobNumber'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['timestamp'] ?? ''} · ${item['result'] ?? ''}'))); }),
+      ..._audit.take(120).map((raw) { final item = Map<String, dynamic>.from(raw as Map); final color = _statusColor('${item['result'] ?? ''}'); return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 3)), borderRadius: BorderRadius.circular(12)), child: ListTile(dense: true, title: Text('${item['action'] ?? 'حدث'} · ${item['actorName'] ?? item['jobNumber'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['timestamp'] ?? ''} · ${item['result'] ?? ''}', style: TextStyle(color: color))))); }),
     ]);
   }
 
@@ -393,7 +432,8 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
       else ...filtered.map((raw) {
         final admin = Map<String, dynamic>.from(raw as Map);
         final id = '${admin['id'] ?? ''}';
-        return _card(ListTile(leading: const Icon(Icons.admin_panel_settings_rounded, color: HadirBrand.primary), title: Text('${admin['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('@${admin['username'] ?? ''} · ${admin['role'] ?? ''}'), trailing: Switch(value: admin['active'] != false, onChanged: (value) => _request('PATCH', '/api/admins/$id', data: {'active': value}))));
+        final color = _statusColor(admin['active'] == false ? 'inactive' : 'active');
+        return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 3)), borderRadius: BorderRadius.circular(12)), child: ListTile(leading: Icon(Icons.admin_panel_settings_rounded, color: color), title: Text('${admin['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('@${admin['username'] ?? ''} · ${admin['role'] ?? ''}'), trailing: Switch(value: admin['active'] != false, onChanged: (value) => _request('PATCH', '/api/admins/$id', data: {'active': value}))));
       }),
     ]);
   }
@@ -404,7 +444,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Text('إعدادات النظام', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), _card(Padding(padding: const EdgeInsets.all(16), child: Column(children: rows)))]);
   }
 
-  Widget _empty(String message) => Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(children: [const Icon(Icons.inbox_outlined, size: 42), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center)])));
+  Widget _empty(String message) => Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(children: [const Icon(Icons.inbox_outlined, size: 42), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center)]));
 
   @override
   Widget build(BuildContext context) {
