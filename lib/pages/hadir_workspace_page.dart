@@ -3,15 +3,34 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../core/api.dart';
+import '../core/hadir_brand.dart';
 import '../core/session.dart';
 
-const _green = Color(0xFF0B6B5A);
-const _greenDark = Color(0xFF064B40);
+const _green = HadirBrand.lightPrimary;
+const _greenDark = HadirBrand.lightPrimary;
 const _soft = Color(0xFFE8F5F0);
-const _bg = Color(0xFFF6F8F7);
-const _ink = Color(0xFF142D27);
-const _muted = Color(0xFF71817C);
-const _line = Color(0xFFE0E8E5);
+const _bg = HadirBrand.lightBackground;
+const _ink = HadirBrand.lightText;
+const _muted = HadirBrand.lightMuted;
+const _line = HadirBrand.lightBorder;
+
+Color _statusColor(String status) {
+  switch (status) {
+    case 'حاضر':
+    case 'انتهى الدوام':
+      return HadirBrand.lightPrimary;
+    case 'متأخر':
+    case 'إذن':
+      return HadirBrand.lightWarning;
+    case 'إجازة':
+      return HadirBrand.lightAccent;
+    case 'غائب':
+    case 'هارب':
+      return HadirBrand.lightDanger;
+    default:
+      return HadirBrand.lightAccent;
+  }
+}
 
 class HadirWorkspacePage extends StatefulWidget {
   const HadirWorkspacePage({super.key});
@@ -144,6 +163,9 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   Widget _statusCard({required DateTime now, required String status, required String detail, required bool active, required bool checkedOut}) {
+    final stateColor = _statusColor(status);
+    final stateSoft = stateColor.withValues(alpha: .13);
+    final stateIcon = checkedOut ? Icons.task_alt_rounded : active ? Icons.work_history_rounded : status == 'إجازة' ? Icons.beach_access_rounded : status == 'إذن' ? Icons.event_available_rounded : status == 'غائب' ? Icons.person_off_rounded : Icons.access_time_rounded;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line), boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 18, offset: Offset(0, 7))]),
@@ -152,18 +174,18 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('حالة اليوم', style: TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700)),
             const SizedBox(height: 3),
-            Text(status, style: const TextStyle(color: _ink, fontSize: 22, fontWeight: FontWeight.w900)),
+            Text(status, style: TextStyle(color: stateColor, fontSize: 22, fontWeight: FontWeight.w900)),
             const SizedBox(height: 3),
             Text(detail, style: const TextStyle(color: _muted, fontSize: 10.5)),
           ])),
-          Container(width: 48, height: 48, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(15)), child: Icon(checkedOut ? Icons.task_alt_rounded : active ? Icons.work_history_rounded : Icons.access_time_rounded, color: _green)),
+          Container(width: 48, height: 48, decoration: BoxDecoration(color: stateSoft, borderRadius: BorderRadius.circular(15), border: Border.all(color: stateColor.withValues(alpha: .22))), child: Icon(stateIcon, color: stateColor)),
         ]),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(14)),
           child: Row(children: [
-            const Icon(Icons.location_on_outlined, size: 16, color: _green),
+            Icon(Icons.location_on_outlined, size: 16, color: stateColor),
             const SizedBox(width: 6),
             const Expanded(child: Text('الموقع المخصص للعمل', style: TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w800))),
             Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(now), style: const TextStyle(color: _muted, fontSize: 9.5)),
@@ -195,7 +217,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   Widget _infoRow(IconData icon, String title, String value) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [Container(width: 31, height: 31, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 16)), const SizedBox(width: 9), Expanded(child: Text(title, style: const TextStyle(color: _muted, fontSize: 10))), Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w800)))]));
+    final color = title == 'الحالة' ? _statusColor(value) : _green;
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [Container(width: 31, height: 31, decoration: BoxDecoration(color: color.withValues(alpha: .13), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color, size: 16)), const SizedBox(width: 9), Expanded(child: Text(title, style: const TextStyle(color: _muted, fontSize: 10))), Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: TextStyle(color: title == 'الحالة' ? color : _ink, fontSize: 10.5, fontWeight: FontWeight.w800)))]));
   }
 
   Widget _requestBanner() {
@@ -272,7 +295,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Widget _liveStatusCard() {
     final today = _todayAttendance(DateTime.now());
     final active = today.any((x) => x is Map && x['type'] == 'check-in') && !today.any((x) => x is Map && x['type'] == 'check-out');
-    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(14)), child: Icon(active ? Icons.work_history_rounded : Icons.access_time_rounded, color: _green)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(active ? 'على رأس العمل' : 'غير مسجل حضور الآن', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(active ? 'يمكنك تسجيل الانصراف عند الانتهاء.' : 'يمكنك بدء الدوام من زر تسجيل الحضور.', style: const TextStyle(color: _muted, fontSize: 11))]))]));
+    final stateColor = active ? _statusColor('حاضر') : _statusColor('جاهز');
+    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: stateColor.withValues(alpha: .13), borderRadius: BorderRadius.circular(14)), child: Icon(active ? Icons.work_history_rounded : Icons.access_time_rounded, color: stateColor)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(active ? 'على رأس العمل' : 'غير مسجل حضور الآن', style: TextStyle(color: stateColor, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(active ? 'يمكنك تسجيل الانصراف عند الانتهاء.' : 'يمكنك بدء الدوام من زر تسجيل الحضور.', style: const TextStyle(color: _muted, fontSize: 11))]))]));
   }
 
   Widget _profileCard() => Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(22)), child: Row(children: [_avatar(light: true), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)), const SizedBox(height: 3), const Text('مساحة الموظف في حاضر', style: TextStyle(color: Colors.white70, fontSize: 11))]))]));
@@ -290,7 +314,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final type = '${map['type'] ?? ''}';
     final stamp = DateTime.tryParse('${map['timestamp'] ?? ''}');
     final isIn = type == 'check-in';
-    return Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(isIn ? Icons.login_rounded : Icons.logout_rounded, color: _green, size: 19)), const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isIn ? 'تسجيل حضور' : 'تسجيل انصراف', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)), const SizedBox(height: 3), Text(stamp == null ? 'وقت غير متاح' : intl.DateFormat('EEEE، d MMMM • HH:mm', 'ar').format(stamp), style: const TextStyle(color: _muted, fontSize: 10))])), _chip(isIn ? 'حضور' : 'انصراف', isIn)]));
+    final eventColor = isIn ? _statusColor('حاضر') : _statusColor('إذن');
+    return Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: eventColor.withValues(alpha: .13), borderRadius: BorderRadius.circular(12)), child: Icon(isIn ? Icons.login_rounded : Icons.logout_rounded, color: eventColor, size: 19)), const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isIn ? 'تسجيل حضور' : 'تسجيل انصراف', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)), const SizedBox(height: 3), Text(stamp == null ? 'وقت غير متاح' : intl.DateFormat('EEEE، d MMMM • HH:mm', 'ar').format(stamp), style: const TextStyle(color: _muted, fontSize: 10))])), _chip(isIn ? 'حضور' : 'انصراف', isIn)]));
   }
 
   Widget _requestTile(dynamic item) {
@@ -299,7 +324,22 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final type = '${map['type'] ?? 'طلب'}';
     final reason = '${map['reason'] ?? ''}';
     final label = status == 'approved' ? 'مقبول' : status == 'rejected' ? 'مرفوض' : status == 'confirmed' ? 'مؤكد' : 'قيد المراجعة';
-    return Container(margin: const EdgeInsets.only(bottom: 9), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(19), border: Border.all(color: _line)), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)), const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(type, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)), if (reason.isNotEmpty) ...[const SizedBox(height: 3), Text(reason, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10))]])), _statusChip(label, status)]));
+    final statusColor = _requestStatusColor(status);
+    return Container(margin: const EdgeInsets.only(bottom: 9), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(19), border: Border.all(color: _line)), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: statusColor.withValues(alpha: .13), borderRadius: BorderRadius.circular(13)), child: Icon(Icons.event_note_outlined, color: statusColor)), const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(type, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)), if (reason.isNotEmpty) ...[const SizedBox(height: 3), Text(reason, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10))]])), _statusChip(label, status)]));
+  }
+
+  Color _requestStatusColor(String status) {
+    switch (status) {
+      case 'approved':
+      case 'confirmed':
+        return HadirBrand.lightPrimary;
+      case 'rejected':
+        return HadirBrand.lightDanger;
+      case 'pending':
+        return HadirBrand.lightWarning;
+      default:
+        return HadirBrand.lightMuted;
+    }
   }
 
   // ignore: unused_element
@@ -323,7 +363,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Widget _iconButton(IconData icon, VoidCallback onTap) => Material(color: Colors.white, borderRadius: BorderRadius.circular(14), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: Container(width: 43, height: 43, decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: _line)), child: Icon(icon, color: _ink, size: 21))));
   Widget _avatar({bool light = false}) => Container(width: 43, height: 43, decoration: BoxDecoration(color: light ? Colors.white24 : _soft, shape: BoxShape.circle), child: Icon(Icons.person_rounded, color: light ? Colors.white : _green, size: 23));
   Widget _chip(String text, bool positive) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: positive ? _soft : const Color(0xFFF1F3F2), borderRadius: BorderRadius.circular(20)), child: Text(text, style: TextStyle(color: positive ? _green : _muted, fontWeight: FontWeight.w800, fontSize: 9)));
-  Widget _statusChip(String text, String status) { final good = status == 'approved' || status == 'confirmed'; return _chip(text, good); }
+  Widget _statusChip(String text, String status) { final color = _requestStatusColor(status); return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: color.withValues(alpha: .13), borderRadius: BorderRadius.circular(20)), child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 9))); }
   Widget _messageCard(String text, IconData icon) => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)), child: Row(children: [Icon(icon, color: _muted), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(color: _muted, fontSize: 11)))]));
   Widget _emptyCard(String title, String subtitle, IconData icon) => Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)), child: Column(children: [Container(width: 48, height: 48, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: _green)), const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 10))]));
   List<dynamic> _todayAttendance(DateTime now) => _attendance.where((item) { final date = DateTime.tryParse('${item is Map ? item['timestamp'] : null}'); return date != null && date.year == now.year && date.month == now.month && date.day == now.day; }).toList();
