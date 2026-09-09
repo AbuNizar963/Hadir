@@ -1,31 +1,33 @@
 import 'package:flutter/material.dart';
 
 /// HADIR visual tokens mirrored from the web application's CSS design system.
+/// The dark palette is the web application's default visual source of truth.
 class HadirBrand {
-  static const darkBackground = Color(0xFF0C0F17);
-  static const darkCard = Color(0xFF151820);
-  static const darkPanel = Color(0xFF1F222B);
-  static const darkText = Color(0xFFF2F5F8);
-  static const darkMuted = Color(0xFFA7ABB7);
-  static const darkBorder = Color(0xFF292D36);
-  static const darkPrimary = Color(0xFF2CD69A);
-  static const darkPrimaryForeground = Color(0xFF031611);
-  static const darkSecondary = Color(0xFF24262E);
-  static const darkAccent = Color(0xFF39C8EA);
-  static const darkWarning = Color(0xFFF8B52B);
+  static const darkBackground = Color(0xFF0C1018);
+  static const darkCard = Color(0xFF151923);
+  static const darkPanel = Color(0xFF1F232E);
+  static const darkText = Color(0xFFF2F5F7);
+  static const darkMuted = Color(0xFFA4AAB7);
+  static const darkBorder = Color(0xFF292F3D);
+  static const darkInput = Color(0xFF252A37);
+  static const darkPrimary = Color(0xFF2BCA90);
+  static const darkPrimaryForeground = Color(0xFF022216);
+  static const darkSecondary = Color(0xFF1F232E);
+  static const darkAccent = Color(0xFF2BBDEE);
+  static const darkWarning = Color(0xFFF6A823);
+  static const darkDanger = Color(0xFFDF3A3A);
 
-  static const surface = Color(0xFFF8FAFC);
-  static const card = Color(0xFFFFFFFF);
-  static const panel = Color(0xFFEFF2F5);
-  static const soft = Color(0xFFEFF2F5);
-  static const text = Color(0xFF151820);
-  static const muted = Color(0xFF59616D);
-  static const border = Color(0xFFD1D7DE);
-  static const primary = Color(0xFF229D70);
-  static const primaryDark = Color(0xFF147A56);
-  static const accent = Color(0xFF2096B8);
-  static const danger = Color(0xFFD52F3E);
-  static const warning = Color(0xFFDE970A);
+  static const lightBackground = Color(0xFFF7F9FC);
+  static const lightCard = Color(0xFFFFFFFF);
+  static const lightPanel = Color(0xFFEFF2F5);
+  static const lightText = Color(0xFF151B28);
+  static const lightMuted = Color(0xFF5E6673);
+  static const lightBorder = Color(0xFFD2D9E0);
+  static const lightInput = Color(0xFFE1E5EA);
+  static const lightPrimary = Color(0xFF229E70);
+  static const lightAccent = Color(0xFF2195B7);
+  static const lightDanger = Color(0xFFD62937);
+  static const lightWarning = Color(0xFFDEA00A);
 
   static const radiusSm = 12.0;
   static const radiusMd = 16.0;
@@ -35,15 +37,16 @@ class HadirBrand {
 
   static ThemeData theme({Brightness brightness = Brightness.light}) {
     final dark = brightness == Brightness.dark;
-    final background = dark ? darkBackground : surface;
-    final surfaceCard = dark ? darkCard : card;
-    final surfacePanel = dark ? darkPanel : panel;
-    final foreground = dark ? darkText : text;
-    final secondaryText = dark ? darkMuted : muted;
-    final outline = dark ? darkBorder : border;
-    final primaryColor = dark ? darkPrimary : primary;
-    final secondaryColor = dark ? darkSecondary : panel;
-    final accentColor = dark ? darkAccent : accent;
+    final background = dark ? darkBackground : lightBackground;
+    final surfaceCard = dark ? darkCard : lightCard;
+    final surfacePanel = dark ? darkPanel : lightPanel;
+    final foreground = dark ? darkText : lightText;
+    final secondaryText = dark ? darkMuted : lightMuted;
+    final outline = dark ? darkBorder : lightBorder;
+    final primaryColor = dark ? darkPrimary : lightPrimary;
+    final secondaryColor = dark ? darkSecondary : lightPanel;
+    final accentColor = dark ? darkAccent : lightAccent;
+    final dangerColor = dark ? darkDanger : lightDanger;
 
     final scheme = ColorScheme.fromSeed(
       seedColor: primaryColor,
@@ -57,7 +60,7 @@ class HadirBrand {
       onSurface: foreground,
       surfaceContainerHighest: surfacePanel,
       outline: outline,
-      error: dark ? const Color(0xFFFF6674) : danger,
+      error: dangerColor,
       onError: Colors.white,
     );
 
@@ -91,7 +94,7 @@ class HadirBrand {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: secondaryColor.withValues(alpha: dark ? .50 : .72),
+        fillColor: dark ? darkInput.withValues(alpha: .50) : lightPanel.withValues(alpha: .72),
         hintStyle: TextStyle(color: secondaryText),
         labelStyle: TextStyle(color: secondaryText),
         border: OutlineInputBorder(
@@ -126,7 +129,7 @@ class HadirBrand {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, controlHeight),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          foregroundColor: dark ? darkText : primaryDark,
+          foregroundColor: dark ? darkText : lightPrimary,
           side: BorderSide(color: outline),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(radiusSm)),
@@ -135,7 +138,7 @@ class HadirBrand {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: dark ? darkText : primaryDark,
+          foregroundColor: dark ? darkText : lightPrimary,
           minimumSize: const Size(0, controlHeight),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(radiusSm)),
