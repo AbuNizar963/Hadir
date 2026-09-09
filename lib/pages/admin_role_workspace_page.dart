@@ -14,7 +14,6 @@ const _line = HadirBrand.darkBorder;
 
 class AdminRoleWorkspacePage extends StatefulWidget {
   const AdminRoleWorkspacePage({super.key});
-
   @override
   State<AdminRoleWorkspacePage> createState() => _AdminRoleWorkspacePageState();
 }
@@ -63,7 +62,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
         api.workforceLive(),
         api.dailyStatus(date: _today()),
         api.requests(),
-        if (role == 'supervisor') api.violations(limit: 100) else api.violations(limit: 100),
+        api.violations(limit: 100),
         api.attendance(limit: 2000),
       ]);
       if (!mounted) return;
@@ -74,7 +73,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
         _daily = results[1] is Map ? Map<String, dynamic>.from(results[1] as Map) : {};
         _requests = results[2] is List ? List<dynamic>.from(results[2] as List) : [];
         _violations = results[3] is List ? List<dynamic>.from(results[3] as List) : [];
-        _employees = results.length > 4 && results[4] is List ? List<dynamic>.from(results[4] as List) : [];
+        _employees = results[4] is List ? List<dynamic>.from(results[4] as List) : [];
         _loading = false;
       });
     } catch (error) {
@@ -257,7 +256,7 @@ class _Stat extends StatelessWidget {
   final IconData icon; final String title; final String value;
   const _Stat({required this.icon, required this.title, required this.value});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _surface.withValues(alpha: .80), borderRadius: BorderRadius.circular(20), border: Border.all(color: _line.withValues(alpha: .72))), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.circle, color: _brand, size: 21)), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, color: _muted)), const SizedBox(height: 2), Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink))]))]));
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _surface.withValues(alpha: .80), borderRadius: BorderRadius.circular(20), border: Border.all(color: _line.withValues(alpha: .72))), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: _brand, size: 21)), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: _muted)), const SizedBox(height: 2), Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink))]))]));
 }
 
 class _Feature extends StatelessWidget {
