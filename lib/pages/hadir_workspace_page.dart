@@ -223,7 +223,10 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       if (status != 'approved' && status != 'confirmed') return false;
       final start = '${item['startDate'] ?? item['createdAt'] ?? ''}'.split('T').first;
       final end = '${item['endDate'] ?? item['startDate'] ?? item['createdAt'] ?? ''}'.split('T').first;
-      return start.isNotEmpty && start <= day && day <= end;
+      final startDate = DateTime.tryParse(start);
+      final endDate = DateTime.tryParse(end);
+      final currentDate = DateTime.tryParse(day);
+      return startDate != null && endDate != null && currentDate != null && !currentDate.isBefore(startDate) && !currentDate.isAfter(endDate);
     }).toList();
   }
 
