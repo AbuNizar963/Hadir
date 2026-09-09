@@ -18,7 +18,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   String _name = 'الإدارة';
   String _role = 'admin';
   List<Map<String, dynamic>> _employees = [];
-  List<dynamic> _requests = [];
   List<dynamic> _violations = [];
   List<dynamic> _escapes = [];
   String _filter = 'all';
@@ -64,7 +63,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
 
       final daily = await api.dailyStatus(date: _today());
       final rows = _asMapList(daily['employees']);
-      final requests = await api.requests();
       final violations = await api.violations(limit: 200);
 
       List<dynamic> escapes = [];
@@ -83,7 +81,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         _name = name;
         _role = role;
         _employees = rows;
-        _requests = requests;
         _violations = violations;
         _escapes = escapes;
         _loading = false;
@@ -134,9 +131,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         return status == 'REST' || status == 'NOT_STARTED';
       }).length;
   int get _leave => _count('LEAVE');
-  int get _pendingRequests => _requests
-      .where((raw) => raw is Map && '${raw['status'] ?? ''}'.toLowerCase() == 'pending')
-      .length;
   int get _openViolations => _violations
       .where((raw) => raw is Map && '${raw['status'] ?? 'open'}'.toLowerCase() != 'resolved')
       .length;
@@ -259,8 +253,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
               _statusGrid(),
               const SizedBox(height: 20),
               _employeeSection(rows),
-              const SizedBox(height: 20),
-              _quickActions(),
             ],
           ),
         ),
@@ -363,7 +355,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       _StatusCardData('الراحة', _rest, Icons.coffee_rounded, 'rest'),
       _StatusCardData('الإجازات', _leave, Icons.event_available_rounded, 'leave'),
       _StatusCardData('الهروب', _escaped, Icons.shield_outlined, 'escaped'),
-      _StatusCardData('طلبات معلقة', _pendingRequests, Icons.pending_actions_rounded, 'all'),
     ];
     return GridView.builder(
       shrinkWrap: true,
@@ -572,51 +563,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       ),
     );
   }
-
-  Widget _quickActions() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'إجراءات سريعة',
-            style: TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 9),
-          _action(Icons.groups_rounded, 'الموظفون', 'إدارة الموظفين والحسابات', '/admin/manage'),
-          _action(Icons.assignment_rounded, 'الطلبات', 'مراجعة الطلبات واتخاذ الإجراء', '/manager/requests'),
-          _action(Icons.bar_chart_rounded, 'التقارير', 'تقارير الحضور والأرشيف', '/admin/reports'),
-          _action(Icons.settings_outlined, 'الإعدادات', 'إعدادات النظام والإدارة', '/admin/settings'),
-        ],
-      );
-
-  Widget _action(IconData icon, String title, String subtitle, String route) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: ListTile(
-          onTap: () => context.go(route),
-          tileColor: _surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-            side: BorderSide(color: _border),
-          ),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _primary.withValues(alpha: .12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: _primary),
-          ),
-          title: Text(
-            title,
-            style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12.5),
-          ),
-          subtitle: Text(
-            subtitle,
-            style: TextStyle(color: _muted, fontSize: 10),
-          ),
-          trailing: Icon(Icons.chevron_left_rounded, color: _muted),
-        ),
-      );
 }
 
 class _StatusCardData {
