@@ -26,6 +26,7 @@ import 'pages/profile_page.dart';
 import 'pages/services_page.dart';
 import 'pages/ai_assistant_page.dart';
 import 'pages/manager_requests_page.dart';
+import 'pages/employee_transfer_page.dart';
 import 'pages/landing_page.dart';
 
 final _modernSession = HadirSession();
@@ -79,9 +80,6 @@ GoRouter buildModernRouter() => GoRouter(
 
     if (currentEmployeeToken == null && currentAdminToken == null && !publicLocations.contains(location)) return '/';
 
-    // Role-specific login pages must stay independent. A saved admin session
-    // must not redirect an employee login request, and an employee session
-    // must not redirect an admin login request.
     if (currentAdminToken != null && (location == '/admin-login' || location == '/manager/login')) return '/admin';
     if (currentEmployeeToken != null && location == '/employee-login') return '/home';
 
@@ -90,12 +88,11 @@ GoRouter buildModernRouter() => GoRouter(
       '/admin/reports', '/admin/reports/archive', '/admin/audit', '/admin/settings',
       '/manager', '/manager/employees', '/manager/workforce', '/manager/requests',
       '/manager/audit', '/manager/reports', '/manager/report-archive', '/manager/settings',
+      '/manager/employees/transfer',
     };
     if (currentAdminToken == null && adminPaths.contains(location)) return '/admin-login';
 
-    // /employee-login is intentionally public; it must never fall through to
-    // the generic /login selector screen.
-    final employeePaths = <String>{
+    const employeePaths = {
       '/home', '/employee', '/center', '/employee/center', '/employee/premium',
       '/attendance', '/history', '/employee/history', '/insights', '/requests',
       '/notifications', '/employee/notifications', '/profile', '/employee/profile',
@@ -123,6 +120,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/manager', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
     GoRoute(path: '/manager-home', redirect: (_, __) => '/manager'),
     GoRoute(path: '/manager/employees', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
+    GoRoute(path: '/manager/employees/transfer', builder: (_, __) => const SwipeBackPage(child: EmployeeTransferPage())),
     GoRoute(path: '/manager/workforce', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
     GoRoute(path: '/manager/requests', builder: (_, __) => const SwipeBackPage(child: ManagerRequestsPage())),
     GoRoute(path: '/manager/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
@@ -135,7 +133,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/premium', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
-    GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in'))),
+    GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in')),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
     GoRoute(path: '/employee/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
     GoRoute(path: '/insights', builder: (_, __) => const SwipeBackPage(child: AttendanceInsightsPage())),
@@ -253,8 +251,6 @@ class LoginEntryPage extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Row(children: [IconButton.filledTonal(onPressed: () => context.go('/'), icon: const Icon(Icons.arrow_forward_rounded)), const SizedBox(width: 10), const Expanded(child: Text('اختيار مساحة الدخول', style: TextStyle(color: Color(0xFF142D27), fontSize: 21, fontWeight: FontWeight.w900)))]),
                   const SizedBox(height: 18),
-                  // Generic /login remains only a selector. The employee-specific
-                  // route is now protected from falling into this screen.
                   FilledButton.icon(onPressed: () => context.go('/employee-login'), icon: const Icon(Icons.person_rounded), label: const Text('مساحة الموظف')),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(onPressed: () => context.go('/manager/login'), icon: const Icon(Icons.admin_panel_settings_rounded), label: const Text('مساحة الإدارة')),
