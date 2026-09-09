@@ -578,7 +578,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Text('إعدادات النظام', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), _card(Padding(padding: const EdgeInsets.all(16), child: Column(children: rows))) ]);
   }
 
-  Widget _empty(String message) => Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(children: [const Icon(Icons.inbox_outlined, size: 42), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center)]));
+  Widget _empty(String message) => Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(children: [const Icon(Icons.inbox_outlined, size: 42), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center)])));
 
   @override
   Widget build(BuildContext context) {
