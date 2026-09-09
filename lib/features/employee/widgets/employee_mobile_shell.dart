@@ -174,7 +174,7 @@ class EmployeeMobileShell extends StatelessWidget {
             children: [
               Align(
                 alignment: Alignment.centerRight,
-                child: Text('الخيارات', style: TextStyle(color: Theme.of(sheetContext).colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900)),
+                child: Text('القائمة', style: TextStyle(color: Theme.of(sheetContext).colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900)),
               ),
               const SizedBox(height: 10),
               _themeSelector(sheetContext),
