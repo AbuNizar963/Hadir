@@ -180,6 +180,7 @@ class EmployeeMobileShell extends StatelessWidget {
               _themeSelector(sheetContext),
               _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
               _optionTile(sheetContext, Icons.explore_outlined, 'القبلة', 'اتجاه القبلة والخدمات المكانية', '/prayer'),
+              _optionTile(sheetContext, Icons.auto_awesome_rounded, 'Hadir AI', 'المساعد الذكي داخل HADIR', '/ai'),
               _optionTile(sheetContext, Icons.settings_outlined, 'الإعدادات', 'إعدادات حساب الموظف', '/employee/center'),
             ],
           ),
