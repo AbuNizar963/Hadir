@@ -90,8 +90,14 @@ class AdminMobileShell extends StatelessWidget {
             Text('نظام حضور وانصراف موثّق', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5, fontWeight: FontWeight.w600)),
           ]),
         ])),
+        _headerButton(context, icon: Icons.smart_toy_outlined, label: 'المساعد', compact: compact, onTap: () => context.push('/ai')),
+        const SizedBox(width: 5),
+        _headerButton(context, icon: Icons.explore_outlined, label: 'القبلة', compact: compact, onTap: () => context.push('/prayer')),
+        const SizedBox(width: 5),
+        _headerButton(context, icon: Icons.wb_sunny_outlined, label: 'الطقس', compact: compact, onTap: () => context.push('/weather')),
+        const SizedBox(width: 5),
         _headerButton(context, icon: Icons.notifications_none_rounded, label: 'الإشعارات', compact: compact, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()))),
-        const SizedBox(width: 7),
+        const SizedBox(width: 5),
         _headerButton(context, icon: Icons.menu_rounded, label: 'القائمة', compact: compact, onTap: () => _showOptions(context)),
       ]),
     );
@@ -160,14 +166,14 @@ class AdminMobileShell extends StatelessWidget {
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         foregroundColor: scheme.onSurface,
-        padding: EdgeInsets.symmetric(horizontal: compact ? 9 : 11, vertical: compact ? 9 : 10),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 9, vertical: compact ? 9 : 10),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         side: BorderSide(color: scheme.outlineVariant),
         backgroundColor: scheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: compact ? 20 : 21), if (!compact) ...[const SizedBox(width: 6), Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))]]),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: compact ? 20 : 21), if (!compact) ...[const SizedBox(width: 5), Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800))]]),
     );
   }
 
@@ -179,7 +185,7 @@ class AdminMobileShell extends StatelessWidget {
       builder: (sheetContext) => SafeArea(child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Align(alignment: Alignment.centerRight, child: Text('الخيارات', style: TextStyle(color: Theme.of(sheetContext).colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900))),
+          Align(alignment: Alignment.centerRight, child: Text('القائمة', style: TextStyle(color: Theme.of(sheetContext).colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900))),
           const SizedBox(height: 10),
           _themeSelector(sheetContext),
           _optionTile(sheetContext, Icons.notifications_none_rounded, 'الإشعارات', 'الإشعارات الإدارية والتنبيهات', '/notifications'),
