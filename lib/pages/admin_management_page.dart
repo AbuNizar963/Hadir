@@ -22,6 +22,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   String? _error;
   String _employeeQuery = '';
   String _employeeStatus = 'all';
+  String _employeeSchedule = 'all';
   String _requestQuery = '';
   String _requestStatus = 'all';
   String _adminQuery = '';
@@ -31,6 +32,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   List<dynamic> _admins = [];
   Map<String, dynamic> _settings = {};
   Map<String, Map<String, dynamic>> _workforceControls = {};
+  List<Map<String, dynamic>> _locations = [];
 
   Color _statusColor(String status, {bool escaped = false, bool hasDevice = false}) {
     if (escaped) return const Color(0xFFDC2626);
@@ -110,6 +112,10 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     return result;
   }
 
+  List<Map<String, dynamic>> _asLocations(dynamic data) {
+    return _asList(data).whereType<Map>().map((raw) => Map<String, dynamic>.from(raw)).toList();
+  }
+
   Future<void> _load() async {
     if (mounted) setState(() { _loading = true; _error = null; });
     try {
@@ -123,6 +129,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         _dio.get('/api/admins'),
         _dio.get('/api/settings'),
         _dio.get('/api/manager/workforce-controls'),
+        _dio.get('/api/locations'),
       ]);
       if (!mounted) return;
       setState(() {
@@ -132,6 +139,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         _admins = _asList(results[3].data);
         _settings = _asMap(results[4].data);
         _workforceControls = _asWorkforceControls(results[5].data);
+        _locations = _asLocations(results[6].data);
         _loading = false;
       });
     } catch (error) {
@@ -199,28 +207,108 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     final name = TextEditingController();
     final job = TextEditingController();
     final pin = TextEditingController();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('إضافة موظف'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
-          TextField(controller: job, decoration: const InputDecoration(labelText: 'الرقم الوظيفي')),
-          TextField(controller: pin, keyboardType: TextInputType.number, obscureText: true, decoration: const InputDecoration(labelText: 'PIN')),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('حفظ')),
-        ],
-      ),
-    );
-    if (result != true || name.text.trim().isEmpty || job.text.trim().isEmpty) return;
-    await _request('POST', '/api/employees', data: {
-      'id': 'mobile-${DateTime.now().microsecondsSinceEpoch}',
-      'name': name.text.trim(), 'jobNumber': job.text.trim(), 'pin': pin.text.trim(),
-      'status': 'active', 'scheduleType': 'ADMIN', 'workStartTime': '08:00', 'workEndTime': '16:00',
-      'workDays': [0, 1, 2, 3, 4], 'specialties': ['general'],
-    });
+    final grace = TextEditingController();
+    final earlyCheckout = TextEditingController();
+    final rotationStart = TextEditingController();
+    final specialties = TextEditingController(text: 'general');
+    var status = 'active';
+    var scheduleType = 'ADMIN';
+    var startTime = '08:00';
+    var endTime = '16:00';
+    var locationId = '';
+    var rotationOn = 7;
+    var rotationOff = 7;
+    var workDays = <int>{0, 1, 2, 3, 4};
+    final dayLabels = const ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('إضافة موظف جديد', style: TextStyle(fontWeight: FontWeight.w900)),
+            content: SizedBox(
+              width: 620,
+              child: SingleChildScrollView(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const Text('بيانات الموظف الأساسية', style: TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 10),
+                  TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم الموظف', hintText: 'اكتب الاسم الكامل')),
+                  const SizedBox(height: 8),
+                  TextField(controller: job, decoration: const InputDecoration(labelText: 'الرقم الوظيفي', hintText: 'مثال: D718075')),
+                  const SizedBox(height: 8),
+                  TextField(controller: pin, obscureText: true, decoration: const InputDecoration(labelText: 'رمز PIN', hintText: '4 أحرف/أرقام على الأقل')),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(initialValue: status, decoration: const InputDecoration(labelText: 'الحالة'), items: const [DropdownMenuItem(value: 'active', child: Text('فعال')), DropdownMenuItem(value: 'suspended', child: Text('موقوف'))], onChanged: (v) => setDialogState(() => status = v ?? 'active')),
+                  const SizedBox(height: 16),
+                  const Text('الدوام والموقع', style: TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(initialValue: scheduleType, decoration: const InputDecoration(labelText: 'نوع الدوام'), items: const [DropdownMenuItem(value: 'ADMIN', child: Text('إداري')), DropdownMenuItem(value: 'ROTATION', child: Text('تناوبي'))], onChanged: (v) => setDialogState(() => scheduleType = v ?? 'ADMIN')),
+                  const SizedBox(height: 8),
+                  Row(children: [Expanded(child: DropdownButtonFormField<String>(initialValue: startTime, decoration: const InputDecoration(labelText: 'بداية الدوام'), items: [for (var h = 0; h < 24; h++) for (var m in const [0, 30]) DropdownMenuItem(value: '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}', child: Text('${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}'))], onChanged: (v) => setDialogState(() => startTime = v ?? startTime))), const SizedBox(width: 8), Expanded(child: DropdownButtonFormField<String>(initialValue: endTime, decoration: const InputDecoration(labelText: 'نهاية الدوام'), items: [for (var h = 0; h < 24; h++) for (var m in const [0, 30]) DropdownMenuItem(value: '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}', child: Text('${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}'))], onChanged: (v) => setDialogState(() => endTime = v ?? endTime))) ]),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(initialValue: locationId.isEmpty ? null : locationId, decoration: const InputDecoration(labelText: 'موقع العمل'), items: [const DropdownMenuItem<String>(value: '', child: Text('المقر الرئيسي')), ..._locations.where((l) => '${l['name'] ?? ''}'.trim() != 'المقر الرئيسي').map((l) => DropdownMenuItem<String>(value: '${l['id'] ?? ''}', child: Text('${l['name'] ?? 'موقع'}')))], onChanged: (v) => setDialogState(() => locationId = v ?? '')),
+                  const SizedBox(height: 8),
+                  Row(children: [Expanded(child: TextField(controller: grace, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سماح التأخير بالدقائق', hintText: 'مثال: 6'))), const SizedBox(width: 8), Expanded(child: TextField(controller: earlyCheckout, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سماح الانصراف المبكر', hintText: 'مثال: 60')))]),
+                  if (scheduleType == 'ADMIN') ...[
+                    const SizedBox(height: 12),
+                    const Text('أيام الدوام', style: TextStyle(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 6, runSpacing: 6, children: [for (var i = 0; i < dayLabels.length; i++) FilterChip(label: Text(dayLabels[i]), selected: workDays.contains(i), onSelected: (selected) => setDialogState(() { if (selected) { workDays.add(i); } else { workDays.remove(i); } }))]),
+                  ],
+                  if (scheduleType == 'ROTATION') ...[
+                    const SizedBox(height: 12),
+                    Row(children: [Expanded(child: DropdownButtonFormField<int>(initialValue: rotationOn, decoration: const InputDecoration(labelText: 'أيام العمل'), items: [for (var i = 1; i <= 31; i++) DropdownMenuItem(value: i, child: Text('$i يوم'))], onChanged: (v) => setDialogState(() => rotationOn = v ?? 7))), const SizedBox(width: 8), Expanded(child: DropdownButtonFormField<int>(initialValue: rotationOff, decoration: const InputDecoration(labelText: 'أيام الراحة'), items: [const DropdownMenuItem(value: 0, child: Text('بدون راحة')), for (var i = 1; i <= 31; i++) DropdownMenuItem(value: i, child: Text('$i يوم'))], onChanged: (v) => setDialogState(() => rotationOff = v ?? 7)))]),
+                    const SizedBox(height: 8),
+                    TextField(controller: rotationStart, keyboardType: TextInputType.datetime, decoration: const InputDecoration(labelText: 'تاريخ أول مناوبة', hintText: 'YYYY-MM-DD')),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(controller: specialties, decoration: const InputDecoration(labelText: 'التخصصات', hintText: 'مثال: general, technician')),
+                  const SizedBox(height: 8),
+                  Text('قاعدة الانصراف المبكر: القيمة بالدقائق وتُحفظ عبر سياسة الموظف بعد إنشاء الحساب.', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ]),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')),
+              FilledButton.icon(onPressed: () {
+                if (name.text.trim().isEmpty || job.text.trim().isEmpty || pin.text.trim().length < 4 || (scheduleType == 'ADMIN' && workDays.isEmpty)) return;
+                Navigator.of(dialogContext).pop(true);
+              }, icon: const Icon(Icons.person_add_alt_1), label: const Text('إضافة الموظف')),
+            ],
+          ),
+        ),
+      );
+      if (result != true) return;
+      final employeeResponse = await _dio.post('/api/employees', data: {
+        'name': name.text.trim(),
+        'jobNumber': job.text.trim(),
+        'pin': pin.text.trim(),
+        'status': status,
+        'scheduleType': scheduleType,
+        'workStartTime': startTime,
+        'workEndTime': endTime,
+        'gracePeriodMinutes': int.tryParse(grace.text.trim()) ?? 0,
+        'workDays': workDays.toList()..sort(),
+        'rotationDaysOn': rotationOn,
+        'rotationDaysOff': rotationOff,
+        'rotationStartDate': rotationStart.text.trim().isEmpty ? null : rotationStart.text.trim(),
+        'locationId': locationId.isEmpty ? null : locationId,
+        'specialties': specialties.text.split(',').map((v) => v.trim()).where((v) => v.isNotEmpty).toList(),
+        'avatar': null,
+      });
+      final employee = _asMap(employeeResponse.data)['employee'];
+      final employeeId = employee is Map ? '${employee['id'] ?? ''}' : '';
+      final early = int.tryParse(earlyCheckout.text.trim()) ?? 0;
+      if (employeeId.isNotEmpty) {
+        await _dio.put('/api/employees/$employeeId/checkout-policy', data: {'earlyCheckoutMinutes': early.clamp(0, 1440)});
+      }
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إضافة الموظف بنجاح')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
+    } finally {
+      name.dispose(); job.dispose(); pin.dispose(); grace.dispose(); earlyCheckout.dispose(); rotationStart.dispose(); specialties.dispose();
+    }
   }
 
   Future<void> _addAdmin() async {
@@ -237,9 +325,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
             TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
             TextField(controller: username, decoration: const InputDecoration(labelText: 'اسم المستخدم')),
             TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'كلمة المرور')),
-            DropdownButtonFormField<String>(initialValue: role, decoration: const InputDecoration(labelText: 'الصلاحية'), items: const [
-              DropdownMenuItem(value: 'manager', child: Text('مدير')), DropdownMenuItem(value: 'supervisor', child: Text('مشرف')),
-            ], onChanged: (value) => setDialogState(() => role = value ?? 'manager')),
+            DropdownButtonFormField<String>(initialValue: role, decoration: const InputDecoration(labelText: 'الصلاحية'), items: const [DropdownMenuItem(value: 'manager', child: Text('مدير')), DropdownMenuItem(value: 'supervisor', child: Text('مشرف'))], onChanged: (value) => setDialogState(() => role = value ?? 'manager')),
           ]),
           actions: [
             TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')),
@@ -267,25 +353,58 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     if (confirmed == true) await _request('DELETE', '/api/employees/$id');
   }
 
+  Future<void> _directAttendance(String id, String name, String type) async {
+    final label = type == 'check-in' ? 'تحضير' : 'انصراف';
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(title: Text('$label مباشر'), content: Text('تأكيد $label للموظف «$name»؟'), actions: [TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('تأكيد'))]));
+    if (confirmed != true) return;
+    try {
+      final path = type == 'check-in' ? '/api/manager/attendance' : '/api/workforce/live';
+      await _dio.post(path, data: {'employeeId': id, 'type': type});
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم تسجيل $label')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
+    }
+  }
+
+  Future<void> _changeEscape(String id, String name, String status) async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(title: Text(status == 'escaped' ? 'تسجيل هروب' : 'تسجيل عودة'), content: TextField(controller: controller, decoration: const InputDecoration(labelText: 'السبب / الملاحظة')), actions: [TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('تأكيد'))]));
+    if (confirmed != true) { controller.dispose(); return; }
+    try {
+      await _dio.post('/api/escape-events', data: {'employeeId': id, 'status': status, 'reason': controller.text.trim()});
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(status == 'escaped' ? 'تم تسجيل الهروب' : 'تم تسجيل العودة')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _employeeRequest(String id, String name, String type) async {
+    final reason = TextEditingController();
+    final start = TextEditingController(text: DateTime.now().toIso8601String().substring(0, 10));
+    final end = TextEditingController(text: DateTime.now().toIso8601String().substring(0, 10));
+    final label = type == 'permission' ? 'إذن' : 'إجازة';
+    try {
+      final result = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(title: Text('تسجيل $label · $name'), content: Column(mainAxisSize: MainAxisSize.min, children: [TextField(controller: start, decoration: const InputDecoration(labelText: 'تاريخ البداية')), TextField(controller: end, decoration: const InputDecoration(labelText: 'تاريخ النهاية')), TextField(controller: reason, decoration: InputDecoration(labelText: 'السبب / الملاحظة'))]), actions: [TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('حفظ'))]));
+      if (result != true) return;
+      await _dio.post('/api/requests', data: {'employeeId': id, 'type': type, 'reason': reason.text.trim(), 'startDate': start.text.trim(), 'endDate': end.text.trim()});
+      await _load();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم تسجيل $label')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
+    } finally {
+      reason.dispose(); start.dispose(); end.dispose();
+    }
+  }
+
   Widget _card(Widget child) => Card(margin: const EdgeInsets.only(bottom: 10), child: child);
 
-  Widget _metric(String label, String value, IconData icon) => Expanded(
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
-        child: Column(children: [
-          Icon(icon, color: HadirBrand.primary), const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10)),
-        ]),
-      ),
-    ),
-  );
+  Widget _metric(String label, String value, IconData icon) => Expanded(child: Card(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13), child: Column(children: [Icon(icon, color: HadirBrand.primary), const SizedBox(height: 6), Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))]))));
 
-  Widget _searchBox({required String hint, required ValueChanged<String> onChanged}) => TextField(
-    onChanged: onChanged,
-    decoration: InputDecoration(prefixIcon: const Icon(Icons.search_rounded), hintText: hint, isDense: true),
-  );
+  Widget _searchBox({required String hint, required ValueChanged<String> onChanged}) => TextField(onChanged: onChanged, decoration: InputDecoration(prefixIcon: const Icon(Icons.search_rounded), hintText: hint, isDense: true));
 
   Map<String, dynamic> _employeeWithControls(Map<String, dynamic> employee) {
     final id = '${employee['id'] ?? ''}';
@@ -300,26 +419,38 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
       final query = _employeeQuery.trim().toLowerCase();
       final name = '${employee['name'] ?? ''}'.toLowerCase();
       final job = '${employee['jobNumber'] ?? ''}'.toLowerCase();
+      final device = '${employee['deviceLabel'] ?? employee['deviceId'] ?? ''}'.toLowerCase();
       final status = '${employee['status'] ?? 'active'}'.toLowerCase();
-      return (query.isEmpty || name.contains(query) || job.contains(query)) && (_employeeStatus == 'all' || status == _employeeStatus);
+      final schedule = '${employee['scheduleType'] ?? 'ADMIN'}';
+      return (query.isEmpty || name.contains(query) || job.contains(query) || device.contains(query)) && (_employeeStatus == 'all' || status == _employeeStatus) && (_employeeSchedule == 'all' || schedule == _employeeSchedule);
     }).toList();
     final active = _employees.where((raw) => raw is Map && '${raw['status'] ?? 'active'}' == 'active').length;
     final inactive = _employees.length - active;
+    final devices = _employees.where((raw) => raw is Map && '${raw['deviceId'] ?? ''}'.trim().isNotEmpty).length;
+    final vip = _employees.where((raw) => raw is Map && _employeeWithControls(Map<String, dynamic>.from(raw))['isVip'] == true).length;
+    final escaped = _employees.where((raw) => raw is Map && '${raw['escapeStatus'] ?? raw['fieldStatus'] ?? ''}'.toLowerCase() == 'escaped').length;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [_metric('إجمالي الموظفين', '${_employees.length}', Icons.groups_rounded), const SizedBox(width: 8), _metric('نشط', '$active', Icons.check_circle_outline_rounded), const SizedBox(width: 8), _metric('غير نشط', '$inactive', Icons.pause_circle_outline_rounded)]),
+      Row(children: [_metric('إجمالي الموظفين', '${_employees.length}', Icons.groups_rounded), const SizedBox(width: 8), _metric('فعال', '$active', Icons.check_circle_outline_rounded), const SizedBox(width: 8), _metric('موقوف', '$inactive', Icons.pause_circle_outline_rounded)]),
       const SizedBox(height: 8),
-      _searchBox(hint: 'ابحث بالاسم أو الرقم الوظيفي', onChanged: (v) => setState(() => _employeeQuery = v)),
+      Row(children: [_metric('أجهزة موثقة', '$devices', Icons.smartphone_rounded), const SizedBox(width: 8), _metric('VIP مفعل', '$vip', Icons.star_rounded), const SizedBox(width: 8), _metric('هروب', '$escaped', Icons.directions_walk_rounded)]),
+      const SizedBox(height: 12),
+      _searchBox(hint: 'بحث بالاسم أو الرقم أو الجهاز', onChanged: (v) => setState(() => _employeeQuery = v)),
       const SizedBox(height: 8),
-      Wrap(spacing: 8, children: [
-        _filterChip('الكل', 'all', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
-        _filterChip('نشط', 'active', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
-        _filterChip('غير نشط', 'inactive', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        _filterChip('كل الحالات', 'all', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
+        _filterChip('فعال', 'active', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
+        _filterChip('موقوف', 'suspended', _employeeStatus, (v) => setState(() => _employeeStatus = v)),
+      ]),
+      const SizedBox(height: 8),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        _filterChip('كل أنواع الدوام', 'all', _employeeSchedule, (v) => setState(() => _employeeSchedule = v)),
+        _filterChip('إداري', 'ADMIN', _employeeSchedule, (v) => setState(() => _employeeSchedule = v)),
+        _filterChip('تناوبي', 'ROTATION', _employeeSchedule, (v) => setState(() => _employeeSchedule = v)),
       ]),
       const SizedBox(height: 12),
-      Row(children: [Expanded(child: Text('${filtered.length} نتيجة', style: const TextStyle(fontWeight: FontWeight.w800))), FilledButton.icon(onPressed: _addEmployee, icon: const Icon(Icons.person_add_alt_1), label: const Text('إضافة'))]),
+      Row(children: [Expanded(child: Text('${filtered.length} نتيجة', style: const TextStyle(fontWeight: FontWeight.w800))), FilledButton.icon(onPressed: _addEmployee, icon: const Icon(Icons.person_add_alt_1), label: const Text('إضافة موظف'))]),
       const SizedBox(height: 10),
-      if (filtered.isEmpty) _empty('لا توجد موظفون مطابقون للبحث.')
-      else ...filtered.map((raw) {
+      if (filtered.isEmpty) _empty('لا توجد نتائج مطابقة.') else ...filtered.map((raw) {
         final employee = _employeeWithControls(Map<String, dynamic>.from(raw as Map));
         final id = '${employee['id'] ?? ''}';
         final name = '${employee['name'] ?? 'بدون اسم'}'.trim();
@@ -331,32 +462,44 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         final isEscaped = escapeStatus == 'escaped' || escapeStatus == 'escape';
         final hasDevice = '${employee['deviceId'] ?? ''}'.trim().isNotEmpty;
         final stateColor = _statusColor(status, escaped: isEscaped, hasDevice: hasDevice);
-        final stateLabel = isEscaped ? 'هارب' : status.toLowerCase() == 'active' ? (hasDevice ? 'نشط ومرتبط' : 'نشط غير مرتبط') : status.toLowerCase() == 'suspended' || status.toLowerCase() == 'inactive' ? 'موقوف' : status;
-        final flags = [if (isVip) 'VIP', if (autoIn) 'حضور تلقائي', if (autoOut) 'انصراف تلقائي'];
+        final stateLabel = isEscaped ? 'هارب' : status.toLowerCase() == 'active' ? (hasDevice ? 'فعال ومرتبط' : 'فعال وغير مرتبط') : status.toLowerCase() == 'suspended' || status.toLowerCase() == 'inactive' ? 'موقوف' : status;
+        final location = _locations.where((l) => '${l['id'] ?? ''}' == '${employee['locationId'] ?? ''}').firstOrNull;
         return _card(Container(
           decoration: BoxDecoration(border: Border(right: BorderSide(color: stateColor, width: 4)), borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            leading: CircleAvatar(backgroundColor: _statusSoft(stateColor), foregroundColor: stateColor, child: Text(name.isEmpty ? 'م' : name.substring(0, 1))),
-            title: Row(children: [Flexible(child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800))), if (isVip) const Padding(padding: EdgeInsets.only(right: 6), child: Text('⭐', style: TextStyle(fontSize: 15)))]),
-            subtitle: Padding(padding: const EdgeInsets.only(top: 5), child: Wrap(spacing: 6, runSpacing: 5, children: [
-              Text('${employee['jobNumber'] ?? '—'} · ${employee['scheduleType'] ?? '—'}'),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: _statusSoft(stateColor), borderRadius: BorderRadius.circular(20)), child: Text(stateLabel, style: TextStyle(color: stateColor, fontWeight: FontWeight.w800, fontSize: 11))),
-              if (flags.isNotEmpty) Text(flags.join(' · ')),
-            ])),
-            isThreeLine: true,
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) { if (value == 'controls') _showWorkforceControls(id, name); if (value == 'reset') _request('DELETE', '/api/employees/$id/device'); if (value == 'delete') _deleteEmployee(id, name); },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'controls', child: Text('قوى العمل والأتمتة')),
-                PopupMenuItem(value: 'reset', child: Text('إعادة ربط الجهاز')),
-                PopupMenuItem(value: 'delete', child: Text('حذف الموظف')),
-              ],
+          child: Padding(padding: const EdgeInsets.fromLTRB(8, 8, 8, 10), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            ListTile(
+              leading: CircleAvatar(backgroundColor: _statusSoft(stateColor), foregroundColor: stateColor, child: Text(name.isEmpty ? 'م' : name.substring(0, 1))),
+              title: Row(children: [Flexible(child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900))), if (isVip) const Padding(padding: EdgeInsets.only(right: 6), child: Text('★ VIP', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900)))]),
+              subtitle: Padding(padding: const EdgeInsets.only(top: 5), child: Wrap(spacing: 6, runSpacing: 5, children: [Text('${employee['jobNumber'] ?? '—'} · ${employee['scheduleType'] == 'ROTATION' ? 'تناوبي' : 'إداري'}'), Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: _statusSoft(stateColor), borderRadius: BorderRadius.circular(20)), child: Text(stateLabel, style: TextStyle(color: stateColor, fontWeight: FontWeight.w800, fontSize: 11)))])),
+              isThreeLine: true,
             ),
-          ),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              _infoPill('الوقت', employee['scheduleType'] == 'ROTATION' ? '${employee['rotationDaysOn'] ?? 7} عمل / ${employee['rotationDaysOff'] ?? 7} راحة' : '${employee['workStartTime'] ?? '--:--'} → ${employee['workEndTime'] ?? '--:--'}'),
+              _infoPill('التأخير', '${employee['gracePeriodMinutes'] ?? 0} دقيقة'),
+              _infoPill('الموقع', '${location?['name'] ?? 'المقر الرئيسي'}'),
+              if (employee['deviceId'] != null && '${employee['deviceId']}'.isNotEmpty) _infoPill('الجهاز', '${employee['deviceLabel'] ?? 'مرتبط'}'),
+              if (autoIn || autoOut) _infoPill('الأتمتة', '${autoIn ? 'حضور' : ''}${autoIn && autoOut ? ' + ' : ''}${autoOut ? 'انصراف' : ''}'),
+            ]),
+            const SizedBox(height: 8),
+            SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+              _smallAction('إذن', Icons.event_available_rounded, () => _employeeRequest(id, name, 'permission')),
+              _smallAction('إجازة', Icons.beach_access_rounded, () => _employeeRequest(id, name, 'leave')),
+              _smallAction('تحضير', Icons.login_rounded, () => _directAttendance(id, name, 'check-in')),
+              _smallAction('انصراف', Icons.logout_rounded, () => _directAttendance(id, name, 'check-out')),
+              _smallAction(isEscaped ? 'عودة' : 'هروب', isEscaped ? Icons.rotate_left_rounded : Icons.directions_walk_rounded, () => _changeEscape(id, name, isEscaped ? 'returned' : 'escaped')),
+              _smallAction('قوى العمل', Icons.auto_awesome_rounded, () => _showWorkforceControls(id, name)),
+              _smallAction('الجهاز', Icons.smartphone_rounded, () => _request('DELETE', '/api/employees/$id/device')),
+              _smallAction('حذف', Icons.delete_outline_rounded, () => _deleteEmployee(id, name)),
+            ])),
+          ])),
         ));
       }),
     ]);
   }
+
+  Widget _infoPill(String label, String value) => Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .45), borderRadius: BorderRadius.circular(10)), child: Text('$label: $value', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)));
+
+  Widget _smallAction(String label, IconData icon, VoidCallback onTap) => Padding(padding: const EdgeInsets.only(left: 6), child: OutlinedButton.icon(onPressed: onTap, icon: Icon(icon, size: 15), label: Text(label), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9), textStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800))));
 
   Widget _filterChip(String label, String value, String current, ValueChanged<String> onSelected) => ChoiceChip(label: Text(label), selected: current == value, onSelected: (_) => onSelected(value));
 
@@ -377,26 +520,18 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
       const SizedBox(height: 8),
       Wrap(spacing: 8, children: [_filterChip('الكل', 'all', _requestStatus, (v) => setState(() => _requestStatus = v)), _filterChip('معلق', 'pending', _requestStatus, (v) => setState(() => _requestStatus = v)), _filterChip('مقبول', 'approved', _requestStatus, (v) => setState(() => _requestStatus = v)), _filterChip('مرفوض', 'rejected', _requestStatus, (v) => setState(() => _requestStatus = v))]),
       const SizedBox(height: 12),
-      if (filtered.isEmpty) _empty('لا توجد طلبات مطابقة.')
-      else ...filtered.map((raw) {
+      if (filtered.isEmpty) _empty('لا توجد طلبات مطابقة.') else ...filtered.map((raw) {
         final request = Map<String, dynamic>.from(raw as Map);
         final id = '${request['id'] ?? ''}';
         final status = '${request['status'] ?? 'pending'}';
         final color = _statusColor(status);
-        return _card(Container(
-          decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 4)), borderRadius: BorderRadius.circular(12)),
-          child: ListTile(title: Text('${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Wrap(spacing: 8, children: [Text('${request['reason'] ?? ''}'), Text('الحالة: $status', style: TextStyle(color: color, fontWeight: FontWeight.w800))]), isThreeLine: true, trailing: status == 'pending' ? PopupMenuButton<String>(onSelected: (value) => _request('PATCH', '/api/requests/$id', data: {'status': value}), itemBuilder: (_) => const [PopupMenuItem(value: 'approved', child: Text('موافقة')), PopupMenuItem(value: 'rejected', child: Text('رفض'))]) : null),
-        ));
+        return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 4)), borderRadius: BorderRadius.circular(12)), child: ListTile(title: Text('${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Wrap(spacing: 8, children: [Text('${request['reason'] ?? ''}'), Text('الحالة: $status', style: TextStyle(color: color, fontWeight: FontWeight.w800))]), isThreeLine: true, trailing: status == 'pending' ? PopupMenuButton<String>(onSelected: (value) => _request('PATCH', '/api/requests/$id', data: {'status': value}), itemBuilder: (_) => const [PopupMenuItem(value: 'approved', child: Text('موافقة')), PopupMenuItem(value: 'rejected', child: Text('رفض'))]) : null));
       }),
     ]);
   }
 
   Widget _reportsView() {
-    final successful = _audit.where((raw) {
-      if (raw is! Map) return false;
-      final item = Map<String, dynamic>.from(raw);
-      return item['result'] == 'success' && (item['action'] == 'check-in' || item['action'] == 'check-out');
-    }).toList();
+    final successful = _audit.where((raw) => raw is Map && raw['result'] == 'success' && (raw['action'] == 'check-in' || raw['action'] == 'check-out')).toList();
     final checkIns = successful.where((raw) => (raw as Map)['action'] == 'check-in').length;
     final checkOuts = successful.where((raw) => (raw as Map)['action'] == 'check-out').length;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -428,8 +563,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
       const SizedBox(height: 8),
       _searchBox(hint: 'ابحث بالاسم أو اسم المستخدم أو الصلاحية', onChanged: (v) => setState(() => _adminQuery = v)),
       const SizedBox(height: 12),
-      if (filtered.isEmpty) _empty('لا توجد حسابات مطابقة.')
-      else ...filtered.map((raw) {
+      if (filtered.isEmpty) _empty('لا توجد حسابات مطابقة.') else ...filtered.map((raw) {
         final admin = Map<String, dynamic>.from(raw as Map);
         final id = '${admin['id'] ?? ''}';
         final color = _statusColor(admin['active'] == false ? 'inactive' : 'active');
@@ -441,7 +575,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
   Widget _settingsView() {
     if (_settings.isEmpty) return _empty('لا توجد إعدادات متاحة.');
     final rows = _settings.entries.map((entry) => Padding(padding: const EdgeInsets.symmetric(vertical: 7), child: Row(children: [Expanded(child: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w700))), Flexible(child: Text('${entry.value}', textAlign: TextAlign.left, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)))]))).toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Text('إعدادات النظام', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), _card(Padding(padding: const EdgeInsets.all(16), child: Column(children: rows)))]);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Text('إعدادات النظام', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), _card(Padding(padding: const EdgeInsets.all(16), child: Column(children: rows))) ]);
   }
 
   Widget _empty(String message) => Card(child: Padding(padding: const EdgeInsets.all(28), child: Column(children: [const Icon(Icons.inbox_outlined, size: 42), const SizedBox(height: 10), Text(message, textAlign: TextAlign.center)])));
@@ -457,20 +591,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off_rounded, size: 48), const SizedBox(height: 12), Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 12), FilledButton(onPressed: _load, child: const Text('إعادة المحاولة'))])))
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(children: List.generate(labels.length, (index) => Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index)),
-                      ))),
-                    ),
-                    const SizedBox(height: 18),
-                    views[_tab],
-                  ]),
-                ),
+              : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: List.generate(labels.length, (index) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index))))), const SizedBox(height: 18), views[_tab]])),
     );
   }
 }
