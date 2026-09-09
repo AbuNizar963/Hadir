@@ -4,9 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/hadir_theme_controller.dart';
 import '../../../pages/notifications_page.dart';
 
-const _brand = Color(0xFF0B6B5A);
-const _soft = Color(0xFFEAF4F0);
-
 class AdminMobileShell extends StatelessWidget {
   const AdminMobileShell({super.key, required this.child});
 
