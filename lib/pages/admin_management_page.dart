@@ -591,7 +591,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off_rounded, size: 48), const SizedBox(height: 12), Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 12), FilledButton(onPressed: _load, child: const Text('إعادة المحاولة'))])))
-              : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: List.generate(labels.length, (index) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index))))), const SizedBox(height: 18), views[_tab]])),
+              : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: List.generate(labels.length, (index) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index)))))), const SizedBox(height: 18), views[_tab]])),
     );
   }
 }
