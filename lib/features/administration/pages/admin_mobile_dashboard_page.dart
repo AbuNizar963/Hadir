@@ -210,6 +210,24 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
     return const Color(0xFF2563A6);
   }
 
+  Color _statusCardColor(_StatusCardData card) {
+    switch (card.filter) {
+      case 'present':
+        return _primary;
+      case 'late':
+        return const Color(0xFFB54708);
+      case 'absent':
+      case 'escaped':
+        return const Color(0xFFB42318);
+      case 'leave':
+        return const Color(0xFF6941C6);
+      case 'rest':
+        return const Color(0xFF2563A6);
+      default:
+        return _primary;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final rows = _filteredEmployees;
@@ -369,6 +387,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       itemBuilder: (_, index) {
         final card = cards[index];
         final active = _filter == card.filter;
+        final color = _statusCardColor(card);
         return InkWell(
           borderRadius: BorderRadius.circular(17),
           onTap: () => setState(() => _filter = card.filter),
@@ -378,7 +397,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
               color: active ? _panel : _surface,
               borderRadius: BorderRadius.circular(17),
               border: Border.all(
-                color: active ? _primary.withValues(alpha: .32) : _border,
+                color: active ? color.withValues(alpha: .32) : _border,
               ),
             ),
             child: Row(
@@ -387,10 +406,10 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: _primary.withValues(alpha: .12),
+                    color: color.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(card.icon, color: _primary, size: 21),
+                  child: Icon(card.icon, color: color, size: 21),
                 ),
                 const SizedBox(width: 9),
                 Expanded(
