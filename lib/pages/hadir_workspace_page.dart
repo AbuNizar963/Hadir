@@ -97,7 +97,6 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
         : active
             ? 'أنت مسجل حضور الآن ويمكنك تسجيل الانصراف.'
             : 'لم يتم تسجيل حضورك بعد.';
-    final actionType = active ? 'check-out' : 'check-in';
 
     return RefreshIndicator(
       color: _green,
@@ -134,7 +133,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
                   title: 'تسجيل حضور',
                   subtitle: checkedIn ? 'تم تسجيل الحضور' : 'بدء الدوام',
                   enabled: !checkedIn && !checkedOut,
-                  onTap: () => context.push('/attendance?type=$actionType'),
+                  onTap: () => context.push('/attendance?type=check-in'),
                 ),
               ),
             ],
@@ -195,7 +194,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
               children: [
                 const Text('HADIR · EMPLOYEE', style: TextStyle(color: _green, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: .7)),
                 const SizedBox(height: 2),
-                Text('لوحة الموظف', style: const TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900)),
+                const Text('لوحة الموظف', style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900)),
                 Text('مرحباً $firstName', style: const TextStyle(color: _muted, fontSize: 11)),
               ],
             ),
@@ -314,21 +313,14 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Widget _sectionCard({required String title, required String subtitle, required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(21),
-        border: Border.all(color: _line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 2),
-          Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5)),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(21), border: Border.all(color: _line)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 2),
+        Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5)),
+        const SizedBox(height: 12),
+        child,
+      ]),
     );
   }
 
@@ -336,30 +328,25 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(14)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: _green, size: 17),
-          const SizedBox(height: 7),
-          Text(title, style: const TextStyle(color: _muted, fontSize: 8.5)),
-          const SizedBox(height: 2),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 10.5)),
-        ],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: _green, size: 17),
+        const SizedBox(height: 7),
+        Text(title, style: const TextStyle(color: _muted, fontSize: 8.5)),
+        const SizedBox(height: 2),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 10.5)),
+      ]),
     );
   }
 
   Widget _infoRow(IconData icon, String title, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Container(width: 31, height: 31, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 16)),
-          const SizedBox(width: 9),
-          Expanded(child: Text(title, style: const TextStyle(color: _muted, fontSize: 10))),
-          Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w800))),
-        ],
-      ),
+      child: Row(children: [
+        Container(width: 31, height: 31, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 16)),
+        const SizedBox(width: 9),
+        Expanded(child: Text(title, style: const TextStyle(color: _muted, fontSize: 10))),
+        Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w800))),
+      ]),
     );
   }
 
@@ -373,14 +360,12 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
         child: Container(
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFCDE6DD))),
-          child: Row(
-            children: [
-              Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)),
-              const SizedBox(width: 10),
-              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('طلب استئذان أو إجازة', style: TextStyle(color: _green, fontWeight: FontWeight.w900, fontSize: 12)), SizedBox(height: 3), Text('إرسال طلب للإدارة', style: TextStyle(color: _muted, fontSize: 9.5))])),
-              const Icon(Icons.chevron_left_rounded, color: _green),
-            ],
-          ),
+          child: Row(children: [
+            Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)),
+            const SizedBox(width: 10),
+            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('طلب استئذان أو إجازة', style: TextStyle(color: _green, fontWeight: FontWeight.w900, fontSize: 12)), SizedBox(height: 3), Text('إرسال طلب للإدارة', style: TextStyle(color: _muted, fontSize: 9.5))])),
+            const Icon(Icons.chevron_left_rounded, color: _green),
+          ]),
         ),
       ),
     );
@@ -398,6 +383,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   String _eventTime(DateTime? value) => value == null ? '—' : intl.DateFormat('HH:mm').format(value);
 
+  // Retained for the existing workspace implementation and future route-level reuse.
+  // ignore: unused_element
   Widget _clockCard(DateTime now) {
     final today = _todayAttendance(now);
     final checkedIn = today.any((x) => x is Map && x['type'] == 'check-in');
@@ -407,167 +394,53 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final type = active ? 'check-out' : 'check-in';
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_green, _greenDark]),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: const [BoxShadow(color: Color(0x240B6B5A), blurRadius: 26, offset: Offset(0, 12))],
-      ),
+      decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_green, _greenDark]), borderRadius: BorderRadius.circular(26), boxShadow: const [BoxShadow(color: Color(0x240B6B5A), blurRadius: 26, offset: Offset(0, 12))]),
       child: Column(children: [
-        Row(children: [
-          Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF9AE3C8), shape: BoxShape.circle)),
-          const SizedBox(width: 7),
-          Expanded(child: Text(status, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12))),
-          Text(intl.DateFormat('d MMMM', 'ar').format(now), style: const TextStyle(color: Colors.white70, fontSize: 11)),
-        ]),
+        Row(children: [Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF9AE3C8), shape: BoxShape.circle)), const SizedBox(width: 7), Expanded(child: Text(status, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12))), Text(intl.DateFormat('d MMMM', 'ar').format(now), style: const TextStyle(color: Colors.white70, fontSize: 11))]),
         const SizedBox(height: 17),
         Text(intl.DateFormat('HH:mm').format(now), style: const TextStyle(color: Colors.white, fontSize: 44, height: 1, fontWeight: FontWeight.w900)),
         const SizedBox(height: 7),
         Text(intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(now), style: const TextStyle(color: Colors.white70, fontSize: 11)),
         const SizedBox(height: 17),
-        SizedBox(width: double.infinity, height: 52, child: FilledButton.icon(
-          onPressed: checkedOut ? null : () => context.push('/attendance?type=$type'),
-          style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: _green, disabledBackgroundColor: Colors.white24, disabledForegroundColor: Colors.white70, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-          icon: Icon(active ? Icons.logout_rounded : Icons.login_rounded, size: 20),
-          label: Text(active ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(fontWeight: FontWeight.w900)),
-        )),
+        SizedBox(width: double.infinity, height: 52, child: FilledButton.icon(onPressed: checkedOut ? null : () => context.push('/attendance?type=$type'), style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: _green, disabledBackgroundColor: Colors.white24, disabledForegroundColor: Colors.white70, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), icon: Icon(active ? Icons.logout_rounded : Icons.login_rounded, size: 20), label: Text(active ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(fontWeight: FontWeight.w900)))),
         const SizedBox(height: 9),
         const Text('سيتم التحقق من الموقع والجهاز وQR عند التسجيل', style: TextStyle(color: Colors.white70, fontSize: 9.5)),
       ]),
     );
   }
 
-  Widget _timesheets() {
-    return RefreshIndicator(
-      color: _green,
-      onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
-        children: [
-          _pageHeader('سجل الدوام', 'المراجعة اليومية والشهرية لحركاتك'),
-          const SizedBox(height: 15),
-          _summaryCard(),
-          const SizedBox(height: 16),
-          _sectionTitle('الحركات الأخيرة'),
-          const SizedBox(height: 9),
-          _attendanceList(),
-        ],
-      ),
-    );
-  }
+  // Retained for existing route behavior; EmployeeMobileShell now owns navigation.
+  // ignore: unused_element
+  Widget _timesheets() => RefreshIndicator(color: _green, onRefresh: _load, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [_pageHeader('سجل الدوام', 'المراجعة اليومية والشهرية لحركاتك'), const SizedBox(height: 15), _summaryCard(), const SizedBox(height: 16), _sectionTitle('الحركات الأخيرة'), const SizedBox(height: 9), _attendanceList()]));
 
-  Widget _attendanceTab() {
-    return RefreshIndicator(
-      color: _green,
-      onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
-        children: [
-          _pageHeader('الحضور والانصراف', 'تسجيل آمن والتحقق من المتطلبات قبل الحفظ'),
-          const SizedBox(height: 15),
-          _liveStatusCard(),
-          const SizedBox(height: 14),
-          Row(children: [
-            Expanded(child: _actionCard(Icons.login_rounded, 'تسجيل الحضور', 'بدء الدوام', () => context.push('/attendance?type=check-in'))),
-            const SizedBox(width: 10),
-            Expanded(child: _actionCard(Icons.logout_rounded, 'تسجيل الانصراف', 'إنهاء الدوام', () => context.push('/attendance?type=check-out'))),
-          ]),
-          const SizedBox(height: 18),
-          _sectionTitle('سجل اليوم'),
-          const SizedBox(height: 9),
-          _attendanceList(),
-        ],
-      ),
-    );
-  }
+  // Retained for existing route behavior; EmployeeMobileShell now owns navigation.
+  // ignore: unused_element
+  Widget _attendanceTab() => RefreshIndicator(color: _green, onRefresh: _load, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [_pageHeader('الحضور والانصراف', 'تسجيل آمن والتحقق من المتطلبات قبل الحفظ'), const SizedBox(height: 15), _liveStatusCard(), const SizedBox(height: 14), Row(children: [Expanded(child: _actionCard(Icons.login_rounded, 'تسجيل الحضور', 'بدء الدوام', () => context.push('/attendance?type=check-in'))), const SizedBox(width: 10), Expanded(child: _actionCard(Icons.logout_rounded, 'تسجيل الانصراف', 'إنهاء الدوام', () => context.push('/attendance?type=check-out')))]), const SizedBox(height: 18), _sectionTitle('سجل اليوم'), const SizedBox(height: 9), _attendanceList()]));
 
-  Widget _requestsTab() {
-    return RefreshIndicator(
-      color: _green,
-      onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
-        children: [
-          Row(children: [
-            Expanded(child: _pageHeader('الطلبات', 'الإجازات والأذونات وحالة كل طلب')),
-            FilledButton.icon(onPressed: () => context.push('/requests'), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('طلب جديد')),
-          ]),
-          const SizedBox(height: 15),
-          if (_loading) const _LoadingCard() else if (_error != null) _messageCard(_error!, Icons.cloud_off_rounded) else if (_requests.isEmpty) _emptyCard('لا توجد طلبات حتى الآن', 'ستظهر هنا طلبات الإجازات والأذونات.', Icons.event_note_outlined) else ..._requests.take(12).map(_requestTile),
-        ],
-      ),
-    );
-  }
+  // Retained for existing route behavior; EmployeeMobileShell now owns navigation.
+  // ignore: unused_element
+  Widget _requestsTab() => RefreshIndicator(color: _green, onRefresh: _load, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [Row(children: [Expanded(child: _pageHeader('الطلبات', 'الإجازات والأذونات وحالة كل طلب')), FilledButton.icon(onPressed: () => context.push('/requests'), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('طلب جديد'))]), const SizedBox(height: 15), if (_loading) const _LoadingCard() else if (_error != null) _messageCard(_error!, Icons.cloud_off_rounded) else if (_requests.isEmpty) _emptyCard('لا توجد طلبات حتى الآن', 'ستظهر هنا طلبات الإجازات والأذونات.', Icons.event_note_outlined) else ..._requests.take(12).map(_requestTile)]));
 
-  Widget _moreTab() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
-      children: [
-        _pageHeader('المزيد', 'الوصول السريع إلى خدمات حاضر'),
-        const SizedBox(height: 15),
-        _profileCard(),
-        const SizedBox(height: 14),
-        _menuTile(Icons.notifications_none_rounded, 'التنبيهات', '${_unreadCount()} غير مقروءة', () => context.push('/notifications')),
-        _menuTile(Icons.history_rounded, 'السجل التفصيلي', 'Timesheets اليومية والشهرية', () => context.push('/history')),
-        _menuTile(Icons.miscellaneous_services_outlined, 'الخدمات', 'الخدمات المتاحة في حسابك', () => context.push('/services')),
-        _menuTile(Icons.person_outline_rounded, 'الملف الشخصي', 'بيانات الحساب والملف', () => context.push('/profile')),
-      ],
-    );
-  }
+  // Retained for existing route behavior; EmployeeMobileShell now owns navigation.
+  // ignore: unused_element
+  Widget _moreTab() => ListView(padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [_pageHeader('المزيد', 'الوصول السريع إلى خدمات حاضر'), const SizedBox(height: 15), _profileCard(), const SizedBox(height: 14), _menuTile(Icons.notifications_none_rounded, 'التنبيهات', '${_unreadCount()} غير مقروءة', () => context.push('/notifications')), _menuTile(Icons.history_rounded, 'السجل التفصيلي', 'Timesheets اليومية والشهرية', () => context.push('/history')), _menuTile(Icons.miscellaneous_services_outlined, 'الخدمات', 'الخدمات المتاحة في حسابك', () => context.push('/services')), _menuTile(Icons.person_outline_rounded, 'الملف الشخصي', 'بيانات الحساب والملف', () => context.push('/profile'))]);
 
+  // Retained as a legacy local navigation definition; the shell owns the visible bar.
+  // ignore: unused_element
   Widget _bottomNav() {
-    const items = [
-      (Icons.home_rounded, 'الرئيسية'),
-      (Icons.calendar_month_rounded, 'الدوام'),
-      (Icons.fingerprint_rounded, 'الحضور'),
-      (Icons.event_note_outlined, 'الطلبات'),
-      (Icons.more_horiz_rounded, 'المزيد'),
-    ];
-    return NavigationBar(
-      selectedIndex: _tab,
-      onDestinationSelected: (index) => setState(() => _tab = index),
-      backgroundColor: Colors.white,
-      indicatorColor: _soft,
-      height: 70,
-      destinations: [for (final item in items) NavigationDestination(icon: Icon(item.$1), selectedIcon: Icon(item.$1, color: _green), label: item.$2)],
-    );
+    const items = [(Icons.home_rounded, 'الرئيسية'), (Icons.calendar_month_rounded, 'الدوام'), (Icons.fingerprint_rounded, 'الحضور'), (Icons.event_note_outlined, 'الطلبات'), (Icons.more_horiz_rounded, 'المزيد')];
+    return NavigationBar(selectedIndex: _tab, onDestinationSelected: (index) => setState(() => _tab = index), backgroundColor: Colors.white, indicatorColor: _soft, height: 70, destinations: [for (final item in items) NavigationDestination(icon: Icon(item.$1), selectedIcon: Icon(item.$1, color: _green), label: item.$2)]);
   }
 
-  Widget _summaryCard() => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
-    child: Row(children: [
-      const Icon(Icons.calendar_month_rounded, color: _green),
-      const SizedBox(width: 10),
-      const Expanded(child: Text('هذا الشهر', style: TextStyle(fontWeight: FontWeight.w900))),
-      Text('${_attendance.length} حركة', style: const TextStyle(color: _muted, fontSize: 11)),
-    ]),
-  );
+  Widget _summaryCard() => Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)), child: Row(children: [const Icon(Icons.calendar_month_rounded, color: _green), const SizedBox(width: 10), const Expanded(child: Text('هذا الشهر', style: TextStyle(fontWeight: FontWeight.w900))), Text('${_attendance.length} حركة', style: const TextStyle(color: _muted, fontSize: 11))]));
 
   Widget _liveStatusCard() {
     final today = _todayAttendance(DateTime.now());
     final active = today.any((x) => x is Map && x['type'] == 'check-in') && !today.any((x) => x is Map && x['type'] == 'check-out');
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
-      child: Row(children: [
-        Container(width: 46, height: 46, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(14)), child: Icon(active ? Icons.work_history_rounded : Icons.access_time_rounded, color: _green)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(active ? 'على رأس العمل' : 'غير مسجل حضور الآن', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(active ? 'يمكنك تسجيل الانصراف عند الانتهاء.' : 'يمكنك بدء الدوام من زر تسجيل الحضور.', style: const TextStyle(color: _muted, fontSize: 11))])),
-      ]),
-    );
+    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(14)), child: Icon(active ? Icons.work_history_rounded : Icons.access_time_rounded, color: _green)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(active ? 'على رأس العمل' : 'غير مسجل حضور الآن', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(active ? 'يمكنك تسجيل الانصراف عند الانتهاء.' : 'يمكنك بدء الدوام من زر تسجيل الحضور.', style: const TextStyle(color: _muted, fontSize: 11))]))]));
   }
 
-  Widget _profileCard() => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(22)),
-    child: Row(children: [
-      _avatar(light: true), const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)), const SizedBox(height: 3), const Text('مساحة الموظف في حاضر', style: TextStyle(color: Colors.white70, fontSize: 11))])),
-    ]),
-  );
+  Widget _profileCard() => Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(22)), child: Row(children: [_avatar(light: true), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)), const SizedBox(height: 3), const Text('مساحة الموظف في حاضر', style: TextStyle(color: Colors.white70, fontSize: 11))]))]));
 
   Widget _attendanceList({int? limit}) {
     if (_loading) return const _LoadingCard();
@@ -582,17 +455,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final type = '${map['type'] ?? ''}';
     final stamp = DateTime.tryParse('${map['timestamp'] ?? ''}');
     final isIn = type == 'check-in';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
-      child: Row(children: [
-        Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(isIn ? Icons.login_rounded : Icons.logout_rounded, color: _green, size: 19)),
-        const SizedBox(width: 11),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isIn ? 'تسجيل حضور' : 'تسجيل انصراف', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)), const SizedBox(height: 3), Text(stamp == null ? 'وقت غير متاح' : intl.DateFormat('EEEE، d MMMM • HH:mm', 'ar').format(stamp), style: const TextStyle(color: _muted, fontSize: 10))])),
-        _chip(isIn ? 'حضور' : 'انصراف', isIn),
-      ]),
-    );
+    return Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(isIn ? Icons.login_rounded : Icons.logout_rounded, color: _green, size: 19)), const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isIn ? 'تسجيل حضور' : 'تسجيل انصراف', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)), const SizedBox(height: 3), Text(stamp == null ? 'وقت غير متاح' : intl.DateFormat('EEEE، d MMMM • HH:mm', 'ar').format(stamp), style: const TextStyle(color: _muted, fontSize: 10))])), _chip(isIn ? 'حضور' : 'انصراف', isIn)]));
   }
 
   Widget _requestTile(dynamic item) {
@@ -601,48 +464,24 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final type = '${map['type'] ?? 'طلب'}';
     final reason = '${map['reason'] ?? ''}';
     final label = status == 'approved' ? 'مقبول' : status == 'rejected' ? 'مرفوض' : status == 'confirmed' ? 'مؤكد' : 'قيد المراجعة';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 9),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(19), border: Border.all(color: _line)),
-      child: Row(children: [
-        Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)),
-        const SizedBox(width: 11),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(type, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)), if (reason.isNotEmpty) ...[const SizedBox(height: 3), Text(reason, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10))]])),
-        _statusChip(label, status),
-      ]),
-    );
+    return Container(margin: const EdgeInsets.only(bottom: 9), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(19), border: Border.all(color: _line)), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)), const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(type, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)), if (reason.isNotEmpty) ...[const SizedBox(height: 3), Text(reason, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10))]])), _statusChip(label, status)]));
   }
 
-  Widget _metric(IconData icon, String title, String value) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 34, height: 34, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 18)), const SizedBox(height: 8), Text(title, style: const TextStyle(color: _muted, fontSize: 9)), const SizedBox(height: 2), Text(value, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12))]),
-  );
+  // ignore: unused_element
+  Widget _metric(IconData icon, String title, String value) => Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 34, height: 34, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 18)), const SizedBox(height: 8), Text(title, style: const TextStyle(color: _muted, fontSize: 9)), const SizedBox(height: 2), Text(value, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12))]);
 
-  Widget _quick(IconData icon, String title, String sub, VoidCallback onTap) => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(18),
-    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6), decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(children: [Container(width: 39, height: 39, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green, size: 19)), const SizedBox(height: 7), Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5)), const SizedBox(height: 2), Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 7.5))]))),
-  );
+  // ignore: unused_element
+  Widget _quick(IconData icon, String title, String sub, VoidCallback onTap) => Material(color: Colors.white, borderRadius: BorderRadius.circular(18), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6), decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(children: [Container(width: 39, height: 39, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green, size: 19)), const SizedBox(height: 7), Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5)), const SizedBox(height: 2), Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 7.5))]))));
 
-  Widget _actionCard(IconData icon, String title, String sub, VoidCallback onTap) => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(20),
-    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(sub, style: const TextStyle(color: _muted, fontSize: 10))]))),
-  );
+  Widget _actionCard(IconData icon, String title, String sub, VoidCallback onTap) => Material(color: Colors.white, borderRadius: BorderRadius.circular(20), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(sub, style: const TextStyle(color: _muted, fontSize: 10))]))));
 
-  Widget _menuTile(IconData icon, String title, String subtitle, VoidCallback onTap) => Card(
-    margin: const EdgeInsets.only(bottom: 8),
-    elevation: 0,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: _line)),
-    child: ListTile(onTap: onTap, leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10)), trailing: const Icon(Icons.chevron_left_rounded, color: _muted)),
-  );
+  Widget _menuTile(IconData icon, String title, String subtitle, VoidCallback onTap) => Card(margin: const EdgeInsets.only(bottom: 8), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: _line)), child: ListTile(onTap: onTap, leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10)), trailing: const Icon(Icons.chevron_left_rounded, color: _muted)));
 
   Widget _sectionTitle(String title, {Widget? action}) => Row(children: [Expanded(child: Text(title, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 15))), if (action != null) action]);
 
   Widget _pageHeader(String title, String subtitle) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 11))]);
 
+  // ignore: unused_element
   Widget _iconButton(IconData icon, VoidCallback onTap) => Material(color: Colors.white, borderRadius: BorderRadius.circular(14), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: Container(width: 43, height: 43, decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: _line)), child: Icon(icon, color: _ink, size: 21))));
 
   Widget _avatar({bool light = false}) => Container(width: 43, height: 43, decoration: BoxDecoration(color: light ? Colors.white24 : _soft, shape: BoxShape.circle), child: Icon(Icons.person_rounded, color: light ? Colors.white : _green, size: 23));
