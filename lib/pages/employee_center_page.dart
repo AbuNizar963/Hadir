@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/api.dart';
@@ -15,8 +16,13 @@ class EmployeeCenterPage extends StatefulWidget {
 class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
   final _session = HadirSession();
   Map<String, dynamic>? _device;
+  Map<String, dynamic>? _profile;
+  List<dynamic> _attendance = const [];
+  List<dynamic> _requests = const [];
+  List<dynamic> _notifications = const [];
   bool _loading = true;
   String? _error;
+  int _tab = 0;
 
   @override
   void initState() {
@@ -25,16 +31,29 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final token = await _session.token();
-      final device = await HadirApi(token: token).employeeDeviceStatus();
+      final api = HadirApi(token: token);
+      final results = await Future.wait<Object?>([
+        api.employeeDeviceStatus(),
+        api.employeeProfile(),
+        api.attendance(limit: 500),
+        api.requests(),
+        api.notifications(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _device = device;
+        _device = results[0] as Map<String, dynamic>;
+        _profile = results[1] as Map<String, dynamic>;
+        _attendance = results[2] as List<dynamic>;
+        _requests = results[3] as List<dynamic>;
+        _notifications = results[4] as List<dynamic>;
         _loading = false;
       });
     } catch (e) {
@@ -46,15 +65,111 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
     }
   }
 
+  dynamic _value(Map<String, dynamic>? source, String key) {
+    if (source == null) return null;
+    return source[key];
+  }
+
+  String _text(dynamic value, [String fallback = 'غير متوفر']) {
+    final text = '${value ?? ''}'.trim();
+    return text.isEmpty ? fallback : text;
+  }
+
+  String _profileText(String key, [String fallback = 'غير متوفر']) =>
+      _text(_value(_profile, key), fallback);
+
+  DateTime? _date(dynamic value) {
+    if (value is DateTime) return value;
+    if (value == null) return null;
+    return DateTime.tryParse('$value');
+  }
+
+  String _dateText(dynamic value) {
+    final date = _date(value);
+    if (date == null) return 'غير متوفر';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  String _timeText(dynamic value) {
+    final date = _date(value);
+    if (date == null) return 'غير متوفر';
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  List<Map<String, dynamic>> get _attendanceMaps => _attendance
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .toList();
+
+  List<Map<String, dynamic>> get _requestMaps => _requests
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .toList();
+
+  List<Map<String, dynamic>> get _notificationMaps => _notifications
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .toList();
+
+  int get _presentDays {
+    final days = <String>{};
+    for (final item in _attendanceMaps) {
+      final date = _date(item['timestamp'] ?? item['time']);
+      if (date != null && _type(item) == 'check-in') {
+        days.add('${date.year}-${date.month}-${date.day}');
+      }
+    }
+    return days.length;
+  }
+
+  int get _lateCount => _attendanceMaps.where((item) {
+        final type = _text(item['type'], '').toLowerCase();
+        return type.contains('late') || type.contains('متأخر');
+      }).length;
+
+  int get _unreadNotifications =>
+      _notificationMaps.where((item) => item['read'] != true).length;
+
+  String _type(Map<String, dynamic> item) =>
+      _text(item['type'], '').toLowerCase();
+
+  String _statusLabel(dynamic value) {
+    final status = _text(value, '').toLowerCase();
+    if (status.contains('approved') || status.contains('مقبول')) return 'مقبول';
+    if (status.contains('rejected') || status.contains('مرفوض')) return 'مرفوض';
+    if (status.contains('pending') || status.contains('معلق')) return 'معلق';
+    if (status.contains('cancel')) return 'ملغى';
+    return _text(value, 'غير محدد');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('مركز الموظف'),
           actions: [
+            if (_unreadNotifications > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: HadirBrand.soft,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(
+                    '$_unreadNotifications',
+                    style: const TextStyle(
+                      color: HadirBrand.primaryDark,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
             IconButton(
               tooltip: 'تحديث',
               onPressed: _loading ? null : _load,
@@ -62,44 +177,30 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
             ),
             const SizedBox(width: 6),
           ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(52),
+            child: SizedBox(
+              height: 52,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                scrollDirection: Axis.horizontal,
+                itemCount: _tabs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 7),
+                itemBuilder: (_, index) => _tabChip(index),
+              ),
+            ),
+          ),
         ),
         body: RefreshIndicator(
           color: HadirBrand.primary,
           onRefresh: _load,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 30),
             children: [
               _hero(),
-              const SizedBox(height: 20),
-              _sectionTitle('الوصول السريع', 'كل ما تحتاجه لإنجاز يومك'),
-              const SizedBox(height: 10),
-              _actionGrid(),
-              const SizedBox(height: 20),
-              _deviceSecurityCard(),
-              const SizedBox(height: 20),
-              _sectionTitle('الخدمات الذكية', 'أدوات إضافية داخل HADIR'),
-              const SizedBox(height: 10),
-              _serviceTile(
-                Icons.cloud_outlined,
-                'الطقس',
-                'حالة الطقس الحالية والتوقعات',
-                () => context.go('/weather'),
-              ),
-              _serviceTile(
-                Icons.mosque_outlined,
-                'الصلاة والقبلة',
-                'مواقيت الصلاة واتجاه القبلة',
-                () => context.go('/prayer'),
-              ),
-              _serviceTile(
-                Icons.auto_awesome_rounded,
-                'Hadir AI',
-                'مساعد ذكي للموظف',
-                () => context.go('/ai'),
-              ),
-              const SizedBox(height: 8),
-              _infoBanner(theme),
+              const SizedBox(height: 16),
+              _tabContent(),
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 _errorCard(),
@@ -111,7 +212,72 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
     );
   }
 
+  static const _tabs = <({String title, IconData icon})>[
+    (title: 'البطاقة', icon: Icons.badge_outlined),
+    (title: 'نظرة عامة', icon: Icons.analytics_outlined),
+    (title: 'التقويم', icon: Icons.calendar_month_outlined),
+    (title: 'النشاط', icon: Icons.timeline_rounded),
+    (title: 'الدوام', icon: Icons.schedule_rounded),
+    (title: 'الطلبات', icon: Icons.assignment_outlined),
+    (title: 'الأمان', icon: Icons.shield_outlined),
+  ];
+
+  Widget _tabChip(int index) {
+    final selected = _tab == index;
+    return Material(
+      color: selected ? HadirBrand.primary : Theme.of(context).cardColor,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: () => setState(() => _tab = index),
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+          child: Row(
+            children: [
+              Icon(
+                _tabs[index].icon,
+                size: 17,
+                color: selected ? Colors.white : HadirBrand.muted,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _tabs[index].title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tabContent() {
+    switch (_tab) {
+      case 0:
+        return _identityTab();
+      case 1:
+        return _overviewTab();
+      case 2:
+        return _calendarTab();
+      case 3:
+        return _activityTab();
+      case 4:
+        return _scheduleTab();
+      case 5:
+        return _requestsTab();
+      case 6:
+        return _securityTab();
+    }
+    return const SizedBox.shrink();
+  }
+
   Widget _hero() {
+    final name = _profileText('name', 'الموظف');
+    final jobNumber = _profileText('jobNumber', '—');
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -138,38 +304,28 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
               color: Colors.white.withValues(alpha: .14),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.grid_view_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
+            child: const Icon(Icons.badge_rounded, color: Colors.white, size: 29),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'مساحتك في HADIR',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'كل خدماتك في مكان واحد',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 Text(
-                  'الحضور والسجل والطلبات والإشعارات.',
-                  style: TextStyle(color: Colors.white70, fontSize: 12.5),
+                  'الرقم الوظيفي: $jobNumber',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12.5),
                 ),
               ],
             ),
@@ -179,186 +335,398 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
     );
   }
 
+  Widget _identityTab() {
+    final role = _profileText('role', _profileText('jobTitle', 'موظف'));
+    final department = _profileText('department', _profileText('departmentName', 'غير محدد'));
+    final status = _profileText('status', 'نشط');
+    final jobNumber = _profileText('jobNumber', '—');
+    return Column(
+      children: [
+        _sectionTitle('بطاقتك الرقمية', 'بيانات الهوية الوظيفية الأساسية'),
+        const SizedBox(height: 10),
+        _card([
+          _identityRow(Icons.person_outline_rounded, 'الاسم', _profileText('name', 'الموظف')),
+          _identityRow(Icons.badge_outlined, 'الرقم الوظيفي', jobNumber, copy: true),
+          _identityRow(Icons.work_outline_rounded, 'المسمى الوظيفي', role),
+          _identityRow(Icons.business_outlined, 'القسم', department),
+          _identityRow(Icons.verified_outlined, 'الحالة', status),
+        ]),
+        const SizedBox(height: 12),
+        _actionBanner(
+          Icons.person_rounded,
+          'الملف الشخصي',
+          'عرض وتعديل بيانات حسابك من الصفحة المخصصة.',
+          () => context.go('/profile'),
+        ),
+      ],
+    );
+  }
+
+  Widget _overviewTab() {
+    return Column(
+      children: [
+        _sectionTitle('نظرة عامة', 'ملخص العمل والالتزام من بيانات الحساب الحالية'),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(child: _metricCard('أيام الحضور', '$_presentDays', Icons.event_available_outlined)),
+            const SizedBox(width: 10),
+            Expanded(child: _metricCard('التأخر', '$_lateCount', Icons.schedule_outlined)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(child: _metricCard('العمليات', '${_attendanceMaps.length}', Icons.touch_app_outlined)),
+            const SizedBox(width: 10),
+            Expanded(child: _metricCard('الطلبات', '${_requestMaps.length}', Icons.assignment_outlined)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _sectionTitle('آخر أيام العمل', 'أحدث عمليات الحضور المسجلة'),
+        const SizedBox(height: 10),
+        if (_attendanceMaps.isEmpty)
+          _emptyCard('لا توجد سجلات حضور متاحة حالياً.')
+        else
+          ..._attendanceMaps.take(6).map(_attendanceTile),
+      ],
+    );
+  }
+
+  Widget _calendarTab() {
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final item in _attendanceMaps) {
+      final date = _date(item['timestamp'] ?? item['time']);
+      if (date == null) continue;
+      final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      grouped.putIfAbsent(key, () => []).add(item);
+    }
+    final entries = grouped.entries.take(31).toList();
+    return Column(
+      children: [
+        _sectionTitle('التقويم', 'الأيام التي ظهرت فيها عمليات الحضور والانصراف'),
+        const SizedBox(height: 10),
+        if (entries.isEmpty)
+          _emptyCard('لا توجد أيام حضور مسجلة بعد.')
+        else
+          ...entries.map((entry) {
+            final date = DateTime.tryParse(entry.key);
+            final hasIn = entry.value.any((item) => _type(item).contains('check-in'));
+            final hasOut = entry.value.any((item) => _type(item).contains('check-out'));
+            return _card([
+              Row(
+                children: [
+                  const Icon(Icons.calendar_today_outlined, color: HadirBrand.primary, size: 21),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      date == null ? entry.key : _dateText(date),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
+                  _miniBadge(hasIn ? 'حضور' : '—', good: hasIn),
+                  const SizedBox(width: 6),
+                  _miniBadge(hasOut ? 'انصراف' : '—', good: hasOut),
+                ],
+              ),
+            ]);
+          }),
+      ],
+    );
+  }
+
+  Widget _activityTab() {
+    final items = _attendanceMaps.take(40).toList();
+    return Column(
+      children: [
+        _sectionTitle('النشاط', 'الخط الزمني لآخر عمليات الحساب'),
+        const SizedBox(height: 10),
+        if (items.isEmpty)
+          _emptyCard('لا توجد عمليات مسجلة بعد.')
+        else
+          ...items.map(_activityTile),
+        const SizedBox(height: 14),
+        _actionBanner(
+          Icons.history_rounded,
+          'سجل العمل الكامل',
+          'فتح صفحة السجل المخصصة مع تفاصيل العمليات.',
+          () => context.go('/history'),
+        ),
+      ],
+    );
+  }
+
+  Widget _scheduleTab() {
+    final scheduleType = _profileText('scheduleType', 'ثابت');
+    final start = _profileText('workStartTime', _profileText('startTime', 'غير محدد'));
+    final end = _profileText('workEndTime', _profileText('endTime', 'غير محدد'));
+    final workDays = _profile?['workDays'];
+    final days = workDays is List ? workDays.map((e) => '$e').join('، ') : _text(workDays, 'حسب الجدول');
+    final rotationOn = _profileText('rotationDaysOn', '—');
+    final rotationOff = _profileText('rotationDaysOff', '—');
+    return Column(
+      children: [
+        _sectionTitle('الدوام', 'المناوبة وأوقات العمل المسجلة في حسابك'),
+        const SizedBox(height: 10),
+        _card([
+          _identityRow(Icons.repeat_rounded, 'نوع الدوام', scheduleType),
+          _identityRow(Icons.login_rounded, 'بداية العمل', start),
+          _identityRow(Icons.logout_rounded, 'نهاية العمل', end),
+          _identityRow(Icons.date_range_outlined, 'أيام العمل', days),
+          if (scheduleType.toLowerCase().contains('rotation') || scheduleType.contains('مناوب')) ...[
+            _identityRow(Icons.event_repeat_rounded, 'أيام العمل في الدورة', rotationOn),
+            _identityRow(Icons.event_busy_outlined, 'أيام الراحة في الدورة', rotationOff),
+          ],
+        ]),
+      ],
+    );
+  }
+
+  Widget _requestsTab() {
+    final items = _requestMaps.take(30).toList();
+    return Column(
+      children: [
+        _sectionTitle('الطلبات', 'الإجازات والاستئذانات والطلبات المرسلة'),
+        const SizedBox(height: 10),
+        if (items.isEmpty)
+          _emptyCard('لا توجد طلبات مسجلة حالياً.')
+        else
+          ...items.map(_requestTile),
+        const SizedBox(height: 12),
+        _actionBanner(
+          Icons.add_task_rounded,
+          'إنشاء طلب',
+          'إرسال طلب إجازة أو استئذان من المسار الحالي.',
+          () => context.go('/requests'),
+        ),
+      ],
+    );
+  }
+
+  Widget _securityTab() {
+    final bound = _device?['bound'] == true;
+    final passkeyCount = (_device?['passkeyCount'] as num?)?.toInt() ?? 0;
+    final deviceLabel = _text(_device?['deviceLabel']);
+    return Column(
+      children: [
+        _sectionTitle('الأمان', 'الحساب والجهاز المرتبطان بالموظف'),
+        const SizedBox(height: 10),
+        _deviceSecurityCard(),
+        const SizedBox(height: 12),
+        _card([
+          _identityRow(Icons.verified_user_outlined, 'حالة الربط', bound ? 'مرتبط وآمن' : 'يحتاج مراجعة'),
+          _identityRow(Icons.phone_android_outlined, 'الجهاز', deviceLabel),
+          _identityRow(Icons.fingerprint_rounded, 'مفاتيح الدخول الآمن', passkeyCount == 0 ? 'غير مسجل' : '$passkeyCount'),
+        ]),
+        const SizedBox(height: 12),
+        _infoBanner(),
+      ],
+    );
+  }
+
+  Widget _deviceSecurityCard() {
+    final bound = _device?['bound'] == true;
+    final title = _loading
+        ? 'جارٍ التحقق من الجهاز…'
+        : bound
+            ? 'الجهاز مرتبط بالحساب'
+            : 'لم يتم ربط الجهاز بعد';
+    return _card([
+      Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: const BoxDecoration(color: HadirBrand.soft, shape: BoxShape.circle),
+            child: Icon(
+              bound ? Icons.verified_user_rounded : Icons.security_rounded,
+              color: HadirBrand.primary,
+              size: 23,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('حماية الجهاز', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(title, style: const TextStyle(fontSize: 12, color: HadirBrand.muted)),
+              ],
+            ),
+          ),
+          if (!_loading) _statusBadge(bound),
+        ],
+      ),
+    ]);
+  }
+
+  Widget _attendanceTile(Map<String, dynamic> item) {
+    final type = _type(item);
+    final isIn = type.contains('check-in');
+    final date = item['timestamp'] ?? item['time'];
+    return _card([
+      Row(
+        children: [
+          _roundIcon(isIn ? Icons.login_rounded : Icons.logout_rounded),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(isIn ? 'تسجيل حضور' : 'تسجيل انصراف', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 3),
+                Text(_dateText(date), style: const TextStyle(fontSize: 11, color: HadirBrand.muted)),
+              ],
+            ),
+          ),
+          Text(_timeText(date), style: Theme.of(context).textTheme.labelLarge),
+        ],
+      ),
+    ]);
+  }
+
+  Widget _activityTile(Map<String, dynamic> item) {
+    final type = _type(item);
+    final isIn = type.contains('check-in');
+    final label = isIn ? 'تسجيل حضور' : type.contains('check-out') ? 'تسجيل انصراف' : _text(item['type'], 'عملية');
+    final date = item['timestamp'] ?? item['time'];
+    final location = _text(item['locationName'] ?? item['location'], 'الموقع غير متوفر');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: _card([
+        Row(
+          children: [
+            _roundIcon(isIn ? Icons.login_rounded : Icons.touch_app_rounded),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 3),
+                  Text(location, style: const TextStyle(fontSize: 11, color: HadirBrand.muted), overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(_timeText(date), style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 3),
+                Text(_dateText(date), style: const TextStyle(fontSize: 10, color: HadirBrand.muted)),
+              ],
+            ),
+          ],
+        ),
+      ]),
+    );
+  }
+
+  Widget _requestTile(Map<String, dynamic> item) {
+    final type = _text(item['type'], 'طلب');
+    final status = _statusLabel(item['status']);
+    final reason = _text(item['reason'], 'بدون سبب');
+    final created = item['createdAt'] ?? item['timestamp'] ?? item['startDate'];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: _card([
+        Row(
+          children: [
+            _roundIcon(Icons.assignment_outlined),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(type, style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 3),
+                  Text(reason, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: HadirBrand.muted)),
+                ],
+              ),
+            ),
+            _miniBadge(status, good: status == 'مقبول'),
+          ],
+        ),
+        if (created != null) ...[
+          const SizedBox(height: 9),
+          Text('التاريخ: ${_dateText(created)}', style: const TextStyle(fontSize: 10.5, color: HadirBrand.muted)),
+        ],
+      ]),
+    );
+  }
+
   Widget _sectionTitle(String title, String subtitle) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 3),
-        Text(
-          subtitle,
-          style: const TextStyle(fontSize: 12, color: HadirBrand.muted),
-        ),
+        Text(subtitle, style: const TextStyle(fontSize: 12, color: HadirBrand.muted)),
       ],
     );
   }
 
-  Widget _actionGrid() {
-    final actions = <({IconData icon, String title, String subtitle, String route})>[
-      (
-        icon: Icons.qr_code_scanner_rounded,
-        title: 'تسجيل الحضور',
-        subtitle: 'QR + GPS',
-        route: '/attendance?type=check-in',
-      ),
-      (
-        icon: Icons.history_rounded,
-        title: 'سجل الحضور',
-        subtitle: 'عملياتك السابقة',
-        route: '/history',
-      ),
-      (
-        icon: Icons.event_note_rounded,
-        title: 'الطلبات',
-        subtitle: 'إجازات وأذونات',
-        route: '/requests',
-      ),
-      (
-        icon: Icons.notifications_none_rounded,
-        title: 'الإشعارات',
-        subtitle: 'التنبيهات والرسائل',
-        route: '/notifications',
-      ),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: actions.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 1.35,
-      ),
-      itemBuilder: (_, index) {
-        final action = actions[index];
-        return _actionCard(
-          action.icon,
-          action.title,
-          action.subtitle,
-          () => context.go(action.route),
-        );
-      },
-    );
-  }
-
-  Widget _actionCard(
-    IconData icon,
-    String title,
-    String subtitle,
-    VoidCallback onTap,
-  ) {
-    return Material(
-      color: Theme.of(context).cardColor,
-      borderRadius: BorderRadius.circular(HadirBrand.radiusLg),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(HadirBrand.radiusLg),
-        child: Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(HadirBrand.radiusLg),
-            border: Border.all(color: Theme.of(context).dividerColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  color: HadirBrand.soft,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: HadirBrand.primary, size: 21),
-              ),
-              const Spacer(),
-              Text(title, style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 3),
-              const Text('—', style: TextStyle(fontSize: 0)),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 11.5, color: HadirBrand.muted),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _deviceSecurityCard() {
-    final bound = _device?['bound'] == true;
-    final passkeyCount = (_device?['passkeyCount'] as num?)?.toInt() ?? 0;
-    final deviceLabel = '${_device?['deviceLabel'] ?? ''}'.trim();
-    final title = _loading
-        ? 'جارٍ التحقق من الجهاز…'
-        : bound
-            ? 'الجهاز مرتبط بالحساب'
-            : 'لم يتم ربط الجهاز بعد';
-
+  Widget _card(List<Widget> children) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(HadirBrand.radiusLg),
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
-      child: Column(
+      child: Column(children: children),
+    );
+  }
+
+  Widget _metricCard(String title, String value, IconData icon) {
+    return _card([
+      Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: const BoxDecoration(
-                  color: HadirBrand.soft,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  bound ? Icons.verified_user_rounded : Icons.security_rounded,
-                  color: HadirBrand.primary,
-                  size: 23,
-                ),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('حماية الجهاز', style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 4),
-                    Text(
-                      title,
-                      style: const TextStyle(fontSize: 12, color: HadirBrand.muted),
-                    ),
-                  ],
-                ),
-              ),
-              if (!_loading) _statusBadge(bound),
-            ],
-          ),
-          if (!_loading) ...[
-            const SizedBox(height: 15),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            _deviceRow(
-              Icons.phone_android_rounded,
-              'اسم الجهاز',
-              deviceLabel.isEmpty ? 'غير متوفر' : deviceLabel,
-            ),
-            const SizedBox(height: 11),
-            _deviceRow(
-              Icons.fingerprint_rounded,
-              'مفاتيح الدخول الآمن',
-              passkeyCount == 0
-                  ? 'غير مسجل'
-                  : '$passkeyCount مفتاح${passkeyCount == 1 ? '' : 'ات'}',
+          _roundIcon(icon),
+          const SizedBox(width: 10),
+          Expanded(child: Text(title, style: const TextStyle(fontSize: 11.5, color: HadirBrand.muted))),
+          Text(value, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    ]);
+  }
+
+  Widget _identityRow(IconData icon, String title, String value, {bool copy = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: HadirBrand.muted, size: 19),
+          const SizedBox(width: 10),
+          Expanded(child: Text(title, style: const TextStyle(fontSize: 11.5, color: HadirBrand.muted))),
+          Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelLarge)),
+          if (copy) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              tooltip: 'نسخ',
+              visualDensity: VisualDensity.compact,
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: value));
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ الرقم الوظيفي')));
+              },
+              icon: const Icon(Icons.copy_rounded, size: 17),
             ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _roundIcon(IconData icon) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: const BoxDecoration(color: HadirBrand.soft, shape: BoxShape.circle),
+      child: Icon(icon, color: HadirBrand.primary, size: 21),
     );
   }
 
@@ -371,77 +739,54 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
       ),
       child: Text(
         bound ? 'آمن' : 'مراجعة',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: bound ? HadirBrand.primaryDark : HadirBrand.warning,
-        ),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: bound ? HadirBrand.primaryDark : HadirBrand.warning),
       ),
     );
   }
 
-  Widget _deviceRow(IconData icon, String title, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: HadirBrand.muted, size: 19),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(color: HadirBrand.muted, fontSize: 11),
-          ),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _serviceTile(
-    IconData icon,
-    String title,
-    String subtitle,
-    VoidCallback onTap,
-  ) {
+  Widget _miniBadge(String text, {required bool good}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(HadirBrand.radiusMd),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: good ? HadirBrand.soft : Theme.of(context).dividerColor.withValues(alpha: .35),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: ListTile(
+      child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: good ? HadirBrand.primaryDark : HadirBrand.muted)),
+    );
+  }
+
+  Widget _actionBanner(IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return Material(
+      color: HadirBrand.soft,
+      borderRadius: BorderRadius.circular(HadirBrand.radiusMd),
+      child: InkWell(
         onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-        leading: Container(
-          width: 43,
-          height: 43,
-          decoration: const BoxDecoration(
-            color: HadirBrand.soft,
-            shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(HadirBrand.radiusMd),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              _roundIcon(icon),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 3),
+                    Text(subtitle, style: const TextStyle(fontSize: 11, color: HadirBrand.muted)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_left_rounded, color: HadirBrand.muted),
+            ],
           ),
-          child: Icon(icon, color: HadirBrand.primary, size: 21),
         ),
-        title: Text(title, style: Theme.of(context).textTheme.titleSmall),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Text(
-            subtitle,
-            style: const TextStyle(fontSize: 12, color: HadirBrand.muted),
-          ),
-        ),
-        trailing: const Icon(Icons.chevron_left_rounded, color: HadirBrand.muted),
       ),
     );
   }
 
-  Widget _infoBanner(ThemeData theme) {
+  Widget _infoBanner() {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -449,22 +794,27 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
         borderRadius: BorderRadius.circular(HadirBrand.radiusMd),
         border: Border.all(color: HadirBrand.border),
       ),
-      child: Row(
+      child: const Row(
         children: [
-          const Icon(Icons.info_outline_rounded, color: HadirBrand.primary),
-          const SizedBox(width: 10),
+          Icon(Icons.info_outline_rounded, color: HadirBrand.primary),
+          SizedBox(width: 10),
           Expanded(
             child: Text(
               'تأكد من تفعيل الموقع والسماح بالكاميرا عند تسجيل الحضور لضمان اكتمال التحقق.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: HadirBrand.text,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 12, color: HadirBrand.text, fontWeight: FontWeight.w600),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _emptyCard(String message) {
+    return _card([
+      const Icon(Icons.inbox_outlined, color: HadirBrand.muted, size: 28),
+      const SizedBox(height: 8),
+      Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: HadirBrand.muted)),
+    ]);
   }
 
   Widget _errorCard() {
@@ -479,12 +829,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
         children: [
           const Icon(Icons.error_outline_rounded, color: HadirBrand.danger),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              _error!,
-              style: const TextStyle(fontSize: 12, color: HadirBrand.text),
-            ),
-          ),
+          Expanded(child: Text(_error!, style: const TextStyle(fontSize: 12, color: HadirBrand.text))),
           TextButton(onPressed: _load, child: const Text('إعادة المحاولة')),
         ],
       ),
