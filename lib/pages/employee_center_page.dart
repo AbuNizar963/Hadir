@@ -82,15 +82,21 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
               const SizedBox(height: 10),
               _serviceTile(
                 Icons.cloud_outlined,
-                'الطقس والصلاة',
-                'الطقس، مواقيت الصلاة والقبلة',
-                () => context.go('/services'),
+                'الطقس',
+                'حالة الطقس الحالية والتوقعات',
+                () => context.go('/weather'),
+              ),
+              _serviceTile(
+                Icons.mosque_outlined,
+                'الصلاة والقبلة',
+                'مواقيت الصلاة واتجاه القبلة',
+                () => context.go('/prayer'),
               ),
               _serviceTile(
                 Icons.auto_awesome_rounded,
                 'Hadir AI',
                 'مساعد ذكي للموظف',
-                () => context.go('/services'),
+                () => context.go('/ai'),
               ),
               const SizedBox(height: 8),
               _infoBanner(theme),
@@ -181,10 +187,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: const TextStyle(
-            fontSize: 12,
-            color: HadirBrand.muted,
-          ),
+          style: const TextStyle(fontSize: 12, color: HadirBrand.muted),
         ),
       ],
     );
@@ -273,16 +276,10 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
               const Spacer(),
               Text(title, style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 3),
-              const Text(
-                '—',
-                style: TextStyle(fontSize: 0),
-              ),
+              const Text('—', style: TextStyle(fontSize: 0)),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: HadirBrand.muted,
-                ),
+                style: const TextStyle(fontSize: 11.5, color: HadirBrand.muted),
               ),
             ],
           ),
@@ -320,9 +317,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  bound
-                      ? Icons.verified_user_rounded
-                      : Icons.security_rounded,
+                  bound ? Icons.verified_user_rounded : Icons.security_rounded,
                   color: HadirBrand.primary,
                   size: 23,
                 ),
@@ -332,17 +327,11 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'حماية الجهاز',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
+                    Text('حماية الجهاز', style: Theme.of(context).textTheme.titleSmall),
                     const SizedBox(height: 4),
                     Text(
                       title,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: HadirBrand.muted,
-                      ),
+                      style: const TextStyle(fontSize: 12, color: HadirBrand.muted),
                     ),
                   ],
                 ),
@@ -399,10 +388,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              color: HadirBrand.muted,
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: HadirBrand.muted, fontSize: 11),
           ),
         ),
         Flexible(
@@ -450,10 +436,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
             style: const TextStyle(fontSize: 12, color: HadirBrand.muted),
           ),
         ),
-        trailing: const Icon(
-          Icons.chevron_left_rounded,
-          color: HadirBrand.muted,
-        ),
+        trailing: const Icon(Icons.chevron_left_rounded, color: HadirBrand.muted),
       ),
     );
   }
@@ -499,10 +482,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
           Expanded(
             child: Text(
               _error!,
-              style: const TextStyle(
-                fontSize: 12,
-                color: HadirBrand.text,
-              ),
+              style: const TextStyle(fontSize: 12, color: HadirBrand.text),
             ),
           ),
           TextButton(onPressed: _load, child: const Text('إعادة المحاولة')),
