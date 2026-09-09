@@ -5,9 +5,6 @@ import '../../../core/api.dart';
 import '../../../core/session.dart';
 
 const _brand = Color(0xFF0B6B5A);
-const _ink = Color(0xFF17322C);
-const _muted = Color(0xFF70817B);
-const _bg = Color(0xFFF7F9F8);
 
 class AdminMobileDashboardPage extends StatefulWidget {
   const AdminMobileDashboardPage({super.key});
@@ -28,6 +25,13 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   List<dynamic> _escapes = [];
   String _filter = 'all';
   String _search = '';
+
+  Color get _ink => Theme.of(context).colorScheme.onSurface;
+  Color get _muted => Theme.of(context).colorScheme.onSurfaceVariant;
+  Color get _surface => Theme.of(context).colorScheme.surface;
+  Color get _panel => Theme.of(context).colorScheme.surfaceContainerHighest;
+  Color get _border => Theme.of(context).colorScheme.outlineVariant;
+  Color get _primary => Theme.of(context).colorScheme.primary;
 
   String get _roleLabel => switch (_role) {
         'owner' => 'المالك',
@@ -209,7 +213,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
     final label = _statusLabel(row);
     if (label == 'هارب' || label == 'غائب') return const Color(0xFFB42318);
     if (label == 'متأخر') return const Color(0xFFB54708);
-    if (label == 'حاضر') return _brand;
+    if (label == 'حاضر') return _primary;
     if (label == 'إجازة') return const Color(0xFF6941C6);
     return const Color(0xFF2563A6);
   }
@@ -220,7 +224,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Container(
-        color: _bg,
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: RefreshIndicator(
           onRefresh: _load,
           child: ListView(
@@ -229,7 +233,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
             children: [
               Text(
                 '$_roleLabel · لوحة القيادة',
-                style: const TextStyle(
+                style: TextStyle(
                   color: _ink,
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
@@ -240,7 +244,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                 _name == 'الإدارة'
                     ? 'نظرة مباشرة على حالة الدوام · ${_today()}'
                     : '$_name · ${_today()}',
-                style: const TextStyle(color: _muted, fontSize: 12),
+                style: TextStyle(color: _muted, fontSize: 12),
               ),
               const SizedBox(height: 16),
               _operationalCard(),
@@ -269,9 +273,9 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   Widget _operationalCard() => Container(
         padding: const EdgeInsets.all(17),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFDCE6E2)),
+          border: Border.all(color: _border),
         ),
         child: Row(
           children: [
@@ -279,17 +283,17 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: const Color(0xFFEAF4F0),
+                color: _primary.withValues(alpha: .12),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.monitor_heart_outlined, color: _brand),
+              child: Icon(Icons.monitor_heart_outlined, color: _primary),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'الحالة التشغيلية الحالية',
                     style: TextStyle(color: _ink, fontWeight: FontWeight.w900),
                   ),
@@ -298,7 +302,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                     _loading
                         ? 'جاري مزامنة حالة الدوام من D1…'
                         : '$_present حاضر · $_absent غائب · $_late متأخر · $_openViolations مخالفات مفتوحة',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: _muted,
                       fontSize: 11,
                       height: 1.45,
@@ -314,18 +318,18 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   Widget _errorCard() => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF1F0),
+          color: Theme.of(context).colorScheme.errorContainer,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFF3B6B1)),
+          border: Border.all(color: Theme.of(context).colorScheme.error.withValues(alpha: .35)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline_rounded, color: Color(0xFFB42318)),
+            Icon(Icons.error_outline_rounded, color: Theme.of(context).colorScheme.error),
             const SizedBox(width: 9),
             Expanded(
               child: Text(
                 _error!,
-                style: const TextStyle(color: Color(0xFF8A1C13), fontSize: 11),
+                style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer, fontSize: 11),
               ),
             ),
             TextButton(onPressed: _load, child: const Text('إعادة')),
@@ -338,7 +342,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: _ink,
               fontSize: 18,
               fontWeight: FontWeight.w900,
@@ -347,7 +351,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
           const SizedBox(height: 3),
           Text(
             subtitle,
-            style: const TextStyle(color: _muted, fontSize: 10.5),
+            style: TextStyle(color: _muted, fontSize: 10.5),
           ),
         ],
       );
@@ -382,12 +386,10 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
           child: Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
-              color: active ? const Color(0xFFEAF4F0) : Colors.white,
+              color: active ? _panel : _surface,
               borderRadius: BorderRadius.circular(17),
               border: Border.all(
-                color: active
-                    ? const Color(0xFFB8DFD2)
-                    : const Color(0xFFDCE6E2),
+                color: active ? _primary.withValues(alpha: .32) : _border,
               ),
             ),
             child: Row(
@@ -396,10 +398,10 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEAF4F0),
+                    color: _primary.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(card.icon, color: _brand, size: 21),
+                  child: Icon(card.icon, color: _primary, size: 21),
                 ),
                 const SizedBox(width: 9),
                 Expanded(
@@ -411,7 +413,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                         card.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _muted,
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
@@ -420,7 +422,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                       const SizedBox(height: 3),
                       Text(
                         '${card.value}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _ink,
                           fontSize: 22,
                           fontWeight: FontWeight.w900,
@@ -440,16 +442,16 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   Widget _employeeSection(List<Map<String, dynamic>> rows) => Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFDCE6E2)),
+          border: Border.all(color: _border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -461,7 +463,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      SizedBox(height: 3),
+                      const SizedBox(height: 3),
                       Text(
                         'المصدر: D1 · الحالة اليومية',
                         style: TextStyle(color: _muted, fontSize: 10),
@@ -472,7 +474,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                 IconButton(
                   onPressed: _load,
                   tooltip: 'تحديث',
-                  icon: const Icon(Icons.refresh_rounded, color: _brand),
+                  icon: Icon(Icons.refresh_rounded, color: _primary),
                 ),
               ],
             ),
@@ -485,7 +487,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                 prefixIcon: const Icon(Icons.search_rounded),
                 isDense: true,
                 filled: true,
-                fillColor: const Color(0xFFF6F8F7),
+                fillColor: _panel.withValues(alpha: .55),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(13),
                   borderSide: BorderSide.none,
@@ -499,8 +501,8 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               )
             else if (rows.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(20),
+              Padding(
+                padding: const EdgeInsets.all(20),
                 child: Center(
                   child: Text(
                     'لا توجد نتائج مطابقة.',
@@ -539,7 +541,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _ink,
                     fontWeight: FontWeight.w800,
                     fontSize: 12.5,
@@ -548,7 +550,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                 const SizedBox(height: 2),
                 Text(
                   '$schedule${jobNumber.isNotEmpty ? ' · $jobNumber' : ''}',
-                  style: const TextStyle(color: _muted, fontSize: 9.5),
+                  style: TextStyle(color: _muted, fontSize: 9.5),
                 ),
               ],
             ),
@@ -556,7 +558,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .75),
+              color: _surface.withValues(alpha: .75),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -576,7 +578,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   Widget _quickActions() => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'إجراءات سريعة',
             style: TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900),
           ),
@@ -592,29 +594,29 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         margin: const EdgeInsets.only(bottom: 8),
         child: ListTile(
           onTap: () => context.go(route),
-          tileColor: Colors.white,
+          tileColor: _surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
-            side: const BorderSide(color: Color(0xFFDCE6E2)),
+            side: BorderSide(color: _border),
           ),
           leading: Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFFEAF4F0),
+              color: _primary.withValues(alpha: .12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: _brand),
+            child: Icon(icon, color: _primary),
           ),
           title: Text(
             title,
-            style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12.5),
+            style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12.5),
           ),
           subtitle: Text(
             subtitle,
-            style: const TextStyle(color: _muted, fontSize: 10),
+            style: TextStyle(color: _muted, fontSize: 10),
           ),
-          trailing: const Icon(Icons.chevron_left_rounded, color: _muted),
+          trailing: Icon(Icons.chevron_left_rounded, color: _muted),
         ),
       );
 }
