@@ -146,7 +146,7 @@ class AdminMobileShell extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: DropdownButtonFormField<ThemeMode>(
-            value: controller.mode,
+            initialValue: controller.mode,
             decoration: InputDecoration(
               labelText: 'مظهر التطبيق',
               prefixIcon: const Icon(Icons.brightness_6_outlined),
