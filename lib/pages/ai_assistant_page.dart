@@ -228,7 +228,7 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
     ]),
     const SizedBox(height: 14),
     ..._examples.take(3).map((x) => Padding(padding: const EdgeInsets.only(bottom: 9), child: OutlinedButton.icon(onPressed: _busy ? null : () => _ask(x), icon: const Icon(Icons.arrow_back_rounded, size: 17), label: Text(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.all(14))))),
-  ];
+  ]);
 
   Widget _bubble(_Message message) => Align(alignment: message.user ? Alignment.centerLeft : Alignment.centerRight, child: Container(constraints: const BoxConstraints(maxWidth: 560), margin: const EdgeInsets.only(bottom: 11), padding: const EdgeInsets.fromLTRB(15, 12, 15, 13), decoration: BoxDecoration(color: message.user ? HadirBrand.darkPrimary : Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.only(topLeft: const Radius.circular(22), topRight: const Radius.circular(22), bottomLeft: Radius.circular(message.user ? 6 : 22), bottomRight: Radius.circular(message.user ? 22 : 6)), border: message.user ? null : Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: .72))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(message.user ? 'أنت' : 'Hadir AI${message.provider == null ? '' : ' · ${_providerLabel(message.provider!)}'}', style: TextStyle(color: message.user ? HadirBrand.darkPrimaryForeground.withValues(alpha: .72) : Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.w800)), const SizedBox(height: 4), Text(message.text, style: TextStyle(color: message.user ? HadirBrand.darkPrimaryForeground : Theme.of(context).colorScheme.onSurface, height: 1.65, fontSize: 13))]));
 
