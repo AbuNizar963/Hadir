@@ -225,7 +225,7 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
       const Text('كيف يمكنني مساعدتك؟', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
       const SizedBox(height: 7),
       const Text('تحدث معي بشكل طبيعي عن الحضور والغياب والهروب والإحصاءات والخدمات المتاحة لك.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, height: 1.6)),
-    ]),
+    ])),
     const SizedBox(height: 14),
     ..._examples.take(3).map((x) => Padding(padding: const EdgeInsets.only(bottom: 9), child: OutlinedButton.icon(onPressed: _busy ? null : () => _ask(x), icon: const Icon(Icons.arrow_back_rounded, size: 17), label: Text(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.all(14))))),
   ]);
