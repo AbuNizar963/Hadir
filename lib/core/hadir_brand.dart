@@ -17,15 +17,16 @@ class HadirBrand {
   static const darkWarning = Color(0xFFF6A823);
   static const darkDanger = Color(0xFFDF3A3A);
 
+  // Exact light-mode equivalents of the website's CSS HSL tokens.
   static const lightBackground = Color(0xFFF7F9FC);
   static const lightCard = Color(0xFFFFFFFF);
-  static const lightPanel = Color(0xFFEFF2F5);
+  static const lightPanel = Color(0xFFEDF0F3);
   static const lightText = Color(0xFF151B28);
   static const lightMuted = Color(0xFF5E6673);
-  static const lightBorder = Color(0xFFD2D9E0);
-  static const lightInput = Color(0xFFE1E5EA);
-  static const lightPrimary = Color(0xFF229E70);
-  static const lightAccent = Color(0xFF2195B7);
+  static const lightBorder = Color(0xFFCED5DE);
+  static const lightInput = Color(0xFFDAE0E7);
+  static const lightPrimary = Color(0xFF22A072);
+  static const lightAccent = Color(0xFF2293B7);
   static const lightDanger = Color(0xFFD62937);
   static const lightWarning = Color(0xFFDEA00A);
 
