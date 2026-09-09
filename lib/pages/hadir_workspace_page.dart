@@ -15,7 +15,6 @@ const _line = Color(0xFFE0E8E5);
 
 class HadirWorkspacePage extends StatefulWidget {
   const HadirWorkspacePage({super.key});
-
   @override
   State<HadirWorkspacePage> createState() => _HadirWorkspacePageState();
 }
@@ -31,25 +30,14 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   List<dynamic> _notifications = const [];
 
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() { _loading = true; _error = null; });
     try {
       final token = await _session.token();
       final api = HadirApi(token: token);
-      final results = await Future.wait<dynamic>([
-        api.me(),
-        api.attendance(limit: 200),
-        api.requests(),
-        api.notifications(),
-      ]);
+      final results = await Future.wait<dynamic>([api.me(), api.attendance(limit: 200), api.requests(), api.notifications()]);
       final me = results[0] as Map<String, dynamic>;
       final user = me['user'];
       if (!mounted) return;
@@ -62,22 +50,14 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = HadirApi.errorMessage(e);
-      });
+      setState(() { _loading = false; _error = HadirApi.errorMessage(e); });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // EmployeeMobileShell owns the single app-level header and fixed bottom
-    // navigation. Keep this page content-only so the dashboard is not nested
-    // inside a second Scaffold/navigation system.
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Container(color: _bg, child: _dashboard()),
-    );
+    // EmployeeMobileShell owns the single app-level header and fixed bottom navigation.
+    return Directionality(textDirection: TextDirection.rtl, child: Container(color: _bg, child: _dashboard()));
   }
 
   Widget _dashboard() {
@@ -89,11 +69,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final checkIn = _firstTodayEvent(today, 'check-in');
     final checkOut = _firstTodayEvent(today, 'check-out');
     final status = checkedOut ? 'انتهى الدوام' : active ? 'حاضر' : 'جاهز لتسجيل الحضور';
-    final statusDetail = checkedOut
-        ? 'تم تسجيل الانصراف لهذا اليوم.'
-        : active
-            ? 'أنت مسجل حضور الآن ويمكنك تسجيل الانصراف.'
-            : 'لم يتم تسجيل حضورك بعد.';
+    final statusDetail = checkedOut ? 'تم تسجيل الانصراف لهذا اليوم.' : active ? 'أنت مسجل حضور الآن ويمكنك تسجيل الانصراف.' : 'لم يتم تسجيل حضورك بعد.';
 
     return RefreshIndicator(
       color: _green,
@@ -106,50 +82,38 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
           const SizedBox(height: 12),
           _statusCard(now: now, status: status, detail: statusDetail, active: active, checkedOut: checkedOut),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _dashboardAction(icon: Icons.logout_rounded, title: 'تسجيل انصراف', subtitle: active ? 'إنهاء الدوام' : 'غير متاح الآن', enabled: active, onTap: () => context.push('/attendance?type=check-out'))),
-              const SizedBox(width: 10),
-              Expanded(child: _dashboardAction(icon: Icons.login_rounded, title: 'تسجيل حضور', subtitle: checkedIn ? 'تم تسجيل الحضور' : 'بدء الدوام', enabled: !checkedIn && !checkedOut, onTap: () => context.push('/attendance?type=check-in'))),
-            ],
-          ),
+          Row(children: [
+            Expanded(child: _dashboardAction(icon: Icons.logout_rounded, title: 'تسجيل انصراف', subtitle: active ? 'إنهاء الدوام' : 'غير متاح الآن', enabled: active, onTap: () => context.push('/attendance?type=check-out'))),
+            const SizedBox(width: 10),
+            Expanded(child: _dashboardAction(icon: Icons.login_rounded, title: 'تسجيل حضور', subtitle: checkedIn ? 'تم تسجيل الحضور' : 'بدء الدوام', enabled: !checkedIn && !checkedOut, onTap: () => context.push('/attendance?type=check-in'))),
+          ]),
           const SizedBox(height: 12),
           _sectionCard(
             title: 'ملخص اليوم',
             subtitle: 'سجل الدوام الحالي',
-            child: Row(
-              children: [
-                Expanded(child: _summaryItem('الحضور', _eventTime(checkIn), Icons.login_rounded)),
-                const SizedBox(width: 8),
-                Expanded(child: _summaryItem('الانصراف', _eventTime(checkOut), Icons.logout_rounded)),
-                const SizedBox(width: 8),
-                Expanded(child: _summaryItem('مدة العمل', _workHours(), Icons.schedule_rounded)),
-              ],
-            ),
+            child: Row(children: [
+              Expanded(child: _summaryItem('الحضور', _eventTime(checkIn), Icons.login_rounded)),
+              const SizedBox(width: 8),
+              Expanded(child: _summaryItem('الانصراف', _eventTime(checkOut), Icons.logout_rounded)),
+              const SizedBox(width: 8),
+              Expanded(child: _summaryItem('مدة العمل', _workHours(), Icons.schedule_rounded)),
+            ]),
           ),
           const SizedBox(height: 12),
           _sectionCard(
             title: 'معلومات الدوام',
             subtitle: 'حالتك الحالية',
-            child: Column(
-              children: [
-                _infoRow(Icons.calendar_today_outlined, 'نوع الجدول', 'حسب جدول الموظف'),
-                _infoRow(Icons.access_time_rounded, 'فترة العمل', 'حسب الجدول الإداري'),
-                _infoRow(Icons.verified_outlined, 'الحالة', status),
-                _infoRow(Icons.location_on_outlined, 'الموقع', 'الموقع المخصص'),
-                _infoRow(Icons.devices_other_rounded, 'الجهاز', 'مرتبط بالحساب'),
-              ],
-            ),
+            child: Column(children: [
+              _infoRow(Icons.calendar_today_outlined, 'نوع الجدول', 'حسب جدول الموظف'),
+              _infoRow(Icons.access_time_rounded, 'فترة العمل', 'حسب الجدول الإداري'),
+              _infoRow(Icons.verified_outlined, 'الحالة', status),
+              _infoRow(Icons.location_on_outlined, 'الموقع', 'الموقع المخصص'),
+              _infoRow(Icons.devices_other_rounded, 'الجهاز', 'مرتبط بالحساب'),
+            ]),
           ),
           const SizedBox(height: 12),
           _requestBanner(),
-          if (_loading) ...[
-            const SizedBox(height: 12),
-            const _LoadingCard(),
-          ] else if (_error != null) ...[
-            const SizedBox(height: 12),
-            _messageCard(_error!, Icons.cloud_off_rounded),
-          ],
+          if (_loading) ...[const SizedBox(height: 12), const _LoadingCard()] else if (_error != null) ...[const SizedBox(height: 12), _messageCard(_error!, Icons.cloud_off_rounded)],
         ],
       ),
     );
@@ -157,27 +121,17 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   Widget _employeeHero(DateTime now) {
     final firstName = _name.trim().split(RegExp(r'\s+')).first;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
-      child: Row(
-        children: [
-          _avatar(),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('HADIR · EMPLOYEE', style: TextStyle(color: _green, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: .7)),
-                const SizedBox(height: 2),
-                const Text('لوحة الموظف', style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900)),
-                Text('مرحباً $firstName', style: const TextStyle(color: _muted, fontSize: 11)),
-              ],
-            ),
-          ),
-          Text(intl.DateFormat('HH:mm').format(now), style: const TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900)),
-        ],
-      ),
-    );
+    return Row(children: [
+      _avatar(),
+      const SizedBox(width: 10),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('HADIR · EMPLOYEE', style: TextStyle(color: _green, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: .7)),
+        const SizedBox(height: 2),
+        const Text('لوحة الموظف', style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900)),
+        Text('مرحباً $firstName', style: const TextStyle(color: _muted, fontSize: 11)),
+      ])),
+      Text(intl.DateFormat('HH:mm').format(now), style: const TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900)),
+    ]);
   }
 
   Widget _statusCard({required DateTime now, required String status, required String detail, required bool active, required bool checkedOut}) {
@@ -211,38 +165,20 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   Widget _dashboardAction({required IconData icon, required String title, required String subtitle, required bool enabled, required VoidCallback onTap}) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 96),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: enabled ? _green.withValues(alpha: .22) : _line)),
-          child: Row(children: [
-            Container(width: 40, height: 40, decoration: BoxDecoration(color: enabled ? _soft : _bg, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: enabled ? _green : _muted, size: 19)),
-            const SizedBox(width: 10),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(title, style: TextStyle(color: enabled ? _ink : _muted, fontWeight: FontWeight.w900, fontSize: 12)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5))])),
-          ]),
-        ),
-      ),
-    );
+    return Material(color: Colors.white, borderRadius: BorderRadius.circular(20), child: InkWell(onTap: enabled ? onTap : null, borderRadius: BorderRadius.circular(20), child: Container(
+      constraints: const BoxConstraints(minHeight: 96),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: enabled ? _green.withValues(alpha: .22) : _line)),
+      child: Row(children: [
+        Container(width: 40, height: 40, decoration: BoxDecoration(color: enabled ? _soft : _bg, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: enabled ? _green : _muted, size: 19)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(title, style: TextStyle(color: enabled ? _ink : _muted, fontWeight: FontWeight.w900, fontSize: 12)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5))])),
+      ]),
+    )));
   }
 
   Widget _sectionCard({required String title, required String subtitle, required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(21), border: Border.all(color: _line)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 2),
-        Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5)),
-        const SizedBox(height: 12),
-        child,
-      ]),
-    );
+    return Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(21), border: Border.all(color: _line)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5)), const SizedBox(height: 12), child]));
   }
 
   Widget _summaryItem(String title, String value, IconData icon) {
@@ -254,19 +190,11 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   Widget _requestBanner() {
-    return Material(
-      color: _soft,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: () => context.push('/requests'),
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFCDE6DD))),
-          child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)), const SizedBox(width: 10), const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('طلب استئذان أو إجازة', style: TextStyle(color: _green, fontWeight: FontWeight.w900, fontSize: 12)), SizedBox(height: 3), Text('إرسال طلب للإدارة', style: TextStyle(color: _muted, fontSize: 9.5))])), const Icon(Icons.chevron_left_rounded, color: _green)]),
-        ),
-      ),
-    );
+    return Material(color: _soft, borderRadius: BorderRadius.circular(20), child: InkWell(onTap: () => context.push('/requests'), borderRadius: BorderRadius.circular(20), child: Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFCDE6DD))),
+      child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)), const SizedBox(width: 10), const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('طلب استئذان أو إجازة', style: TextStyle(color: _green, fontWeight: FontWeight.w900, fontSize: 12)), SizedBox(height: 3), Text('إرسال طلب للإدارة', style: TextStyle(color: _muted, fontSize: 9.5))])), const Icon(Icons.chevron_left_rounded, color: _green)]),
+    )));
   }
 
   DateTime? _firstTodayEvent(List<dynamic> today, String type) {
@@ -352,75 +280,31 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   // ignore: unused_element
-  Widget _metric(IconData icon, String title, String value) => Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 34, height: 34, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 18)), const SizedBox(height: 8), Text(title, style: const TextStyle(color: _muted, fontSize: 9)), const SizedBox(height: 2), Text(value, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12))]);
+  Widget _metric(IconData icon, String title, String value) => Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 34, height: 34, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 18)), const SizedBox(height: 8), Text(title, style: const TextStyle(color: _muted, fontSize: 9)), const SizedBox(height: 2), Text(value, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12))]));
 
   // ignore: unused_element
   Widget _quick(IconData icon, String title, String sub, VoidCallback onTap) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
-          child: Column(children: [
-            Container(width: 39, height: 39, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green, size: 19)),
-            const SizedBox(height: 7),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5)),
-            const SizedBox(height: 2),
-            Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 7.5)),
-          ]),
-        ),
-      ),
-    );
+    return Material(color: Colors.white, borderRadius: BorderRadius.circular(18), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6), decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(children: [Container(width: 39, height: 39, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green, size: 19)), const SizedBox(height: 7), Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5)), const SizedBox(height: 2), Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 7.5))]))));
   }
 
   Widget _actionCard(IconData icon, String title, String sub, VoidCallback onTap) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)),
-            const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-            const SizedBox(height: 3),
-            Text(sub, style: const TextStyle(color: _muted, fontSize: 10)),
-          ]),
-        ),
-      ),
-    );
+    return Material(color: Colors.white, borderRadius: BorderRadius.circular(20), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(sub, style: const TextStyle(color: _muted, fontSize: 10))]))));
   }
 
   Widget _menuTile(IconData icon, String title, String subtitle, VoidCallback onTap) => Card(margin: const EdgeInsets.only(bottom: 8), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: _line)), child: ListTile(onTap: onTap, leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10)), trailing: const Icon(Icons.chevron_left_rounded, color: _muted)));
 
   Widget _sectionTitle(String title, {Widget? action}) => Row(children: [Expanded(child: Text(title, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 15))), if (action != null) action]);
-
   Widget _pageHeader(String title, String subtitle) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 11))]);
 
   // ignore: unused_element
   Widget _iconButton(IconData icon, VoidCallback onTap) => Material(color: Colors.white, borderRadius: BorderRadius.circular(14), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: Container(width: 43, height: 43, decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: _line)), child: Icon(icon, color: _ink, size: 21))));
-
   Widget _avatar({bool light = false}) => Container(width: 43, height: 43, decoration: BoxDecoration(color: light ? Colors.white24 : _soft, shape: BoxShape.circle), child: Icon(Icons.person_rounded, color: light ? Colors.white : _green, size: 23));
-
   Widget _chip(String text, bool positive) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: positive ? _soft : const Color(0xFFF1F3F2), borderRadius: BorderRadius.circular(20)), child: Text(text, style: TextStyle(color: positive ? _green : _muted, fontWeight: FontWeight.w800, fontSize: 9)));
-
   Widget _statusChip(String text, String status) { final good = status == 'approved' || status == 'confirmed'; return _chip(text, good); }
-
   Widget _messageCard(String text, IconData icon) => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)), child: Row(children: [Icon(icon, color: _muted), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(color: _muted, fontSize: 11)))]));
-
   Widget _emptyCard(String title, String subtitle, IconData icon) => Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)), child: Column(children: [Container(width: 48, height: 48, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: _green)), const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 10))]));
-
   List<dynamic> _todayAttendance(DateTime now) => _attendance.where((item) { final date = DateTime.tryParse('${item is Map ? item['timestamp'] : null}'); return date != null && date.year == now.year && date.month == now.month && date.day == now.day; }).toList();
-
   String _workHours() { final times = _todayAttendance(DateTime.now()).whereType<Map>().map((e) => DateTime.tryParse('${e['timestamp']}')).whereType<DateTime>().toList()..sort(); if (times.length < 2) return '—'; final d = times.last.difference(times.first); return '${d.inHours}س ${d.inMinutes.remainder(60)}د'; }
-
   int _unreadCount() => _notifications.where((x) => x is Map && x['readAt'] == null && x['read'] != true).length;
 }
 
