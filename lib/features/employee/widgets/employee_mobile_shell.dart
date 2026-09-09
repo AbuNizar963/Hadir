@@ -5,9 +5,9 @@ import '../../../core/hadir_theme_controller.dart';
 
 /// Android/iOS employee shell.
 ///
-/// Uses the same navigation placement as the manager shell: a compact
-/// branded header at the top and a five-item bottom navigation bar.
-/// Existing employee routes and functionality remain unchanged.
+/// Mirrors the website structure: a compact utility header followed by the
+/// employee navigation row. Existing employee routes and functionality remain
+/// unchanged.
 class EmployeeMobileShell extends StatelessWidget {
   const EmployeeMobileShell({super.key, required this.child});
   final Widget child;
@@ -18,7 +18,7 @@ class EmployeeMobileShell extends StatelessWidget {
     if (path == '/employee/center' || path == '/center' || path == '/employee/premium') return 1;
     if (path == '/employee/history' || path == '/history') return 2;
     if (path == '/employee/profile' || path == '/profile') return 3;
-    return 4;
+    return -1;
   }
 
   void _go(BuildContext context, int index) {
@@ -31,8 +31,6 @@ class EmployeeMobileShell extends StatelessWidget {
         context.go('/employee/history');
       case 3:
         context.go('/employee/profile');
-      case 4:
-        _showOptions(context);
     }
   }
 
@@ -40,7 +38,6 @@ class EmployeeMobileShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final selected = _selectedIndex(context);
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -50,24 +47,10 @@ class EmployeeMobileShell extends StatelessWidget {
           child: Column(
             children: [
               _header(context),
+              _navigation(context, selected),
               Expanded(child: child),
             ],
           ),
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: selected,
-          onDestinationSelected: (index) => _go(context, index),
-          backgroundColor: scheme.surface,
-          indicatorColor: scheme.primary.withValues(alpha: .12),
-          height: 74,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: [
-            NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded, color: scheme.primary), label: 'لوحة الموظف'),
-            NavigationDestination(icon: const Icon(Icons.business_center_outlined), selectedIcon: Icon(Icons.business_center_rounded, color: scheme.primary), label: 'مركز الموظف'),
-            NavigationDestination(icon: const Icon(Icons.access_time_outlined), selectedIcon: Icon(Icons.access_time_filled, color: scheme.primary), label: 'سجل العمل'),
-            NavigationDestination(icon: const Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded, color: scheme.primary), label: 'الملف الشخصي'),
-            NavigationDestination(icon: const Icon(Icons.more_horiz_rounded), selectedIcon: Icon(Icons.more_horiz_rounded, color: scheme.primary), label: 'المزيد'),
-          ],
         ),
       ),
     );
@@ -133,6 +116,66 @@ class EmployeeMobileShell extends StatelessWidget {
             compact: compact,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _navigation(BuildContext context, int selected) {
+    final scheme = Theme.of(context).colorScheme;
+    final items = const [
+      (Icons.dashboard_outlined, Icons.dashboard_rounded, 'لوحة الموظف'),
+      (Icons.business_center_outlined, Icons.business_center_rounded, 'مركز الموظف'),
+      (Icons.access_time_outlined, Icons.access_time_filled, 'سجل العمل'),
+      (Icons.person_outline_rounded, Icons.person_rounded, 'الملف الشخصي'),
+    ];
+    return Container(
+      height: 78,
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 4),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final active = selected == index;
+          return InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => _go(context, index),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              constraints: const BoxConstraints(minWidth: 88),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: active ? scheme.primary.withValues(alpha: .13) : Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: active ? scheme.primary.withValues(alpha: .28) : Colors.transparent,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 23),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.$3,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: active ? scheme.primary : scheme.onSurfaceVariant,
+                      fontSize: 10.5,
+                      fontWeight: active ? FontWeight.w900 : FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
