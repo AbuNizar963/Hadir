@@ -7,7 +7,6 @@ import '../core/session.dart';
 
 class AIAssistantPage extends StatefulWidget {
   const AIAssistantPage({super.key});
-
   @override
   State<AIAssistantPage> createState() => _AIAssistantPageState();
 }
@@ -31,16 +30,9 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
   Map<String, dynamic>? _employee;
   Map<String, dynamic> _managerData = {};
   List<dynamic> _attendance = [];
-  List<dynamic> _escapes = [];
 
-  static const _employeeExamples = <String>[
-    ...HadirLocalAi.employeeExamples,
-    'ما الخدمات المتاحة لي؟',
-  ];
-  static const _managerExamples = <String>[
-    ...HadirLocalAi.managerExamples,
-    'ما الخدمات المتاحة لي؟',
-  ];
+  static const _employeeExamples = <String>[...HadirLocalAi.employeeExamples, 'ما الخدمات المتاحة لي؟'];
+  static const _managerExamples = <String>[...HadirLocalAi.managerExamples, 'ما الخدمات المتاحة لي؟'];
 
   @override
   void initState() {
@@ -70,7 +62,6 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
           final results = await Future.wait<dynamic>([api.employeeProfile(), api.attendance(limit: 2000)]);
           if (!mounted) return;
           setState(() {
-            _manager = false;
             _employee = results[0] is Map ? Map<String, dynamic>.from(results[0] as Map) : null;
             _attendance = results[1] is List ? List<dynamic>.from(results[1] as List) : [];
             _contextLoading = false;
@@ -85,13 +76,13 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
           });
         }
       }
-    } catch (error) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _contextLoading = false;
         _messages
           ..clear()
-          ..add(const _Message(user: false, text: 'مرحبًا. Hadir AI جاهز. إذا تعذر تحميل البيانات الآن، سأستخدم الوضع المحلي عند توفر البيانات المخزنة.'));
+          ..add(const _Message(user: false, text: 'مرحبًا. Hadir AI جاهز. إذا تعذر تحميل البيانات الآن، سأستخدم الوضع المحلي عند توفر البيانات.'));
       });
     }
   }
@@ -115,7 +106,6 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
       _messages.add(_Message(user: true, text: text));
     });
     _jumpToEnd();
-
     try {
       final token = _manager ? await _session.adminToken() : await _session.token();
       if (token == null || token.isEmpty) throw Exception('missing token');
@@ -123,9 +113,7 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
       final raw = response.data;
       final data = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
       final answer = '${data['text'] ?? ''}'.trim();
-      if (response.statusCode != 200 || data['ok'] != true || answer.isEmpty) {
-        throw Exception('${data['error'] ?? 'تعذر تشغيل النموذج'}');
-      }
+      if (response.statusCode != 200 || data['ok'] != true || answer.isEmpty) throw Exception('${data['error'] ?? 'تعذر تشغيل النموذج'}');
       final provider = '${data['provider'] ?? 'cloudflare-workers-ai'}';
       if (!mounted) return;
       setState(() {
@@ -135,7 +123,7 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
     } catch (_) {
       if (!mounted) return;
       final fallback = _manager
-          ? HadirLocalAi.manager(text, _managerEmployees(), _managerAttendance(), _managerEscapes())
+          ? HadirLocalAi.manager(text, _asList(_managerData['employees']), _asList(_managerData['attendance']), _asList(_managerData['escapes']))
           : HadirLocalAi.employee(text, _employee, _attendance);
       setState(() {
         _provider = 'محلي';
@@ -149,9 +137,6 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
     }
   }
 
-  List<dynamic> _managerEmployees() => _asList(_managerData['employees']);
-  List<dynamic> _managerAttendance() => _asList(_managerData['attendance']);
-  List<dynamic> _managerEscapes() => _asList(_managerData['escapes']);
   List<dynamic> _asList(dynamic value) => value is List ? List<dynamic>.from(value) : const <dynamic>[];
 
   String _providerLabel(String value) {
@@ -164,9 +149,7 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
 
   void _jumpToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
-      }
+      if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
     });
   }
 
@@ -211,7 +194,7 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
       const SizedBox(height: 5),
       Text(_manager ? 'تحليل بيانات الموظفين ضمن الصلاحيات الممنوحة لك.' : 'معلومات حضورك وخدماتك دون كشف بيانات الآخرين.', style: TextStyle(color: scheme.onSurfaceVariant, height: 1.6, fontSize: 11)),
       const SizedBox(height: 18),
-      ..._examples.map((x) => Padding(padding: const EdgeInsets.only(bottom: 8), child: OutlinedButton(onPressed: _busy ? null : () => _ask(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)), child: Text(x, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)))),
+      ..._examples.map((x) => Padding(padding: const EdgeInsets.only(bottom: 8), child: OutlinedButton(onPressed: _busy ? null : () => _ask(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)), child: Text(x, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700))))),
       const SizedBox(height: 10),
       Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: scheme.surfaceContainerHighest.withValues(alpha: .65), borderRadius: BorderRadius.circular(16)), child: Row(children: [Icon(_contextLoading ? Icons.sync_rounded : Icons.check_circle_outline_rounded, size: 17, color: HadirBrand.darkPrimary), const SizedBox(width: 8), Expanded(child: Text(_contextLoading ? 'جارٍ تحميل سياق الحساب…' : 'بيانات الحساب متاحة للمساعد حسب الصلاحيات.', style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant)))])),
     ])));
@@ -242,9 +225,9 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
       const Text('كيف يمكنني مساعدتك؟', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
       const SizedBox(height: 7),
       const Text('تحدث معي بشكل طبيعي عن الحضور والغياب والهروب والإحصاءات والخدمات المتاحة لك.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, height: 1.6)),
-    ])),
+    ]),
     const SizedBox(height: 14),
-    ..._examples.take(3).map((x) => Padding(padding: const EdgeInsets.only(bottom: 9), child: OutlinedButton.icon(onPressed: _busy ? null : () => _ask(x), icon: const Icon(Icons.arrow_back_rounded, size: 17), label: Text(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.all(14)))),),
+    ..._examples.take(3).map((x) => Padding(padding: const EdgeInsets.only(bottom: 9), child: OutlinedButton.icon(onPressed: _busy ? null : () => _ask(x), icon: const Icon(Icons.arrow_back_rounded, size: 17), label: Text(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.all(14))))),
   ];
 
   Widget _bubble(_Message message) => Align(alignment: message.user ? Alignment.centerLeft : Alignment.centerRight, child: Container(constraints: const BoxConstraints(maxWidth: 560), margin: const EdgeInsets.only(bottom: 11), padding: const EdgeInsets.fromLTRB(15, 12, 15, 13), decoration: BoxDecoration(color: message.user ? HadirBrand.darkPrimary : Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.only(topLeft: const Radius.circular(22), topRight: const Radius.circular(22), bottomLeft: Radius.circular(message.user ? 6 : 22), bottomRight: Radius.circular(message.user ? 22 : 6)), border: message.user ? null : Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: .72))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(message.user ? 'أنت' : 'Hadir AI${message.provider == null ? '' : ' · ${_providerLabel(message.provider!)}'}', style: TextStyle(color: message.user ? HadirBrand.darkPrimaryForeground.withValues(alpha: .72) : Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.w800)), const SizedBox(height: 4), Text(message.text, style: TextStyle(color: message.user ? HadirBrand.darkPrimaryForeground : Theme.of(context).colorScheme.onSurface, height: 1.65, fontSize: 13))]));
