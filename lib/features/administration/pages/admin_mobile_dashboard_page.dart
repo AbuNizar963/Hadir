@@ -4,8 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/api.dart';
 import '../../../core/session.dart';
 
-const _brand = Color(0xFF0B6B5A);
-
 class AdminMobileDashboardPage extends StatefulWidget {
   const AdminMobileDashboardPage({super.key});
 
