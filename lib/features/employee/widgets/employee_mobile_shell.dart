@@ -28,6 +28,32 @@ class _EmployeeMobileShellState extends State<EmployeeMobileShell> {
     return -1;
   }
 
+  String _pageTitle(BuildContext context) {
+    final path = GoRouterState.of(context).uri.path;
+    if (path == '/employee' || path == '/home') return 'لوحة الموظف';
+    if (path == '/employee/center' || path == '/center' || path == '/employee/premium') return 'مركز الموظف';
+    if (path == '/employee/history' || path == '/history') return 'سجل العمل';
+    if (path == '/employee/profile' || path == '/profile') return 'الملف الشخصي';
+    if (path == '/employee/notifications' || path == '/notifications') return 'الإشعارات';
+    if (path == '/weather') return 'الطقس';
+    if (path == '/prayer') return 'القبلة ومواقيت الصلاة';
+    if (path == '/ai') return 'المساعد الذكي';
+    if (path.startsWith('/attendance')) return 'الحضور والانصراف';
+    if (path.startsWith('/requests')) return 'الطلبات';
+    return 'حاضر';
+  }
+
+  String _pageSubtitle(BuildContext context) {
+    final path = GoRouterState.of(context).uri.path;
+    if (path == '/employee' || path == '/home') return 'متابعة حالة اليوم وتسجيل الحضور والانصراف والطلبات.';
+    if (path == '/employee/center' || path == '/center' || path == '/employee/premium') return 'بطاقتك الرقمية وملخص العمل والدوام والخدمات المرتبطة بحسابك.';
+    if (path == '/employee/history' || path == '/history') return 'راجع عمليات الحضور والانصراف وسجل عملك.';
+    if (path == '/employee/profile' || path == '/profile') return 'إدارة بياناتك الشخصية وبيانات الحساب.';
+    if (path == '/employee/notifications' || path == '/notifications') return 'التنبيهات والرسائل الخاصة بحسابك.';
+    if (path == '/attendance') return 'التحقق من الموقع والجهاز وتسجيل العملية.';
+    return '';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +97,7 @@ class _EmployeeMobileShellState extends State<EmployeeMobileShell> {
               _header(context),
               _navigation(context, selected),
               if (_menuOpen) _utilityMenu(context),
+              _pageHeader(context),
               Expanded(child: widget.child),
             ],
           ),
@@ -186,7 +213,7 @@ class _EmployeeMobileShellState extends State<EmployeeMobileShell> {
                 constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: scheme.error, shape: BoxShape.rectangle, borderRadius: BorderRadius.circular(99)),
+                decoration: BoxDecoration(color: scheme.error, borderRadius: BorderRadius.circular(99)),
                 child: Text(_unreadNotifications > 99 ? '99+' : '$_unreadNotifications', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
               ),
             ),
@@ -245,6 +272,33 @@ class _EmployeeMobileShellState extends State<EmployeeMobileShell> {
             const SizedBox(height: 3),
             Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurface.withValues(alpha: .80), fontSize: 10.5, fontWeight: active ? FontWeight.w800 : FontWeight.w600, height: 1)),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pageHeader(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final subtitle = _pageSubtitle(context);
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .35)))),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('HADIR · EMPLOYEE', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.5)),
+              const SizedBox(height: 4),
+              Text(_pageTitle(context), style: TextStyle(color: scheme.onSurface, fontSize: 27, height: 1.15, fontWeight: FontWeight.w900)),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 7),
+                Text(subtitle, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11.5, height: 1.45)),
+              ],
+            ],
+          ),
         ),
       ),
     );
