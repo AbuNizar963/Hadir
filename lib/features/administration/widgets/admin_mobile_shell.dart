@@ -13,7 +13,7 @@ class AdminMobileShell extends StatelessWidget {
     final uri = GoRouterState.of(context).uri;
     if (uri.path == '/admin' || uri.path == '/manager') return 0;
     if (uri.path == '/manager/requests') return 1;
-    if (uri.path == '/admin/manage' || uri.path == '/manager/employees') return 2;
+    if (uri.path == '/admin/manage' || uri.path == '/manager/employees' || uri.path == '/manager/employees/transfer') return 2;
     if (uri.path == '/admin/reports' || uri.path == '/manager/reports') return 4;
     if (uri.path == '/admin/reports/archive' || uri.path == '/manager/report-archive') return 5;
     if (uri.path == '/admin/audit' || uri.path == '/manager/audit') return 3;
@@ -145,12 +145,7 @@ class AdminMobileShell extends StatelessWidget {
                 children: [
                   Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 23),
                   const SizedBox(height: 3),
-                  Text(
-                    item.$3,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 10.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700),
-                  ),
+                  Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 10.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700)),
                 ],
               ),
             ),
@@ -189,6 +184,7 @@ class AdminMobileShell extends StatelessWidget {
           const SizedBox(height: 10),
           _themeSelector(sheetContext),
           _optionTile(sheetContext, Icons.notifications_none_rounded, 'الإشعارات', 'الإشعارات الإدارية والتنبيهات', '/notifications'),
+          _optionTile(sheetContext, Icons.groups_outlined, 'نقل الموظفين الذكي', 'استيراد وتصدير الموظفين مع المعاينة والتحقق', '/manager/employees/transfer'),
           _optionTile(sheetContext, Icons.fact_check_outlined, 'سجل التدقيق', 'مراجعة العمليات والأحداث الإدارية', '/admin/audit'),
           _optionTile(sheetContext, Icons.archive_outlined, 'أرشيف التقارير', 'التقارير المحفوظة والأرشيف', '/admin/reports/archive'),
           _optionTile(sheetContext, Icons.psychology_outlined, 'المساعد الذكي', 'المساعد والتحليلات الذكية', '/ai'),
@@ -210,22 +206,13 @@ class AdminMobileShell extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 8),
           child: DropdownButtonFormField<ThemeMode>(
             initialValue: controller.mode,
-            decoration: InputDecoration(
-              labelText: 'مظهر التطبيق',
-              prefixIcon: const Icon(Icons.brightness_6_outlined),
-              filled: true,
-              fillColor: scheme.surfaceContainerHighest.withValues(alpha: .45),
-            ),
+            decoration: InputDecoration(labelText: 'مظهر التطبيق', prefixIcon: const Icon(Icons.brightness_6_outlined), filled: true, fillColor: scheme.surfaceContainerHighest.withValues(alpha: .45)),
             items: const [
               DropdownMenuItem(value: ThemeMode.system, child: Text('تلقائي حسب الجهاز')),
               DropdownMenuItem(value: ThemeMode.light, child: Text('الوضع الفاتح')),
               DropdownMenuItem(value: ThemeMode.dark, child: Text('الوضع الداكن')),
             ],
-            onChanged: (mode) {
-              if (mode != null) {
-                controller.setMode(mode);
-              }
-            },
+            onChanged: (mode) { if (mode != null) controller.setMode(mode); },
           ),
         );
       },
