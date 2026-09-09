@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/api.dart';
+import '../core/hadir_brand.dart';
 import '../core/session.dart';
 
-const _brand = Color(0xFF0B6B5A);
-const _ink = Color(0xFF17322C);
-const _muted = Color(0xFF70817B);
-const _surface = Color(0xFFFFFFFF);
-const _soft = Color(0xFFEAF4F0);
+const _brand = HadirBrand.darkPrimary;
+const _ink = HadirBrand.darkText;
+const _muted = HadirBrand.darkMuted;
+const _surface = HadirBrand.darkCard;
+const _soft = HadirBrand.darkPanel;
+const _line = HadirBrand.darkBorder;
 
 class AdminRoleWorkspacePage extends StatefulWidget {
   const AdminRoleWorkspacePage({super.key});
@@ -46,10 +48,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() { _loading = true; _error = null; });
     try {
       final token = await _session.adminToken();
       if (token == null || token.isEmpty) {
@@ -64,7 +63,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
         api.workforceLive(),
         api.dailyStatus(date: _today()),
         api.requests(),
-        if (!_isSupervisor || role == 'supervisor') api.violations(limit: 100),
+        if (role == 'supervisor') api.violations(limit: 100) else api.violations(limit: 100),
         api.attendance(limit: 2000),
       ]);
       if (!mounted) return;
@@ -80,10 +79,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = HadirApi.errorMessage(error);
-      });
+      setState(() { _loading = false; _error = HadirApi.errorMessage(error); });
     }
   }
 
@@ -121,7 +117,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF7F9F8),
+        backgroundColor: HadirBrand.darkBackground,
         body: RefreshIndicator(
           onRefresh: _load,
           child: CustomScrollView(
@@ -130,7 +126,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
               SliverAppBar(
                 pinned: true,
                 elevation: 0,
-                backgroundColor: const Color(0xFFF7F9F8),
+                backgroundColor: HadirBrand.darkBackground,
                 surfaceTintColor: Colors.transparent,
                 titleSpacing: 18,
                 title: Row(children: [
@@ -138,7 +134,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
                     Text(_roleLabel, style: const TextStyle(fontSize: 12, color: _muted)),
                     Text(_name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink)),
                   ])),
-                  IconButton(onPressed: _logout, tooltip: 'تسجيل الخروج', icon: const Icon(Icons.logout_rounded)),
+                  IconButton(onPressed: _logout, tooltip: 'تسجيل الخروج', icon: const Icon(Icons.logout_rounded, color: _muted)),
                 ]),
               ),
               SliverPadding(
@@ -155,24 +151,9 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
                   const SizedBox(height: 10),
                   ..._features(),
                   const SizedBox(height: 22),
-                  if (_isOwner) ...[
-                    _sectionTitle('المالك', 'إدارة شاملة وصلاحيات عليا'),
-                    const SizedBox(height: 10),
-                    _ownerPanel(),
-                    const SizedBox(height: 22),
-                  ],
-                  if (_isManager) ...[
-                    _sectionTitle('المدير', 'التشغيل واتخاذ القرار'),
-                    const SizedBox(height: 10),
-                    _managerPanel(),
-                    const SizedBox(height: 22),
-                  ],
-                  if (_isSupervisor) ...[
-                    _sectionTitle('المشرف', 'المتابعة اليومية للفريق'),
-                    const SizedBox(height: 10),
-                    _supervisorPanel(),
-                    const SizedBox(height: 22),
-                  ],
+                  if (_isOwner) ...[_sectionTitle('المالك', 'إدارة شاملة وصلاحيات عليا'), const SizedBox(height: 10), _ownerPanel(), const SizedBox(height: 22)],
+                  if (_isManager) ...[_sectionTitle('المدير', 'التشغيل واتخاذ القرار'), const SizedBox(height: 10), _managerPanel(), const SizedBox(height: 22)],
+                  if (_isSupervisor) ...[_sectionTitle('المشرف', 'المتابعة اليومية للفريق'), const SizedBox(height: 10), _supervisorPanel(), const SizedBox(height: 22)],
                   _recentRequests(),
                 ])),
               ),
@@ -186,17 +167,17 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
   Widget _hero() => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_brand, Color(0xFF064B40)]),
+          gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [HadirBrand.darkPrimary, Color(0xFF116C82)]),
           borderRadius: BorderRadius.circular(28),
-          boxShadow: const [BoxShadow(color: Color(0x220B6B5A), blurRadius: 26, offset: Offset(0, 12))],
+          boxShadow: [BoxShadow(color: HadirBrand.darkPrimary.withValues(alpha: .18), blurRadius: 26, offset: const Offset(0, 12))],
         ),
         child: Row(children: [
-          Container(width: 54, height: 54, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 30)),
+          Container(width: 54, height: 54, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.admin_panel_settings_rounded, color: HadirBrand.darkPrimaryForeground, size: 30)),
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_loading ? 'جارٍ تحديث مساحة العمل...' : 'مركز $_roleLabel في حاضر', style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+            Text(_loading ? 'جارٍ تحديث مساحة العمل...' : 'مركز $_roleLabel في حاضر', style: const TextStyle(color: HadirBrand.darkPrimaryForeground, fontSize: 21, fontWeight: FontWeight.w900)),
             const SizedBox(height: 5),
-            Text(_roleDescription(), style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.45)),
+            Text(_roleDescription(), style: const TextStyle(color: Color(0xCC022216), fontSize: 12, height: 1.45)),
           ])),
         ]),
       );
@@ -210,84 +191,73 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
 
   Widget _sectionTitle(String title, String subtitle) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: _ink)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(fontSize: 11, color: _muted))]))]);
 
-  Widget _stats() => GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.7,
-        children: [
-          _Stat(icon: Icons.groups_rounded, title: 'الموظفون', value: '${_employees.length}'),
-          _Stat(icon: Icons.how_to_reg_rounded, title: 'حاضرون الآن', value: '$_present'),
-          _Stat(icon: Icons.pending_actions_rounded, title: 'طلبات معلقة', value: '$_pendingRequests'),
-          _Stat(icon: Icons.warning_amber_rounded, title: 'مخالفات مفتوحة', value: '$_openViolations'),
-          _Stat(icon: Icons.schedule_rounded, title: 'متأخرون', value: '$_late'),
-          _Stat(icon: Icons.person_off_rounded, title: 'غائبون', value: '$_absent'),
-        ],
-      );
+  Widget _stats() => GridView.count(crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.7, children: [
+    _Stat(icon: Icons.groups_rounded, title: 'الموظفون', value: '${_employees.length}'),
+    _Stat(icon: Icons.how_to_reg_rounded, title: 'حاضرون الآن', value: '$_present'),
+    _Stat(icon: Icons.pending_actions_rounded, title: 'طلبات معلقة', value: '$_pendingRequests'),
+    _Stat(icon: Icons.warning_amber_rounded, title: 'مخالفات مفتوحة', value: '$_openViolations'),
+    _Stat(icon: Icons.schedule_rounded, title: 'متأخرون', value: '$_late'),
+    _Stat(icon: Icons.person_off_rounded, title: 'غائبون', value: '$_absent'),
+  ]);
 
   List<Widget> _features() {
     final features = <Widget>[
-      _Feature(icon: Icons.groups_rounded, title: 'الموظفون والحسابات', subtitle: 'إدارة الموظفين وإعادة ربط الأجهزة والحسابات', onTap: () => context.push('/admin/manage')),
+      _Feature(icon: Icons.groups_rounded, title: 'الموظفون والحسابات', subtitle: 'إدارة الموظفين وإعادة ربط الأجهزة والحسابات', onTap: () => context.push('/manager/employees')),
       _Feature(icon: Icons.upload_file_rounded, title: 'نقل الموظفين الذكي', subtitle: 'استيراد وتصدير الموظفين بصيغ CSV وExcel مع المعاينة والتحقق', onTap: () => context.push('/manager/employees/transfer')),
-      _Feature(icon: Icons.fingerprint_rounded, title: 'الحضور والانصراف', subtitle: 'مراجعة العمليات والسجل اليومي', onTap: () => context.push('/admin/manage')),
-      _Feature(icon: Icons.assignment_rounded, title: 'الطلبات', subtitle: 'مراجعة الطلبات واتخاذ الإجراء المناسب', onTap: () => context.push('/admin/manage')),
-      _Feature(icon: Icons.assessment_rounded, title: 'التقارير', subtitle: 'تقارير الحضور المهنية والأرشيف', onTap: () => context.push('/admin/reports')),
-      _Feature(icon: Icons.location_on_outlined, title: 'المواقع والقوى العاملة', subtitle: 'المواقع والحالة الحية للقوى العاملة', onTap: () => context.push('/admin/operations')),
+      _Feature(icon: Icons.fingerprint_rounded, title: 'الحضور والانصراف', subtitle: 'لوحة الحضور اليومية والحالة الحالية للموظفين', onTap: () => context.push('/manager')),
+      _Feature(icon: Icons.assignment_rounded, title: 'الطلبات', subtitle: 'مراجعة الطلبات واتخاذ الإجراء المناسب', onTap: () => context.push('/manager/requests')),
+      _Feature(icon: Icons.assessment_rounded, title: 'التقارير', subtitle: 'تقارير الحضور المهنية والأرشيف', onTap: () => context.push('/manager/reports')),
+      _Feature(icon: Icons.location_on_outlined, title: 'المواقع والقوى العاملة', subtitle: 'المواقع والحالة الحية للقوى العاملة', onTap: () => context.push('/manager/workforce')),
     ];
     if (_isOwner || _isManager) {
-      features.add(_Feature(icon: Icons.admin_panel_settings_outlined, title: 'الحسابات والصلاحيات', subtitle: _isOwner ? 'المديرون والمشرفون وإدارة النظام' : 'المستخدمون الإداريون المتاحون', onTap: () => context.push('/admin/manage')));
-      features.add(_Feature(icon: Icons.settings_outlined, title: 'إعدادات النظام', subtitle: 'الاسم، رمز QR، الموقع، ساعات العمل وفترات السماح', onTap: () => context.push('/admin/settings')));
+      features.add(_Feature(icon: Icons.admin_panel_settings_outlined, title: 'الحسابات والصلاحيات', subtitle: _isOwner ? 'المديرون والمشرفون وإدارة النظام' : 'المستخدمون الإداريون المتاحون', onTap: () => context.push('/manager')));
+      features.add(_Feature(icon: Icons.settings_outlined, title: 'إعدادات النظام', subtitle: 'الاسم، رمز QR، الموقع، ساعات العمل وفترات السماح', onTap: () => context.push('/manager/settings')));
     }
     if (_isOwner) {
-      features.add(_Feature(icon: Icons.security_rounded, title: 'التدقيق والإعدادات الحساسة', subtitle: 'السجل الإداري والإعدادات الحساسة', onTap: () => context.push('/admin/manage')));
-      features.add(_Feature(icon: Icons.archive_rounded, title: 'أرشيف التقارير', subtitle: 'التقارير المحفوظة والتنزيل والحذف', onTap: () => context.push('/admin/reports/archive')));
+      features.add(_Feature(icon: Icons.security_rounded, title: 'التدقيق والإعدادات الحساسة', subtitle: 'السجل الإداري والإعدادات الحساسة', onTap: () => context.push('/manager/audit')));
+      features.add(_Feature(icon: Icons.archive_rounded, title: 'أرشيف التقارير', subtitle: 'التقارير المحفوظة والتنزيل والحذف', onTap: () => context.push('/manager/report-archive')));
     }
     return features;
   }
 
   Widget _ownerPanel() => _Panel(children: [
-        _MiniAction(icon: Icons.verified_user_rounded, title: 'صلاحيات المالك', subtitle: 'صلاحية عليا لإدارة المؤسسة بالكامل.'),
-        _MiniAction(icon: Icons.manage_accounts_rounded, title: 'إدارة الإدارة', subtitle: 'إضافة ومتابعة المديرين والمشرفين.'),
-        _MiniAction(icon: Icons.policy_outlined, title: 'الرقابة والتدقيق', subtitle: 'الوصول إلى سجل العمليات الحساسة.'),
-      ]);
+    _MiniAction(icon: Icons.verified_user_rounded, title: 'صلاحيات المالك', subtitle: 'صلاحية عليا لإدارة المؤسسة بالكامل.'),
+    _MiniAction(icon: Icons.manage_accounts_rounded, title: 'إدارة الإدارة', subtitle: 'إضافة ومتابعة المديرين والمشرفين.'),
+    _MiniAction(icon: Icons.policy_outlined, title: 'الرقابة والتدقيق', subtitle: 'الوصول إلى سجل العمليات الحساسة.'),
+  ]);
 
   Widget _managerPanel() => _Panel(children: [
-        _MiniAction(icon: Icons.today_rounded, title: 'مؤشرات التشغيل', subtitle: 'الحضور والغياب والتأخير وطلبات الفريق.'),
-        _MiniAction(icon: Icons.fact_check_rounded, title: 'اعتماد الطلبات', subtitle: 'مراجعة الطلبات المعلقة من مساحة الإدارة.'),
-        _MiniAction(icon: Icons.bar_chart_rounded, title: 'التقارير المهنية', subtitle: 'تحليل الحضور واستخراج التقارير.'),
-      ]);
+    _MiniAction(icon: Icons.today_rounded, title: 'مؤشرات التشغيل', subtitle: 'الحضور والغياب والتأخير وطلبات الفريق.'),
+    _MiniAction(icon: Icons.fact_check_rounded, title: 'اعتماد الطلبات', subtitle: 'مراجعة الطلبات المعلقة من مساحة الإدارة.'),
+    _MiniAction(icon: Icons.bar_chart_rounded, title: 'التقارير المهنية', subtitle: 'تحليل الحضور واستخراج التقارير.'),
+  ]);
 
   Widget _supervisorPanel() => _Panel(children: [
-        _MiniAction(icon: Icons.groups_2_rounded, title: 'الفريق الآن', subtitle: 'متابعة حالة القوى العاملة في الوقت الحقيقي.'),
-        _MiniAction(icon: Icons.schedule_rounded, title: 'التأخير والغياب', subtitle: 'مؤشرات اليوم للمشرف والفريق.'),
-        _MiniAction(icon: Icons.report_problem_outlined, title: 'المخالفات', subtitle: 'متابعة الحالات التشغيلية المفتوحة.'),
-      ]);
+    _MiniAction(icon: Icons.groups_2_rounded, title: 'الفريق الآن', subtitle: 'متابعة حالة القوى العاملة في الوقت الحقيقي.'),
+    _MiniAction(icon: Icons.schedule_rounded, title: 'التأخير والغياب', subtitle: 'مؤشرات اليوم للمشرف والفريق.'),
+    _MiniAction(icon: Icons.report_problem_outlined, title: 'المخالفات', subtitle: 'متابعة الحالات التشغيلية المفتوحة.'),
+  ]);
 
   Widget _recentRequests() {
     final pending = _requests.where((raw) => raw is Map && '${raw['status'] ?? ''}' == 'pending').take(5).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _sectionTitle('آخر الطلبات', '${pending.length} طلب يحتاج المتابعة'),
       const SizedBox(height: 10),
-      if (pending.isEmpty)
-        const _EmptyCard(text: 'لا توجد طلبات معلقة حاليًا.')
-      else
-        ...pending.map((raw) {
-          final item = Map<String, dynamic>.from(raw as Map);
-          return Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(leading: const Icon(Icons.pending_actions_rounded, color: _brand), title: Text('${item['type'] ?? 'طلب'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['employeeName'] ?? item['employeeId'] ?? 'موظف'} · ${item['reason'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis), trailing: const Icon(Icons.chevron_left_rounded)));
-        }),
+      if (pending.isEmpty) const _EmptyCard(text: 'لا توجد طلبات معلقة حاليًا.') else ...pending.map((raw) {
+        final item = Map<String, dynamic>.from(raw as Map);
+        return Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(leading: const Icon(Icons.pending_actions_rounded, color: _brand), title: Text('${item['type'] ?? 'طلب'}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('${item['employeeName'] ?? item['employeeId'] ?? 'موظف'} · ${item['reason'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis), trailing: const Icon(Icons.chevron_left_rounded)));
+      }),
     ]);
   }
 
-  Widget _errorCard() => Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: const Color(0xFFFFF4F2), borderRadius: BorderRadius.circular(18)), child: Row(children: [const Icon(Icons.cloud_off_rounded, color: Color(0xFFB94A3D)), const SizedBox(width: 9), Expanded(child: Text(_error!, style: const TextStyle(color: Color(0xFF8D332C), fontSize: 12))), TextButton(onPressed: _load, child: const Text('إعادة'))]));
+  Widget _errorCard() => Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: HadirBrand.darkDanger.withValues(alpha: .10), borderRadius: BorderRadius.circular(18), border: Border.all(color: HadirBrand.darkDanger.withValues(alpha: .28))), child: Row(children: [const Icon(Icons.cloud_off_rounded, color: HadirBrand.darkDanger), const SizedBox(width: 9), Expanded(child: Text(_error!, style: const TextStyle(color: HadirBrand.darkText, fontSize: 12))), TextButton(onPressed: _load, child: const Text('إعادة'))]));
 }
 
 class _Stat extends StatelessWidget {
   final IconData icon; final String title; final String value;
   const _Stat({required this.icon, required this.title, required this.value});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E9E6))), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: _brand, size: 21)), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: _muted)), const SizedBox(height: 2), Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink))]))]));
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _surface.withValues(alpha: .80), borderRadius: BorderRadius.circular(20), border: Border.all(color: _line.withValues(alpha: .72))), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.circle, color: _brand, size: 21)), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, color: _muted)), const SizedBox(height: 2), Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _ink))]))]));
 }
 
 class _Feature extends StatelessWidget {
@@ -301,7 +271,7 @@ class _Panel extends StatelessWidget {
   final List<Widget> children;
   const _Panel({required this.children});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFE2E9E6))), child: Column(children: children));
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _surface.withValues(alpha: .80), borderRadius: BorderRadius.circular(22), border: Border.all(color: _line.withValues(alpha: .72))), child: Column(children: children));
 }
 
 class _MiniAction extends StatelessWidget {
@@ -315,5 +285,5 @@ class _EmptyCard extends StatelessWidget {
   final String text;
   const _EmptyCard({required this.text});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE2E9E6))), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.inbox_outlined, color: _muted), const SizedBox(width: 8), Text(text, style: const TextStyle(color: _muted, fontSize: 12))]));
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: _surface.withValues(alpha: .80), borderRadius: BorderRadius.circular(18), border: Border.all(color: _line.withValues(alpha: .72))), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.inbox_outlined, color: _muted), const SizedBox(width: 8), Text(text, style: const TextStyle(color: _muted, fontSize: 12))]));
 }
