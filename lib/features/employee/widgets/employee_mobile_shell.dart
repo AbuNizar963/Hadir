@@ -111,6 +111,14 @@ class EmployeeMobileShell extends StatelessWidget {
           ),
           _headerButton(
             context,
+            Icons.menu_rounded,
+            'القائمة',
+            () => _showOptions(context),
+            compact: compact,
+          ),
+          SizedBox(width: compact ? 5 : 7),
+          _headerButton(
+            context,
             Icons.notifications_none_rounded,
             'الإشعارات',
             () => context.push('/employee/notifications'),
@@ -119,9 +127,9 @@ class EmployeeMobileShell extends StatelessWidget {
           SizedBox(width: compact ? 5 : 7),
           _headerButton(
             context,
-            Icons.menu_rounded,
-            'الخيارات',
-            () => _showOptions(context),
+            Icons.wb_sunny_outlined,
+            'الطقس',
+            () => context.push('/weather'),
             compact: compact,
           ),
         ],
