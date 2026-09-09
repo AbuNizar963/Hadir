@@ -145,7 +145,14 @@ class AdminMobileShell extends StatelessWidget {
       title: Text(title, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900)),
       subtitle: Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10.5)),
       trailing: const Icon(Icons.chevron_left_rounded, color: _muted),
-      onTap: () { Navigator.of(context).pop(); context.push(route); },
+      onTap: () {
+        Navigator.of(context).pop();
+        if (route == '/notifications') {
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()));
+        } else {
+          context.push(route);
+        }
+      },
     );
   }
 }
