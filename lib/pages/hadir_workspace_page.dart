@@ -71,78 +71,332 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   @override
   Widget build(BuildContext context) {
+    // EmployeeMobileShell owns the single app-level header and fixed bottom
+    // navigation. Keep this page content-only so the dashboard is not nested
+    // inside a second Scaffold/navigation system.
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: _bg,
-        body: SafeArea(
-          bottom: false,
-          child: IndexedStack(
-            index: _tab,
-            children: [
-              _dashboard(),
-              _timesheets(),
-              _attendanceTab(),
-              _requestsTab(),
-              _moreTab(),
-            ],
-          ),
-        ),
-        bottomNavigationBar: _bottomNav(),
+      child: Container(
+        color: _bg,
+        child: _dashboard(),
       ),
     );
   }
 
   Widget _dashboard() {
     final now = DateTime.now();
-    final firstName = _name.trim().split(RegExp(r'\s+')).first;
+    final today = _todayAttendance(now);
+    final checkedIn = today.any((x) => x is Map && x['type'] == 'check-in');
+    final checkedOut = today.any((x) => x is Map && x['type'] == 'check-out');
+    final active = checkedIn && !checkedOut;
+    final checkIn = _firstTodayEvent(today, 'check-in');
+    final checkOut = _firstTodayEvent(today, 'check-out');
+    final status = checkedOut ? 'انتهى الدوام' : active ? 'حاضر' : 'جاهز لتسجيل الحضور';
+    final statusDetail = checkedOut
+        ? 'تم تسجيل الانصراف لهذا اليوم.'
+        : active
+            ? 'أنت مسجل حضور الآن ويمكنك تسجيل الانصراف.'
+            : 'لم يتم تسجيل حضورك بعد.';
+    final actionType = active ? 'check-out' : 'check-in';
+
     return RefreshIndicator(
       color: _green,
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 30),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
         children: [
-          Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(now.hour < 12 ? 'صباح الخير' : 'مساء الخير', style: const TextStyle(color: _muted, fontSize: 12, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 3),
-              Text(firstName, style: const TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.w900)),
-            ])),
-            _iconButton(Icons.notifications_none_rounded, () => setState(() => _tab = 4)),
-            const SizedBox(width: 8),
-            _avatar(),
-          ]),
-          const SizedBox(height: 18),
-          _clockCard(now),
-          const SizedBox(height: 18),
-          _sectionTitle('ملخص اليوم'),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: _metric(Icons.schedule_rounded, 'ساعات العمل', _workHours())),
-            const SizedBox(width: 9),
-            Expanded(child: _metric(Icons.fact_check_outlined, 'الطلبات', '${_requests.length}')),
-            const SizedBox(width: 9),
-            Expanded(child: _metric(Icons.notifications_none_rounded, 'التنبيهات', '${_unreadCount()}')),
-          ]),
-          const SizedBox(height: 20),
-          _sectionTitle('إجراءات سريعة'),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: _quick(Icons.qr_code_scanner_rounded, 'الحضور', 'GPS + QR', () => context.push('/attendance?type=check-in'))),
-            const SizedBox(width: 8),
-            Expanded(child: _quick(Icons.history_rounded, 'السجل', 'اليومي والشهري', () => setState(() => _tab = 1))),
-            const SizedBox(width: 8),
-            Expanded(child: _quick(Icons.event_note_outlined, 'طلب جديد', 'إجازة أو إذن', () => setState(() => _tab = 3))),
-          ]),
-          const SizedBox(height: 20),
-          _sectionTitle('آخر الحركات', action: TextButton(onPressed: () => setState(() => _tab = 2), child: const Text('عرض الكل'))),
-          const SizedBox(height: 8),
-          _attendanceList(limit: 4),
+          _employeeHero(now),
+          const SizedBox(height: 12),
+          _statusCard(
+            now: now,
+            status: status,
+            detail: statusDetail,
+            active: active,
+            checkedOut: checkedOut,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _dashboardAction(
+                  icon: Icons.logout_rounded,
+                  title: 'تسجيل انصراف',
+                  subtitle: active ? 'إنهاء الدوام' : 'غير متاح الآن',
+                  enabled: active,
+                  onTap: () => context.push('/attendance?type=check-out'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _dashboardAction(
+                  icon: Icons.login_rounded,
+                  title: 'تسجيل حضور',
+                  subtitle: checkedIn ? 'تم تسجيل الحضور' : 'بدء الدوام',
+                  enabled: !checkedIn && !checkedOut,
+                  onTap: () => context.push('/attendance?type=$actionType'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _sectionCard(
+            title: 'ملخص اليوم',
+            subtitle: 'سجل الدوام الحالي',
+            child: Row(
+              children: [
+                Expanded(child: _summaryItem('الحضور', _eventTime(checkIn), Icons.login_rounded)),
+                const SizedBox(width: 8),
+                Expanded(child: _summaryItem('الانصراف', _eventTime(checkOut), Icons.logout_rounded)),
+                const SizedBox(width: 8),
+                Expanded(child: _summaryItem('مدة العمل', _workHours(), Icons.schedule_rounded)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _sectionCard(
+            title: 'معلومات الدوام',
+            subtitle: 'حالتك الحالية',
+            child: Column(
+              children: [
+                _infoRow(Icons.calendar_today_outlined, 'نوع الجدول', 'حسب جدول الموظف'),
+                _infoRow(Icons.access_time_rounded, 'فترة العمل', 'حسب الجدول الإداري'),
+                _infoRow(Icons.verified_outlined, 'الحالة', status),
+                _infoRow(Icons.location_on_outlined, 'الموقع', 'الموقع المخصص'),
+                _infoRow(Icons.devices_other_rounded, 'الجهاز', 'مرتبط بالحساب'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _requestBanner(),
+          if (_loading) ...[
+            const SizedBox(height: 12),
+            const _LoadingCard(),
+          ] else if (_error != null) ...[
+            const SizedBox(height: 12),
+            _messageCard(_error!, Icons.cloud_off_rounded),
+          ],
         ],
       ),
     );
   }
+
+  Widget _employeeHero(DateTime now) {
+    final firstName = _name.trim().split(RegExp(r'\s+')).first;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
+      child: Row(
+        children: [
+          _avatar(),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('HADIR · EMPLOYEE', style: TextStyle(color: _green, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: .7)),
+                const SizedBox(height: 2),
+                Text('لوحة الموظف', style: const TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900)),
+                Text('مرحباً $firstName', style: const TextStyle(color: _muted, fontSize: 11)),
+              ],
+            ),
+          ),
+          Text(intl.DateFormat('HH:mm').format(now), style: const TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusCard({
+    required DateTime now,
+    required String status,
+    required String detail,
+    required bool active,
+    required bool checkedOut,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _line),
+        boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 18, offset: Offset(0, 7))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('حالة اليوم', style: TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 3),
+                    Text(status, style: const TextStyle(color: _ink, fontSize: 22, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 3),
+                    Text(detail, style: const TextStyle(color: _muted, fontSize: 10.5)),
+                  ],
+                ),
+              ),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(15)),
+                child: Icon(checkedOut ? Icons.task_alt_rounded : active ? Icons.work_history_rounded : Icons.access_time_rounded, color: _green),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(14)),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on_outlined, size: 16, color: _green),
+                const SizedBox(width: 6),
+                const Expanded(child: Text('الموقع المخصص للعمل', style: TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w800))),
+                Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(now), style: const TextStyle(color: _muted, fontSize: 9.5)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dashboardAction({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 96),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: enabled ? _green.withValues(alpha: .22) : _line),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: enabled ? _soft : _bg, borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: enabled ? _green : _muted, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(title, style: TextStyle(color: enabled ? _ink : _muted, fontWeight: FontWeight.w900, fontSize: 12)),
+                    const SizedBox(height: 3),
+                    Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionCard({required String title, required String subtitle, required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: _line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 2),
+          Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5)),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryItem(String title, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(14)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: _green, size: 17),
+          const SizedBox(height: 7),
+          Text(title, style: const TextStyle(color: _muted, fontSize: 8.5)),
+          const SizedBox(height: 2),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 10.5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(width: 31, height: 31, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 16)),
+          const SizedBox(width: 9),
+          Expanded(child: Text(title, style: const TextStyle(color: _muted, fontSize: 10))),
+          Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w800))),
+        ],
+      ),
+    );
+  }
+
+  Widget _requestBanner() {
+    return Material(
+      color: _soft,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: () => context.push('/requests'),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFCDE6DD))),
+          child: Row(
+            children: [
+              Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)),
+              const SizedBox(width: 10),
+              const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('طلب استئذان أو إجازة', style: TextStyle(color: _green, fontWeight: FontWeight.w900, fontSize: 12)), SizedBox(height: 3), Text('إرسال طلب للإدارة', style: TextStyle(color: _muted, fontSize: 9.5))])),
+              const Icon(Icons.chevron_left_rounded, color: _green),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  DateTime? _firstTodayEvent(List<dynamic> today, String type) {
+    for (final item in today) {
+      if (item is Map && item['type'] == type) {
+        final stamp = DateTime.tryParse('${item['timestamp'] ?? ''}');
+        if (stamp != null) return stamp;
+      }
+    }
+    return null;
+  }
+
+  String _eventTime(DateTime? value) => value == null ? '—' : intl.DateFormat('HH:mm').format(value);
 
   Widget _clockCard(DateTime now) {
     final today = _todayAttendance(now);
