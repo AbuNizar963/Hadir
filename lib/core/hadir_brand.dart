@@ -29,6 +29,21 @@ class HadirBrand {
   static const lightDanger = Color(0xFFD62937);
   static const lightWarning = Color(0xFFDEA00A);
 
+  // Backward-compatible aliases for existing pages. Keep these compile-time
+  // constants because several existing widgets use them inside const trees.
+  static const background = darkBackground;
+  static const card = darkCard;
+  static const panel = darkPanel;
+  static const text = darkText;
+  static const muted = darkMuted;
+  static const border = darkBorder;
+  static const input = darkInput;
+  static const primary = darkPrimary;
+  static const primaryDark = darkPrimary;
+  static const soft = darkPanel;
+  static const warning = darkWarning;
+  static const danger = darkDanger;
+
   static const radiusSm = 12.0;
   static const radiusMd = 16.0;
   static const radiusLg = 20.0;
