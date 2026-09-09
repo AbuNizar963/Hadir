@@ -6,9 +6,6 @@ import '../core/hadir_brand.dart';
 import '../core/session.dart';
 
 const _adminBrand = HadirBrand.darkPrimary;
-const _adminInk = HadirBrand.darkText;
-const _adminMuted = HadirBrand.darkMuted;
-const _adminSurface = HadirBrand.darkCard;
 const _adminSoft = HadirBrand.darkSecondary;
 
 class AdminHomePage extends StatefulWidget {
@@ -95,11 +92,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
             sliver: SliverList(delegate: SliverChildListDelegate([
               _overviewCard(),
               if (error != null) ...[const SizedBox(height: 12), _errorCard()],
-              const SizedBox(height: 22), Text('حالة الدوام اليوم', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 22), Text('حالة الدوام اليوم', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
               const SizedBox(height: 10), _attendanceGrid(),
-              const SizedBox(height: 22), Text('نظرة سريعة', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 22), Text('نظرة سريعة', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
               const SizedBox(height: 10), _statsGrid(),
-              const SizedBox(height: 22), Text('الإدارة', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 22), Text('الإدارة', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
               const SizedBox(height: 10),
               _AdminFeature(icon: Icons.groups_rounded, title: 'الموظفون والحسابات', subtitle: 'الموظفون، الأجهزة، المسؤولون والصلاحيات', onTap: () => context.push('/admin/manage')),
               _AdminFeature(icon: Icons.fact_check_rounded, title: 'الحضور والانصراف', subtitle: 'مراجعة السجلات والتحقق من عمليات الحضور', onTap: () => context.push('/admin/manage')),
