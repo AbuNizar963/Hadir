@@ -163,7 +163,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
     final next = <String, dynamic>{...previous, ...patch, 'id': id};
     if (mounted) setState(() => _workforceControls[id] = next);
     try {
-      await _dio.patch('/api/manager/workforce-controls/$id', data: patch);
+      await _dio.patch('/api/workforce/live', data: {'employeeId': id, ...patch});
       await _load();
     } catch (error) {
       if (!mounted) return;
@@ -567,7 +567,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         final admin = Map<String, dynamic>.from(raw as Map);
         final id = '${admin['id'] ?? ''}';
         final color = _statusColor(admin['active'] == false ? 'inactive' : 'active');
-        return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 3)), borderRadius: BorderRadius.circular(12)), child: ListTile(leading: Icon(Icons.admin_panel_settings_rounded, color: color), title: Text('${admin['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('@${admin['username'] ?? ''} · ${admin['role'] ?? ''}'), trailing: Switch(value: admin['active'] != false, onChanged: (value) => _request('PATCH', '/api/admins/$id', data: {'active': value})))));
+        return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 3)), borderRadius: BorderRadius.circular(12)), child: ListTile(leading: Icon(Icons.admin_panel_settings_rounded, color: color), title: Text('${admin['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Text('@${admin['username'] ?? ''} · ${admin['role'] ?? ''}'), trailing: Switch(value: admin['active'] != false, onChanged: (value) => _request('PATCH', '/api/admins/$id', data: {'active': value}))));
       }),
     ]);
   }
