@@ -115,6 +115,22 @@ class EmployeeMobileShell extends StatelessWidget {
             () => context.push('/weather'),
             compact: compact,
           ),
+          SizedBox(width: compact ? 5 : 7),
+          _headerButton(
+            context,
+            Icons.explore_outlined,
+            'القبلة',
+            () => context.push('/prayer'),
+            compact: compact,
+          ),
+          SizedBox(width: compact ? 5 : 7),
+          _headerButton(
+            context,
+            Icons.auto_awesome_rounded,
+            'المساعد',
+            () => context.push('/ai'),
+            compact: compact,
+          ),
         ],
       ),
     );
