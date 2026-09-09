@@ -3,9 +3,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/hadir_theme_controller.dart';
 
-const _brand = Color(0xFF0B6B5A);
-const _soft = Color(0xFFE8F5F0);
-
 /// Android/iOS employee shell.
 ///
 /// Uses the same navigation placement as the manager shell: a compact
