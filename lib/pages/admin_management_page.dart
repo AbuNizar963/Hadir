@@ -525,7 +525,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
         final id = '${request['id'] ?? ''}';
         final status = '${request['status'] ?? 'pending'}';
         final color = _statusColor(status);
-        return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 4)), borderRadius: BorderRadius.circular(12)), child: ListTile(title: Text('${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Wrap(spacing: 8, children: [Text('${request['reason'] ?? ''}'), Text('الحالة: $status', style: TextStyle(color: color, fontWeight: FontWeight.w800))]), isThreeLine: true, trailing: status == 'pending' ? PopupMenuButton<String>(onSelected: (value) => _request('PATCH', '/api/requests/$id', data: {'status': value}), itemBuilder: (_) => const [PopupMenuItem(value: 'approved', child: Text('موافقة')), PopupMenuItem(value: 'rejected', child: Text('رفض'))]) : null));
+        return _card(Container(decoration: BoxDecoration(border: Border(right: BorderSide(color: color, width: 4)), borderRadius: BorderRadius.circular(12)), child: ListTile(title: Text('${request['type'] ?? 'طلب'} · ${request['employeeName'] ?? request['employeeId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)), subtitle: Wrap(spacing: 8, children: [Text('${request['reason'] ?? ''}'), Text('الحالة: $status', style: TextStyle(color: color, fontWeight: FontWeight.w800))]), isThreeLine: true, trailing: status == 'pending' ? PopupMenuButton<String>(onSelected: (value) => _request('PATCH', '/api/requests/$id', data: {'status': value}), itemBuilder: (_) => const [PopupMenuItem(value: 'approved', child: Text('موافقة')), PopupMenuItem(value: 'rejected', child: Text('رفض'))]) : null)));
       }),
     ]);
   }
@@ -591,7 +591,7 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off_rounded, size: 48), const SizedBox(height: 12), Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 12), FilledButton(onPressed: _load, child: const Text('إعادة المحاولة'))])))
-              : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: List.generate(labels.length, (index) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index))))), const SizedBox(height: 18), views[_tab]])),
+              : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 32), children: [SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: List.generate(labels.length, (index) => Padding(padding: const EdgeInsets.only(left: 8), child: ChoiceChip(selected: _tab == index, avatar: Icon(icons[index], size: 17), label: Text(labels[index]), onSelected: (_) => setState(() => _tab = index))))), const SizedBox(height: 18), views[_tab]]))),
     );
   }
 }
