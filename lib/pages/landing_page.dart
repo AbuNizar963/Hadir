@@ -27,7 +27,7 @@ class LandingPage extends StatelessWidget {
                   children: [
                     const _BrandHeader(),
                     const SizedBox(height: 28),
-                    _LoginCard(context),
+                    _loginCard(context),
                     const SizedBox(height: 22),
                     const Text(
                       'حاضر · نظام حضور وانصراف',
@@ -47,7 +47,7 @@ class LandingPage extends StatelessWidget {
     );
   }
 
-  Widget _LoginCard(BuildContext context) {
+  Widget _loginCard(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
