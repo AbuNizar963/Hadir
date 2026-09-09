@@ -123,7 +123,6 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   Widget _employeeHero(DateTime now) {
-    final firstName = _name.trim().split(RegExp(r'\s+')).first;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line), boxShadow: const [BoxShadow(color: Color(0x0A142D27), blurRadius: 16, offset: Offset(0, 6))]),
