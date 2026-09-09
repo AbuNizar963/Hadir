@@ -157,7 +157,7 @@ class EmployeeTransfer {
     for (final part in raw.split(RegExp(r'[,،|;/]+')).map((v) => v.trim()).where((v) => v.isNotEmpty)) {
       final number = int.tryParse(part);
       if (number != null) {
-        result.add(number.clamp(0, 6));
+        result.add(number.clamp(0, 6).toInt());
       } else if (map.containsKey(part)) {
         result.add(map[part]!);
       }
@@ -221,7 +221,8 @@ class EmployeeTransfer {
 
   static List<Map<String, Object?>> decodeXlsx(List<int> bytes) {
     final workbook = Excel.decodeBytes(bytes);
-    final sheetName = workbook.getDefaultSheet() ?? workbook.tables.keys.firstOrNull;
+    final defaultSheet = workbook.getDefaultSheet();
+    final sheetName = defaultSheet ?? (workbook.tables.isEmpty ? null : workbook.tables.keys.first);
     if (sheetName == null) throw const FormatException('لم يتم العثور على ورقة بيانات.');
     final sheet = workbook.tables[sheetName];
     if (sheet == null || sheet.rows.isEmpty) throw const FormatException('لم يتم العثور على بيانات الموظفين.');
