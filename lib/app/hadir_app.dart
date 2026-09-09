@@ -3,11 +3,36 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/hadir_brand.dart';
+import '../core/hadir_theme_controller.dart';
 import '../services/updater_service.dart';
 import 'router.dart';
 
-class HadirApp extends StatelessWidget {
+class HadirApp extends StatefulWidget {
   const HadirApp({super.key});
+
+  @override
+  State<HadirApp> createState() => _HadirAppState();
+}
+
+class _HadirAppState extends State<HadirApp> {
+  final _themeController = HadirThemeController.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _themeController.addListener(_themeChanged);
+    unawaited(_themeController.load());
+  }
+
+  void _themeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _themeController.removeListener(_themeChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +51,7 @@ class HadirApp extends StatelessWidget {
       ),
       theme: HadirBrand.theme(),
       darkTheme: HadirBrand.theme(brightness: Brightness.dark),
-      themeMode: ThemeMode.system,
+      themeMode: _themeController.mode,
       routerConfig: buildModernRouter(),
     );
   }
