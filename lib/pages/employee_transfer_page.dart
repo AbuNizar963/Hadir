@@ -93,7 +93,7 @@ class _EmployeeTransferPageState extends State<EmployeeTransferPage> {
   Future<void> _export() async {
     try {
       final csv = EmployeeTransfer.toCsv(_exportRows);
-      await Share.share(csv, subject: 'HADIR - تصدير الموظفين');
+      await SharePlus.instance.share(ShareParams(text: csv, subject: 'HADIR - تصدير الموظفين'));
     } catch (error) {
       if (mounted) setState(() => _error = _errorMessage(error));
     }
@@ -138,53 +138,33 @@ class _EmployeeTransferPageState extends State<EmployeeTransferPage> {
 
   Widget _metric(String label, String value, IconData icon) => Container(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant), color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .45)),
-        child: Row(children: [Icon(icon, size: 20), const SizedBox(width: 10), Expanded(child: Text(label)), Text(value, style: const TextStyle(fontWeight: FontWeight.w900))]),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
+        child: Row(children: [Icon(icon, size: 20), const SizedBox(width: 10), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label), Text(value, style: const TextStyle(fontWeight: FontWeight.w800))])]),
       );
 
   @override
   Widget build(BuildContext context) {
-    final preview = _preview;
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(title: const Text('نقل الموظفين الذكي'), centerTitle: false),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(padding: const EdgeInsets.all(16), children: [
-                Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const Text('استيراد وتصدير الموظفين', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 8),
-                  const Text('يدعم CSV بالعناوين العربية أو الإنجليزية، مع معاينة قبل الإضافة والتحقق من الاسم والرقم الوظيفي والتكرارات.'),
-                  const SizedBox(height: 16),
-                  Row(children: [Expanded(child: _metric('الموظفون الحاليون', '${_employees.length}', Icons.groups_rounded)), const SizedBox(width: 10), Expanded(child: _metric('حقول النقل', '${EmployeeTransfer.headers.length}', Icons.table_chart_rounded))]),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(onPressed: _export, icon: const Icon(Icons.ios_share_rounded), label: const Text('تصدير الموظفين CSV')),
-                ]))),
+    return Scaffold(
+      appBar: AppBar(title: const Text('نقل الموظفين الذكي')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(padding: const EdgeInsets.all(16), children: [
+              Wrap(spacing: 10, runSpacing: 10, children: [_metric('الموظفون', '${_employees.length}', Icons.groups_rounded), _metric('جاهز للتصدير', '${_exportRows.length}', Icons.file_upload_rounded)]),
+              const SizedBox(height: 16),
+              if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+              if (_message != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_message!)),
+              FilledButton.icon(onPressed: _busy ? null : _export, icon: const Icon(Icons.share_rounded), label: const Text('تصدير الموظفين CSV')),
+              const SizedBox(height: 16),
+              TextField(controller: _csvController, maxLines: 10, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'بيانات CSV', hintText: 'ألصق بيانات الموظفين هنا')),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(onPressed: _busy ? null : _previewImport, icon: const Icon(Icons.preview_rounded), label: const Text('معاينة الاستيراد')),
+              if (_preview != null) ...[
                 const SizedBox(height: 12),
-                Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const Text('استيراد CSV', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 6),
-                  const Text('الصق محتوى CSV هنا. سيتم اكتشاف الأعمدة تلقائيًا ثم عرض المعاينة قبل الإضافة إلى النظام.'),
-                  const SizedBox(height: 12),
-                  TextField(controller: _csvController, minLines: 8, maxLines: 16, textDirection: TextDirection.ltr, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'الاسم,الرقم الوظيفي,نوع الدوام,...')),
-                  const SizedBox(height: 10),
-                  FilledButton.icon(onPressed: _busy ? null : _previewImport, icon: const Icon(Icons.auto_awesome_rounded), label: const Text('تحليل ومعاينة')),
-                  if (preview != null) ...[
-                    const SizedBox(height: 14),
-                    _metric('صفوف صالحة', '${preview.validRows}', Icons.check_circle_outline_rounded),
-                    const SizedBox(height: 8),
-                    _metric('صفوف غير صالحة', '${preview.invalidRows}', Icons.error_outline_rounded),
-                    const SizedBox(height: 8),
-                    _metric('أرقام وظيفية مكررة', '${preview.duplicateJobNumbers.length}', Icons.content_copy_rounded),
-                    const SizedBox(height: 12),
-                    FilledButton.icon(onPressed: _busy || preview.rows.isEmpty ? null : _import, icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.cloud_upload_rounded), label: Text(_busy ? 'جاري الاستيراد…' : 'تأكيد الاستيراد')),
-                  ],
-                ]))),
-                if (_message != null) ...[const SizedBox(height: 12), Card(child: ListTile(leading: const Icon(Icons.check_circle_rounded), title: Text('$_message')))],
-                if (_error != null) ...[const SizedBox(height: 12), Card(child: ListTile(leading: const Icon(Icons.error_rounded), title: Text('$_error')))],
-              ]),
-      ),
+                Text('صالح: ${_preview!.validRows} • أخطاء: ${_preview!.invalidRows} • إجمالي: ${_preview!.rows.length}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                FilledButton.icon(onPressed: _busy || _preview!.validRows == 0 ? null : _import, icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download_done_rounded), label: const Text('استيراد الصفوف الصالحة')),
+              ],
+            ]),
     );
   }
 }
