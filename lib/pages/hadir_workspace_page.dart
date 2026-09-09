@@ -56,7 +56,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   @override
   Widget build(BuildContext context) {
-    // EmployeeMobileShell owns the single app-level header and fixed bottom navigation.
+    // EmployeeMobileShell owns the single app-level header and secondary navigation.
     return Directionality(textDirection: TextDirection.rtl, child: Container(color: _bg, child: _dashboard()));
   }
 
@@ -68,8 +68,11 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final active = checkedIn && !checkedOut;
     final checkIn = _firstTodayEvent(today, 'check-in');
     final checkOut = _firstTodayEvent(today, 'check-out');
-    final status = checkedOut ? 'انتهى الدوام' : active ? 'حاضر' : 'جاهز لتسجيل الحضور';
-    final statusDetail = checkedOut ? 'تم تسجيل الانصراف لهذا اليوم.' : active ? 'أنت مسجل حضور الآن ويمكنك تسجيل الانصراف.' : 'لم يتم تسجيل حضورك بعد.';
+    final todayRequests = _todayApprovedRequests(now);
+    final hasLeave = todayRequests.any((x) => '${x['type'] ?? ''}'.toLowerCase() == 'leave');
+    final hasPermission = todayRequests.any((x) => '${x['type'] ?? ''}'.toLowerCase() == 'permission');
+    final status = hasLeave ? 'إجازة' : hasPermission ? 'إذن' : checkedOut ? 'انتهى الدوام' : active ? 'حاضر' : 'جاهز لتسجيل الحضور';
+    final statusDetail = hasLeave ? 'لديك إجازة معتمدة لهذا اليوم.' : hasPermission ? 'لديك إذن معتمد لهذا اليوم.' : checkedOut ? 'تم تسجيل الانصراف لهذا اليوم.' : active ? 'أنت مسجل حضور الآن ويمكنك تسجيل الانصراف.' : 'لم يتم تسجيل حضورك بعد.';
 
     return RefreshIndicator(
       color: _green,
@@ -83,14 +86,14 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
           _statusCard(now: now, status: status, detail: statusDetail, active: active, checkedOut: checkedOut),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: _dashboardAction(icon: Icons.logout_rounded, title: 'تسجيل انصراف', subtitle: active ? 'إنهاء الدوام' : 'غير متاح الآن', enabled: active, onTap: () => context.push('/attendance?type=check-out'))),
+            Expanded(child: _dashboardAction(icon: Icons.login_rounded, title: 'تسجيل حضور', subtitle: hasLeave || hasPermission ? status : checkedIn ? 'تم تسجيل الحضور' : 'مسح رمز QR', enabled: !checkedIn && !checkedOut && !hasLeave && !hasPermission, onTap: () => context.push('/attendance?type=check-in'))),
             const SizedBox(width: 10),
-            Expanded(child: _dashboardAction(icon: Icons.login_rounded, title: 'تسجيل حضور', subtitle: checkedIn ? 'تم تسجيل الحضور' : 'بدء الدوام', enabled: !checkedIn && !checkedOut, onTap: () => context.push('/attendance?type=check-in'))),
+            Expanded(child: _dashboardAction(icon: Icons.logout_rounded, title: 'تسجيل انصراف', subtitle: active ? 'إنهاء الدوام' : checkOut != null ? 'تم تسجيل الانصراف' : 'بعد تسجيل الحضور', enabled: active, onTap: () => context.push('/attendance?type=check-out'))),
           ]),
           const SizedBox(height: 12),
           _sectionCard(
             title: 'ملخص اليوم',
-            subtitle: 'سجل الدوام الحالي',
+            subtitle: 'سجل الدوام',
             child: Row(children: [
               Expanded(child: _summaryItem('الحضور', _eventTime(checkIn), Icons.login_rounded)),
               const SizedBox(width: 8),
@@ -105,7 +108,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
             subtitle: 'حالتك الحالية',
             child: Column(children: [
               _infoRow(Icons.calendar_today_outlined, 'نوع الجدول', 'حسب جدول الموظف'),
-              _infoRow(Icons.access_time_rounded, 'فترة العمل', 'حسب الجدول الإداري'),
+              _infoRow(Icons.access_time_rounded, 'الفترة', 'حسب الجدول الإداري'),
               _infoRow(Icons.verified_outlined, 'الحالة', status),
               _infoRow(Icons.location_on_outlined, 'الموقع', 'الموقع المخصص'),
               _infoRow(Icons.devices_other_rounded, 'الجهاز', 'مرتبط بالحساب'),
@@ -121,17 +124,24 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   Widget _employeeHero(DateTime now) {
     final firstName = _name.trim().split(RegExp(r'\s+')).first;
-    return Row(children: [
-      _avatar(),
-      const SizedBox(width: 10),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('HADIR · EMPLOYEE', style: TextStyle(color: _green, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: .7)),
-        const SizedBox(height: 2),
-        const Text('لوحة الموظف', style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900)),
-        Text('مرحباً $firstName', style: const TextStyle(color: _muted, fontSize: 11)),
-      ])),
-      Text(intl.DateFormat('HH:mm').format(now), style: const TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900)),
-    ]);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line), boxShadow: const [BoxShadow(color: Color(0x0A142D27), blurRadius: 16, offset: Offset(0, 6))]),
+      child: Row(children: [
+        _avatar(),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('مرحباً بك', style: TextStyle(color: _muted, fontSize: 10)),
+          Text(_name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 16, fontWeight: FontWeight.w900)),
+          Text('HADIR · EMPLOYEE  ·  لوحة الموظف', style: const TextStyle(color: _green, fontSize: 9.5, fontWeight: FontWeight.w800)),
+        ])),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(intl.DateFormat('HH:mm').format(now), style: const TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 2),
+          Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(now), style: const TextStyle(color: _muted, fontSize: 9.5)),
+        ]),
+      ]),
+    );
   }
 
   Widget _statusCard({required DateTime now, required String status, required String detail, required bool active, required bool checkedOut}) {
@@ -205,6 +215,17 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       }
     }
     return null;
+  }
+
+  List<Map<dynamic, dynamic>> _todayApprovedRequests(DateTime now) {
+    final day = intl.DateFormat('yyyy-MM-dd').format(now);
+    return _requests.whereType<Map>().where((item) {
+      final status = '${item['status'] ?? ''}'.toLowerCase();
+      if (status != 'approved' && status != 'confirmed') return false;
+      final start = '${item['startDate'] ?? item['createdAt'] ?? ''}'.split('T').first;
+      final end = '${item['endDate'] ?? item['startDate'] ?? item['createdAt'] ?? ''}'.split('T').first;
+      return start.isNotEmpty && start <= day && day <= end;
+    }).toList();
   }
 
   String _eventTime(DateTime? value) => value == null ? '—' : intl.DateFormat('HH:mm').format(value);
