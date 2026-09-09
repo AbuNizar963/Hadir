@@ -3,15 +3,21 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/hadir_theme_controller.dart';
 import '../../../core/session.dart';
+import '../../../services/notifications_service.dart';
 
-/// Android/iOS employee shell.
-///
-/// Mirrors the website structure: a compact utility header followed by the
-/// employee navigation row. Existing employee routes and functionality remain
-/// unchanged.
-class EmployeeMobileShell extends StatelessWidget {
+/// Employee shell matching the website EmployeeLayout structure.
+class EmployeeMobileShell extends StatefulWidget {
   const EmployeeMobileShell({super.key, required this.child});
   final Widget child;
+
+  @override
+  State<EmployeeMobileShell> createState() => _EmployeeMobileShellState();
+}
+
+class _EmployeeMobileShellState extends State<EmployeeMobileShell> {
+  bool _menuOpen = false;
+  bool _themeMenuOpen = false;
+  int _unreadNotifications = 0;
 
   int _selectedIndex(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
@@ -20,6 +26,21 @@ class EmployeeMobileShell extends StatelessWidget {
     if (path == '/employee/history' || path == '/history') return 2;
     if (path == '/employee/profile' || path == '/profile') return 3;
     return -1;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadNotifications();
+  }
+
+  Future<void> _loadUnreadNotifications() async {
+    try {
+      final rows = await NotificationsService().list();
+      if (mounted) setState(() => _unreadNotifications = rows.where((n) => !n.read).length);
+    } catch (_) {
+      // The notifications page remains the source of truth if the shell count fails.
+    }
   }
 
   void _go(BuildContext context, int index) {
@@ -49,7 +70,8 @@ class EmployeeMobileShell extends StatelessWidget {
             children: [
               _header(context),
               _navigation(context, selected),
-              Expanded(child: child),
+              if (_menuOpen) _utilityMenu(context),
+              Expanded(child: widget.child),
             ],
           ),
         ),
@@ -58,50 +80,116 @@ class EmployeeMobileShell extends StatelessWidget {
   }
 
   Widget _header(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 430;
     final scheme = Theme.of(context).colorScheme;
+    final utilities = <({IconData icon, String label, VoidCallback action})>[
+      (icon: _menuOpen ? Icons.close_rounded : Icons.menu_rounded, label: 'القائمة', action: () => setState(() { _menuOpen = !_menuOpen; _themeMenuOpen = false; })),
+      (icon: Icons.notifications_none_rounded, label: 'الإشعارات', action: () async { await context.push('/employee/notifications'); if (mounted) _loadUnreadNotifications(); }),
+      (icon: Icons.cloud_outlined, label: 'الطقس', action: () => context.push('/weather')),
+      (icon: Icons.explore_outlined, label: 'القبلة', action: () => context.push('/prayer')),
+      (icon: Icons.smart_toy_outlined, label: 'المساعد', action: () => context.push('/ai')),
+    ];
     return Container(
-      padding: EdgeInsets.fromLTRB(compact ? 10 : 14, 10, compact ? 10 : 14, 9),
+      constraints: const BoxConstraints(minHeight: 76),
       decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+        color: scheme.surface.withValues(alpha: .95),
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .72))),
+        boxShadow: [BoxShadow(color: scheme.onSurface.withValues(alpha: .045), blurRadius: 18, offset: const Offset(0, 7))],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Row(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            ...utilities.map((item) => Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: _utilityButton(context, item.icon, item.label, item.action, selected: item.label == 'القائمة' && _menuOpen, showBadge: item.label == 'الإشعارات'),
+            )),
+            const SizedBox(width: 4),
+            _brand(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _brand(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () => context.go('/employee'),
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: scheme.primary.withValues(alpha: .30)),
+              ),
+              child: Icon(Icons.how_to_reg_rounded, color: scheme.primary, size: 23),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: compact ? 40 : 42,
-                  height: compact ? 40 : 42,
-                  decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: .10),
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(color: scheme.primary.withValues(alpha: .20)),
-                  ),
-                  child: Icon(Icons.how_to_reg_rounded, color: scheme.primary, size: 25),
-                ),
-                const SizedBox(width: 9),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('حاضر', style: TextStyle(color: scheme.onSurface, fontSize: 22, height: 1, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 4),
-                    Text('HADIR  •  v1.1', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5, letterSpacing: 1.1, fontWeight: FontWeight.w700)),
-                  ],
-                ),
+                Text('حاضر', style: TextStyle(color: scheme.onSurface, fontSize: 18, height: 1, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                Text('HADIR  •  v1.1', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 8.5, letterSpacing: 1.0, fontWeight: FontWeight.w700)),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _utilityButton(BuildContext context, IconData icon, String label, VoidCallback onTap, {bool selected = false, bool showBadge = false}) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 80,
+      height: 48,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Material(
+            color: selected ? scheme.primary.withValues(alpha: .05) : scheme.surface.withValues(alpha: .70),
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: selected ? scheme.primary.withValues(alpha: .40) : scheme.outlineVariant.withValues(alpha: .70)),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: selected ? scheme.primary : scheme.onSurface.withValues(alpha: .85), size: 20),
+                    const SizedBox(height: 2),
+                    Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: selected ? scheme.primary : scheme.onSurface.withValues(alpha: .85), fontSize: 10.5, fontWeight: FontWeight.w600, height: 1)),
+                  ],
+                ),
+              ),
+            ),
           ),
-          _headerButton(context, Icons.menu_rounded, 'القائمة', () => _showOptions(context), compact: compact),
-          SizedBox(width: compact ? 5 : 7),
-          _headerButton(context, Icons.notifications_none_rounded, 'الإشعارات', () => context.push('/employee/notifications'), compact: compact),
-          SizedBox(width: compact ? 5 : 7),
-          _headerButton(context, Icons.wb_sunny_outlined, 'الطقس', () => context.push('/weather'), compact: compact),
-          SizedBox(width: compact ? 5 : 7),
-          _headerButton(context, Icons.explore_outlined, 'القبلة', () => context.push('/prayer'), compact: compact),
-          SizedBox(width: compact ? 5 : 7),
-          _headerButton(context, Icons.auto_awesome_rounded, 'المساعد', () => context.push('/ai'), compact: compact),
+          if (showBadge && _unreadNotifications > 0)
+            Positioned(
+              top: -2,
+              right: -2,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: scheme.error, shape: BoxShape.rectangle, borderRadius: BorderRadius.circular(99)),
+                child: Text(_unreadNotifications > 99 ? '99+' : '$_unreadNotifications', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+              ),
+            ),
         ],
       ),
     );
@@ -116,91 +204,75 @@ class EmployeeMobileShell extends StatelessWidget {
       (Icons.person_outline_rounded, Icons.person_rounded, 'الملف الشخصي'),
     ];
     return Container(
-      height: 78,
       decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+        color: scheme.surface.withValues(alpha: .95),
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .72))),
       ),
-      child: ListView.separated(
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 4),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          final active = selected == index;
-          return InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => _go(context, index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              constraints: const BoxConstraints(minWidth: 88),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: active ? scheme.primary.withValues(alpha: .13) : Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: active ? scheme.primary.withValues(alpha: .28) : Colors.transparent),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 23),
-                  const SizedBox(height: 3),
-                  Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 10.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700)),
-                ],
-              ),
-            ),
-          );
-        },
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          children: [
+            for (var index = 0; index < items.length; index++) ...[
+              _navItem(context, index, items[index], selected == index),
+              if (index < items.length - 1) const SizedBox(width: 4),
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _headerButton(BuildContext context, IconData icon, String label, VoidCallback onTap, {required bool compact}) {
+  Widget _navItem(BuildContext context, int index, (IconData, IconData, String) item, bool active) {
     final scheme = Theme.of(context).colorScheme;
-    return IconButton(
-      onPressed: onTap,
-      tooltip: label,
-      visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints(minWidth: 42, minHeight: 42),
-      padding: EdgeInsets.zero,
-      style: IconButton.styleFrom(
-        foregroundColor: scheme.onSurface,
-        backgroundColor: compact ? scheme.primary.withValues(alpha: .08) : Colors.transparent,
-        side: compact ? BorderSide(color: scheme.outlineVariant) : null,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => _go(context, index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        constraints: const BoxConstraints(minWidth: 86, minHeight: 54),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? scheme.primary.withValues(alpha: .15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: active ? Border.all(color: scheme.primary.withValues(alpha: .35)) : null,
+          boxShadow: active ? [BoxShadow(color: scheme.primary.withValues(alpha: .08), blurRadius: 8, offset: const Offset(0, 3))] : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurface.withValues(alpha: .80), size: 20),
+            const SizedBox(height: 3),
+            Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurface.withValues(alpha: .80), fontSize: 10.5, fontWeight: active ? FontWeight.w800 : FontWeight.w600, height: 1)),
+          ],
+        ),
       ),
-      icon: Icon(icon, size: 21),
     );
   }
 
-  Future<void> _showOptions(BuildContext context) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (sheetContext) => SafeArea(
+  Widget _utilityMenu(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
+      elevation: 8,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .70))),
+        ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Wrap(
+            alignment: WrapAlignment.start,
+            spacing: 6,
+            runSpacing: 6,
             children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text('القائمة', style: TextStyle(color: Theme.of(sheetContext).colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900)),
-              ),
-              const SizedBox(height: 10),
-              _themeSelector(sheetContext),
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-                leading: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(color: Theme.of(sheetContext).colorScheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14)),
-                  child: Icon(Icons.logout_rounded, color: Theme.of(sheetContext).colorScheme.error),
-                ),
-                title: Text('تسجيل خروج', style: TextStyle(color: Theme.of(sheetContext).colorScheme.error, fontWeight: FontWeight.w900)),
-                onTap: () => _logout(context),
+              _themeMenuButton(context),
+              TextButton.icon(
+                onPressed: _logout,
+                icon: Icon(Icons.logout_rounded, color: scheme.error, size: 18),
+                label: Text('تسجيل خروج', style: TextStyle(color: scheme.error, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -209,39 +281,37 @@ class EmployeeMobileShell extends StatelessWidget {
     );
   }
 
-  Widget _themeSelector(BuildContext context) {
-    return AnimatedBuilder(
-      animation: HadirThemeController.instance,
-      builder: (context, _) {
-        final scheme = Theme.of(context).colorScheme;
-        final controller = HadirThemeController.instance;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: DropdownButtonFormField<ThemeMode>(
-            initialValue: controller.mode,
-            decoration: InputDecoration(
-              labelText: 'مظهر التطبيق',
-              prefixIcon: const Icon(Icons.brightness_6_outlined),
-              filled: true,
-              fillColor: scheme.surfaceContainerHighest.withValues(alpha: .45),
-            ),
-            items: const [
-              DropdownMenuItem(value: ThemeMode.system, child: Text('تلقائي حسب الجهاز')),
-              DropdownMenuItem(value: ThemeMode.light, child: Text('الوضع الفاتح')),
-              DropdownMenuItem(value: ThemeMode.dark, child: Text('الوضع الداكن')),
-            ],
-            onChanged: (mode) {
-              if (mode != null) controller.setMode(mode);
-            },
-          ),
-        );
+  Widget _themeMenuButton(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return PopupMenuButton<ThemeMode>(
+      tooltip: 'المظهر',
+      onSelected: (mode) {
+        HadirThemeController.instance.setMode(mode);
+        setState(() => _themeMenuOpen = false);
       },
+      offset: const Offset(0, 46),
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: ThemeMode.dark, child: ListTile(leading: Icon(Icons.dark_mode_outlined), title: Text('داكن'))),
+        PopupMenuItem(value: ThemeMode.light, child: ListTile(leading: Icon(Icons.light_mode_outlined), title: Text('فاتح'))),
+        PopupMenuItem(value: ThemeMode.system, child: ListTile(leading: Icon(Icons.monitor_outlined), title: Text('تلقائي'))),
+      ],
+      child: TextButton.icon(
+        onPressed: () => setState(() => _themeMenuOpen = !_themeMenuOpen),
+        icon: const Icon(Icons.palette_outlined, size: 18),
+        label: const Text('المظهر'),
+        style: TextButton.styleFrom(foregroundColor: scheme.onSurface),
+      ),
     );
   }
 
-  Future<void> _logout(BuildContext context) async {
-    Navigator.of(context).pop();
-    await HadirSession().clear();
-    if (context.mounted) context.go('/login');
+  Future<void> _logout() async {
+    try {
+      await HadirSession().clear();
+    } finally {
+      if (mounted) {
+        setState(() { _menuOpen = false; _themeMenuOpen = false; });
+        context.go('/login');
+      }
+    }
   }
 }
