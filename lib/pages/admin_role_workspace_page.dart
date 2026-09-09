@@ -230,6 +230,7 @@ class _AdminRoleWorkspacePageState extends State<AdminRoleWorkspacePage> {
   List<Widget> _features() {
     final features = <Widget>[
       _Feature(icon: Icons.groups_rounded, title: 'الموظفون والحسابات', subtitle: 'إدارة الموظفين وإعادة ربط الأجهزة والحسابات', onTap: () => context.push('/admin/manage')),
+      _Feature(icon: Icons.upload_file_rounded, title: 'نقل الموظفين الذكي', subtitle: 'استيراد وتصدير الموظفين بصيغ CSV وExcel مع المعاينة والتحقق', onTap: () => context.push('/manager/employees/transfer')),
       _Feature(icon: Icons.fingerprint_rounded, title: 'الحضور والانصراف', subtitle: 'مراجعة العمليات والسجل اليومي', onTap: () => context.push('/admin/manage')),
       _Feature(icon: Icons.assignment_rounded, title: 'الطلبات', subtitle: 'مراجعة الطلبات واتخاذ الإجراء المناسب', onTap: () => context.push('/admin/manage')),
       _Feature(icon: Icons.assessment_rounded, title: 'التقارير', subtitle: 'تقارير الحضور المهنية والأرشيف', onTap: () => context.push('/admin/reports')),
