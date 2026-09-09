@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
 
 /// Shared visual language for the HADIR Flutter application.
-/// The tokens intentionally mirror the web application's light/dark palette.
+/// The tokens mirror the website's light/dark visual language.
 class HadirBrand {
-  static const primary = Color(0xFF22A072);
-  static const primaryDark = Color(0xFF167A59);
-  static const accent = Color(0xFF2BBDEE);
-  static const surface = Color(0xFFF9FAFB);
+  static const primary = Color(0xFF0B6B5A);
+  static const primaryDark = Color(0xFF064B40);
+  static const accent = Color(0xFF22C58A);
+  static const surface = Color(0xFFF4F7F6);
   static const card = Color(0xFFFFFFFF);
-  static const panel = Color(0xFFEDEFF3);
-  static const soft = Color(0xFFEFF7F3);
-  static const text = Color(0xFF151B28);
-  static const muted = Color(0xFF5C697A);
-  static const border = Color(0xFFCED5DE);
+  static const panel = Color(0xFFEAF4F0);
+  static const soft = Color(0xFFEAF4F0);
+  static const text = Color(0xFF142D27);
+  static const muted = Color(0xFF73827E);
+  static const border = Color(0xFFDCE6E2);
   static const danger = Color(0xFFDF3A3A);
   static const warning = Color(0xFFF59E0B);
 
-  static const darkBackground = Color(0xFF0C1018);
-  static const darkCard = Color(0xFF151923);
-  static const darkPanel = Color(0xFF1F232E);
-  static const darkText = Color(0xFFF1F5F9);
-  static const darkMuted = Color(0xFFA4AAB7);
-  static const darkBorder = Color(0xFF292F3D);
-  static const darkPrimary = Color(0xFF2BCA90);
-  static const darkSoft = Color(0xFF123226);
+  static const darkBackground = Color(0xFF0D1513);
+  static const darkCard = Color(0xFF14201C);
+  static const darkPanel = Color(0xFF1B2A25);
+  static const darkText = Color(0xFFF0F7F4);
+  static const darkMuted = Color(0xFFA8B8B2);
+  static const darkBorder = Color(0xFF2A3A34);
+  static const darkPrimary = Color(0xFF35D19A);
+  static const darkSoft = Color(0xFF123B2E);
   static const darkWarning = Color(0xFFFBBF24);
 
   static const radiusSm = 12.0;
