@@ -149,7 +149,9 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
 
   void _jumpToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+      }
     });
   }
 
@@ -163,78 +165,209 @@ class _AIAssistantPageState extends State<AIAssistantPage> {
         appBar: AppBar(
           leading: IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_forward_rounded)),
           titleSpacing: 0,
-          title: Row(children: [
-            Container(width: 44, height: 44, decoration: BoxDecoration(color: HadirBrand.darkPrimary, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: HadirBrand.darkPrimary.withValues(alpha: .18), blurRadius: 16, offset: const Offset(0, 7))]), child: const Center(child: Text('AI', style: TextStyle(color: HadirBrand.darkPrimaryForeground, fontWeight: FontWeight.w900)))),
-            const SizedBox(width: 11),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [const Text('Hadir AI', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)), const SizedBox(width: 7), _pill(_provider)]),
-              Text(_manager ? 'مساعد المدير' : 'مساعد الموظف', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)),
-            ])),
-          ]),
+          title: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: HadirBrand.darkPrimary,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [BoxShadow(color: HadirBrand.darkPrimary.withValues(alpha: .18), blurRadius: 16, offset: const Offset(0, 7))],
+                ),
+                child: const Center(child: Text('AI', style: TextStyle(color: HadirBrand.darkPrimaryForeground, fontWeight: FontWeight.w900))),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [const Text('Hadir AI', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)), const SizedBox(width: 7), _pill(_provider)]),
+                    Text(_manager ? 'مساعد المدير' : 'مساعد الموظف', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        body: LayoutBuilder(builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 760;
-          return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (wide) SizedBox(width: 280, child: _sidePanel()),
-            Expanded(child: Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 10), child: _chatPanel())),
-          ]);
-        }),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 760;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (wide) SizedBox(width: 280, child: _sidePanel()),
+                Expanded(child: Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 10), child: _chatPanel())),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _pill(String text) => Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: HadirBrand.darkPrimary.withValues(alpha: .10), borderRadius: BorderRadius.circular(30)), child: Text(text, style: const TextStyle(color: HadirBrand.darkPrimary, fontSize: 9, fontWeight: FontWeight.w800)));
+  Widget _pill(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(color: HadirBrand.darkPrimary.withValues(alpha: .10), borderRadius: BorderRadius.circular(30)),
+      child: Text(text, style: const TextStyle(color: HadirBrand.darkPrimary, fontSize: 9, fontWeight: FontWeight.w800)),
+    );
+  }
 
   Widget _sidePanel() {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(padding: const EdgeInsets.fromLTRB(12, 4, 0, 10), child: Card(margin: EdgeInsets.zero, child: ListView(padding: const EdgeInsets.all(16), children: [
-      const Text('المساعد الشخصي', style: TextStyle(color: HadirBrand.darkPrimary, fontSize: 11, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 5),
-      Text(_manager ? 'لوحة المدير' : 'مساعدك', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 5),
-      Text(_manager ? 'تحليل بيانات الموظفين ضمن الصلاحيات الممنوحة لك.' : 'معلومات حضورك وخدماتك دون كشف بيانات الآخرين.', style: TextStyle(color: scheme.onSurfaceVariant, height: 1.6, fontSize: 11)),
-      const SizedBox(height: 18),
-      ..._examples.map((x) => Padding(padding: const EdgeInsets.only(bottom: 8), child: OutlinedButton(onPressed: _busy ? null : () => _ask(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)), child: Text(x, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700))))),
-      const SizedBox(height: 10),
-      Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: scheme.surfaceContainerHighest.withValues(alpha: .65), borderRadius: BorderRadius.circular(16)), child: Row(children: [Icon(_contextLoading ? Icons.sync_rounded : Icons.check_circle_outline_rounded, size: 17, color: HadirBrand.darkPrimary), const SizedBox(width: 8), Expanded(child: Text(_contextLoading ? 'جارٍ تحميل سياق الحساب…' : 'بيانات الحساب متاحة للمساعد حسب الصلاحيات.', style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant)))])),
-    ])));
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 0, 10),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const Text('المساعد الشخصي', style: TextStyle(color: HadirBrand.darkPrimary, fontSize: 11, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 5),
+            Text(_manager ? 'لوحة المدير' : 'مساعدك', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 5),
+            Text(_manager ? 'تحليل بيانات الموظفين ضمن الصلاحيات الممنوحة لك.' : 'معلومات حضورك وخدماتك دون كشف بيانات الآخرين.', style: TextStyle(color: scheme.onSurfaceVariant, height: 1.6, fontSize: 11)),
+            const SizedBox(height: 18),
+            ..._examples.map(_exampleButton),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: scheme.surfaceContainerHighest.withValues(alpha: .65), borderRadius: BorderRadius.circular(16)),
+              child: Row(
+                children: [
+                  Icon(_contextLoading ? Icons.sync_rounded : Icons.check_circle_outline_rounded, size: 17, color: HadirBrand.darkPrimary),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(_contextLoading ? 'جارٍ تحميل سياق الحساب…' : 'بيانات الحساب متاحة للمساعد حسب الصلاحيات.', style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant))),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _exampleButton(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: OutlinedButton(
+        onPressed: _busy ? null : () => _ask(text),
+        style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+        child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+      ),
+    );
   }
 
   Widget _chatPanel() {
     final scheme = Theme.of(context).colorScheme;
-    return Card(margin: EdgeInsets.zero, child: Column(children: [
-      Padding(padding: const EdgeInsets.fromLTRB(18, 16, 18, 12), child: Row(children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_manager ? 'مساعد المدير' : 'مساعد الموظف', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-          const SizedBox(height: 3),
-          Text('اسأل بلغة طبيعية، وسأستخدم بيانات حاضر المسموح بها.', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)),
-        ])),
-        Row(children: [Container(width: 7, height: 7, decoration: BoxDecoration(color: _provider == 'محلي' ? HadirBrand.darkWarning : HadirBrand.darkPrimary, shape: BoxShape.circle)), const SizedBox(width: 6), Text(_provider, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.w700))]),
-      ])),
-      const Divider(height: 1),
-      Expanded(child: _messages.length <= 1 ? _emptyChat() : ListView.builder(controller: _scroll, padding: const EdgeInsets.fromLTRB(14, 18, 14, 14), itemCount: _messages.length, itemBuilder: (_, i) => _bubble(_messages[i]))),
-      if (_busy) Padding(padding: const EdgeInsets.only(bottom: 7, right: 18), child: Align(alignment: Alignment.centerRight, child: Text('Hadir AI يفكر…', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)))),
-      _composer(),
-    ]));
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_manager ? 'مساعد المدير' : 'مساعد الموظف', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                      const SizedBox(height: 3),
+                      Text('اسأل بلغة طبيعية، وسأستخدم بيانات حاضر المسموح بها.', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)),
+                    ],
+                  ),
+                ),
+                Row(children: [Container(width: 7, height: 7, decoration: BoxDecoration(color: _provider == 'محلي' ? HadirBrand.darkWarning : HadirBrand.darkPrimary, shape: BoxShape.circle)), const SizedBox(width: 6), Text(_provider, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.w700))]),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(child: _messages.length <= 1 ? _emptyChat() : ListView.builder(controller: _scroll, padding: const EdgeInsets.fromLTRB(14, 18, 14, 14), itemCount: _messages.length, itemBuilder: (_, i) => _bubble(_messages[i]))),
+          if (_busy) Padding(padding: const EdgeInsets.only(bottom: 7, right: 18), child: Align(alignment: Alignment.centerRight, child: Text('Hadir AI يفكر…', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)))),
+          _composer(),
+        ],
+      ),
+    );
   }
 
-  Widget _emptyChat() => ListView(padding: const EdgeInsets.fromLTRB(16, 28, 16, 18), children: [
-    Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: HadirBrand.darkPrimary.withValues(alpha: .035), borderRadius: BorderRadius.circular(26), border: Border.all(color: HadirBrand.darkPrimary.withValues(alpha: .10))), child: Column(children: [
-      Container(width: 56, height: 56, decoration: BoxDecoration(color: HadirBrand.darkPrimary.withValues(alpha: .10), borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.auto_awesome_rounded, color: HadirBrand.darkPrimary)),
-      const SizedBox(height: 14),
-      const Text('كيف يمكنني مساعدتك؟', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 7),
-      const Text('تحدث معي بشكل طبيعي عن الحضور والغياب والهروب والإحصاءات والخدمات المتاحة لك.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, height: 1.6)),
-    ])),
-    const SizedBox(height: 14),
-    ..._examples.take(3).map((x) => Padding(padding: const EdgeInsets.only(bottom: 9), child: OutlinedButton.icon(onPressed: _busy ? null : () => _ask(x), icon: const Icon(Icons.arrow_back_rounded, size: 17), label: Text(x), style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.all(14))))),
-  ]);
+  Widget _emptyChat() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 28, 16, 18),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(color: HadirBrand.darkPrimary.withValues(alpha: .035), borderRadius: BorderRadius.circular(26), border: Border.all(color: HadirBrand.darkPrimary.withValues(alpha: .10))),
+          child: Column(
+            children: [
+              Container(width: 56, height: 56, decoration: BoxDecoration(color: HadirBrand.darkPrimary.withValues(alpha: .10), borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.auto_awesome_rounded, color: HadirBrand.darkPrimary)),
+              const SizedBox(height: 14),
+              const Text('كيف يمكنني مساعدتك؟', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 7),
+              const Text('تحدث معي بشكل طبيعي عن الحضور والغياب والهروب والإحصاءات والخدمات المتاحة لك.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, height: 1.6)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (final text in _examples.take(3))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 9),
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : () => _ask(text),
+              icon: const Icon(Icons.arrow_back_rounded, size: 17),
+              label: Text(text),
+              style: OutlinedButton.styleFrom(alignment: Alignment.centerRight, padding: const EdgeInsets.all(14)),
+            ),
+          ),
+      ],
+    );
+  }
 
-  Widget _bubble(_Message message) => Align(alignment: message.user ? Alignment.centerLeft : Alignment.centerRight, child: Container(constraints: const BoxConstraints(maxWidth: 560), margin: const EdgeInsets.only(bottom: 11), padding: const EdgeInsets.fromLTRB(15, 12, 15, 13), decoration: BoxDecoration(color: message.user ? HadirBrand.darkPrimary : Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.only(topLeft: const Radius.circular(22), topRight: const Radius.circular(22), bottomLeft: Radius.circular(message.user ? 6 : 22), bottomRight: Radius.circular(message.user ? 22 : 6)), border: message.user ? null : Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: .72))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(message.user ? 'أنت' : 'Hadir AI${message.provider == null ? '' : ' · ${_providerLabel(message.provider!)}'}', style: TextStyle(color: message.user ? HadirBrand.darkPrimaryForeground.withValues(alpha: .72) : Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.w800)), const SizedBox(height: 4), Text(message.text, style: TextStyle(color: message.user ? HadirBrand.darkPrimaryForeground : Theme.of(context).colorScheme.onSurface, height: 1.65, fontSize: 13))]));
+  Widget _bubble(_Message message) {
+    final scheme = Theme.of(context).colorScheme;
+    return Align(
+      alignment: message.user ? Alignment.centerLeft : Alignment.centerRight,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 560),
+        margin: const EdgeInsets.only(bottom: 11),
+        padding: const EdgeInsets.fromLTRB(15, 12, 15, 13),
+        decoration: BoxDecoration(
+          color: message.user ? HadirBrand.darkPrimary : scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(22),
+            topRight: const Radius.circular(22),
+            bottomLeft: Radius.circular(message.user ? 6 : 22),
+            bottomRight: Radius.circular(message.user ? 22 : 6),
+          ),
+          border: message.user ? null : Border.all(color: scheme.outline.withValues(alpha: .72)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message.user ? 'أنت' : 'Hadir AI${message.provider == null ? '' : ' · ${_providerLabel(message.provider!)}'}', style: TextStyle(color: message.user ? HadirBrand.darkPrimaryForeground.withValues(alpha: .72) : scheme.onSurfaceVariant, fontSize: 9, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(message.text, style: TextStyle(color: message.user ? HadirBrand.darkPrimaryForeground : scheme.onSurface, height: 1.65, fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+  }
 
-  Widget _composer() => SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(10, 7, 10, 11), child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-    Expanded(child: TextField(controller: _question, minLines: 1, maxLines: 4, textInputAction: TextInputAction.newline, onSubmitted: (_) => _ask(), decoration: const InputDecoration(hintText: 'اكتب سؤالك هنا…'))),
-    const SizedBox(width: 8),
-    SizedBox(width: 48, height: 48, child: FilledButton(onPressed: _busy ? null : () => _ask(), style: FilledButton.styleFrom(padding: EdgeInsets.zero), child: const Icon(Icons.arrow_upward_rounded))),
-  ]));
+  Widget _composer() {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 7, 10, 11),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(child: TextField(controller: _question, minLines: 1, maxLines: 4, textInputAction: TextInputAction.newline, onSubmitted: (_) => _ask(), decoration: const InputDecoration(hintText: 'اكتب سؤالك هنا…'))),
+            const SizedBox(width: 8),
+            SizedBox(width: 48, height: 48, child: FilledButton(onPressed: _busy ? null : () => _ask(), style: FilledButton.styleFrom(padding: EdgeInsets.zero), child: const Icon(Icons.arrow_upward_rounded))),
+          ],
+        ),
+      ),
+    );
+  }
 }
