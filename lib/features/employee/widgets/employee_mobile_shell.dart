@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/hadir_theme_controller.dart';
+import '../../../core/session.dart';
 
 /// Android/iOS employee shell.
 ///
@@ -240,6 +241,7 @@ class EmployeeMobileShell extends StatelessWidget {
 
   Future<void> _logout(BuildContext context) async {
     Navigator.of(context).pop();
-    await HadirThemeController.instance.logout(context);
+    await HadirSession().clear();
+    if (context.mounted) context.go('/login');
   }
 }
