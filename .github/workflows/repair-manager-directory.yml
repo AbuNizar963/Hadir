@@ -1,0 +1,30 @@
+name: Repair manager directory syntax
+on:
+  push:
+    branches: [Apps]
+permissions:
+  contents: write
+jobs:
+  repair:
+    if: contains(github.event.head_commit.message, 'repair manager directory syntax') == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repair missing Scaffold close
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('lib/pages/manager_employees_directory_page.dart')
+          lines=p.read_text().splitlines()
+          if len(lines) >= 455 and lines[454].strip() == ');':
+              lines[454] = '    ));'
+              p.write_text('\n'.join(lines)+'\n')
+          else:
+              raise SystemExit(f'Unexpected line 455: {lines[454] if len(lines)>=455 else "missing"!r}')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/pages/manager_employees_directory_page.dart
+          git diff --cached --quiet && exit 0
+          git commit -m 'repair manager directory syntax'
+          git push origin Apps
