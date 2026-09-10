@@ -52,7 +52,7 @@ class _HadirAppState extends State<HadirApp> {
       theme: HadirBrand.theme(),
       darkTheme: HadirBrand.theme(brightness: Brightness.dark),
       themeMode: _themeController.mode,
-      routerConfig: buildModernRouter(),
+      routerConfig: buildAppRouter(),
     );
   }
 }
@@ -77,9 +77,6 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // A long-lived app must not wait for a restart to discover a newly
-    // published APK. Resume checks cover normal foregrounding; this periodic
-    // check covers a user who leaves HADIR open for an extended period.
     _periodicCheck = Timer.periodic(const Duration(minutes: 15), (_) {
       unawaited(_checkForUpdate());
     });
@@ -109,9 +106,6 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap>
     try {
       final update = await _updater.check();
       if (!mounted || update == null || _dialogVisible) return;
-      // Do not repeatedly interrupt the user for the same release when the
-      // app resumes or the 15-minute background check fires. A newer release
-      // is always eligible to prompt again.
       if (_lastPromptedVersion == update.versionCode) return;
       _lastPromptedVersion = update.versionCode;
       _dialogVisible = true;
