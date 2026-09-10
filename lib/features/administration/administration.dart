@@ -5,6 +5,7 @@
 library;
 
 export 'pages/admin_mobile_home_page.dart';
+export 'pages/admin_home_page.dart';
 export 'pages/admin_mobile_settings_page.dart';
 export 'pages/admin_audit_page.dart';
 export 'pages/admin_management_page.dart';
