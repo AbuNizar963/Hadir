@@ -1,4 +1,4 @@
-/// Administration audit page compatibility entry point.
+/// Administration audit page public implementation entry point.
 library;
 
-export '../../../pages/admin_audit_page.dart';
+export 'admin_audit_implementation.dart';
