@@ -23,7 +23,7 @@ on:
       - 'analysis_options.yaml'
       - '.github/workflows/flutter-mobile.yml'
 
-# Final verification after dashboard warning cleanup
+# Final verification after required dashboard panel restoration
 jobs:
   android:
     runs-on: ubuntu-latest
