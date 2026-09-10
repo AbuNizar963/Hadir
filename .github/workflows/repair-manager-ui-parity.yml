@@ -1,0 +1,53 @@
+name: Repair manager employee directory UI parity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply targeted Flutter parity fixes
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('lib/pages/manager_employees_directory_page.dart')
+          s = p.read_text(encoding='utf-8')
+          replacements = [
+            ("final initial = name.trim().isEmpty ? 'م' : name.trim().substring(0, 1);", "final initials = name.trim().split(RegExp(r'\\s+')).where((x) => x.isNotEmpty).take(2).map((x) => x.substring(0, 1)).join();\n    final initial = initials.isEmpty ? 'م' : initials;"),
+            ("Flexible(child: Text('الانصراف المبكر: ${e['earlyCheckoutGraceMinutes'] ?? e['earlyCheckoutMinutes'] ?? 0} دقيقة', textAlign: TextAlign.end, style: const TextStyle(fontSize: 9)))", "Flexible(child: Text(((e['earlyCheckoutGraceMinutes'] ?? e['earlyCheckoutMinutes'] ?? 0) as num?)?.toInt() == 0 ? 'الانصراف المبكر: بعد انتهاء الدوام' : 'الانصراف المبكر: ${e['earlyCheckoutGraceMinutes'] ?? e['earlyCheckoutMinutes']} دقيقة', textAlign: TextAlign.end, style: const TextStyle(fontSize: 9)))"),
+            ("var vip = employee['isVip'] == true;\n    var autoIn = employee['autoCheckIn'] == true;\n    var autoOut = employee['autoCheckOut'] == true;", "final vip = employee['isVip'] == true;\n    final enabled = !vip;"),
+            ("final saved = await showDialog<bool>(", "final saved = await showDialog<bool>("),
+          ]
+          for old, new in replacements[:2]:
+            if old not in s:
+              raise SystemExit(f'missing expected text: {old[:80]}')
+            s = s.replace(old, new, 1)
+          start = s.index("  Future<void> _workforce(Map<String, dynamic> employee) async {")
+          end = s.index("\n  Future<void> _attendance", start)
+          old_block = s[start:end]
+          new_block = """  Future<void> _workforce(Map<String, dynamic> employee) async {
+    final id = '${employee['id'] ?? ''}';
+    final enabled = employee['isVip'] != true;
+    await _request('PATCH', '/api/workforce/live', data: {
+      'employeeId': id,
+      'isVip': enabled,
+      'autoCheckIn': enabled,
+      'autoCheckOut': enabled,
+    });
+  }
+"""
+          s = s[:start] + new_block + s[end:]
+          p.write_text(s, encoding='utf-8')
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/pages/manager_employees_directory_page.dart
+          git diff --cached --quiet && exit 0
+          git commit -m "align manager employee cards with web reference"
+          git push origin Apps
