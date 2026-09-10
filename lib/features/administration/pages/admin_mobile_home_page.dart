@@ -6,6 +6,7 @@ import 'admin_mobile_dashboard_page.dart';
 ///
 /// The router owns the shared AdminMobileShell. This page must therefore
 /// provide dashboard content only, preventing duplicate headers and bars.
+/// The dashboard itself follows the canonical HADIR reference layout.
 class AdminMobileHomePage extends StatelessWidget {
   const AdminMobileHomePage({super.key});
 
