@@ -148,39 +148,31 @@ class UpdaterService {
     );
 
     final location = response.headers.value('location');
-    final body = response.data as String? ?? '';
     final candidates = <String>[
       if (location != null && location.isNotEmpty) location,
-      body,
+      (response.data as String?) ?? '',
     ];
 
     int? code;
     String? tag;
-    final tagPattern = RegExp(
-      r'(?:^|/)(android-v1\.0\.(\d+))(?:$|[?#&<>" ])',
-    );
+    final tagPattern = RegExp(r'(?:^|/)(android-v1\\.0\\.(\\d+))(?:$|[?#&<>" ])');
     for (final candidate in candidates) {
       final match = tagPattern.firstMatch(candidate);
       if (match == null) continue;
       final parsed = int.tryParse(match.group(2) ?? '');
-      final matchedTag = match.group(1);
-      if (parsed == null || matchedTag == null || parsed <= currentCode) {
-        continue;
-      }
+      if (parsed == null || parsed <= currentCode) continue;
       if (code == null || parsed > code) {
         code = parsed;
-        tag = matchedTag;
+        tag = match.group(1);
       }
     }
 
-    final resolvedCode = code;
-    final resolvedTag = tag;
-    if (resolvedCode == null || resolvedTag == null) return null;
+    if (code == null || tag == null) return null;
 
     return UpdateInfo(
-      versionCode: resolvedCode,
-      versionName: '1.0.$resolvedCode',
-      downloadUrl: '$_releaseDownloadBase/$resolvedTag/app-release.apk',
+      versionCode: code,
+      versionName: '1.0.$code',
+      downloadUrl: '$_releaseDownloadBase/$tag/app-release.apk',
       releaseNotes: '',
     );
   }
@@ -196,7 +188,7 @@ class UpdaterService {
       if (release['draft'] == true || release['prerelease'] == true) continue;
 
       final tag = (release['tag_name'] ?? '').toString().trim();
-      final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
+      final match = RegExp(r'^android-v1\\.0\\.(\\d+)$').firstMatch(tag);
       final code = int.tryParse(match?.group(1) ?? '');
       if (code == null || code <= currentCode ||
           (bestCode != null && code <= bestCode)) {
@@ -224,20 +216,14 @@ class UpdaterService {
       bestDownloadUrl = downloadUrl;
     }
 
-    final resolvedCode = bestCode;
-    final resolvedRelease = bestRelease;
-    final resolvedDownloadUrl = bestDownloadUrl;
-    if (resolvedCode == null ||
-        resolvedRelease == null ||
-        resolvedDownloadUrl == null) {
+    if (bestCode == null || bestRelease == null || bestDownloadUrl == null) {
       return null;
     }
-
     return UpdateInfo(
-      versionCode: resolvedCode,
-      versionName: '1.0.$resolvedCode',
-      downloadUrl: resolvedDownloadUrl,
-      releaseNotes: (resolvedRelease['body'] ?? '').toString().trim(),
+      versionCode: bestCode,
+      versionName: '1.0.$bestCode',
+      downloadUrl: bestDownloadUrl,
+      releaseNotes: (bestRelease['body'] ?? '').toString().trim(),
     );
   }
 
@@ -256,15 +242,15 @@ class UpdaterService {
       ),
     );
 
-    final xml = response.data as String? ?? '';
+    final xml = (response.data as String?) ?? '';
     if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
 
     final entryPattern = RegExp(
-      r'<entry\b[\s\S]*?</entry>',
+      r'<entry\\b[\\s\\S]*?</entry>',
       caseSensitive: false,
     );
     final tagPattern = RegExp(
-      r'(?:/|%2F)(android-v1\.0\.(\d+))(?:<|&|"|\?)',
+      r'(?:/|%2F)(android-v1\\.0\\.(\\d+))(?:<|&|"|\\?)',
       caseSensitive: false,
     );
 
@@ -275,23 +261,20 @@ class UpdaterService {
       final entry = match.group(0) ?? '';
       final tagMatch = tagPattern.firstMatch(entry);
       final code = int.tryParse(tagMatch?.group(2) ?? '');
-      final tag = tagMatch?.group(1);
-      if (code == null || tag == null || code <= currentCode ||
+      if (code == null || code <= currentCode ||
           (bestCode != null && code <= bestCode)) {
         continue;
       }
       bestCode = code;
-      bestTag = tag;
+      bestTag = tagMatch?.group(1);
     }
 
-    final resolvedCode = bestCode;
-    final resolvedTag = bestTag;
-    if (resolvedCode == null || resolvedTag == null) return null;
+    if (bestCode == null || bestTag == null) return null;
 
     return UpdateInfo(
-      versionCode: resolvedCode,
-      versionName: '1.0.$resolvedCode',
-      downloadUrl: '$_releaseDownloadBase/$resolvedTag/app-release.apk',
+      versionCode: bestCode,
+      versionName: '1.0.$bestCode',
+      downloadUrl: '$_releaseDownloadBase/$bestTag/app-release.apk',
       releaseNotes: '',
     );
   }
