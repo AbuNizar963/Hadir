@@ -1,4 +1,4 @@
-# rerun analyzer repair
+# refined analyzer repair
 name: Repair admin dashboard analyzer
 on:
   push:
@@ -21,21 +21,22 @@ jobs:
           p = Path('lib/features/administration/pages/admin_mobile_dashboard_page.dart')
           s = p.read_text(encoding='utf-8')
           replacements = [
-              ("  String _name = 'الإدارة';\n", ''),
-              ("  String get _roleLabel => switch (_role) {\n        'owner' => 'المالك',\n        'manager' => 'المدير',\n        'supervisor' => 'المشرف',\n        _ => 'الإدارة',\n      };\n\n", ''),
-              ("  int get _openViolations => _violations\n      .where((raw) => raw is Map && '${raw['status'] ?? 'open'}'.toLowerCase() != 'resolved')\n      .length;\n", ''),
-              ("  Widget _sectionTitle(String title, String subtitle) => Column(\n        crossAxisAlignment: CrossAxisAlignment.start,\n        children: [\n          Text(\n            title,\n            style: TextStyle(\n              color: _ink,\n              fontSize: 18,\n              fontWeight: FontWeight.w900,\n            ),\n          ),\n          const SizedBox(height: 3),\n          Text(\n            subtitle,\n            style: TextStyle(color: _muted, fontSize: 10.5),\n          ),\n        ],\n      );\n\n", ''),
+              ("  String _role = 'admin';\n", ''),
+              ("  List<dynamic> _violations = [];\n", ''),
+              ("      final name = user is Map ? '${user['name'] ?? 'الإدارة'}' : 'الإدارة';\n", ''),
+              ("        _role = role;\n", ''),
           ]
           for old, new in replacements:
               if old not in s:
-                  raise SystemExit('expected dashboard fragment not found')
+                  raise SystemExit(f'expected dashboard fragment not found: {old[:50]}')
               s = s.replace(old, new, 1)
-          s = s.replace("        _name = name;\n", "")
+          s = s.replace("        _violations = violations;\n", "")
+          s = s.replace("      final violations = await api.violations(limit: 200);\n", "")
           p.write_text(s, encoding='utf-8')
       - name: Commit dashboard analyzer repair
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add lib/features/administration/pages/admin_mobile_dashboard_page.dart
-          git commit -m 'fix: remove unused dashboard declarations'
+          git commit -m 'fix: remove unused dashboard state'
           git push origin Apps
