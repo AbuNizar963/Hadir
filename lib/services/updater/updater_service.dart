@@ -52,7 +52,7 @@ class UpdaterService {
     receiveTimeout: const Duration(seconds: 30),
     headers: {
       'Accept': 'application/vnd.github+json',
-      'User-Agent': 'Hadir-Flutter-Updater',
+      'User-Agent': 'Hadir-Flutter-Updater-484-Test',
       'Cache-Control': 'no-cache, no-store, max-age=0',
       'Pragma': 'no-cache',
     },
