@@ -151,9 +151,7 @@ class UpdaterService {
     final responseData = response.data;
     final responseText = responseData is String
         ? responseData
-        : responseData == null
-            ? ''
-            : responseData.toString();
+        : responseData.toString();
     final candidates = <String>[
       if (location != null && location.isNotEmpty) location,
       responseText,
@@ -251,9 +249,7 @@ class UpdaterService {
     final responseData = response.data;
     final xml = responseData is String
         ? responseData
-        : responseData == null
-            ? ''
-            : responseData.toString();
+        : responseData.toString();
     if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
 
     final entryPattern = RegExp(
