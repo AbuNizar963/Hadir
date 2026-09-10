@@ -38,8 +38,8 @@ class InstallPermissionRequiredException implements Exception {}
 class UpdaterService {
   static const _channel = MethodChannel('hadir/updater');
   static const _progressChannel = EventChannel('hadir/updater_progress');
-  static const _latestReleaseUrl =
-      'https://api.github.com/repos/AbuNizar963/Hadir/releases/latest';
+  static const _releasesUrl =
+      'https://api.github.com/repos/AbuNizar963/Hadir/releases';
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 10),
@@ -74,37 +74,60 @@ class UpdaterService {
       try {
         final currentCode = await currentVersionCode();
         final response = await _dio.get<dynamic>(
-          _latestReleaseUrl,
-          queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
+          _releasesUrl,
+          queryParameters: {
+            'per_page': 20,
+            '_t': DateTime.now().millisecondsSinceEpoch,
+          },
           options: Options(responseType: ResponseType.json),
         );
-        final release = response.data is String
-            ? jsonDecode(response.data as String) as Map<String, dynamic>
-            : Map<String, dynamic>.from(response.data as Map);
-        if (release['draft'] == true || release['prerelease'] == true) return null;
 
-        final tag = (release['tag_name'] ?? '').toString().trim();
-        final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
-        final code = int.tryParse(match?.group(1) ?? '');
-        if (code == null || code <= currentCode) return null;
+        final rawReleases = response.data is String
+            ? jsonDecode(response.data as String)
+            : response.data;
+        if (rawReleases is! List) return null;
 
-        final assets = (release['assets'] as List<dynamic>?) ?? const [];
-        String? downloadUrl;
-        for (final item in assets) {
-          final asset = Map<String, dynamic>.from(item as Map);
-          final name = (asset['name'] ?? '').toString();
-          if (name == 'app-release.apk' || name == 'app-release-signed.apk') {
-            downloadUrl = asset['browser_download_url']?.toString();
-            if (downloadUrl != null && downloadUrl.isNotEmpty) break;
+        Map<String, dynamic>? bestRelease;
+        int? bestCode;
+        String? bestDownloadUrl;
+
+        for (final rawRelease in rawReleases) {
+          if (rawRelease is! Map) continue;
+          final release = Map<String, dynamic>.from(rawRelease);
+          if (release['draft'] == true || release['prerelease'] == true) continue;
+
+          final tag = (release['tag_name'] ?? '').toString().trim();
+          final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
+          final code = int.tryParse(match?.group(1) ?? '');
+          if (code == null || code <= currentCode || (bestCode != null && code <= bestCode)) continue;
+
+          final assets = (release['assets'] as List<dynamic>?) ?? const [];
+          String? downloadUrl;
+          for (final item in assets) {
+            if (item is! Map) continue;
+            final asset = Map<String, dynamic>.from(item);
+            final name = (asset['name'] ?? '').toString();
+            if (name == 'app-release.apk' || name == 'app-release-signed.apk') {
+              final candidate = asset['browser_download_url']?.toString();
+              if (candidate != null && candidate.isNotEmpty) {
+                downloadUrl = candidate;
+                break;
+              }
+            }
           }
-        }
-        if (downloadUrl == null || downloadUrl.isEmpty) return null;
+          if (downloadUrl == null || downloadUrl.isEmpty) continue;
 
+          bestCode = code;
+          bestRelease = release;
+          bestDownloadUrl = downloadUrl;
+        }
+
+        if (bestCode == null || bestRelease == null || bestDownloadUrl == null) return null;
         return UpdateInfo(
-          versionCode: code,
-          versionName: '1.0.$code',
-          downloadUrl: downloadUrl,
-          releaseNotes: (release['body'] ?? '').toString().trim(),
+          versionCode: bestCode,
+          versionName: '1.0.$bestCode',
+          downloadUrl: bestDownloadUrl,
+          releaseNotes: (bestRelease['body'] ?? '').toString().trim(),
         );
       } catch (error) {
         lastError = error;
