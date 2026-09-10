@@ -224,9 +224,10 @@ class _EmployeeMobileShellState extends State<EmployeeMobileShell> {
 
   Widget _navigation(BuildContext context, int selected) {
     final scheme = Theme.of(context).colorScheme;
+    // Lucide equivalents used by the website: LayoutDashboard, Building2, Clock3, UserRound.
     final items = const [
       (Icons.dashboard_outlined, Icons.dashboard_rounded, 'لوحة الموظف'),
-      (Icons.business_center_outlined, Icons.business_center_rounded, 'مركز الموظف'),
+      (Icons.business_outlined, Icons.business_rounded, 'مركز الموظف'),
       (Icons.access_time_outlined, Icons.access_time_filled, 'سجل العمل'),
       (Icons.person_outline_rounded, Icons.person_rounded, 'الملف الشخصي'),
     ];
