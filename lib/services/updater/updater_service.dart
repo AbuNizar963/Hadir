@@ -130,7 +130,7 @@ class UpdaterService {
   }
 
   Future<UpdateInfo?> _checkLatestRelease(int currentCode) async {
-    final response = await _dio.get<String>(
+    final response = await _dio.get<dynamic>(
       _latestReleaseUrl,
       queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
       options: Options(
@@ -148,9 +148,13 @@ class UpdaterService {
     );
 
     final location = response.headers.value('location');
+    final responseData = response.data;
+    final responseText = responseData is String
+        ? responseData
+        : responseData?.toString() ?? '';
     final candidates = <String>[
       if (location != null && location.isNotEmpty) location,
-      response.data,
+      responseText,
     ];
 
     int? code;
@@ -228,7 +232,7 @@ class UpdaterService {
   }
 
   Future<UpdateInfo?> _checkAtomFeed(int currentCode) async {
-    final response = await _dio.get<String>(
+    final response = await _dio.get<dynamic>(
       _releasesAtomUrl,
       queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
       options: Options(
@@ -242,7 +246,10 @@ class UpdaterService {
       ),
     );
 
-    final xml = response.data;
+    final responseData = response.data;
+    final xml = responseData is String
+        ? responseData
+        : responseData?.toString() ?? '';
     if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
 
     final entryPattern = RegExp(
