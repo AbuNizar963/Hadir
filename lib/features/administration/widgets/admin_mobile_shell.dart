@@ -120,7 +120,7 @@ class AdminMobileShell extends StatelessWidget {
       (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'التقارير'),
     ];
     return Container(
-      height: 58,
+      height: 54,
       decoration: BoxDecoration(
         color: scheme.surface.withValues(alpha: .98),
         border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .65))),
