@@ -47,7 +47,7 @@ class AdminMobileSettingsPage extends StatelessWidget {
               'إدارة النظام والهوية والمواقع والحسابات والأمان',
               style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11.5, height: 1.5),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             _companyCard(context),
             const SizedBox(height: 14),
             Text(
