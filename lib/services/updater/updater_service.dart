@@ -150,20 +150,25 @@ class UpdaterService {
     final location = response.headers.value('location');
     final candidates = <String>[
       if (location != null && location.isNotEmpty) location,
-      response.data,
+      response.data ?? '',
     ];
 
     int? code;
     String? tag;
-    final tagPattern = RegExp(r'(?:^|/)(android-v1\.0\.(\d+))(?:$|[?#&<>" ])');
+    final tagPattern = RegExp(
+      r'(?:^|/)(android-v1\.0\.(\d+))(?:$|[?#&<>" ])',
+    );
     for (final candidate in candidates) {
       final match = tagPattern.firstMatch(candidate);
       if (match == null) continue;
       final parsed = int.tryParse(match.group(2) ?? '');
-      if (parsed == null || parsed <= currentCode) continue;
+      final matchedTag = match.group(1);
+      if (parsed == null || matchedTag == null || parsed <= currentCode) {
+        continue;
+      }
       if (code == null || parsed > code) {
         code = parsed;
-        tag = match.group(1);
+        tag = matchedTag;
       }
     }
 
@@ -261,12 +266,13 @@ class UpdaterService {
       final entry = match.group(0) ?? '';
       final tagMatch = tagPattern.firstMatch(entry);
       final code = int.tryParse(tagMatch?.group(2) ?? '');
-      if (code == null || code <= currentCode ||
+      final tag = tagMatch?.group(1);
+      if (code == null || tag == null || code <= currentCode ||
           (bestCode != null && code <= bestCode)) {
         continue;
       }
       bestCode = code;
-      bestTag = tagMatch?.group(1);
+      bestTag = tag;
     }
 
     if (bestCode == null || bestTag == null) return null;
