@@ -20,7 +20,7 @@ class AdminMobileSettingsPage extends StatelessWidget {
           ),
         ),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
           children: [
             Text(
               'HADIR  ·  OWNER',
@@ -42,7 +42,7 @@ class AdminMobileSettingsPage extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 6),
             Text(
               'إدارة النظام والهوية والمواقع والحسابات والأمان',
               style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11, height: 1.5),
