@@ -1,6 +1,7 @@
 name: Flutter App
 
 on:
+  workflow_dispatch:
   push:
     branches: [Apps]
     paths:
