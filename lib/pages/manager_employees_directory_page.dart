@@ -360,8 +360,8 @@ class _ManagerEmployeesDirectoryPageState extends State<ManagerEmployeesDirector
         'specialties': specialties.text.split(',').map((x) => x.trim()).where((x) => x.isNotEmpty).toList(),
       };
       if (pin.text.trim().isNotEmpty) payload['pin'] = pin.text.trim();
-      await request('PATCH', '/api/employees/${employee['id']}', data: payload);
-      await request('PUT', '/api/employees/${employee['id']}/checkout-policy', data: {'earlyCheckoutMinutes': (int.tryParse(early.text.trim()) ?? 0).clamp(0, 1440)});
+      await _request('PATCH', '/api/employees/${employee['id']}', data: payload);
+      await _request('PUT', '/api/employees/${employee['id']}/checkout-policy', data: {'earlyCheckoutMinutes': (int.tryParse(early.text.trim()) ?? 0).clamp(0, 1440)});
     }
     name.dispose();
     job.dispose();
