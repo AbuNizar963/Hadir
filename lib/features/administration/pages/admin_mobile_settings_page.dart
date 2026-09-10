@@ -8,52 +8,64 @@ class AdminMobileSettingsPage extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 24, 18, 28),
-        children: [
-          Text(
-            'HADIR  ·  OWNER',
-            textDirection: TextDirection.ltr,
-            style: TextStyle(
-              color: scheme.onSurfaceVariant,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.5,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: const Alignment(0.95, -0.9),
+            radius: 1.25,
+            colors: [
+              scheme.primary.withValues(alpha: .075),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 24, 18, 28),
+          children: [
+            Text(
+              'HADIR  ·  OWNER',
+              textDirection: TextDirection.ltr,
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'الإعدادات',
-            style: TextStyle(
-              color: scheme.onSurface,
-              fontSize: 28,
-              height: 1.1,
-              fontWeight: FontWeight.w900,
+            const SizedBox(height: 5),
+            Text(
+              'الإعدادات',
+              style: TextStyle(
+                color: scheme.onSurface,
+                fontSize: 28,
+                height: 1.1,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            'إدارة النظام والهوية والمواقع والحسابات والأمان',
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11.5, height: 1.5),
-          ),
-          const SizedBox(height: 18),
-          _companyCard(context),
-          const SizedBox(height: 14),
-          Text(
-            'الإعدادات',
-            style: TextStyle(color: scheme.onSurface, fontSize: 16, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'اختر قسمًا لفتح واجهته الإدارية',
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5),
-          ),
-          const SizedBox(height: 9),
-          _section(context, Icons.person_outline_rounded, 'الهوية والحسابات', 'هوية الشركة وحسابات الإدارة'),
-          _section(context, Icons.location_on_outlined, 'المواقع و QR', 'مواقع العمل ورموز QR'),
-          _section(context, Icons.admin_panel_settings_outlined, 'الأمان والصلاحيات', 'الحسابات والصلاحيات الإدارية'),
-          _section(context, Icons.tune_rounded, 'المتقدم والتشخيص', 'التشخيص وإعادة التهيئة والأدوات المتقدمة'),
-        ],
+            const SizedBox(height: 7),
+            Text(
+              'إدارة النظام والهوية والمواقع والحسابات والأمان',
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11.5, height: 1.5),
+            ),
+            const SizedBox(height: 18),
+            _companyCard(context),
+            const SizedBox(height: 14),
+            Text(
+              'الإعدادات',
+              style: TextStyle(color: scheme.onSurface, fontSize: 16, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'اختر قسمًا لفتح واجهته الإدارية',
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5),
+            ),
+            const SizedBox(height: 9),
+            _section(context, Icons.person_outline_rounded, 'الهوية والحسابات', 'هوية الشركة وحسابات الإدارة'),
+            _section(context, Icons.location_on_outlined, 'المواقع و QR', 'مواقع العمل ورموز QR'),
+            _section(context, Icons.admin_panel_settings_outlined, 'الأمان والصلاحيات', 'الحسابات والصلاحيات الإدارية'),
+            _section(context, Icons.tune_rounded, 'المتقدم والتشخيص', 'التشخيص وإعادة التهيئة والأدوات المتقدمة'),
+          ],
+        ),
       ),
     );
   }
