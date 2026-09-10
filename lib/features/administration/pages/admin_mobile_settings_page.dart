@@ -52,7 +52,7 @@ class AdminMobileSettingsPage extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               'الإعدادات',
-              style: TextStyle(color: scheme.onSurface, fontSize: 16, fontWeight: FontWeight.w900),
+              style: TextStyle(color: scheme.onSurface, fontSize: 14, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 4),
             Text(
