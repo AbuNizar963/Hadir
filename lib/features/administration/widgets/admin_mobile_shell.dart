@@ -60,10 +60,10 @@ class AdminMobileShell extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 390;
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: EdgeInsets.fromLTRB(compact ? 12 : 16, 10, compact ? 12 : 16, 10),
+      padding: EdgeInsets.fromLTRB(compact ? 8 : 12, 7, compact ? 8 : 12, 7),
       decoration: BoxDecoration(
         color: scheme.surface.withValues(alpha: .96),
-        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .75))),
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .65))),
       ),
       child: Row(
         children: [
@@ -71,29 +71,29 @@ class AdminMobileShell extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: compact ? 44 : 48,
-                  height: compact ? 44 : 48,
+                  width: compact ? 38 : 42,
+                  height: compact ? 38 : 42,
                   decoration: BoxDecoration(
                     color: scheme.primary.withValues(alpha: .10),
                     shape: BoxShape.circle,
-                    border: Border.all(color: scheme.primary.withValues(alpha: .55), width: 1.4),
+                    border: Border.all(color: scheme.primary.withValues(alpha: .55), width: 1.2),
                   ),
-                  child: Icon(Icons.wb_sunny_rounded, color: scheme.primary, size: compact ? 26 : 29),
+                  child: Icon(Icons.wb_sunny_rounded, color: scheme.primary, size: compact ? 22 : 24),
                 ),
-                const SizedBox(width: 9),
+                const SizedBox(width: 7),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       'حاضر',
-                      style: TextStyle(color: scheme.onSurface, fontSize: compact ? 20 : 22, height: 1, fontWeight: FontWeight.w900),
+                      style: TextStyle(color: scheme.onSurface, fontSize: compact ? 18 : 20, height: 1, fontWeight: FontWeight.w900),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
                     Text(
                       'HADIR  •  v1.1',
                       textDirection: TextDirection.ltr,
-                      style: TextStyle(color: scheme.onSurfaceVariant, fontSize: compact ? 9 : 10, fontWeight: FontWeight.w700, letterSpacing: .4),
+                      style: TextStyle(color: scheme.onSurfaceVariant, fontSize: compact ? 8 : 9, fontWeight: FontWeight.w700, letterSpacing: .35),
                     ),
                   ],
                 ),
@@ -101,9 +101,9 @@ class AdminMobileShell extends StatelessWidget {
             ),
           ),
           _headerButton(context, icon: Icons.wb_sunny_outlined, label: 'الطقس', compact: compact, onTap: () => context.push('/weather')),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           _headerButton(context, icon: Icons.notifications_none_rounded, label: 'الإشعارات', compact: compact, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()))),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           _headerButton(context, icon: Icons.menu_rounded, label: 'القائمة', compact: compact, onTap: () => _showOptions(context)),
         ],
       ),
@@ -120,37 +120,37 @@ class AdminMobileShell extends StatelessWidget {
       (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'التقارير'),
     ];
     return Container(
-      height: 76,
+      height: 58,
       decoration: BoxDecoration(
         color: scheme.surface.withValues(alpha: .98),
-        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .75))),
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .65))),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 4),
+        separatorBuilder: (_, __) => const SizedBox(width: 3),
         itemBuilder: (context, index) {
           final item = items[index];
           final active = selected == index;
           return InkWell(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             onTap: () => _go(context, index),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              constraints: const BoxConstraints(minWidth: 92),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              constraints: const BoxConstraints(minWidth: 82),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: active ? scheme.primary.withValues(alpha: .13) : Colors.transparent,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: active ? scheme.primary.withValues(alpha: .35) : Colors.transparent, width: 1.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: active ? scheme.primary.withValues(alpha: .35) : Colors.transparent, width: 1.1),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 24),
-                  const SizedBox(height: 3),
-                  Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 10.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700)),
+                  Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 20),
+                  const SizedBox(height: 1),
+                  Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 9, fontWeight: active ? FontWeight.w900 : FontWeight.w700)),
                 ],
               ),
             ),
@@ -166,21 +166,19 @@ class AdminMobileShell extends StatelessWidget {
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         foregroundColor: scheme.onSurface,
-        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 11, vertical: compact ? 9 : 10),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 8, vertical: compact ? 6 : 7),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        side: BorderSide(color: scheme.outlineVariant),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .85)),
         backgroundColor: scheme.surface.withValues(alpha: .55),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: compact ? 20 : 21),
-          if (!compact) ...[
-            const SizedBox(width: 5),
-            Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800)),
-          ],
+          Icon(icon, size: compact ? 16 : 18),
+          const SizedBox(width: 3),
+          Text(label, style: TextStyle(fontSize: compact ? 8 : 9, fontWeight: FontWeight.w800)),
         ],
       ),
     );
