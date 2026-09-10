@@ -155,7 +155,7 @@ class UpdaterService {
 
     int? code;
     String? tag;
-    final tagPattern = RegExp(r'(?:^|/)(android-v1\\.0\\.(\\d+))(?:$|[?#&<>" ])');
+    final tagPattern = RegExp(r'(?:^|/)(android-v1\.0\.(\d+))(?:$|[?#&<>" ])');
     for (final candidate in candidates) {
       final match = tagPattern.firstMatch(candidate);
       if (match == null) continue;
@@ -188,7 +188,7 @@ class UpdaterService {
       if (release['draft'] == true || release['prerelease'] == true) continue;
 
       final tag = (release['tag_name'] ?? '').toString().trim();
-      final match = RegExp(r'^android-v1\\.0\\.(\\d+)$').firstMatch(tag);
+      final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
       final code = int.tryParse(match?.group(1) ?? '');
       if (code == null || code <= currentCode ||
           (bestCode != null && code <= bestCode)) {
@@ -246,11 +246,11 @@ class UpdaterService {
     if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
 
     final entryPattern = RegExp(
-      r'<entry\\b[\\s\\S]*?</entry>',
+      r'<entry\b[\s\S]*?</entry>',
       caseSensitive: false,
     );
     final tagPattern = RegExp(
-      r'(?:/|%2F)(android-v1\\.0\\.(\\d+))(?:<|&|"|\\?)',
+      r'(?:/|%2F)(android-v1\.0\.(\d+))(?:<|&|"|\?)',
       caseSensitive: false,
     );
 
