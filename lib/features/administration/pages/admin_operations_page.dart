@@ -1,4 +1,4 @@
-/// Administration operations page compatibility entry point.
+/// Administration operations page public entry point.
 library;
 
-export '../../../pages/admin_operations_page.dart';
+export 'admin_operations_implementation.dart';
