@@ -23,6 +23,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   Color get _ink => Theme.of(context).colorScheme.onSurface;
   Color get _muted => Theme.of(context).colorScheme.onSurfaceVariant;
   Color get _surface => Theme.of(context).colorScheme.surface;
+  Color get _panel => Theme.of(context).colorScheme.surfaceContainerHighest;
   Color get _border => Theme.of(context).colorScheme.outlineVariant;
   Color get _primary => Theme.of(context).colorScheme.primary;
 
