@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: hadir-android-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-android-release:
     name: Build signed Flutter Android APK
