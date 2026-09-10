@@ -15,9 +15,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   final _session = HadirSession();
   bool _loading = true;
   String? _error;
-  String _role = 'admin';
   List<Map<String, dynamic>> _employees = [];
-  List<dynamic> _violations = [];
   List<dynamic> _escapes = [];
   String _filter = 'all';
   String _search = '';
@@ -51,11 +49,9 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       final me = await api.me();
       final user = me['user'];
       final role = user is Map ? '${user['role'] ?? 'admin'}'.toLowerCase() : 'admin';
-      final name = user is Map ? '${user['name'] ?? 'الإدارة'}' : 'الإدارة';
 
       final daily = await api.dailyStatus(date: _today());
       final rows = _asMapList(daily['employees']);
-      final violations = await api.violations(limit: 200);
 
       List<dynamic> escapes = [];
       try {
@@ -70,9 +66,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
 
       if (!mounted) return;
       setState(() {
-        _role = role;
         _employees = rows;
-        _violations = violations;
         _escapes = escapes;
         _loading = false;
       });
