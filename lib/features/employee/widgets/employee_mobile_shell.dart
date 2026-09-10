@@ -112,8 +112,6 @@ class _EmployeeMobileShellState extends State<EmployeeMobileShell> {
       (icon: _menuOpen ? Icons.close_rounded : Icons.menu_rounded, label: 'القائمة', action: () => setState(() { _menuOpen = !_menuOpen; _themeMenuOpen = false; })),
       (icon: Icons.notifications_none_rounded, label: 'الإشعارات', action: () async { await context.push('/employee/notifications'); if (mounted) _loadUnreadNotifications(); }),
       (icon: Icons.cloud_outlined, label: 'الطقس', action: () => context.push('/weather')),
-      (icon: Icons.explore_outlined, label: 'القبلة', action: () => context.push('/prayer')),
-      (icon: Icons.smart_toy_outlined, label: 'المساعد', action: () => context.push('/ai')),
     ];
     return Container(
       constraints: const BoxConstraints(minHeight: 76),
