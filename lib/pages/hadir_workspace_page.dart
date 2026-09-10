@@ -5,334 +5,549 @@ import 'package:intl/intl.dart' as intl;
 import '../core/api.dart';
 import '../core/session.dart';
 
-const _green = Color(0xFF0B6B5A);
-const _greenDark = Color(0xFF064B40);
-const _soft = Color(0xFFE8F5F0);
-const _bg = Color(0xFFF6F8F7);
-const _ink = Color(0xFF142D27);
-const _muted = Color(0xFF71817C);
-const _line = Color(0xFFE0E8E5);
-
 class HadirWorkspacePage extends StatefulWidget {
   const HadirWorkspacePage({super.key});
+
   @override
   State<HadirWorkspacePage> createState() => _HadirWorkspacePageState();
 }
 
 class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   final _session = HadirSession();
-  int _tab = 0;
   bool _loading = true;
   String? _error;
-  String _name = 'الموظف';
+  Map<String, dynamic> _profile = <String, dynamic>{};
   List<dynamic> _attendance = const [];
   List<dynamic> _requests = const [];
   List<dynamic> _notifications = const [];
+  DateTime _now = DateTime.now();
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _now = DateTime.now();
+      });
+    }
     try {
       final token = await _session.token();
       final api = HadirApi(token: token);
-      final results = await Future.wait<dynamic>([api.me(), api.attendance(limit: 200), api.requests(), api.notifications()]);
-      final me = results[0] as Map<String, dynamic>;
-      final user = me['user'];
+      final results = await Future.wait<Object?>([
+        api.employeeProfile(),
+        api.attendance(limit: 500),
+        api.requests(),
+        api.notifications(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _name = user is Map ? '${user['name'] ?? 'الموظف'}' : 'الموظف';
-        _attendance = results[1] as List<dynamic>;
-        _requests = results[2] as List<dynamic>;
-        _notifications = results[3] as List<dynamic>;
+        _profile = results[0] is Map
+            ? Map<String, dynamic>.from(results[0] as Map)
+            : <String, dynamic>{};
+        _attendance = results[1] is List ? results[1] as List : const [];
+        _requests = results[2] is List ? results[2] as List : const [];
+        _notifications = results[3] is List ? results[3] as List : const [];
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _loading = false; _error = HadirApi.errorMessage(e); });
+      setState(() {
+        _loading = false;
+        _error = HadirApi.errorMessage(e);
+      });
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // EmployeeMobileShell owns the single app-level header and secondary navigation.
-    return Directionality(textDirection: TextDirection.rtl, child: Container(color: _bg, child: _dashboard()));
+  String _text(String key, [String fallback = '']) {
+    final value = _profile[key];
+    final text = '${value ?? ''}'.trim();
+    return text.isEmpty ? fallback : text;
   }
 
-  Widget _dashboard() {
-    final now = DateTime.now();
-    final today = _todayAttendance(now);
-    final checkedIn = today.any((x) => x is Map && x['type'] == 'check-in');
-    final checkedOut = today.any((x) => x is Map && x['type'] == 'check-out');
-    final active = checkedIn && !checkedOut;
-    final checkIn = _firstTodayEvent(today, 'check-in');
-    final checkOut = _firstTodayEvent(today, 'check-out');
-    final todayRequests = _todayApprovedRequests(now);
-    final hasLeave = todayRequests.any((x) => '${x['type'] ?? ''}'.toLowerCase() == 'leave');
-    final hasPermission = todayRequests.any((x) => '${x['type'] ?? ''}'.toLowerCase() == 'permission');
-    final status = hasLeave ? 'إجازة' : hasPermission ? 'إذن' : checkedOut ? 'انتهى الدوام' : active ? 'حاضر' : 'جاهز لتسجيل الحضور';
-    final statusDetail = hasLeave ? 'لديك إجازة معتمدة لهذا اليوم.' : hasPermission ? 'لديك إذن معتمد لهذا اليوم.' : checkedOut ? 'تم تسجيل الانصراف لهذا اليوم.' : active ? 'أنت مسجل حضور الآن ويمكنك تسجيل الانصراف.' : 'لم يتم تسجيل حضورك بعد.';
+  DateTime? _date(dynamic value) => value == null ? null : DateTime.tryParse('$value');
 
-    return RefreshIndicator(
-      color: _green,
-      onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
+  List<Map<String, dynamic>> get _attendanceMaps => _attendance
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+
+  List<Map<String, dynamic>> get _requestMaps => _requests
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+
+  List<Map<String, dynamic>> _todayAttendance() {
+    return _attendanceMaps.where((item) {
+      final date = _date(item['timestamp'] ?? item['time']);
+      return date != null && date.year == _now.year && date.month == _now.month && date.day == _now.day;
+    }).toList()
+      ..sort((a, b) => '${a['timestamp'] ?? ''}'.compareTo('${b['timestamp'] ?? ''}'));
+  }
+
+  List<Map<String, dynamic>> _todayApprovedRequests() {
+    final today = intl.DateFormat('yyyy-MM-dd').format(_now);
+    return _requestMaps.where((item) {
+      final status = '${item['status'] ?? ''}'.toLowerCase();
+      if (status != 'approved' && status != 'confirmed') return false;
+      final start = '${item['startDate'] ?? item['createdAt'] ?? ''}'.split('T').first;
+      final end = '${item['endDate'] ?? item['startDate'] ?? item['createdAt'] ?? ''}'.split('T').first;
+      return start.isNotEmpty && end.isNotEmpty && start <= today && today <= end;
+    }).toList();
+  }
+
+  Map<String, dynamic>? _event(List<Map<String, dynamic>> rows, String type) {
+    for (final row in rows) {
+      if ('${row['type'] ?? ''}' == type) return row;
+    }
+    return null;
+  }
+
+  String _time(dynamic value) {
+    final date = _date(value);
+    return date == null ? '—' : intl.DateFormat('HH:mm').format(date);
+  }
+
+  String _duration(DateTime? from, DateTime? to) {
+    if (from == null) return '—';
+    final end = to ?? _now;
+    final minutes = end.difference(from).inMinutes;
+    if (minutes < 0) return '—';
+    return '${minutes ~/ 60}س ${minutes % 60}د';
+  }
+
+  String _clock(String value, String fallback) => RegExp(r'^\d{1,2}:\d{2}$').hasMatch(value) ? value : fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        color: colors.surface,
+        child: RefreshIndicator(
+          color: colors.primary,
+          onRefresh: _load,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
+            children: [
+              _employeeHero(colors),
+              const SizedBox(height: 12),
+              if (_loading && _profile.isEmpty)
+                const _LoadingCard()
+              else if (_error != null && _profile.isEmpty)
+                _messageCard(colors, _error!, Icons.cloud_off_rounded)
+              else ...[
+                _statusCard(colors),
+                const SizedBox(height: 12),
+                _actions(colors),
+                const SizedBox(height: 12),
+                _summaryCard(colors),
+                const SizedBox(height: 12),
+                _workInfoCard(colors),
+                const SizedBox(height: 12),
+                _requestBanner(colors),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  _messageCard(colors, _error!, Icons.cloud_off_rounded),
+                ],
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _employeeHero(ColorScheme colors) {
+    final name = _text('name', 'الموظف');
+    final jobNumber = _text('jobNumber', '—');
+    final location = _text('locationName', 'الموقع المخصص');
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _employeeHero(now),
-          const SizedBox(height: 12),
-          _statusCard(now: now, status: status, detail: statusDetail, active: active, checkedOut: checkedOut),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _dashboardAction(icon: Icons.login_rounded, title: 'تسجيل حضور', subtitle: hasLeave || hasPermission ? status : checkedIn ? 'تم تسجيل الحضور' : 'مسح رمز QR', enabled: !checkedIn && !checkedOut && !hasLeave && !hasPermission, onTap: () => context.push('/attendance?type=check-in'))),
-            const SizedBox(width: 10),
-            Expanded(child: _dashboardAction(icon: Icons.logout_rounded, title: 'تسجيل انصراف', subtitle: active ? 'إنهاء الدوام' : checkOut != null ? 'تم تسجيل الانصراف' : 'بعد تسجيل الحضور', enabled: active, onTap: () => context.push('/attendance?type=check-out'))),
-          ]),
-          const SizedBox(height: 12),
-          _sectionCard(
-            title: 'ملخص اليوم',
-            subtitle: 'سجل الدوام',
-            child: Row(children: [
-              Expanded(child: _summaryItem('الحضور', _eventTime(checkIn), Icons.login_rounded)),
-              const SizedBox(width: 8),
-              Expanded(child: _summaryItem('الانصراف', _eventTime(checkOut), Icons.logout_rounded)),
-              const SizedBox(width: 8),
-              Expanded(child: _summaryItem('مدة العمل', _workHours(), Icons.schedule_rounded)),
-            ]),
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.primary.withValues(alpha: .25)),
+            ),
+            child: Icon(Icons.person_rounded, color: colors.primary, size: 29),
           ),
-          const SizedBox(height: 12),
-          _sectionCard(
-            title: 'معلومات الدوام',
-            subtitle: 'حالتك الحالية',
-            child: Column(children: [
-              _infoRow(Icons.calendar_today_outlined, 'نوع الجدول', 'حسب جدول الموظف'),
-              _infoRow(Icons.access_time_rounded, 'الفترة', 'حسب الجدول الإداري'),
-              _infoRow(Icons.verified_outlined, 'الحالة', status),
-              _infoRow(Icons.location_on_outlined, 'الموقع', 'الموقع المخصص'),
-              _infoRow(Icons.devices_other_rounded, 'الجهاز', 'مرتبط بالحساب'),
-            ]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('مرحبًا بك', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+                const SizedBox(height: 2),
+                Text(name, style: TextStyle(color: colors.onSurface, fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 2),
+                Text('$jobNumber · $location', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11)),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          _requestBanner(),
-          if (_loading) ...[const SizedBox(height: 12), const _LoadingCard()] else if (_error != null) ...[const SizedBox(height: 12), _messageCard(_error!, Icons.cloud_off_rounded)],
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(intl.DateFormat('HH:mm').format(_now), style: TextStyle(color: colors.onSurface, fontSize: 20, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 2),
+              Text(intl.DateFormat('EEE، d MMM', 'ar').format(_now), style: TextStyle(color: colors.onSurfaceVariant, fontSize: 10)),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _employeeHero(DateTime now) {
+  Widget _statusCard(ColorScheme colors) {
+    final today = _todayAttendance();
+    final checkIn = _event(today, 'check-in');
+    final checkOut = _event(today, 'check-out');
+    final approved = _todayApprovedRequests();
+    final hasLeave = approved.any((x) => '${x['type'] ?? ''}'.toLowerCase() == 'leave');
+    final hasPermission = approved.any((x) => '${x['type'] ?? ''}'.toLowerCase() == 'permission');
+    final scheduleType = _text('scheduleType', '').toUpperCase();
+    final isRotation = scheduleType == 'ROTATION';
+    final workStart = _clock(_text('workStartTime'), '09:00');
+    final workEnd = _clock(_text('workEndTime'), '16:00');
+    final isWorkDay = _isWorkDay();
+    String label;
+    String detail;
+    Color tone;
+    if (hasLeave) {
+      label = 'إجازة';
+      detail = 'لديك إجازة معتمدة لهذا اليوم.';
+      tone = colors.secondary;
+    } else if (hasPermission) {
+      label = 'إذن';
+      detail = 'لديك إذن معتمد لهذا اليوم.';
+      tone = colors.secondary;
+    } else if (!isWorkDay) {
+      label = 'راحة';
+      detail = 'اليوم ليس ضمن أيام العمل.';
+      tone = colors.secondary;
+    } else if (checkIn != null && checkOut == null) {
+      final late = _lateMinutes(checkIn, workStart);
+      label = late > 0 ? 'متأخر' : 'حاضر';
+      detail = late > 0 ? 'تم تسجيل حضورك بعد بداية الفترة.' : 'أنت مسجل حضور الآن.';
+      tone = late > 0 ? Colors.orange : colors.primary;
+    } else if (checkIn != null && checkOut != null) {
+      label = 'حاضر';
+      detail = 'تم تسجيل الانصراف لهذا اليوم.';
+      tone = colors.primary;
+    } else {
+      label = 'لم تبدأ المناوبة';
+      detail = 'لم يحن وقت بداية المناوبة بعد.';
+      tone = colors.secondary;
+    }
+    final late = checkIn == null ? 0 : _lateMinutes(checkIn, workStart);
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line), boxShadow: const [BoxShadow(color: Color(0x0A142D27), blurRadius: 16, offset: Offset(0, 6))]),
-      child: Row(children: [
-        _avatar(),
-        const SizedBox(width: 10),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('مرحباً بك', style: TextStyle(color: _muted, fontSize: 10)),
-          Text(_name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 16, fontWeight: FontWeight.w900)),
-          Text('HADIR · EMPLOYEE  ·  لوحة الموظف', style: const TextStyle(color: _green, fontSize: 9.5, fontWeight: FontWeight.w800)),
-        ])),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(intl.DateFormat('HH:mm').format(now), style: const TextStyle(color: _ink, fontSize: 17, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 2),
-          Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(now), style: const TextStyle(color: _muted, fontSize: 9.5)),
-        ]),
-      ]),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tone.withValues(alpha: .32)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('حالة اليوم', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+                  const SizedBox(height: 2),
+                  Text(label, style: TextStyle(color: colors.onSurface, fontSize: 19, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 2),
+                  Text(detail, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11)),
+                ]),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: tone.withValues(alpha: .12), borderRadius: BorderRadius.circular(20)),
+                child: Text(label, style: TextStyle(color: tone, fontSize: 11, fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isRotation ? '${_text('rotationDaysOn', '4')} أيام عمل + ${_text('rotationDaysOff', '4')} أيام راحة' : '$workStart → $workEnd',
+            style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
+          ),
+          if (late > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.orange.withValues(alpha: .10), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.orange.withValues(alpha: .35))),
+              child: Text('تم رصد تأخر $late دقيقة عن بداية الفترة.', style: const TextStyle(color: Colors.orange, fontSize: 11)),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
-  Widget _statusCard({required DateTime now, required String status, required String detail, required bool active, required bool checkedOut}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line), boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 18, offset: Offset(0, 7))]),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('حالة اليوم', style: TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 3),
-            Text(status, style: const TextStyle(color: _ink, fontSize: 22, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 3),
-            Text(detail, style: const TextStyle(color: _muted, fontSize: 10.5)),
-          ])),
-          Container(width: 48, height: 48, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(15)), child: Icon(checkedOut ? Icons.task_alt_rounded : active ? Icons.work_history_rounded : Icons.access_time_rounded, color: _green)),
-        ]),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(14)),
-          child: Row(children: [
-            const Icon(Icons.location_on_outlined, size: 16, color: _green),
-            const SizedBox(width: 6),
-            const Expanded(child: Text('الموقع المخصص للعمل', style: TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w800))),
-            Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(now), style: const TextStyle(color: _muted, fontSize: 9.5)),
+  Widget _actions(ColorScheme colors) {
+    final today = _todayAttendance();
+    final checkIn = _event(today, 'check-in');
+    final checkOut = _event(today, 'check-out');
+    final approved = _todayApprovedRequests();
+    final blocked = approved.any((x) {
+      final type = '${x['type'] ?? ''}'.toLowerCase();
+      return type == 'leave' || type == 'permission';
+    });
+    final canIn = checkIn == null && checkOut == null && !blocked && _isWorkDay();
+    final canOut = checkIn != null && checkOut == null;
+    return Row(
+      children: [
+        Expanded(child: _actionCard(colors, 'تسجيل حضور', canIn ? 'مسح رمز QR' : 'غير متاح الآن', Icons.login_rounded, canIn, () => context.push('/employee/scan/check-in'))),
+        const SizedBox(width: 12),
+        Expanded(child: _actionCard(colors, 'تسجيل انصراف', canOut ? 'إنهاء الدوام' : 'بعد تسجيل الحضور', Icons.logout_rounded, canOut, () => context.push('/employee/scan/check-out'))),
+      ],
+    );
+  }
+
+  Widget _actionCard(ColorScheme colors, String title, String subtitle, IconData icon, bool enabled, VoidCallback onTap) {
+    final tone = icon == Icons.logout_rounded ? colors.secondary : colors.primary;
+    return Material(
+      color: colors.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: enabled ? tone.withValues(alpha: .28) : colors.outlineVariant)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(width: 40, height: 40, decoration: BoxDecoration(color: enabled ? tone.withValues(alpha: .12) : colors.surface, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: enabled ? tone : colors.onSurfaceVariant, size: 20)),
+            const SizedBox(height: 10),
+            Text(title, style: TextStyle(color: enabled ? colors.onSurface : colors.onSurfaceVariant, fontWeight: FontWeight.w900, fontSize: 13)),
+            const SizedBox(height: 2),
+            Text(subtitle, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 10)),
           ]),
         ),
+      ),
+    );
+  }
+
+  Widget _summaryCard(ColorScheme colors) {
+    final today = _todayAttendance();
+    final checkIn = _event(today, 'check-in');
+    final checkOut = _event(today, 'check-out');
+    return _card(colors, 'ملخص اليوم', 'سجل الدوام', Row(children: [
+      Expanded(child: _stat(colors, 'الحضور', _time(checkIn?['timestamp'] ?? checkIn?['time']), Icons.login_rounded)),
+      const SizedBox(width: 8),
+      Expanded(child: _stat(colors, 'الانصراف', _time(checkOut?['timestamp'] ?? checkOut?['time']), Icons.logout_rounded)),
+      const SizedBox(width: 8),
+      Expanded(child: _stat(colors, 'مدة العمل', _duration(_date(checkIn?['timestamp'] ?? checkIn?['time']), _date(checkOut?['timestamp'] ?? checkOut?['time'])), Icons.schedule_rounded)),
+    ]));
+  }
+
+  Widget _workInfoCard(ColorScheme colors) {
+    final scheduleType = _text('scheduleType', '').toUpperCase();
+    final isRotation = scheduleType == 'ROTATION';
+    final start = _clock(_text('workStartTime'), '09:00');
+    final end = _clock(_text('workEndTime'), '16:00');
+    final status = _statusLabel();
+    final device = _text('deviceLabel', 'غير مرتبط');
+    final location = _text('locationName', 'الموقع المخصص');
+    return _card(colors, 'معلومات الدوام', 'حالتك الحالية', Column(children: [
+      _rowInfo(colors, 'الفترة', isRotation ? '${_text('rotationDaysOn', '4')} أيام عمل + ${_text('rotationDaysOff', '4')} أيام راحة' : '$start → $end'),
+      _rowInfo(colors, isRotation ? 'وقت المناوبة' : 'الفترة', '$start → $end'),
+      _rowInfo(colors, 'الحالة', status),
+      _rowInfo(colors, 'الجهاز', device),
+      _rowInfo(colors, 'الموقع', location),
+    ]));
+  }
+
+  Widget _card(ColorScheme colors, String title, String subtitle, Widget child) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: colors.surfaceContainerHighest, borderRadius: BorderRadius.circular(18), border: Border.all(color: colors.outlineVariant)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+        const SizedBox(height: 2),
+        Text(subtitle, style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.w900, fontSize: 15)),
+        const SizedBox(height: 12),
+        child,
       ]),
     );
   }
 
-  Widget _dashboardAction({required IconData icon, required String title, required String subtitle, required bool enabled, required VoidCallback onTap}) {
-    return Material(color: Colors.white, borderRadius: BorderRadius.circular(20), child: InkWell(onTap: enabled ? onTap : null, borderRadius: BorderRadius.circular(20), child: Container(
-      constraints: const BoxConstraints(minHeight: 96),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: enabled ? _green.withValues(alpha: .22) : _line)),
-      child: Row(children: [
-        Container(width: 40, height: 40, decoration: BoxDecoration(color: enabled ? _soft : _bg, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: enabled ? _green : _muted, size: 19)),
-        const SizedBox(width: 10),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(title, style: TextStyle(color: enabled ? _ink : _muted, fontWeight: FontWeight.w900, fontSize: 12)), const SizedBox(height: 3), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5))])),
+  Widget _stat(ColorScheme colors, String title, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: colors.surface, borderRadius: BorderRadius.circular(12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: colors.primary, size: 17),
+        const SizedBox(height: 7),
+        Text(title, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 9)),
+        const SizedBox(height: 2),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.w900, fontSize: 10.5)),
       ]),
-    )));
+    );
   }
 
-  Widget _sectionCard({required String title, required String subtitle, required Widget child}) {
-    return Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(21), border: Border.all(color: _line)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5)), const SizedBox(height: 12), child]));
+  Widget _rowInfo(ColorScheme colors, String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(children: [
+        Expanded(child: Text(title, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11))),
+        Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.onSurface, fontSize: 11, fontWeight: FontWeight.w800))),
+      ]),
+    );
   }
 
-  Widget _summaryItem(String title, String value, IconData icon) {
-    return Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(14)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: _green, size: 17), const SizedBox(height: 7), Text(title, style: const TextStyle(color: _muted, fontSize: 8.5)), const SizedBox(height: 2), Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 10.5))]));
+  Widget _requestBanner(ColorScheme colors) {
+    return Material(
+      color: colors.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: _openRequestDialog,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: colors.secondary.withValues(alpha: .28))),
+          child: Row(children: [
+            Container(width: 42, height: 42, decoration: BoxDecoration(color: colors.secondary.withValues(alpha: .12), borderRadius: BorderRadius.circular(13)), child: Icon(Icons.event_note_outlined, color: colors.secondary)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('طلب استئذان أو إجازة', style: TextStyle(color: colors.secondary, fontWeight: FontWeight.w900, fontSize: 13)), const SizedBox(height: 2), Text('إرسال طلب للإدارة', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 10))])),
+            Icon(Icons.chevron_left_rounded, color: colors.secondary),
+          ]),
+        ),
+      ),
+    );
   }
 
-  Widget _infoRow(IconData icon, String title, String value) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [Container(width: 31, height: 31, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 16)), const SizedBox(width: 9), Expanded(child: Text(title, style: const TextStyle(color: _muted, fontSize: 10))), Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w800)))]));
+  Future<void> _openRequestDialog() async {
+    String type = 'permission';
+    String reason = '';
+    String startDate = intl.DateFormat('yyyy-MM-dd').format(_now);
+    String endDate = startDate;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final ranged = type == 'permission' || type == 'leave';
+          return AlertDialog(
+            title: const Text('طلب استئذان أو إجازة'),
+            content: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                DropdownButtonFormField<String>(
+                  value: type,
+                  decoration: const InputDecoration(labelText: 'نوع الطلب'),
+                  items: const [
+                    DropdownMenuItem(value: 'permission', child: Text('إذن')),
+                    DropdownMenuItem(value: 'leave', child: Text('إجازة')),
+                    DropdownMenuItem(value: 'checkout', child: Text('انصراف مبكر')),
+                  ],
+                  onChanged: (value) => setDialogState(() => type = value ?? type),
+                ),
+                if (ranged) ...[
+                  const SizedBox(height: 10),
+                  TextFormField(initialValue: startDate, decoration: const InputDecoration(labelText: 'تاريخ البداية'), onChanged: (v) => startDate = v),
+                  const SizedBox(height: 8),
+                  TextFormField(initialValue: endDate, decoration: const InputDecoration(labelText: 'تاريخ النهاية'), onChanged: (v) => endDate = v),
+                ],
+                const SizedBox(height: 10),
+                TextFormField(maxLines: 3, decoration: const InputDecoration(labelText: 'السبب'), onChanged: (v) => reason = v),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('إلغاء')),
+              FilledButton(
+                onPressed: () async {
+                  if (ranged && (startDate.isEmpty || endDate.isEmpty || endDate.compareTo(startDate) < 0)) return;
+                  try {
+                    final token = await _session.token();
+                    final api = HadirApi(token: token);
+                    await api.createRequest(type: type, reason: reason.trim(), startDate: ranged ? startDate : null, endDate: ranged ? endDate : null, employeeId: _text('id'));
+                    if (!mounted) return;
+                    Navigator.of(dialogContext).pop();
+                    await _load();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال الطلب للإدارة.')));
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(HadirApi.errorMessage(e))));
+                  }
+                },
+                child: const Text('إرسال'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
-  Widget _requestBanner() {
-    return Material(color: _soft, borderRadius: BorderRadius.circular(20), child: InkWell(onTap: () => context.push('/requests'), borderRadius: BorderRadius.circular(20), child: Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFCDE6DD))),
-      child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)), const SizedBox(width: 10), const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('طلب استئذان أو إجازة', style: TextStyle(color: _green, fontWeight: FontWeight.w900, fontSize: 12)), SizedBox(height: 3), Text('إرسال طلب للإدارة', style: TextStyle(color: _muted, fontSize: 9.5))])), const Icon(Icons.chevron_left_rounded, color: _green)]),
-    )));
+  int _lateMinutes(Map<String, dynamic> checkIn, String workStart) {
+    final stamp = _date(checkIn['timestamp'] ?? checkIn['time']);
+    if (stamp == null) return 0;
+    final parts = workStart.split(':');
+    if (parts.length != 2) return 0;
+    final scheduled = DateTime(stamp.year, stamp.month, stamp.day, int.tryParse(parts[0]) ?? 9, int.tryParse(parts[1]) ?? 0);
+    final grace = int.tryParse('${_profile['gracePeriodMinutes'] ?? 10}') ?? 10;
+    return ((stamp.difference(scheduled).inMinutes) - grace).clamp(0, 100000);
   }
 
-  DateTime? _firstTodayEvent(List<dynamic> today, String type) {
-    for (final item in today) {
-      if (item is Map && item['type'] == type) {
-        final stamp = DateTime.tryParse('${item['timestamp'] ?? ''}');
-        if (stamp != null) return stamp;
-      }
+  bool _isWorkDay() {
+    final days = _profile['workDays'];
+    if (days is List && days.isNotEmpty) {
+      final weekday = _now.weekday;
+      return days.any((day) {
+        final text = '$day'.toLowerCase();
+        return text == '$weekday' || text == _weekdayName(weekday) || text.contains(_weekdayName(weekday));
+      });
     }
-    return null;
+    return true;
   }
 
-  List<Map<dynamic, dynamic>> _todayApprovedRequests(DateTime now) {
-    final day = intl.DateFormat('yyyy-MM-dd').format(now);
-    return _requests.whereType<Map>().where((item) {
-      final status = '${item['status'] ?? ''}'.toLowerCase();
-      if (status != 'approved' && status != 'confirmed') return false;
-      final start = '${item['startDate'] ?? item['createdAt'] ?? ''}'.split('T').first;
-      final end = '${item['endDate'] ?? item['startDate'] ?? item['createdAt'] ?? ''}'.split('T').first;
-      final startDate = DateTime.tryParse(start);
-      final endDate = DateTime.tryParse(end);
-      final currentDate = DateTime.tryParse(day);
-      return startDate != null && endDate != null && currentDate != null && !currentDate.isBefore(startDate) && !currentDate.isAfter(endDate);
-    }).toList();
+  String _weekdayName(int day) {
+    const names = <String>['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    return names[day - 1];
   }
 
-  String _eventTime(DateTime? value) => value == null ? '—' : intl.DateFormat('HH:mm').format(value);
-
-  // Retained for the existing workspace implementation and future route-level reuse.
-  // ignore: unused_element
-  Widget _clockCard(DateTime now) {
-    final today = _todayAttendance(now);
-    final checkedIn = today.any((x) => x is Map && x['type'] == 'check-in');
-    final checkedOut = today.any((x) => x is Map && x['type'] == 'check-out');
-    final active = checkedIn && !checkedOut;
-    final status = checkedOut ? 'تم إنهاء الدوام' : active ? 'أنت على رأس العمل' : 'جاهز لتسجيل الحضور';
-    final type = active ? 'check-out' : 'check-in';
-    return Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_green, _greenDark]), borderRadius: BorderRadius.circular(26), boxShadow: const [BoxShadow(color: Color(0x240B6B5A), blurRadius: 26, offset: Offset(0, 12))]), child: Column(children: [Row(children: [Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF9AE3C8), shape: BoxShape.circle)), const SizedBox(width: 7), Expanded(child: Text(status, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12))), Text(intl.DateFormat('d MMMM', 'ar').format(now), style: const TextStyle(color: Colors.white70, fontSize: 11))]), const SizedBox(height: 17), Text(intl.DateFormat('HH:mm').format(now), style: const TextStyle(color: Colors.white, fontSize: 44, height: 1, fontWeight: FontWeight.w900)), const SizedBox(height: 7), Text(intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(now), style: const TextStyle(color: Colors.white70, fontSize: 11)), const SizedBox(height: 17), SizedBox(width: double.infinity, height: 52, child: FilledButton.icon(onPressed: checkedOut ? null : () => context.push('/attendance?type=$type'), style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: _green, disabledBackgroundColor: Colors.white24, disabledForegroundColor: Colors.white70, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), icon: Icon(active ? Icons.logout_rounded : Icons.login_rounded, size: 20), label: Text(active ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(fontWeight: FontWeight.w900)))), const SizedBox(height: 9), const Text('سيتم التحقق من الموقع والجهاز وQR عند التسجيل', style: TextStyle(color: Colors.white70, fontSize: 9.5))]));
+  String _statusLabel() {
+    final today = _todayAttendance();
+    final checkIn = _event(today, 'check-in');
+    final checkOut = _event(today, 'check-out');
+    final approved = _todayApprovedRequests();
+    if (approved.any((x) => '${x['type'] ?? ''}'.toLowerCase() == 'leave')) return 'إجازة';
+    if (approved.any((x) => '${x['type'] ?? ''}'.toLowerCase() == 'permission')) return 'إذن';
+    if (!_isWorkDay()) return 'راحة';
+    if (checkIn != null) return _lateMinutes(checkIn, _clock(_text('workStartTime'), '09:00')) > 0 ? 'متأخر' : 'حاضر';
+    if (checkOut != null) return 'حاضر';
+    return 'لم تبدأ المناوبة';
   }
 
-  // Retained for existing route behavior; EmployeeMobileShell now owns navigation.
-  // ignore: unused_element
-  Widget _timesheets() => RefreshIndicator(color: _green, onRefresh: _load, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [_pageHeader('سجل الدوام', 'المراجعة اليومية والشهرية لحركاتك'), const SizedBox(height: 15), _summaryCard(), const SizedBox(height: 16), _sectionTitle('الحركات الأخيرة'), const SizedBox(height: 9), _attendanceList()]));
-
-  // Retained for existing route behavior; EmployeeMobileShell now owns navigation.
-  // ignore: unused_element
-  Widget _attendanceTab() => RefreshIndicator(color: _green, onRefresh: _load, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [_pageHeader('الحضور والانصراف', 'تسجيل آمن والتحقق من المتطلبات قبل الحفظ'), const SizedBox(height: 15), _liveStatusCard(), const SizedBox(height: 14), Row(children: [Expanded(child: _actionCard(Icons.login_rounded, 'تسجيل الحضور', 'بدء الدوام', () => context.push('/attendance?type=check-in'))), const SizedBox(width: 10), Expanded(child: _actionCard(Icons.logout_rounded, 'تسجيل الانصراف', 'إنهاء الدوام', () => context.push('/attendance?type=check-out')))]), const SizedBox(height: 18), _sectionTitle('سجل اليوم'), const SizedBox(height: 9), _attendanceList()]));
-
-  // Retained for existing route behavior; EmployeeMobileShell now owns navigation.
-  // ignore: unused_element
-  Widget _requestsTab() => RefreshIndicator(color: _green, onRefresh: _load, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [Row(children: [Expanded(child: _pageHeader('الطلبات', 'الإجازات والأذونات وحالة كل طلب')), FilledButton.icon(onPressed: () => context.push('/requests'), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('طلب جديد'))]), const SizedBox(height: 15), if (_loading) const _LoadingCard() else if (_error != null) _messageCard(_error!, Icons.cloud_off_rounded) else if (_requests.isEmpty) _emptyCard('لا توجد طلبات حتى الآن', 'ستظهر هنا طلبات الإجازات والأذونات.', Icons.event_note_outlined) else ..._requests.take(12).map(_requestTile)]));
-
-  // Retained for existing route behavior; EmployeeMobileShell now owns navigation.
-  // ignore: unused_element
-  Widget _moreTab() => ListView(padding: const EdgeInsets.fromLTRB(18, 18, 18, 30), children: [_pageHeader('المزيد', 'الوصول السريع إلى خدمات حاضر'), const SizedBox(height: 15), _profileCard(), const SizedBox(height: 14), _menuTile(Icons.notifications_none_rounded, 'التنبيهات', '${_unreadCount()} غير مقروءة', () => context.push('/notifications')), _menuTile(Icons.history_rounded, 'السجل التفصيلي', 'Timesheets اليومية والشهرية', () => context.push('/history')), _menuTile(Icons.miscellaneous_services_outlined, 'الخدمات', 'الخدمات المتاحة في حسابك', () => context.push('/services')), _menuTile(Icons.person_outline_rounded, 'الملف الشخصي', 'بيانات الحساب والملف', () => context.push('/profile'))]);
-
-  // Retained as a legacy local navigation definition; the shell owns the visible bar.
-  // ignore: unused_element
-  Widget _bottomNav() {
-    const items = [(Icons.home_rounded, 'الرئيسية'), (Icons.calendar_month_rounded, 'الدوام'), (Icons.fingerprint_rounded, 'الحضور'), (Icons.event_note_outlined, 'الطلبات'), (Icons.more_horiz_rounded, 'المزيد')];
-    return NavigationBar(selectedIndex: _tab, onDestinationSelected: (index) => setState(() => _tab = index), backgroundColor: Colors.white, indicatorColor: _soft, height: 70, destinations: [for (final item in items) NavigationDestination(icon: Icon(item.$1), selectedIcon: Icon(item.$1, color: _green), label: item.$2)]);
+  Widget _messageCard(ColorScheme colors, String text, IconData icon) {
+    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: colors.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: colors.outlineVariant)), child: Row(children: [Icon(icon, color: colors.onSurfaceVariant), const SizedBox(width: 10), Expanded(child: Text(text, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11)))]));
   }
-
-  Widget _summaryCard() => Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)), child: Row(children: [const Icon(Icons.calendar_month_rounded, color: _green), const SizedBox(width: 10), const Expanded(child: Text('هذا الشهر', style: TextStyle(fontWeight: FontWeight.w900))), Text('${_attendance.length} حركة', style: const TextStyle(color: _muted, fontSize: 11))]));
-
-  Widget _liveStatusCard() {
-    final today = _todayAttendance(DateTime.now());
-    final active = today.any((x) => x is Map && x['type'] == 'check-in') && !today.any((x) => x is Map && x['type'] == 'check-out');
-    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)), child: Row(children: [Container(width: 46, height: 46, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(14)), child: Icon(active ? Icons.work_history_rounded : Icons.access_time_rounded, color: _green)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(active ? 'على رأس العمل' : 'غير مسجل حضور الآن', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(active ? 'يمكنك تسجيل الانصراف عند الانتهاء.' : 'يمكنك بدء الدوام من زر تسجيل الحضور.', style: const TextStyle(color: _muted, fontSize: 11))]))]));
-  }
-
-  Widget _profileCard() => Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(22)), child: Row(children: [_avatar(light: true), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)), const SizedBox(height: 3), const Text('مساحة الموظف في حاضر', style: TextStyle(color: Colors.white70, fontSize: 11))]))]));
-
-  Widget _attendanceList({int? limit}) {
-    if (_loading) return const _LoadingCard();
-    if (_error != null) return _messageCard(_error!, Icons.cloud_off_rounded);
-    if (_attendance.isEmpty) return _emptyCard('لا توجد حركات حضور', 'ابدأ أول تسجيل حضور من زر الحضور.', Icons.event_available_rounded);
-    final data = limit == null ? _attendance : _attendance.take(limit);
-    return Column(children: data.map(_attendanceTile).toList());
-  }
-
-  Widget _attendanceTile(dynamic item) {
-    final map = item is Map ? item : const <dynamic, dynamic>{};
-    final type = '${map['type'] ?? ''}';
-    final stamp = DateTime.tryParse('${map['timestamp'] ?? ''}');
-    final isIn = type == 'check-in';
-    return Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(isIn ? Icons.login_rounded : Icons.logout_rounded, color: _green, size: 19)), const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(isIn ? 'تسجيل حضور' : 'تسجيل انصراف', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)), const SizedBox(height: 3), Text(stamp == null ? 'وقت غير متاح' : intl.DateFormat('EEEE، d MMMM • HH:mm', 'ar').format(stamp), style: const TextStyle(color: _muted, fontSize: 10))])), _chip(isIn ? 'حضور' : 'انصراف', isIn)]));
-  }
-
-  Widget _requestTile(dynamic item) {
-    final map = item is Map ? item : const <dynamic, dynamic>{};
-    final status = '${map['status'] ?? 'pending'}';
-    final type = '${map['type'] ?? 'طلب'}';
-    final reason = '${map['reason'] ?? ''}';
-    final label = status == 'approved' ? 'مقبول' : status == 'rejected' ? 'مرفوض' : status == 'confirmed' ? 'مؤكد' : 'قيد المراجعة';
-    return Container(margin: const EdgeInsets.only(bottom: 9), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(19), border: Border.all(color: _line)), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.event_note_outlined, color: _green)), const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(type, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)), if (reason.isNotEmpty) ...[const SizedBox(height: 3), Text(reason, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10))]])), _statusChip(label, status)]));
-  }
-
-  // ignore: unused_element
-  Widget _metric(IconData icon, String title, String value) => Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 34, height: 34, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: _green, size: 18)), const SizedBox(height: 8), Text(title, style: const TextStyle(color: _muted, fontSize: 9)), const SizedBox(height: 2), Text(value, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12))]));
-
-  // ignore: unused_element
-  Widget _quick(IconData icon, String title, String sub, VoidCallback onTap) {
-    return Material(color: Colors.white, borderRadius: BorderRadius.circular(18), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6), decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Column(children: [Container(width: 39, height: 39, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green, size: 19)), const SizedBox(height: 7), Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10.5)), const SizedBox(height: 2), Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 7.5))]))));
-  }
-
-  Widget _actionCard(IconData icon, String title, String sub, VoidCallback onTap) {
-    return Material(color: Colors.white, borderRadius: BorderRadius.circular(20), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Padding(padding: const EdgeInsets.all(15), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(sub, style: const TextStyle(color: _muted, fontSize: 10))]))));
-  }
-
-  Widget _menuTile(IconData icon, String title, String subtitle, VoidCallback onTap) => Card(margin: const EdgeInsets.only(bottom: 8), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: _line)), child: ListTile(onTap: onTap, leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: _green)), title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)), subtitle: Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10)), trailing: const Icon(Icons.chevron_left_rounded, color: _muted)));
-
-  Widget _sectionTitle(String title, {Widget? action}) => Row(children: [Expanded(child: Text(title, style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 15))), if (action != null) action]);
-  Widget _pageHeader(String title, String subtitle) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(subtitle, style: const TextStyle(color: _muted, fontSize: 11))]);
-
-  // ignore: unused_element
-  Widget _iconButton(IconData icon, VoidCallback onTap) => Material(color: Colors.white, borderRadius: BorderRadius.circular(14), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: Container(width: 43, height: 43, decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: _line)), child: Icon(icon, color: _ink, size: 21))));
-  Widget _avatar({bool light = false}) => Container(width: 43, height: 43, decoration: BoxDecoration(color: light ? Colors.white24 : _soft, shape: BoxShape.circle), child: Icon(Icons.person_rounded, color: light ? Colors.white : _green, size: 23));
-  Widget _chip(String text, bool positive) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: positive ? _soft : const Color(0xFFF1F3F2), borderRadius: BorderRadius.circular(20)), child: Text(text, style: TextStyle(color: positive ? _green : _muted, fontWeight: FontWeight.w800, fontSize: 9)));
-  Widget _statusChip(String text, String status) { final good = status == 'approved' || status == 'confirmed'; return _chip(text, good); }
-  Widget _messageCard(String text, IconData icon) => Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)), child: Row(children: [Icon(icon, color: _muted), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(color: _muted, fontSize: 11)))]));
-  Widget _emptyCard(String title, String subtitle, IconData icon) => Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)), child: Column(children: [Container(width: 48, height: 48, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: _green)), const SizedBox(height: 10), Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 10))]));
-  List<dynamic> _todayAttendance(DateTime now) => _attendance.where((item) { final date = DateTime.tryParse('${item is Map ? item['timestamp'] : null}'); return date != null && date.year == now.year && date.month == now.month && date.day == now.day; }).toList();
-  String _workHours() { final times = _todayAttendance(DateTime.now()).whereType<Map>().map((e) => DateTime.tryParse('${e['timestamp']}')).whereType<DateTime>().toList()..sort(); if (times.length < 2) return '—'; final d = times.last.difference(times.first); return '${d.inHours}س ${d.inMinutes.remainder(60)}د'; }
-  int _unreadCount() => _notifications.where((x) => x is Map && x['readAt'] == null && x['read'] != true).length;
 }
 
 class _LoadingCard extends StatelessWidget {
   const _LoadingCard();
+
   @override
-  Widget build(BuildContext context) => Container(height: 86, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)), child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: _green)));
+  Widget build(BuildContext context) {
+    return const SizedBox(height: 160, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+  }
 }
