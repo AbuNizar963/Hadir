@@ -1,4 +1,4 @@
-# refined analyzer repair
+# finish analyzer repair
 name: Repair admin dashboard analyzer
 on:
   push:
@@ -14,29 +14,26 @@ jobs:
         with:
           ref: Apps
           fetch-depth: 0
-      - name: Remove unused dashboard declarations
+      - name: Remove remaining unused dashboard declarations
         shell: python
         run: |
           from pathlib import Path
           p = Path('lib/features/administration/pages/admin_mobile_dashboard_page.dart')
           s = p.read_text(encoding='utf-8')
           replacements = [
-              ("  String _role = 'admin';\n", ''),
-              ("  List<dynamic> _violations = [];\n", ''),
-              ("      final name = user is Map ? '${user['name'] ?? 'الإدارة'}' : 'الإدارة';\n", ''),
-              ("        _role = role;\n", ''),
+              ("  Color get _panel => Theme.of(context).colorScheme.surfaceContainerHighest;\n", ''),
+              ("      final role = user is Map ? '${user['role'] ?? 'admin'}'.toLowerCase() : 'admin';\n", ''),
+              ("      final me = await api.me();\n      final user = me['user'];\n", "      await api.me();\n"),
           ]
           for old, new in replacements:
               if old not in s:
-                  raise SystemExit(f'expected dashboard fragment not found: {old[:50]}')
+                  raise SystemExit(f'expected dashboard fragment not found: {old[:60]}')
               s = s.replace(old, new, 1)
-          s = s.replace("        _violations = violations;\n", "")
-          s = s.replace("      final violations = await api.violations(limit: 200);\n", "")
           p.write_text(s, encoding='utf-8')
       - name: Commit dashboard analyzer repair
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add lib/features/administration/pages/admin_mobile_dashboard_page.dart
-          git commit -m 'fix: remove unused dashboard state'
+          git commit -m 'fix: remove remaining dashboard warnings'
           git push origin Apps
