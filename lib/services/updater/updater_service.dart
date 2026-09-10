@@ -126,7 +126,7 @@ class UpdaterService {
       lastError = error;
     }
 
-    throw lastError ?? StateError('تعذر التحقق من وجود تحديث');
+    throw lastError!;
   }
 
   Future<UpdateInfo?> _checkLatestRelease(int currentCode) async {
