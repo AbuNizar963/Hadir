@@ -11,7 +11,7 @@ class HadirThemeController extends ChangeNotifier {
   static const _storageKey = 'hadir_theme_mode';
   static const _storage = FlutterSecureStorage();
 
-  ThemeMode _mode = ThemeMode.system;
+  ThemeMode _mode = ThemeMode.dark;
   bool _loaded = false;
 
   ThemeMode get mode => _mode;
@@ -24,7 +24,7 @@ class HadirThemeController extends ChangeNotifier {
     } else if (saved == 'dark') {
       _mode = ThemeMode.dark;
     } else {
-      _mode = ThemeMode.system;
+      _mode = ThemeMode.dark;
     }
     _loaded = true;
     notifyListeners();
