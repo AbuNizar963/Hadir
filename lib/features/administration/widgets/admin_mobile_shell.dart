@@ -150,7 +150,7 @@ class AdminMobileShell extends StatelessWidget {
                 children: [
                   Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 20),
                   const SizedBox(height: 1),
-                  Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 9, fontWeight: active ? FontWeight.w900 : FontWeight.w700)),
+                  Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 11, fontWeight: active ? FontWeight.w900 : FontWeight.w700)),
                 ],
               ),
             ),
