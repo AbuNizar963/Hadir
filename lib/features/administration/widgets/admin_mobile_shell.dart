@@ -10,33 +10,27 @@ class AdminMobileShell extends StatelessWidget {
   final Widget child;
 
   int _selectedIndex(BuildContext context) {
-    final uri = GoRouterState.of(context).uri;
-    if (uri.path == '/admin' || uri.path == '/manager') return 0;
-    if (uri.path == '/manager/requests') return 1;
-    if (uri.path == '/admin/manage' || uri.path == '/manager/employees' || uri.path == '/manager/employees/transfer') return 2;
-    if (uri.path == '/admin/reports' || uri.path == '/manager/reports') return 4;
-    if (uri.path == '/admin/reports/archive' || uri.path == '/manager/report-archive') return 5;
-    if (uri.path == '/admin/audit' || uri.path == '/manager/audit') return 3;
-    if (uri.path == '/admin/settings' || uri.path == '/manager/settings') return 6;
+    final path = GoRouterState.of(context).uri.path;
+    if (path == '/admin' || path == '/manager') return 0;
+    if (path == '/manager/requests') return 1;
+    if (path == '/admin/manage' || path == '/manager/employees' || path == '/manager/employees/transfer') return 2;
+    if (path == '/admin/audit' || path == '/manager/audit') return 3;
+    if (path == '/admin/reports' || path == '/manager/reports') return 4;
     return -1;
   }
 
   void _go(BuildContext context, int index) {
     switch (index) {
       case 0:
-        context.go('/admin');
+        context.go('/manager');
       case 1:
         context.go('/manager/requests');
       case 2:
-        context.go('/admin/manage');
+        context.go('/manager/employees');
       case 3:
-        context.go('/admin/audit');
+        context.go('/manager/audit');
       case 4:
-        context.go('/admin/reports');
-      case 5:
-        context.go('/admin/reports/archive');
-      case 6:
-        context.go('/admin/settings');
+        context.go('/manager/reports');
     }
   }
 
@@ -66,40 +60,53 @@ class AdminMobileShell extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 390;
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: EdgeInsets.fromLTRB(compact ? 12 : 14, 10, compact ? 12 : 14, 9),
+      padding: EdgeInsets.fromLTRB(compact ? 12 : 16, 10, compact ? 12 : 16, 10),
       decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+        color: scheme.surface.withValues(alpha: .96),
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .75))),
       ),
-      child: Row(children: [
-        Expanded(child: Row(children: [
-          Container(
-            width: compact ? 40 : 44,
-            height: compact ? 40 : 44,
-            decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: .12),
-              borderRadius: BorderRadius.circular(compact ? 13 : 15),
-              border: Border.all(color: scheme.primary.withValues(alpha: .20)),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  width: compact ? 44 : 48,
+                  height: compact ? 44 : 48,
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: .10),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: scheme.primary.withValues(alpha: .55), width: 1.4),
+                  ),
+                  child: Icon(Icons.wb_sunny_rounded, color: scheme.primary, size: compact ? 26 : 29),
+                ),
+                const SizedBox(width: 9),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'حاضر',
+                      style: TextStyle(color: scheme.onSurface, fontSize: compact ? 20 : 22, height: 1, fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'HADIR  •  v1.1',
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(color: scheme.onSurfaceVariant, fontSize: compact ? 9 : 10, fontWeight: FontWeight.w700, letterSpacing: .4),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: Icon(Icons.how_to_reg_rounded, color: scheme.primary, size: compact ? 23 : 25),
           ),
-          const SizedBox(width: 9),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('حاضر', style: TextStyle(color: scheme.onSurface, fontSize: 22, height: 1, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 4),
-            Text('نظام حضور وانصراف موثّق', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5, fontWeight: FontWeight.w600)),
-          ]),
-        ])),
-        _headerButton(context, icon: Icons.smart_toy_outlined, label: 'المساعد', compact: compact, onTap: () => context.push('/ai')),
-        const SizedBox(width: 5),
-        _headerButton(context, icon: Icons.explore_outlined, label: 'القبلة', compact: compact, onTap: () => context.push('/prayer')),
-        const SizedBox(width: 5),
-        _headerButton(context, icon: Icons.wb_sunny_outlined, label: 'الطقس', compact: compact, onTap: () => context.push('/weather')),
-        const SizedBox(width: 5),
-        _headerButton(context, icon: Icons.notifications_none_rounded, label: 'الإشعارات', compact: compact, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()))),
-        const SizedBox(width: 5),
-        _headerButton(context, icon: Icons.menu_rounded, label: 'القائمة', compact: compact, onTap: () => _showOptions(context)),
-      ]),
+          _headerButton(context, icon: Icons.wb_sunny_outlined, label: 'الطقس', compact: compact, onTap: () => context.push('/weather')),
+          const SizedBox(width: 6),
+          _headerButton(context, icon: Icons.notifications_none_rounded, label: 'الإشعارات', compact: compact, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()))),
+          const SizedBox(width: 6),
+          _headerButton(context, icon: Icons.menu_rounded, label: 'القائمة', compact: compact, onTap: () => _showOptions(context)),
+        ],
+      ),
     );
   }
 
@@ -111,14 +118,12 @@ class AdminMobileShell extends StatelessWidget {
       (Icons.groups_outlined, Icons.groups_rounded, 'الموظفون'),
       (Icons.fact_check_outlined, Icons.fact_check_rounded, 'سجل التدقيق'),
       (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'التقارير'),
-      (Icons.archive_outlined, Icons.archive_rounded, 'أرشيف التقارير'),
-      (Icons.settings_outlined, Icons.settings_rounded, 'الإعدادات'),
     ];
     return Container(
-      height: 78,
+      height: 76,
       decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+        color: scheme.surface.withValues(alpha: .98),
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .75))),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -133,17 +138,17 @@ class AdminMobileShell extends StatelessWidget {
             onTap: () => _go(context, index),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              constraints: const BoxConstraints(minWidth: 88),
+              constraints: const BoxConstraints(minWidth: 92),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
                 color: active ? scheme.primary.withValues(alpha: .13) : Colors.transparent,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: active ? scheme.primary.withValues(alpha: .28) : Colors.transparent),
+                border: Border.all(color: active ? scheme.primary.withValues(alpha: .35) : Colors.transparent, width: 1.2),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 23),
+                  Icon(active ? item.$2 : item.$1, color: active ? scheme.primary : scheme.onSurfaceVariant, size: 24),
                   const SizedBox(height: 3),
                   Text(item.$3, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? scheme.primary : scheme.onSurfaceVariant, fontSize: 10.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700)),
                 ],
@@ -161,14 +166,23 @@ class AdminMobileShell extends StatelessWidget {
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         foregroundColor: scheme.onSurface,
-        padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 9, vertical: compact ? 9 : 10),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 11, vertical: compact ? 9 : 10),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         side: BorderSide(color: scheme.outlineVariant),
-        backgroundColor: scheme.surface,
+        backgroundColor: scheme.surface.withValues(alpha: .55),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: compact ? 20 : 21), if (!compact) ...[const SizedBox(width: 5), Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800))]]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: compact ? 20 : 21),
+          if (!compact) ...[
+            const SizedBox(width: 5),
+            Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800)),
+          ],
+        ],
+      ),
     );
   }
 
@@ -177,22 +191,27 @@ class AdminMobileShell extends StatelessWidget {
       context: context,
       showDragHandle: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (sheetContext) => SafeArea(child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Align(alignment: Alignment.centerRight, child: Text('القائمة', style: TextStyle(color: Theme.of(sheetContext).colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900))),
-          const SizedBox(height: 10),
-          _themeSelector(sheetContext),
-          _optionTile(sheetContext, Icons.notifications_none_rounded, 'الإشعارات', 'الإشعارات الإدارية والتنبيهات', '/notifications'),
-          _optionTile(sheetContext, Icons.groups_outlined, 'نقل الموظفين الذكي', 'استيراد وتصدير الموظفين مع المعاينة والتحقق', '/manager/employees/transfer'),
-          _optionTile(sheetContext, Icons.fact_check_outlined, 'سجل التدقيق', 'مراجعة العمليات والأحداث الإدارية', '/admin/audit'),
-          _optionTile(sheetContext, Icons.archive_outlined, 'أرشيف التقارير', 'التقارير المحفوظة والأرشيف', '/admin/reports/archive'),
-          _optionTile(sheetContext, Icons.psychology_outlined, 'المساعد الذكي', 'المساعد والتحليلات الذكية', '/ai'),
-          _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
-          _optionTile(sheetContext, Icons.explore_outlined, 'القبلة', 'اتجاه القبلة والخدمات المكانية', '/prayer'),
-          _optionTile(sheetContext, Icons.settings_outlined, 'الإعدادات', 'إعدادات النظام والإدارة', '/admin/settings'),
-        ]),
-      )),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(alignment: Alignment.centerRight, child: Text('القائمة', style: TextStyle(color: Theme.of(sheetContext).colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900))),
+              const SizedBox(height: 10),
+              _themeSelector(sheetContext),
+              _optionTile(sheetContext, Icons.notifications_none_rounded, 'الإشعارات', 'الإشعارات الإدارية والتنبيهات', '/notifications'),
+              _optionTile(sheetContext, Icons.groups_outlined, 'نقل الموظفين الذكي', 'استيراد وتصدير الموظفين مع المعاينة والتحقق', '/manager/employees/transfer'),
+              _optionTile(sheetContext, Icons.fact_check_outlined, 'سجل التدقيق', 'مراجعة العمليات والأحداث الإدارية', '/admin/audit'),
+              _optionTile(sheetContext, Icons.archive_outlined, 'أرشيف التقارير', 'التقارير المحفوظة والأرشيف', '/admin/reports/archive'),
+              _optionTile(sheetContext, Icons.psychology_outlined, 'المساعد الذكي', 'المساعد والتحليلات الذكية', '/ai'),
+              _optionTile(sheetContext, Icons.wb_sunny_outlined, 'الطقس', 'حالة الطقس والخدمات المرتبطة بالموقع', '/weather'),
+              _optionTile(sheetContext, Icons.explore_outlined, 'القبلة', 'اتجاه القبلة والخدمات المكانية', '/prayer'),
+              _optionTile(sheetContext, Icons.settings_outlined, 'الإعدادات', 'إعدادات النظام والإدارة', '/admin/settings'),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
