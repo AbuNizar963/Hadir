@@ -77,14 +77,11 @@ class UpdaterService {
 
   Future<UpdateInfo?> check() async {
     final currentCode = await currentVersionCode();
-    Object? lastError;
 
     try {
       final latest = await _checkLatestRelease(currentCode);
       if (latest != null) return latest;
-    } catch (error) {
-      lastError = error;
-    }
+    } catch (_) {}
 
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
@@ -108,7 +105,6 @@ class UpdaterService {
         if (update != null) return update;
         return null;
       } catch (error) {
-        lastError = error;
         final status = error is DioException ? error.response?.statusCode : null;
         if (status == 403 || status == 429) break;
         if (attempt < 2) {
@@ -124,11 +120,8 @@ class UpdaterService {
       if (fallback != null) return fallback;
       return null;
     } catch (error) {
-      lastError = error;
+      throw error;
     }
-
-    if (lastError != null) throw lastError;
-    throw StateError('تعذر التحقق من وجود تحديث');
   }
 
   Future<UpdateInfo?> _checkLatestRelease(int currentCode) async {
