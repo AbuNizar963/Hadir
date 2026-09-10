@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// HADIR visual tokens mirrored from the web application's CSS design system.
 /// Keep these values shared so every Flutter page inherits the same visual language.
@@ -87,7 +88,7 @@ class HadirBrand {
       scaffoldBackgroundColor: background,
       canvasColor: background,
       visualDensity: VisualDensity.standard,
-      fontFamily: 'Cairo',
+      fontFamily: GoogleFonts.cairo().fontFamily,
       splashFactory: NoSplash.splashFactory,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
