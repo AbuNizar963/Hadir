@@ -71,7 +71,8 @@ class UpdaterService {
       });
 
   Future<int> currentVersionCode() async {
-    return (await _channel.invokeMethod<num>('currentVersionCode'))?.toInt() ?? 1;
+    final value = await _channel.invokeMethod<num>('currentVersionCode');
+    return value?.toInt() ?? 1;
   }
 
   Future<UpdateInfo?> check() async {
@@ -126,7 +127,8 @@ class UpdaterService {
       lastError = error;
     }
 
-    throw lastError!;
+    if (lastError != null) throw lastError;
+    throw StateError('تعذر التحقق من وجود تحديث');
   }
 
   Future<UpdateInfo?> _checkLatestRelease(int currentCode) async {
@@ -159,7 +161,9 @@ class UpdaterService {
 
     int? code;
     String? tag;
-    final tagPattern = RegExp(r'(?:^|/)(android-v1\.0\.(\d+))(?:$|[?#&<>" ])');
+    final tagPattern = RegExp(
+      r'(?:^|/)(android-v1\.0\.(\d+))(?:$|[?#&<>" ])',
+    );
     for (final candidate in candidates) {
       final match = tagPattern.firstMatch(candidate);
       if (match == null) continue;
