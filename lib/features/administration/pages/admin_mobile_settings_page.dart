@@ -4,67 +4,1089 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/api.dart';
 import '../../../core/session.dart';
 
-enum SettingsView { home, identity, locations, security, diagnostics }
+enum _SettingsView { home, identity, locations, security, diagnostics }
 
 class AdminMobileSettingsPage extends StatefulWidget {
   const AdminMobileSettingsPage({super.key});
+
   @override
   State<AdminMobileSettingsPage> createState() => _AdminMobileSettingsPageState();
 }
 
 class _AdminMobileSettingsPageState extends State<AdminMobileSettingsPage> {
-  static const bg=Color(0xFF080D18), card=Color(0xFF111827), inner=Color(0xFF151E30), green=Color(0xFF17D7A1), cyan=Color(0xFF10E7FF), muted=Color(0xFF8B97AA), line=Color(0xFF263146), red=Color(0xFFFF4D55);
-  final _session=HadirSession();
-  final _ownerName=TextEditingController(), _ownerUsername=TextEditingController(), _ownerPassword=TextEditingController(), _specialty=TextEditingController();
-  final _bulkMinutes=TextEditingController(text:'10'), _locationName=TextEditingController(), _locationLat=TextEditingController(), _locationLng=TextEditingController(), _locationRadius=TextEditingController(text:'100');
-  SettingsView _view=SettingsView.home; Map<String,dynamic> _settings={}; List<dynamic> _locations=[], _admins=[]; bool _loading=true,_saving=false,_addingLocation=false; String? _error,_editingLocation; String _bulkAction='';
-  @override void initState(){super.initState();_load();}
-  @override void dispose(){for(final c in [_ownerName,_ownerUsername,_ownerPassword,_specialty,_bulkMinutes,_locationName,_locationLat,_locationLng,_locationRadius]){c.dispose();}super.dispose();}
-  Future<HadirApi?> _api()async{final t=await _session.adminToken();if(t==null||t.isEmpty){if(mounted)setState(()=>_error='انتهت جلسة الإدارة. سجّل الدخول مرة أخرى.');return null;}return HadirApi(token:t);}
-  List<dynamic> _asList(dynamic v)=>v is List?List<dynamic>.from(v):v is Map&&v['admins'] is List?List<dynamic>.from(v['admins']):const[];
-  Future<void> _load({bool withAdmins=false})async{if(mounted)setState((){_loading=true;_error=null;});try{final a=await _api();if(a==null)return;final r=await Future.wait<dynamic>([a.settings(),a.locations(),if(withAdmins)a.dio.get('/api/admins')]);if(!mounted)return;setState((){_settings=Map<String,dynamic>.from(r[0]as Map);_locations=List<dynamic>.from(r[1]as List);if(withAdmins)_admins=_asList(r[2]);_loading=false;});_ownerName.text='${_settings['ownerName']??''}';_ownerUsername.text='${_settings['ownerUsername']??''}';}catch(e){if(mounted)setState((){_loading=false;_error=HadirApi.errorMessage(e);});}}
-  Future<void> _save(Map<String,dynamic> patch)async{if(_saving||patch.isEmpty)return;setState(()=>_saving=true);try{final a=await _api();if(a==null)return;final u=await a.updateSettings(patch);if(!mounted)return;setState(()=>_settings={..._settings,...patch,...u});_toast('تم حفظ الإعدادات');}catch(e){if(mounted)setState(()=>_error=HadirApi.errorMessage(e));}finally{if(mounted)setState(()=>_saving=false);}}
-  void _toast(String s,{bool danger=false})=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor:danger?red:green,content:Text(s,style:TextStyle(color:danger?Colors.white:Colors.black,fontWeight:FontWeight.w800))));
-  Future<bool> _confirm(String t,String m)async{final r=await showDialog<bool>(context:context,builder:(c)=>AlertDialog(backgroundColor:inner,title:Text(t,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900)),content:Text(m,style:const TextStyle(color:muted)),actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('متابعة'))]));return r==true;}
-  InputDecoration _input(String h)=>InputDecoration(hintText:h,hintStyle:const TextStyle(color:muted),filled:true,fillColor:const Color(0xFF070C16),border:const OutlineInputBorder(borderRadius:BorderRadius.all(Radius.circular(12)),borderSide:BorderSide(color:line)),enabledBorder:const OutlineInputBorder(borderRadius:BorderRadius.all(Radius.circular(12)),borderSide:BorderSide(color:line)),focusedBorder:const OutlineInputBorder(borderRadius:BorderRadius.all(Radius.circular(12)),borderSide:BorderSide(color:green)));
-  Widget _eyebrow(String s,{Color color=green})=>Text(s,style:TextStyle(color:color,fontSize:10,fontWeight:FontWeight.w900,letterSpacing:1.2,fontFamily:'monospace'));
-  Widget _iconBox(IconData i,{Color color=green})=>Container(width:42,height:42,decoration:BoxDecoration(color:color.withValues(alpha:.10),borderRadius:BorderRadius.circular(13)),child:Icon(i,color:color,size:21));
-  Widget _box(Widget c,{Color border=line})=>Container(padding:const EdgeInsets.all(15),decoration:BoxDecoration(color:card,borderRadius:BorderRadius.circular(22),border:Border.all(color:border)),child:c);
-  Widget _head(String t,String s,IconData i,{Color color=green})=>Row(children:[_iconBox(i,color:color),const SizedBox(width:9),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(t,style:const TextStyle(color:Colors.white,fontSize:14,fontWeight:FontWeight.w900)),Text(s,style:const TextStyle(color:muted,fontSize:9.5))]))]);
-  Widget _pageHead(String t,String s,IconData i)=>Row(children:[IconButton(onPressed:()=>setState(()=>_view=SettingsView.home),icon:const Icon(Icons.chevron_right_rounded,color:muted)),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.end,children:[Text(t,style:const TextStyle(color:Colors.white,fontSize:19,fontWeight:FontWeight.w900)),Text(s,style:const TextStyle(color:muted,fontSize:10))])),const SizedBox(width:9),_iconBox(i)]);
-  Widget _home()=>ListView(physics:const AlwaysScrollableScrollPhysics(),padding:const EdgeInsets.fromLTRB(18,15,18,88),children:[_box(Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[_eyebrow('HADIR · OWNER'),const SizedBox(height:3),const Text('الإعدادات',textAlign:TextAlign.right,style:TextStyle(color:Colors.white,fontSize:27,fontWeight:FontWeight.w900)),const Text('إدارة النظام والهوية والمواقع والحسابات والأمان',textAlign:TextAlign.right,style:TextStyle(color:muted,fontSize:10.5)),const SizedBox(height:15),_brand()]),border:green.withValues(alpha:.22)),const SizedBox(height:10),_box(Column(children:[_head('الإعدادات','اختر قسمًا لفتح واجهته الإدارية',Icons.settings_outlined),_homeRow('الهوية والحسابات','هوية الشركة وحسابات الإدارة',Icons.person_outline_rounded,SettingsView.identity),_homeRow('المواقع و QR','مواقع العمل ورموز الحضور',Icons.location_on_outlined,SettingsView.locations),_homeRow('الأمان والصلاحيات','الحسابات والعمليات الجماعية',Icons.person_add_alt_1_outlined,SettingsView.security),_homeRow('المتقدم والتشخيص','التشخيص وإعادة التهيئة',Icons.gps_fixed_outlined,SettingsView.diagnostics)]))]);
-  Widget _brand()=>Container(padding:const EdgeInsets.all(14),decoration:BoxDecoration(color:inner,borderRadius:BorderRadius.circular(21),border:Border.all(color:green.withValues(alpha:.18))),child:Column(children:[Container(width:96,height:96,padding:const EdgeInsets.all(16),decoration:BoxDecoration(color:const Color(0xFF1B2437),shape:BoxShape.circle,border:Border.all(color:green.withValues(alpha:.25),width:2)),child:Image.asset('assets/branding/hadir_logo_transparent.png')),const SizedBox(height:8),Text('${_settings['brandName']??'قسم شرطة الشهباء'}',style:const TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.w900)),const Text('هوية الشركة · الإعدادات المركزية',style:TextStyle(color:muted,fontSize:9.5)),TextButton(onPressed:(){setState(()=>_view=SettingsView.identity);_load(withAdmins:true);},child:const Text('إدارة الهوية',style:TextStyle(color:red,fontSize:10,fontWeight:FontWeight.w900)))]));
-  Widget _homeRow(String t,String s,IconData i,SettingsView v)=>InkWell(onTap:(){setState(()=>_view=v);if(v==SettingsView.identity)_load(withAdmins:true);},child:Container(padding:const EdgeInsets.symmetric(vertical:12),decoration:const BoxDecoration(border:Border(bottom:BorderSide(color:line))),child:Row(children:[_iconBox(i),const SizedBox(width:10),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(t,style:const TextStyle(color:Colors.white,fontSize:12.5,fontWeight:FontWeight.w900)),Text(s,style:const TextStyle(color:muted,fontSize:9.5))])),const Icon(Icons.chevron_left_rounded,color:muted)]));
-  Widget _identity()=>ListView(padding:const EdgeInsets.fromLTRB(18,10,18,88),children:[_pageHead('الهوية والحسابات','هوية الشركة والحسابات الإدارية',Icons.badge_outlined),const SizedBox(height:9),_box(Column(children:[_head('هوية الشركة والجهة','الاسم والشعار وتخصصات العمل',Icons.business_outlined),const SizedBox(height:10),_field('اسم الشركة / الجهة',_settings['brandName']?.toString()??'',(v)=>_save({'brandName':v})),const SizedBox(height:10),const Align(alignment:Alignment.centerRight,child:Text('تخصصات العمل',style:TextStyle(color:muted,fontSize:10.5,fontWeight:FontWeight.w700))),const SizedBox(height:6),Row(children:[Expanded(child:TextField(controller:_specialty,textDirection:TextDirection.rtl,style:const TextStyle(color:Colors.white,fontSize:11),decoration:_input('إضافة تخصص جديد'))),const SizedBox(width:6),FilledButton(onPressed:_addSpecialty,style:FilledButton.styleFrom(backgroundColor:green,foregroundColor:Colors.black),child:const Text('+ إضافة'))]),const SizedBox(height:6),..._specialties().asMap().entries.map((e)=>Container(margin:const EdgeInsets.only(top:4),padding:const EdgeInsets.symmetric(horizontal:8,vertical:6),decoration:BoxDecoration(color:inner,borderRadius:BorderRadius.circular(10)),child:Row(children:[IconButton(onPressed:()=>_removeSpecialty(e.value),icon:const Icon(Icons.delete_outline,color:red,size:16)),Expanded(child:Text('${e.key+1}. ${e.value}',textAlign:TextAlign.right,style:const TextStyle(color:Colors.white,fontSize:10.5,fontWeight:FontWeight.w800))),const Icon(Icons.drag_indicator_rounded,color:muted,size:15)])))])),const SizedBox(height:9),_box(Column(children:[_head('حساب المالك','بيانات المالك وتحديث كلمة المرور',Icons.person_outline_rounded,color:cyan),const SizedBox(height:10),_fieldController('اسم المالك',_ownerName),const SizedBox(height:7),_fieldController('اسم المستخدم',_ownerUsername),const SizedBox(height:7),_fieldController('كلمة مرور جديدة',_ownerPassword,obscure:true),const SizedBox(height:9),Align(alignment:Alignment.centerLeft,child:FilledButton(onPressed:_saveOwner,style:FilledButton.styleFrom(backgroundColor:green,foregroundColor:Colors.black),child:const Text('حفظ بيانات المالك')))]),border:cyan.withValues(alpha:.25)),const SizedBox(height:9),_accounts()]);
-  List<String> _specialties()=>List<String>.from(_settings['specialties'] is List?_settings['specialties'] as List:const[]);
-  Future<void> _addSpecialty()async{final v=_specialty.text.trim();if(v.isEmpty)return;final x=_specialties();if(!x.contains(v))x.add(v);_specialty.clear();await _save({'specialties':x});}
-  Future<void> _removeSpecialty(String v)async{final x=_specialties()..remove(v);await _save({'specialties':x});}
-  Widget _field(String h,String initial,ValueChanged<String> onSave){final c=TextEditingController(text:initial);return Row(children:[Expanded(child:TextField(controller:c,textDirection:TextDirection.rtl,style:const TextStyle(color:Colors.white,fontSize:12),decoration:_input(h),onSubmitted:onSave)),IconButton(onPressed:(){final v=c.text.trim();if(v.isNotEmpty)onSave(v);},icon:const Icon(Icons.save_outlined,color:green,size:19))]);}
-  Widget _fieldController(String h,TextEditingController c,{bool obscure=false})=>TextField(controller:c,obscureText:obscure,textDirection:TextDirection.rtl,style:const TextStyle(color:Colors.white,fontSize:12),decoration:_input(h));
-  Future<void> _saveOwner()async{final p=<String,dynamic>{'ownerName':_ownerName.text.trim(),'ownerUsername':_ownerUsername.text.trim()};if(_ownerPassword.text.isNotEmpty)p['ownerPassword']=_ownerPassword.text;await _save(p);_ownerPassword.clear();}
-  Widget _accounts()=>_box(Column(children:[_head('حسابات المدراء والمشرفين','إدارة حسابات الإدارة والصلاحيات',Icons.admin_panel_settings_outlined),const SizedBox(height:7),Align(alignment:Alignment.centerLeft,child:FilledButton.icon(onPressed:_createAdmin,icon:const Icon(Icons.add,size:16),label:const Text('إضافة حساب'))),if(_admins.isEmpty)const Padding(padding:EdgeInsets.all(12),child:Text('لا توجد حسابات إضافية أو لم يتم تحميلها بعد.',style:TextStyle(color:muted,fontSize:9.5))),..._admins.map((r){final a=r is Map?Map<String,dynamic>.from(r):<String,dynamic>{};final active=a['active']!=false;final id='${a['id']??''}';return Container(margin:const EdgeInsets.only(top:5),padding:const EdgeInsets.symmetric(horizontal:8,vertical:6),decoration:BoxDecoration(color:inner,borderRadius:BorderRadius.circular(10)),child:Row(children:[Icon(active?Icons.check_circle_outline:Icons.block_outlined,color:active?green:red,size:16),const SizedBox(width:6),Expanded(child:Text('${a['name']??a['username']??'حساب'} · ${a['role']??'manager'}',style:const TextStyle(color:Colors.white,fontSize:10.5,fontWeight:FontWeight.w800))),Switch(value:active,onChanged:(v)=>_toggleAdmin(id,v)),IconButton(onPressed:()=>_deleteAdmin(id),icon:const Icon(Icons.delete_outline,color:red,size:17))]));})]));
-  Future<void> _createAdmin()async{final n=await _prompt('اسم المدير أو المشرف');if(n==null||n.trim().isEmpty)return;final u=await _prompt('اسم المستخدم');if(u==null||u.trim().isEmpty)return;final p=await _prompt('كلمة المرور');if(p==null||p.length<12){_toast('كلمة المرور يجب أن تكون 12 محرفًا على الأقل',danger:true);return;}try{final a=await _api();if(a==null)return;await a.dio.post('/api/admins',data:{'name':n.trim(),'username':u.trim(),'password':p,'role':'manager'});await _load(withAdmins:true);_toast('تمت إضافة الحساب');}catch(e){_toast(HadirApi.errorMessage(e),danger:true);}}
-  Future<String?> _prompt(String h)async{final c=TextEditingController();final r=await showDialog<String>(context:context,builder:(x)=>AlertDialog(backgroundColor:inner,title:Text(h,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900)),content:TextField(controller:c,textDirection:TextDirection.rtl,style:const TextStyle(color:Colors.white),decoration:_input(h)),actions:[TextButton(onPressed:()=>Navigator.pop(x),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(x,c.text),child:const Text('حفظ'))]));c.dispose();return r;}
-  Future<void> _toggleAdmin(String id,bool active)async{if(id.isEmpty)return;try{final a=await _api();if(a==null)return;await a.dio.patch('/api/admins/${Uri.encodeComponent(id)}',data:{'active':active});await _load(withAdmins:true);}catch(e){_toast(HadirApi.errorMessage(e),danger:true);}}
-  Future<void> _deleteAdmin(String id)async{if(id.isEmpty||!await _confirm('حذف الحساب','هل تريد حذف حساب الإدارة هذا؟'))return;try{final a=await _api();if(a==null)return;await a.dio.delete('/api/admins/${Uri.encodeComponent(id)}');await _load(withAdmins:true);}catch(e){_toast(HadirApi.errorMessage(e),danger:true);}}
-  Widget _locationsPage()=>ListView(padding:const EdgeInsets.fromLTRB(18,10,18,88),children:[_pageHead('المواقع و QR','مواقع العمل ورموز الحضور',Icons.location_on_outlined),const SizedBox(height:9),_box(Column(children:[_head('مواقع العمل','إدارة مواقع العمل في القائمة المستقلة',Icons.location_on_outlined),const SizedBox(height:7),..._locations.map((r){final x=r is Map?Map<String,dynamic>.from(r):<String,dynamic>{};final id='${x['id']??''}';return Container(margin:const EdgeInsets.only(top:5),padding:const EdgeInsets.symmetric(horizontal:8,vertical:6),decoration:BoxDecoration(color:inner,borderRadius:BorderRadius.circular(10)),child:Row(children:[const Icon(Icons.location_on_outlined,color:green,size:18),const SizedBox(width:6),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('${x['name']??id}',style:const TextStyle(color:Colors.white,fontSize:10.5,fontWeight:FontWeight.w800)),Text('${x['lat']??'—'} · ${x['lng']??'—'} · ${x['radiusMeters']??'—'} م',style:const TextStyle(color:muted,fontSize:9))])),IconButton(onPressed:()=>_editLocation(x),icon:const Icon(Icons.edit_outlined,color:cyan,size:17)),if(id!='main')IconButton(onPressed:()=>_deleteLocation(id),icon:const Icon(Icons.delete_outline,color:red,size:17))]));}),const SizedBox(height:7),OutlinedButton.icon(onPressed:(){_editingLocation=null;_clearLocation();setState(()=>_addingLocation=true);},icon:const Icon(Icons.add,color:green,size:17),label:const Text('إضافة موقع عمل جديد',style:TextStyle(color:green))),if(_addingLocation)...[const Divider(color:line,height:20),_fieldController('اسم الموقع',_locationName),const SizedBox(height:7),_fieldController('خط العرض',_locationLat),const SizedBox(height:7),_fieldController('خط الطول',_locationLng),const SizedBox(height:7),_fieldController('النطاق بالمتر',_locationRadius),const SizedBox(height:8),Row(children:[Expanded(child:OutlinedButton(onPressed:()=>setState(()=>_addingLocation=false),child:const Text('إلغاء'))),const SizedBox(width:7),Expanded(child:FilledButton(onPressed:_saveLocation,style:FilledButton.styleFrom(backgroundColor:green,foregroundColor:Colors.black),child:const Text('حفظ الموقع')))])])),const SizedBox(height:9),_box(Column(children:[_head('رمز QR','الرمز المستخدم للتحقق من الحضور والانصراف',Icons.qr_code_2_rounded,color:cyan),const SizedBox(height:8),Align(alignment:Alignment.centerRight,child:_eyebrow('QR ACCESS · 04',color:cyan)),const SizedBox(height:6),Container(padding:const EdgeInsets.all(14),decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(18)),child:QrImageView(data:'${_settings['qrCode']??'HADIR-SITE-01-STATIC'}',size:220)),const SizedBox(height:7),Text('${_settings['qrCode']??'HADIR-SITE-01-STATIC'}',style:const TextStyle(color:muted,fontSize:9,fontFamily:'monospace')),const SizedBox(height:8),Row(children:[Expanded(child:OutlinedButton.icon(onPressed:()=>_save({'qrCode':'HADIR-${DateTime.now().millisecondsSinceEpoch}'}),icon:const Icon(Icons.qr_code_2,size:16),label:const Text('توليد رمز جديد'))),const SizedBox(width:7),Expanded(child:FilledButton.icon(onPressed:()=>_toast('الرمز جاهز للطباعة أو المشاركة من الجهاز'),icon:const Icon(Icons.print_outlined,size:16),label:const Text('طباعة الرمز'),style:FilledButton.styleFrom(backgroundColor:cyan,foregroundColor:Colors.black)))])]))]);
-  void _clearLocation(){_locationName.clear();_locationLat.text='${_settings['workSiteLat']??''}';_locationLng.text='${_settings['workSiteLng']??''}';_locationRadius.text='${_settings['radiusMeters']??100}';}
-  void _editLocation(Map<String,dynamic>x){_editingLocation='${x['id']??''}';_locationName.text='${x['name']??''}';_locationLat.text='${x['lat']??''}';_locationLng.text='${x['lng']??''}';_locationRadius.text='${x['radiusMeters']??100}';setState(()=>_addingLocation=true);}
-  Future<void> _saveLocation()async{final lat=double.tryParse(_locationLat.text),lng=double.tryParse(_locationLng.text),rad=double.tryParse(_locationRadius.text);if(_locationName.text.trim().isEmpty||lat==null||lng==null||rad==null||rad<=0){_toast('بيانات الموقع غير صالحة',danger:true);return;}try{final a=await _api();if(a==null)return;await a.dio.put('/api/locations',data:{'id':_editingLocation??'loc_${DateTime.now().millisecondsSinceEpoch}','name':_locationName.text.trim(),'lat':lat,'lng':lng,'radiusMeters':rad});setState(()=>_addingLocation=false);await _load();_toast('تم حفظ الموقع');}catch(e){_toast(HadirApi.errorMessage(e),danger:true);}}
-  Future<void> _deleteLocation(String id)async{if(id.isEmpty||!await _confirm('حذف الموقع','سيتم حذف الموقع من قائمة مواقع العمل.'))return;try{final a=await _api();if(a==null)return;await a.dio.delete('/api/locations/${Uri.encodeComponent(id)}');await _load();_toast('تم حذف الموقع');}catch(e){_toast(HadirApi.errorMessage(e),danger:true);}}
-  Widget _security()=>ListView(padding:const EdgeInsets.fromLTRB(18,10,18,88),children:[_pageHead('الأمان والصلاحيات','حسابات المالك والعمليات الجماعية للموظفين',Icons.shield_outlined),const SizedBox(height:9),_box(Column(children:[_head('إدارة الموظفين دفعة واحدة','عمليات جماعية متاحة للمالك فقط',Icons.manage_accounts_outlined),const SizedBox(height:10),DropdownButtonFormField<String>(initialValue:_bulkAction.isEmpty?null:_bulkAction,dropdownColor:inner,style:const TextStyle(color:Colors.white,fontSize:11),decoration:_input('اختيار إعداد'),items:const[DropdownMenuItem(value:'password',child:Text('تغيير كلمة مرور جميع الموظفين')),DropdownMenuItem(value:'avatar',child:Text('تغيير الصورة الشخصية للجميع')),DropdownMenuItem(value:'grace',child:Text('مهلة التأخر')),DropdownMenuItem(value:'earlyCheckout',child:Text('مهلة الانصراف المبكر')),DropdownMenuItem(value:'adminWorkHours',child:Text('أوقات دوام الموظفين الإداريين')),DropdownMenuItem(value:'rotationWorkHours',child:Text('أوقات دوام الموظفين التناوبيين')),DropdownMenuItem(value:'rotationDays',child:Text('أيام التناوب للموظفين التناوبيين')),DropdownMenuItem(value:'unlinkDevices',child:Text('فك ربط جميع الأجهزة')),DropdownMenuItem(value:'revokeSessions',child:Text('تسجيل خروج جميع الموظفين'))],onChanged:(v)=>setState(()=>_bulkAction=v??'')),const SizedBox(height:8),if(_bulkAction=='grace'||_bulkAction=='earlyCheckout')_fieldController('عدد الدقائق',_bulkMinutes),if(_bulkAction=='adminWorkHours'||_bulkAction=='rotationWorkHours')_info('08:00 → 16:00','وقت البداية والنهاية يطبقان حسب نوع الدوام.'),if(_bulkAction=='rotationDays')_info('4 أيام مناوبة + 4 أيام راحة','دورة التناوب للموظفين التناوبيين.'),if(_bulkAction=='avatar')_info('الصورة الموحدة','رفع الصورة الموحدة يتم من واجهة الموظفين الذكية.'),if(_bulkAction=='password')_info('كلمة مرور جديدة','سيتم إلغاء الجلسات الحالية بعد التطبيق.'),const SizedBox(height:8),Align(alignment:Alignment.centerLeft,child:FilledButton(onPressed:_runBulk,style:FilledButton.styleFrom(backgroundColor:green,foregroundColor:Colors.black),child:const Text('تنفيذ العملية')))]))]);
-  Widget _info(String t,String s)=>Container(width:double.infinity,padding:const EdgeInsets.all(11),decoration:BoxDecoration(color:const Color(0xFF0A111E),borderRadius:BorderRadius.circular(13),border:Border.all(color:green.withValues(alpha:.17))),child:Column(crossAxisAlignment:CrossAxisAlignment.end,children:[Text(t,style:const TextStyle(color:Colors.white,fontSize:10.5,fontWeight:FontWeight.w800)),Text(s,textAlign:TextAlign.right,style:const TextStyle(color:muted,fontSize:9.5))]));
-  Future<void> _runBulk()async{if(_bulkAction.isEmpty){_toast('اختر إعدادًا من القائمة',danger:true);return;}final p=<String,dynamic>{'action':_bulkAction};if(_bulkAction=='grace'||_bulkAction=='earlyCheckout')p['minutes']=int.tryParse(_bulkMinutes.text)??10;if(_bulkAction=='password'){final v=await _prompt('كلمة مرور الموظفين');if(v==null||v.length<6){_toast('كلمة المرور يجب أن تكون 6 محارف على الأقل',danger:true);return;}p['password']=v;}if(_bulkAction=='adminWorkHours'||_bulkAction=='rotationWorkHours'){p['workStartTime']='08:00';p['workEndTime']='16:00';}if(_bulkAction=='rotationDays'){p['rotationDaysOn']=4;p['rotationDaysOff']=4;}if((_bulkAction=='unlinkDevices'||_bulkAction=='revokeSessions')&&!await _confirm('تأكيد العملية','ستؤثر هذه العملية على جميع الموظفين.'))return;try{final a=await _api();if(a==null)return;final r=await a.dio.post('/api/owner/bulk-settings',data:p);final d=r.data is Map?Map<String,dynamic>.from(r.data as Map):<String,dynamic>{};_toast(d['message']?.toString()??'تم تنفيذ العملية بنجاح');}catch(e){_toast(HadirApi.errorMessage(e),danger:true);}}
-  Widget _diagnostics()=>ListView(padding:const EdgeInsets.fromLTRB(18,10,18,88),children:[_pageHead('النظام والتشخيص','فحص صحة النظام وإجراءات المالك',Icons.gps_fixed_outlined),const SizedBox(height:9),_box(Column(children:[_head('تشخيص النظام','مراجعة سجل الأخطاء الصحي وتنظيمه',Icons.gps_fixed_outlined),const SizedBox(height:10),Row(children:[Expanded(child:OutlinedButton.icon(onPressed:_checkHealth,icon:const Icon(Icons.gps_fixed_outlined,size:16),label:const Text('فتح سجل التشخيص'))),const SizedBox(width:7),Expanded(child:FilledButton.icon(onPressed:_checkHealth,icon:const Icon(Icons.refresh,size:16),label:const Text('فحص النظام'),style:FilledButton.styleFrom(backgroundColor:green,foregroundColor:Colors.black)))])])),const SizedBox(height:9),_danger('DANGER ZONE · 08','إعادة تهيئة النظام','إجراء مسؤول للمالك لإعادة بيانات التشغيل والاختبار.','إعادة تهيئة النظام'),const SizedBox(height:9),_danger('LOCAL RESET · 09','إعادة تعيين البيانات','إعادة تعيين بيانات النظام المحلية عند الحاجة.','إعادة تعيين البيانات'),const SizedBox(height:9),_box(Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[_eyebrow('SERVER SETTINGS',color:cyan),const SizedBox(height:6),const Text('إعدادات الخادم الإضافية',textAlign:TextAlign.right,style:TextStyle(color:Colors.white,fontSize:13,fontWeight:FontWeight.w900)),..._extraSettings()]))]);
-  Widget _danger(String code,String title,String sub,String button)=>_box(Column(children:[_head(title,sub,Icons.security_outlined,color:red),const SizedBox(height:7),Align(alignment:Alignment.centerLeft,child:FilledButton.icon(onPressed:_resetData,icon:const Icon(Icons.restart_alt,size:16),label:Text(button),style:FilledButton.styleFrom(backgroundColor:red,foregroundColor:Colors.white)))]),border:red.withValues(alpha:.35));
-  List<Widget> _extraSettings(){const known={'brandName','brandLogo','qrCode','workSiteLat','workSiteLng','radiusMeters','workStart','workEnd','lateGraceMinutes','earlyLeaveGraceMinutes','earlyGraceMinutes','specialties','ownerName','ownerUsername','adminAccounts','locations'};final e=_settings.entries.where((x)=>!known.contains(x.key)).toList();if(e.isEmpty)return[const Text('لا توجد مفاتيح إضافية من الخادم.',style:TextStyle(color:muted,fontSize:9.5))];return e.map((x)=>_settingTile(x.key,x.value)).toList();}
-  Widget _settingTile(String key,dynamic value)=>Container(margin:const EdgeInsets.only(top:6),decoration:BoxDecoration(color:inner,borderRadius:BorderRadius.circular(11),border:Border.all(color:line)),child:ListTile(dense:true,contentPadding:const EdgeInsets.symmetric(horizontal:9,vertical:1),leading:Icon(_iconFor(key),color:cyan,size:19),title:Text(key,style:const TextStyle(color:Colors.white,fontSize:10.5,fontWeight:FontWeight.w800)),subtitle:Text(_displayValue(value),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:muted,fontSize:9)),trailing:const Icon(Icons.edit_outlined,color:muted,size:16),onTap:()=>_editValue(key,value)));
-  IconData _iconFor(String key){final l=key.toLowerCase();if(l.contains('qr'))return Icons.qr_code_2_rounded;if(l.contains('location')||l.contains('lat')||l.contains('lng')||l.contains('radius'))return Icons.location_on_outlined;if(l.contains('time')||l.contains('start')||l.contains('end')||l.contains('grace'))return Icons.schedule_rounded;if(l.contains('owner')||l.contains('admin')||l.contains('account'))return Icons.admin_panel_settings_rounded;if(l.contains('security')||l.contains('device')||l.contains('token'))return Icons.security_rounded;return Icons.tune_rounded;}
-  String _displayValue(dynamic v){if(v is List)return v.join(', ');if(v is Map)return v.entries.map((e)=>'${e.key}: ${e.value}').join(' · ');return v==null?'':'$v';}
-  Future<void> _editValue(String key,dynamic value)async{final c=TextEditingController(text:_displayValue(value));final r=await showDialog<String>(context:context,builder:(x)=>AlertDialog(backgroundColor:inner,title:Text(_labelFor(key),style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900)),content:TextField(controller:c,autofocus:true,maxLines:4,textDirection:TextDirection.rtl,style:const TextStyle(color:Colors.white),decoration:_input('القيمة')),actions:[TextButton(onPressed:()=>Navigator.pop(x),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(x,c.text.trim()),child:const Text('حفظ'))]));c.dispose();if(r==null)return;dynamic n=r;if(value is num)n=num.tryParse(r)??r;if(value is bool)n=r.toLowerCase()=='true'||r=='1'||r=='نعم';if(value is List)n=r.split(',').map((x)=>x.trim()).where((x)=>x.isNotEmpty).toList();await _save({key:n});}
-  String _labelFor(String k){const m={'brandName':'اسم الشركة / الجهة','brandLogo':'شعار الشركة','qrCode':'رمز الحضور QR','workSiteLat':'خط العرض','workSiteLng':'خط الطول','radiusMeters':'نطاق الموقع بالمتر','workStart':'بداية الدوام','workEnd':'نهاية الدوام','lateGraceMinutes':'مهلة التأخر بالدقائق','earlyLeaveGraceMinutes':'مهلة الانصراف المبكر بالدقائق','earlyGraceMinutes':'مهلة الانصراف المبكر بالدقائق','specialties':'تخصصات العمل','ownerName':'اسم المالك','ownerUsername':'اسم مستخدم المالك'};return m[k]??k;}
-  Future<void> _checkHealth()async{try{final a=await _api();if(a==null)return;final h=await a.health();if(!mounted)return;showDialog(context:context,builder:(c)=>AlertDialog(backgroundColor:inner,title:const Text('حالة الخادم',style:TextStyle(color:Colors.white)),content:Text(_displayValue(h),style:const TextStyle(color:muted)),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إغلاق'))]));}catch(e){_toast(HadirApi.errorMessage(e),danger:true);}}
-  Future<void> _clearDiagnosticLog()async{_toast('تم فتح أدوات التشخيص؛ مسح السجل يتم حسب صلاحيات الخادم.');}
-  Future<void> _resetData()async{if(!await _confirm('إعادة التهيئة','هذا الإجراء للمالك فقط وقد يحذف بيانات التشغيل والاختبار. هل تريد المتابعة؟'))return;try{final a=await _api();if(a==null)return;final r=await a.dio.post('/api/workforce/reset',data:{'confirmation':'تأكيد'});final d=r.data is Map?Map<String,dynamic>.from(r.data as Map):<String,dynamic>{};_toast(d['message']?.toString()??'تمت إعادة التهيئة');await _load(withAdmins:true);}catch(e){_toast(HadirApi.errorMessage(e),danger:true);}}
-  @override Widget build(BuildContext context){Widget body;switch(_view){case SettingsView.home:body=_home();case SettingsView.identity:body=_identity();case SettingsView.locations:body=_locationsPage();case SettingsView.security:body=_security();case SettingsView.diagnostics:body=_diagnostics();}return Directionality(textDirection:TextDirection.rtl,child:Scaffold(backgroundColor:bg,body:Stack(children:[if(_loading)const Center(child:CircularProgressIndicator(color:green))else body,if(_error!=null&&!_loading)Positioned(left:18,right:18,bottom:66,child:Material(color:red,borderRadius:BorderRadius.circular(10),child:Padding(padding:const EdgeInsets.all(9),child:Text(_error!,textAlign:TextAlign.center,style:const TextStyle(color:Colors.white,fontSize:9,fontWeight:FontWeight.w700)))),Positioned(left:18,right:18,bottom:12,child:SafeArea(top:false,child:SizedBox(height:40,child:FilledButton(onPressed:_saving?null:()=>_save(_settings),style:FilledButton.styleFrom(backgroundColor:cyan,foregroundColor:Colors.black,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(12))),child:Text(_saving?'جارٍ الحفظ…':'حفظ الإعدادات',style:const TextStyle(fontSize:11,fontWeight:FontWeight.w900)))))])));}
+  static const _bg = Color(0xFF080D18);
+  static const _card = Color(0xFF111827);
+  static const _inner = Color(0xFF151E30);
+  static const _green = Color(0xFF17D7A1);
+  static const _cyan = Color(0xFF10E7FF);
+  static const _muted = Color(0xFF8B97AA);
+  static const _line = Color(0xFF263146);
+  static const _red = Color(0xFFFF4D55);
+
+  final _session = HadirSession();
+  final _ownerName = TextEditingController();
+  final _ownerUsername = TextEditingController();
+  final _ownerPassword = TextEditingController();
+  final _specialty = TextEditingController();
+  final _bulkMinutes = TextEditingController(text: '10');
+  final _locationName = TextEditingController();
+  final _locationLat = TextEditingController();
+  final _locationLng = TextEditingController();
+  final _locationRadius = TextEditingController(text: '100');
+
+  _SettingsView _view = _SettingsView.home;
+  Map<String, dynamic> _settings = {};
+  List<dynamic> _locations = [];
+  List<dynamic> _admins = [];
+  bool _loading = true;
+  bool _saving = false;
+  bool _addingLocation = false;
+  String? _error;
+  String? _editingLocation;
+  String _bulkAction = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _ownerName.dispose();
+    _ownerUsername.dispose();
+    _ownerPassword.dispose();
+    _specialty.dispose();
+    _bulkMinutes.dispose();
+    _locationName.dispose();
+    _locationLat.dispose();
+    _locationLng.dispose();
+    _locationRadius.dispose();
+    super.dispose();
+  }
+
+  Future<HadirApi?> _api() async {
+    final token = await _session.adminToken();
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        setState(() => _error = 'انتهت جلسة الإدارة. سجّل الدخول مرة أخرى.');
+      }
+      return null;
+    }
+    return HadirApi(token: token);
+  }
+
+  Future<void> _load({bool withAdmins = false}) async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      final api = await _api();
+      if (api == null) return;
+      final results = await Future.wait<dynamic>([
+        api.settings(),
+        api.locations(),
+        if (withAdmins) api.dio.get('/api/admins'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _settings = Map<String, dynamic>.from(results[0] as Map);
+        _locations = List<dynamic>.from(results[1] as List);
+        if (withAdmins) {
+          final raw = results[2];
+          _admins = raw is List
+              ? List<dynamic>.from(raw)
+              : raw is Map && raw['admins'] is List
+                  ? List<dynamic>.from(raw['admins'] as List)
+                  : <dynamic>[];
+        }
+        _loading = false;
+      });
+      _ownerName.text = '${_settings['ownerName'] ?? ''}';
+      _ownerUsername.text = '${_settings['ownerUsername'] ?? ''}';
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = HadirApi.errorMessage(error);
+      });
+    }
+  }
+
+  Future<void> _save(Map<String, dynamic> patch) async {
+    if (_saving || patch.isEmpty) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final api = await _api();
+      if (api == null) return;
+      final updated = await api.updateSettings(patch);
+      if (!mounted) return;
+      setState(() {
+        _settings = {..._settings, ...patch, ...updated};
+      });
+      _toast('تم حفظ الإعدادات');
+    } catch (error) {
+      if (mounted) setState(() => _error = HadirApi.errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _toast(String text, {bool danger = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: danger ? _red : _green,
+        content: Text(
+          text,
+          style: TextStyle(
+            color: danger ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirm(String title, String message) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _inner,
+        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: Text(message, style: const TextStyle(color: _muted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('متابعة')),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  InputDecoration _input(String hint) {
+    return const InputDecoration().copyWith(
+      hintText: hint,
+      hintStyle: const TextStyle(color: _muted),
+      filled: true,
+      fillColor: Color(0xFF070C16),
+      border: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+        borderSide: BorderSide(color: _line),
+      ),
+      enabledBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+        borderSide: BorderSide(color: _line),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+        borderSide: BorderSide(color: _green),
+      ),
+    );
+  }
+
+  Widget _eyebrow(String text, {Color color = _green}) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: color,
+        fontSize: 10,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 1.2,
+        fontFamily: 'monospace',
+      ),
+    );
+  }
+
+  Widget _iconBox(IconData icon, {Color color = _green}) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Icon(icon, color: color, size: 21),
+    );
+  }
+
+  Widget _box(Widget child, {Color border = _line}) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: border),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _head(String title, String subtitle, IconData icon, {Color color = _green}) {
+    return Row(
+      children: [
+        _iconBox(icon, color: color),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+              Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _pageHead(String title, String subtitle, IconData icon) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: () => setState(() => _view = _SettingsView.home),
+          icon: const Icon(Icons.chevron_right_rounded, color: _muted),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(title, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+              Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 9),
+        _iconBox(icon),
+      ],
+    );
+  }
+
+  Widget _home() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(18, 15, 18, 88),
+      children: [
+        _box(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _eyebrow('HADIR · OWNER'),
+              const SizedBox(height: 3),
+              const Text('الإعدادات', textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900)),
+              const Text('إدارة النظام والهوية والمواقع والحسابات والأمان', textAlign: TextAlign.right, style: TextStyle(color: _muted, fontSize: 10.5)),
+              const SizedBox(height: 15),
+              _brandCard(),
+            ],
+          ),
+          border: _green.withValues(alpha: .22),
+        ),
+        const SizedBox(height: 10),
+        _box(
+          Column(
+            children: [
+              _head('الإعدادات', 'اختر قسمًا لفتح واجهته الإدارية', Icons.settings_outlined),
+              _homeRow('الهوية والحسابات', 'هوية الشركة وحسابات الإدارة', Icons.person_outline_rounded, _SettingsView.identity),
+              _homeRow('المواقع و QR', 'مواقع العمل ورموز الحضور', Icons.location_on_outlined, _SettingsView.locations),
+              _homeRow('الأمان والصلاحيات', 'الحسابات والعمليات الجماعية', Icons.person_add_alt_1_outlined, _SettingsView.security),
+              _homeRow('المتقدم والتشخيص', 'التشخيص وإعادة التهيئة', Icons.gps_fixed_outlined, _SettingsView.diagnostics),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _brandCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _inner,
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: _green.withValues(alpha: .18)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 96,
+            height: 96,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B2437),
+              shape: BoxShape.circle,
+              border: Border.all(color: _green.withValues(alpha: .25), width: 2),
+            ),
+            child: Image.asset('assets/branding/hadir_logo_transparent.png'),
+          ),
+          const SizedBox(height: 8),
+          Text('${_settings['brandName'] ?? 'قسم شرطة الشهباء'}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+          const Text('هوية الشركة · الإعدادات المركزية', style: TextStyle(color: _muted, fontSize: 9.5)),
+          TextButton(
+            onPressed: () {
+              setState(() => _view = _SettingsView.identity);
+              _load(withAdmins: true);
+            },
+            child: const Text('إدارة الهوية', style: TextStyle(color: _red, fontSize: 10, fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _homeRow(String title, String subtitle, IconData icon, _SettingsView view) {
+    return InkWell(
+      onTap: () {
+        setState(() => _view = view);
+        if (view == _SettingsView.identity) _load(withAdmins: true);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _line))),
+        child: Row(
+          children: [
+            _iconBox(icon),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900)),
+                  Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9.5)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_left_rounded, color: _muted),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _identity() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 88),
+      children: [
+        _pageHead('الهوية والحسابات', 'هوية الشركة والحسابات الإدارية', Icons.badge_outlined),
+        const SizedBox(height: 9),
+        _box(
+          Column(
+            children: [
+              _head('هوية الشركة والجهة', 'الاسم والشعار وتخصصات العمل', Icons.business_outlined),
+              const SizedBox(height: 10),
+              _field('اسم الشركة / الجهة', '${_settings['brandName'] ?? ''}', (value) => _save({'brandName': value})),
+              const SizedBox(height: 10),
+              const Align(alignment: Alignment.centerRight, child: Text('تخصصات العمل', style: TextStyle(color: _muted, fontSize: 10.5, fontWeight: FontWeight.w700))),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(child: TextField(controller: _specialty, textDirection: TextDirection.rtl, style: const TextStyle(color: Colors.white, fontSize: 11), decoration: _input('إضافة تخصص جديد'))),
+                  const SizedBox(width: 6),
+                  FilledButton(onPressed: _addSpecialty, style: FilledButton.styleFrom(backgroundColor: _green, foregroundColor: Colors.black), child: const Text('+ إضافة')),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ..._specialties().asMap().entries.map((entry) {
+                return Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(color: _inner, borderRadius: BorderRadius.circular(10)),
+                  child: Row(
+                    children: [
+                      IconButton(onPressed: () => _removeSpecialty(entry.value), icon: const Icon(Icons.delete_outline, color: _red, size: 16)),
+                      Expanded(child: Text('${entry.key + 1}. ${entry.value}', textAlign: TextAlign.right, style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800))),
+                      const Icon(Icons.drag_indicator_rounded, color: _muted, size: 15),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        const SizedBox(height: 9),
+        _box(
+          Column(
+            children: [
+              _head('حساب المالك', 'بيانات المالك وتحديث كلمة المرور', Icons.person_outline_rounded, color: _cyan),
+              const SizedBox(height: 10),
+              _fieldController('اسم المالك', _ownerName),
+              const SizedBox(height: 7),
+              _fieldController('اسم المستخدم', _ownerUsername),
+              const SizedBox(height: 7),
+              _fieldController('كلمة مرور جديدة', _ownerPassword, obscure: true),
+              const SizedBox(height: 9),
+              Align(alignment: Alignment.centerLeft, child: FilledButton(onPressed: _saveOwner, style: FilledButton.styleFrom(backgroundColor: _green, foregroundColor: Colors.black), child: const Text('حفظ بيانات المالك'))),
+            ],
+          ),
+          border: _cyan.withValues(alpha: .25),
+        ),
+        const SizedBox(height: 9),
+        _accounts(),
+      ],
+    );
+  }
+
+  List<String> _specialties() {
+    final value = _settings['specialties'];
+    return value is List ? value.map((item) => '$item').toList() : <String>[];
+  }
+
+  Future<void> _addSpecialty() async {
+    final value = _specialty.text.trim();
+    if (value.isEmpty) return;
+    final values = _specialties();
+    if (!values.contains(value)) values.add(value);
+    _specialty.clear();
+    await _save({'specialties': values});
+  }
+
+  Future<void> _removeSpecialty(String value) async {
+    final values = _specialties()..remove(value);
+    await _save({'specialties': values});
+  }
+
+  Widget _field(String hint, String initial, ValueChanged<String> onSave) {
+    final controller = TextEditingController(text: initial);
+    return Row(
+      children: [
+        Expanded(child: TextField(controller: controller, textDirection: TextDirection.rtl, style: const TextStyle(color: Colors.white, fontSize: 12), decoration: _input(hint), onSubmitted: onSave)),
+        IconButton(onPressed: () { final value = controller.text.trim(); if (value.isNotEmpty) onSave(value); }, icon: const Icon(Icons.save_outlined, color: _green, size: 19)),
+      ],
+    );
+  }
+
+  Widget _fieldController(String hint, TextEditingController controller, {bool obscure = false}) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      textDirection: TextDirection.rtl,
+      style: const TextStyle(color: Colors.white, fontSize: 12),
+      decoration: _input(hint),
+    );
+  }
+
+  Future<void> _saveOwner() async {
+    final patch = <String, dynamic>{
+      'ownerName': _ownerName.text.trim(),
+      'ownerUsername': _ownerUsername.text.trim(),
+    };
+    if (_ownerPassword.text.isNotEmpty) patch['ownerPassword'] = _ownerPassword.text;
+    await _save(patch);
+    _ownerPassword.clear();
+  }
+
+  Widget _accounts() {
+    return _box(
+      Column(
+        children: [
+          _head('حسابات المدراء والمشرفين', 'إدارة حسابات الإدارة والصلاحيات', Icons.admin_panel_settings_outlined),
+          const SizedBox(height: 7),
+          Align(alignment: Alignment.centerLeft, child: FilledButton.icon(onPressed: _createAdmin, icon: const Icon(Icons.add, size: 16), label: const Text('إضافة حساب'))),
+          if (_admins.isEmpty)
+            const Padding(padding: EdgeInsets.all(12), child: Text('لا توجد حسابات إضافية أو لم يتم تحميلها بعد.', style: TextStyle(color: _muted, fontSize: 9.5))),
+          ..._admins.map((raw) {
+            final admin = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+            final active = admin['active'] != false;
+            final id = '${admin['id'] ?? ''}';
+            return Container(
+              margin: const EdgeInsets.only(top: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(color: _inner, borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                children: [
+                  Icon(active ? Icons.check_circle_outline : Icons.block_outlined, color: active ? _green : _red, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text('${admin['name'] ?? admin['username'] ?? 'حساب'} · ${admin['role'] ?? 'manager'}', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800))),
+                  Switch(value: active, onChanged: (value) => _toggleAdmin(id, value)),
+                  IconButton(onPressed: () => _deleteAdmin(id), icon: const Icon(Icons.delete_outline, color: _red, size: 17)),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createAdmin() async {
+    final name = await _prompt('اسم المدير أو المشرف');
+    if (name == null || name.trim().isEmpty) return;
+    final username = await _prompt('اسم المستخدم');
+    if (username == null || username.trim().isEmpty) return;
+    final password = await _prompt('كلمة المرور');
+    if (password == null || password.length < 12) {
+      _toast('كلمة المرور يجب أن تكون 12 محرفًا على الأقل', danger: true);
+      return;
+    }
+    try {
+      final api = await _api();
+      if (api == null) return;
+      await api.dio.post('/api/admins', data: {'name': name.trim(), 'username': username.trim(), 'password': password, 'role': 'manager'});
+      await _load(withAdmins: true);
+      _toast('تمت إضافة الحساب');
+    } catch (error) {
+      _toast(HadirApi.errorMessage(error), danger: true);
+    }
+  }
+
+  Future<String?> _prompt(String hint) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _inner,
+        title: Text(hint, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: TextField(controller: controller, textDirection: TextDirection.rtl, style: const TextStyle(color: Colors.white), decoration: _input(hint)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text), child: const Text('حفظ')),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  Future<void> _toggleAdmin(String id, bool active) async {
+    if (id.isEmpty) return;
+    try {
+      final api = await _api();
+      if (api == null) return;
+      await api.dio.patch('/api/admins/${Uri.encodeComponent(id)}', data: {'active': active});
+      await _load(withAdmins: true);
+    } catch (error) {
+      _toast(HadirApi.errorMessage(error), danger: true);
+    }
+  }
+
+  Future<void> _deleteAdmin(String id) async {
+    if (id.isEmpty || !await _confirm('حذف الحساب', 'هل تريد حذف حساب الإدارة هذا؟')) return;
+    try {
+      final api = await _api();
+      if (api == null) return;
+      await api.dio.delete('/api/admins/${Uri.encodeComponent(id)}');
+      await _load(withAdmins: true);
+    } catch (error) {
+      _toast(HadirApi.errorMessage(error), danger: true);
+    }
+  }
+
+  Widget _locationsPage() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 88),
+      children: [
+        _pageHead('المواقع و QR', 'مواقع العمل ورموز الحضور', Icons.location_on_outlined),
+        const SizedBox(height: 9),
+        _box(
+          Column(
+            children: [
+              _head('مواقع العمل', 'إدارة مواقع العمل في القائمة المستقلة', Icons.location_on_outlined),
+              const SizedBox(height: 7),
+              ..._locations.map((raw) {
+                final location = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+                final id = '${location['id'] ?? ''}';
+                return Container(
+                  margin: const EdgeInsets.only(top: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(color: _inner, borderRadius: BorderRadius.circular(10)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined, color: _green, size: 18),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${location['name'] ?? id}', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                            Text('${location['lat'] ?? '—'} · ${location['lng'] ?? '—'} · ${location['radiusMeters'] ?? '—'} م', style: const TextStyle(color: _muted, fontSize: 9)),
+                          ],
+                        ),
+                      ),
+                      IconButton(onPressed: () => _editLocation(location), icon: const Icon(Icons.edit_outlined, color: _cyan, size: 17)),
+                      if (id != 'main') IconButton(onPressed: () => _deleteLocation(id), icon: const Icon(Icons.delete_outline, color: _red, size: 17)),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 7),
+              OutlinedButton.icon(
+                onPressed: () {
+                  _editingLocation = null;
+                  _clearLocation();
+                  setState(() => _addingLocation = true);
+                },
+                icon: const Icon(Icons.add, color: _green, size: 17),
+                label: const Text('إضافة موقع عمل جديد', style: TextStyle(color: _green)),
+              ),
+              if (_addingLocation) ...[
+                const Divider(color: _line, height: 20),
+                _fieldController('اسم الموقع', _locationName),
+                const SizedBox(height: 7),
+                _fieldController('خط العرض', _locationLat),
+                const SizedBox(height: 7),
+                _fieldController('خط الطول', _locationLng),
+                const SizedBox(height: 7),
+                _fieldController('النطاق بالمتر', _locationRadius),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: OutlinedButton(onPressed: () => setState(() => _addingLocation = false), child: const Text('إلغاء'))),
+                    const SizedBox(width: 7),
+                    Expanded(child: FilledButton(onPressed: _saveLocation, style: FilledButton.styleFrom(backgroundColor: _green, foregroundColor: Colors.black), child: const Text('حفظ الموقع'))),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 9),
+        _box(
+          Column(
+            children: [
+              _head('رمز QR', 'الرمز المستخدم للتحقق من الحضور والانصراف', Icons.qr_code_2_rounded, color: _cyan),
+              const SizedBox(height: 8),
+              Align(alignment: Alignment.centerRight, child: _eyebrow('QR ACCESS · 04', color: _cyan)),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+                child: QrImageView(data: '${_settings['qrCode'] ?? 'HADIR-SITE-01-STATIC'}', size: 220),
+              ),
+              const SizedBox(height: 7),
+              Text('${_settings['qrCode'] ?? 'HADIR-SITE-01-STATIC'}', style: const TextStyle(color: _muted, fontSize: 9, fontFamily: 'monospace')),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: OutlinedButton.icon(onPressed: () => _save({'qrCode': 'HADIR-${DateTime.now().millisecondsSinceEpoch}'}), icon: const Icon(Icons.qr_code_2, size: 16), label: const Text('توليد رمز جديد'))),
+                  const SizedBox(width: 7),
+                  Expanded(child: FilledButton.icon(onPressed: () => _toast('الرمز جاهز للطباعة أو المشاركة من الجهاز'), icon: const Icon(Icons.print_outlined, size: 16), label: const Text('طباعة الرمز'), style: FilledButton.styleFrom(backgroundColor: _cyan, foregroundColor: Colors.black))),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _clearLocation() {
+    _locationName.clear();
+    _locationLat.text = '${_settings['workSiteLat'] ?? ''}';
+    _locationLng.text = '${_settings['workSiteLng'] ?? ''}';
+    _locationRadius.text = '${_settings['radiusMeters'] ?? 100}';
+  }
+
+  void _editLocation(Map<String, dynamic> location) {
+    _editingLocation = '${location['id'] ?? ''}';
+    _locationName.text = '${location['name'] ?? ''}';
+    _locationLat.text = '${location['lat'] ?? ''}';
+    _locationLng.text = '${location['lng'] ?? ''}';
+    _locationRadius.text = '${location['radiusMeters'] ?? 100}';
+    setState(() => _addingLocation = true);
+  }
+
+  Future<void> _saveLocation() async {
+    final lat = double.tryParse(_locationLat.text);
+    final lng = double.tryParse(_locationLng.text);
+    final radius = double.tryParse(_locationRadius.text);
+    if (_locationName.text.trim().isEmpty || lat == null || lng == null || radius == null || radius <= 0) {
+      _toast('بيانات الموقع غير صالحة', danger: true);
+      return;
+    }
+    try {
+      final api = await _api();
+      if (api == null) return;
+      await api.dio.put('/api/locations', data: {
+        'id': _editingLocation ?? 'loc_${DateTime.now().millisecondsSinceEpoch}',
+        'name': _locationName.text.trim(),
+        'lat': lat,
+        'lng': lng,
+        'radiusMeters': radius,
+      });
+      setState(() => _addingLocation = false);
+      await _load();
+      _toast('تم حفظ الموقع');
+    } catch (error) {
+      _toast(HadirApi.errorMessage(error), danger: true);
+    }
+  }
+
+  Future<void> _deleteLocation(String id) async {
+    if (id.isEmpty || !await _confirm('حذف الموقع', 'سيتم حذف الموقع من قائمة مواقع العمل.')) return;
+    try {
+      final api = await _api();
+      if (api == null) return;
+      await api.dio.delete('/api/locations/${Uri.encodeComponent(id)}');
+      await _load();
+      _toast('تم حذف الموقع');
+    } catch (error) {
+      _toast(HadirApi.errorMessage(error), danger: true);
+    }
+  }
+
+  Widget _security() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 88),
+      children: [
+        _pageHead('الأمان والصلاحيات', 'حسابات المالك والعمليات الجماعية للموظفين', Icons.shield_outlined),
+        const SizedBox(height: 9),
+        _box(
+          Column(
+            children: [
+              _head('إدارة الموظفين دفعة واحدة', 'عمليات جماعية متاحة للمالك فقط', Icons.manage_accounts_outlined),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: _bulkAction.isEmpty ? null : _bulkAction,
+                dropdownColor: _inner,
+                style: const TextStyle(color: Colors.white, fontSize: 11),
+                decoration: _input('اختيار إعداد'),
+                items: const [
+                  DropdownMenuItem(value: 'password', child: Text('تغيير كلمة مرور جميع الموظفين')),
+                  DropdownMenuItem(value: 'avatar', child: Text('تغيير الصورة الشخصية للجميع')),
+                  DropdownMenuItem(value: 'grace', child: Text('مهلة التأخر')),
+                  DropdownMenuItem(value: 'earlyCheckout', child: Text('مهلة الانصراف المبكر')),
+                  DropdownMenuItem(value: 'adminWorkHours', child: Text('أوقات دوام الموظفين الإداريين')),
+                  DropdownMenuItem(value: 'rotationWorkHours', child: Text('أوقات دوام الموظفين التناوبيين')),
+                  DropdownMenuItem(value: 'rotationDays', child: Text('أيام التناوب للموظفين التناوبيين')),
+                  DropdownMenuItem(value: 'unlinkDevices', child: Text('فك ربط جميع الأجهزة')),
+                  DropdownMenuItem(value: 'revokeSessions', child: Text('تسجيل خروج جميع الموظفين')),
+                ],
+                onChanged: (value) => setState(() => _bulkAction = value ?? ''),
+              ),
+              const SizedBox(height: 8),
+              if (_bulkAction == 'grace' || _bulkAction == 'earlyCheckout') _fieldController('عدد الدقائق', _bulkMinutes),
+              if (_bulkAction == 'adminWorkHours' || _bulkAction == 'rotationWorkHours') _info('08:00 → 16:00', 'وقت البداية والنهاية يطبقان حسب نوع الدوام.'),
+              if (_bulkAction == 'rotationDays') _info('4 أيام مناوبة + 4 أيام راحة', 'دورة التناوب للموظفين التناوبيين.'),
+              if (_bulkAction == 'avatar') _info('الصورة الموحدة', 'رفع الصورة الموحدة يتم من واجهة الموظفين الذكية.'),
+              if (_bulkAction == 'password') _info('كلمة مرور جديدة', 'سيتم إلغاء الجلسات الحالية بعد التطبيق.'),
+              const SizedBox(height: 8),
+              Align(alignment: Alignment.centerLeft, child: FilledButton(onPressed: _runBulk, style: FilledButton.styleFrom(backgroundColor: _green, foregroundColor: Colors.black), child: const Text('تنفيذ العملية'))),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _info(String title, String subtitle) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(color: const Color(0xFF0A111E), borderRadius: BorderRadius.circular(13), border: Border.all(color: _green.withValues(alpha: .17))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
+          Text(subtitle, textAlign: TextAlign.right, style: const TextStyle(color: _muted, fontSize: 9.5)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runBulk() async {
+    if (_bulkAction.isEmpty) {
+      _toast('اختر إعدادًا من القائمة', danger: true);
+      return;
+    }
+    final payload = <String, dynamic>{'action': _bulkAction};
+    if (_bulkAction == 'grace' || _bulkAction == 'earlyCheckout') payload['minutes'] = int.tryParse(_bulkMinutes.text) ?? 10;
+    if (_bulkAction == 'password') {
+      final password = await _prompt('كلمة مرور الموظفين');
+      if (password == null || password.length < 6) {
+        _toast('كلمة المرور يجب أن تكون 6 محارف على الأقل', danger: true);
+        return;
+      }
+      payload['password'] = password;
+    }
+    if (_bulkAction == 'adminWorkHours' || _bulkAction == 'rotationWorkHours') {
+      payload['workStartTime'] = '08:00';
+      payload['workEndTime'] = '16:00';
+    }
+    if (_bulkAction == 'rotationDays') {
+      payload['rotationDaysOn'] = 4;
+      payload['rotationDaysOff'] = 4;
+    }
+    if ((_bulkAction == 'unlinkDevices' || _bulkAction == 'revokeSessions') && !await _confirm('تأكيد العملية', 'ستؤثر هذه العملية على جميع الموظفين.')) return;
+    try {
+      final api = await _api();
+      if (api == null) return;
+      final response = await api.dio.post('/api/owner/bulk-settings', data: payload);
+      final data = response.data is Map ? Map<String, dynamic>.from(response.data as Map) : <String, dynamic>{};
+      _toast(data['message']?.toString() ?? 'تم تنفيذ العملية بنجاح');
+    } catch (error) {
+      _toast(HadirApi.errorMessage(error), danger: true);
+    }
+  }
+
+  Widget _diagnostics() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 88),
+      children: [
+        _pageHead('النظام والتشخيص', 'فحص صحة النظام وإجراءات المالك', Icons.gps_fixed_outlined),
+        const SizedBox(height: 9),
+        _box(
+          Column(
+            children: [
+              _head('تشخيص النظام', 'مراجعة سجل الأخطاء الصحي وتنظيمه', Icons.gps_fixed_outlined),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: OutlinedButton.icon(onPressed: _checkHealth, icon: const Icon(Icons.gps_fixed_outlined, size: 16), label: const Text('فتح سجل التشخيص'))),
+                  const SizedBox(width: 7),
+                  Expanded(child: FilledButton.icon(onPressed: _checkHealth, icon: const Icon(Icons.refresh, size: 16), label: const Text('فحص النظام'), style: FilledButton.styleFrom(backgroundColor: _green, foregroundColor: Colors.black))),
+                ],
+              ),
+              const SizedBox(height: 6),
+              _actionTile('مسح السجل', 'تنظيف سجل الأخطاء الصحي وتنظيمه.', Icons.delete_sweep_outlined, _clearDiagnosticLog),
+            ],
+          ),
+        ),
+        const SizedBox(height: 9),
+        _danger('DANGER ZONE · 08', 'إعادة تهيئة النظام', 'إجراء مسؤول للمالك لإعادة بيانات التشغيل والاختبار.', 'إعادة تهيئة النظام'),
+        const SizedBox(height: 9),
+        _danger('LOCAL RESET · 09', 'إعادة تعيين البيانات', 'إعادة تعيين بيانات النظام المحلية عند الحاجة.', 'إعادة تعيين البيانات'),
+        const SizedBox(height: 9),
+        _box(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _eyebrow('SERVER SETTINGS', color: _cyan),
+              const SizedBox(height: 6),
+              const Text('إعدادات الخادم الإضافية', textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 5),
+              ..._extraSettings(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _actionTile(String title, String subtitle, IconData icon, VoidCallback onTap) {
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      decoration: BoxDecoration(color: _inner, borderRadius: BorderRadius.circular(11), border: Border.all(color: _line)),
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 9, vertical: 1),
+        leading: Icon(icon, color: _green, size: 20),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+        subtitle: Text(subtitle, style: const TextStyle(color: _muted, fontSize: 9)),
+        trailing: const Icon(Icons.chevron_left_rounded, color: _muted, size: 18),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _danger(String code, String title, String subtitle, String button) {
+    return _box(
+      Column(
+        children: [
+          _head(title, subtitle, Icons.security_outlined, color: _red),
+          const SizedBox(height: 7),
+          Align(alignment: Alignment.centerLeft, child: FilledButton.icon(onPressed: _resetData, icon: const Icon(Icons.restart_alt, size: 16), label: Text(button), style: FilledButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white))),
+        ],
+      ),
+      border: _red.withValues(alpha: .35),
+    );
+  }
+
+  List<Widget> _extraSettings() {
+    const known = <String>{
+      'brandName', 'brandLogo', 'qrCode', 'workSiteLat', 'workSiteLng', 'radiusMeters',
+      'workStart', 'workEnd', 'lateGraceMinutes', 'earlyLeaveGraceMinutes', 'earlyGraceMinutes',
+      'specialties', 'ownerName', 'ownerUsername', 'adminAccounts', 'locations',
+    };
+    final entries = _settings.entries.where((entry) => !known.contains(entry.key)).toList();
+    if (entries.isEmpty) return [const Text('لا توجد مفاتيح إضافية من الخادم.', style: TextStyle(color: _muted, fontSize: 9.5))];
+    return entries.map((entry) => _settingTile(entry.key, entry.value)).toList();
+  }
+
+  Widget _settingTile(String key, dynamic value) {
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      decoration: BoxDecoration(color: _inner, borderRadius: BorderRadius.circular(11), border: Border.all(color: _line)),
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 9, vertical: 1),
+        leading: Icon(_iconFor(key), color: _cyan, size: 19),
+        title: Text(_labelFor(key), style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
+        subtitle: Text(_displayValue(value), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 9)),
+        trailing: const Icon(Icons.edit_outlined, color: _muted, size: 16),
+        onTap: () => _editValue(key, value),
+      ),
+    );
+  }
+
+  IconData _iconFor(String key) {
+    final lower = key.toLowerCase();
+    if (lower.contains('qr')) return Icons.qr_code_2_rounded;
+    if (lower.contains('location') || lower.contains('lat') || lower.contains('lng') || lower.contains('radius')) return Icons.location_on_outlined;
+    if (lower.contains('time') || lower.contains('start') || lower.contains('end') || lower.contains('grace')) return Icons.schedule_rounded;
+    if (lower.contains('owner') || lower.contains('admin') || lower.contains('account')) return Icons.admin_panel_settings_rounded;
+    if (lower.contains('security') || lower.contains('device') || lower.contains('token')) return Icons.security_rounded;
+    return Icons.tune_rounded;
+  }
+
+  String _labelFor(String key) {
+    const labels = <String, String>{
+      'brandName': 'اسم الشركة / الجهة',
+      'brandLogo': 'شعار الشركة',
+      'qrCode': 'رمز الحضور QR',
+      'workSiteLat': 'خط العرض',
+      'workSiteLng': 'خط الطول',
+      'radiusMeters': 'نطاق الموقع بالمتر',
+      'workStart': 'بداية الدوام',
+      'workEnd': 'نهاية الدوام',
+      'lateGraceMinutes': 'مهلة التأخر بالدقائق',
+      'earlyLeaveGraceMinutes': 'مهلة الانصراف المبكر بالدقائق',
+      'earlyGraceMinutes': 'مهلة الانصراف المبكر بالدقائق',
+      'specialties': 'تخصصات العمل',
+      'ownerName': 'اسم المالك',
+      'ownerUsername': 'اسم مستخدم المالك',
+    };
+    return labels[key] ?? key;
+  }
+
+  String _displayValue(dynamic value) {
+    if (value is List) return value.join(', ');
+    if (value is Map) return value.entries.map((entry) => '${entry.key}: ${entry.value}').join(' · ');
+    return value == null ? '' : '$value';
+  }
+
+  Future<void> _editValue(String key, dynamic value) async {
+    final controller = TextEditingController(text: _displayValue(value));
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _inner,
+        title: Text(_labelFor(key), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: TextField(controller: controller, autofocus: true, maxLines: 4, textDirection: TextDirection.rtl, style: const TextStyle(color: Colors.white), decoration: _input('القيمة')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('حفظ')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null) return;
+    dynamic next = result;
+    if (value is num) next = num.tryParse(result) ?? result;
+    if (value is bool) next = result.toLowerCase() == 'true' || result == '1' || result == 'نعم';
+    if (value is List) next = result.split(',').map((item) => item.trim()).where((item) => item.isNotEmpty).toList();
+    await _save({key: next});
+  }
+
+  Future<void> _checkHealth() async {
+    try {
+      final api = await _api();
+      if (api == null) return;
+      final health = await api.health();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: _inner,
+          title: const Text('حالة الخادم', style: TextStyle(color: Colors.white)),
+          content: Text(_displayValue(health), style: const TextStyle(color: _muted)),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
+        ),
+      );
+    } catch (error) {
+      _toast(HadirApi.errorMessage(error), danger: true);
+    }
+  }
+
+  Future<void> _clearDiagnosticLog() async {
+    _toast('تم فتح أدوات التشخيص؛ مسح السجل يتم حسب صلاحيات الخادم.');
+  }
+
+  Future<void> _resetData() async {
+    if (!await _confirm('إعادة التهيئة', 'هذا الإجراء للمالك فقط وقد يحذف بيانات التشغيل والاختبار. هل تريد المتابعة؟')) return;
+    try {
+      final api = await _api();
+      if (api == null) return;
+      final response = await api.dio.post('/api/workforce/reset', data: {'confirmation': 'تأكيد'});
+      final data = response.data is Map ? Map<String, dynamic>.from(response.data as Map) : <String, dynamic>{};
+      _toast(data['message']?.toString() ?? 'تمت إعادة التهيئة');
+      await _load(withAdmins: true);
+    } catch (error) {
+      _toast(HadirApi.errorMessage(error), danger: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget body;
+    switch (_view) {
+      case _SettingsView.home:
+        body = _home();
+        break;
+      case _SettingsView.identity:
+        body = _identity();
+        break;
+      case _SettingsView.locations:
+        body = _locationsPage();
+        break;
+      case _SettingsView.security:
+        body = _security();
+        break;
+      case _SettingsView.diagnostics:
+        body = _diagnostics();
+        break;
+    }
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: _bg,
+        body: Stack(
+          children: [
+            if (_loading)
+              const Center(child: CircularProgressIndicator(color: _green))
+            else
+              body,
+            if (_error != null && !_loading)
+              Positioned(
+                left: 18,
+                right: 18,
+                bottom: 66,
+                child: Material(
+                  color: _red,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Padding(
+                    padding: const EdgeInsets.all(9),
+                    child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ),
+            Positioned(
+              left: 18,
+              right: 18,
+              bottom: 12,
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: 40,
+                  child: FilledButton(
+                    onPressed: _saving ? null : () => _save(_settings),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _cyan,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(_saving ? 'جارٍ الحفظ…' : 'حفظ الإعدادات', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
