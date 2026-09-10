@@ -452,7 +452,7 @@ class _ManagerEmployeesDirectoryPageState extends State<ManagerEmployeesDirector
           if (_loading) const Padding(padding: EdgeInsets.all(45), child: Center(child: CircularProgressIndicator())) else if (_error != null) Padding(padding: const EdgeInsets.all(24), child: Column(children: [const Icon(Icons.cloud_off_rounded, size: 42), const SizedBox(height: 8), Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 8), FilledButton(onPressed: _load, child: const Text('إعادة المحاولة'))])) else if (list.isEmpty) const Padding(padding: EdgeInsets.all(40), child: Column(children: [Icon(Icons.search_off_rounded, size: 42), SizedBox(height: 8), Text('لا توجد نتائج', style: TextStyle(fontWeight: FontWeight.w900)), SizedBox(height: 4), Text('جرّب تغيير البحث أو الفلاتر.')])) else Padding(padding: const EdgeInsets.only(top: 12), child: LayoutBuilder(builder: (context, c) { final columns = c.maxWidth > 1200 ? 4 : c.maxWidth > 760 ? 3 : c.maxWidth > 480 ? 2 : 1; return GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: list.length, gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, crossAxisSpacing: 9, mainAxisSpacing: 9, childAspectRatio: columns == 1 ? .72 : .68), itemBuilder: (_, i) => _employeeCard(list[i])); })),
         ],
       ),
-    );
+    ));
   }
 
   Future<void> _addEmployee() async {
