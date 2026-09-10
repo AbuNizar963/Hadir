@@ -1,4 +1,4 @@
-/// Administration reports page compatibility entry point.
+/// Administration reports page public entry point.
 library;
 
-export '../../../pages/admin_reports_page.dart';
+export 'admin_reports_implementation.dart';
