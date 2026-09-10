@@ -1,7 +1,6 @@
-/// Employee center feature entry point.
+/// Compatibility facade for the employee center screen.
 ///
-/// The complete existing implementation remains in the legacy path while the
-/// feature boundary is established. It can be moved without changing callers.
+/// The complete implementation lives inside the employee feature boundary.
 library;
 
-export '../../../pages/employee_center_page.dart';
+export 'employee_center_page_implementation.dart';
