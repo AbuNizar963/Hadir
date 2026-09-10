@@ -119,8 +119,8 @@ class UpdaterService {
       final fallback = await _checkAtomFeed(currentCode);
       if (fallback != null) return fallback;
       return null;
-    } catch (error) {
-      throw error;
+    } catch (_) {
+      rethrow;
     }
   }
 
