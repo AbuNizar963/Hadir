@@ -20,7 +20,7 @@ class AdminMobileSettingsPage extends StatelessWidget {
           ),
         ),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 24, 18, 28),
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
           children: [
             Text(
               'HADIR  ·  OWNER',
