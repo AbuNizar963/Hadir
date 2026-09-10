@@ -272,16 +272,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                     style: TextStyle(color: _muted, fontSize: 12, height: 1.65),
                   ),
                 ),
-                const SizedBox(width: 14),
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: _primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(Icons.monitor_heart_outlined, color: _primary, size: 28),
-                ),
               ],
             ),
           ],
@@ -328,7 +318,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         crossAxisCount: 2,
         crossAxisSpacing: 10,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.48,
+        childAspectRatio: 1.62,
       ),
       itemCount: cards.length,
       itemBuilder: (_, index) {
@@ -377,6 +367,11 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                       style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.w900),
                     ),
                   ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'عرض القائمة',
+                  style: TextStyle(color: color.withValues(alpha: .78), fontSize: 10.5, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
