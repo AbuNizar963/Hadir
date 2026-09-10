@@ -1,7 +1,6 @@
-/// Employee AI assistant feature entry point.
+/// Compatibility facade for the employee AI assistant screen.
 ///
-/// The complete existing implementation remains in the legacy path while the
-/// feature boundary is established. It can be moved without changing callers.
+/// The complete implementation lives inside the employee feature boundary.
 library;
 
-export '../../../pages/ai_assistant_page.dart';
+export 'ai_assistant_page_implementation.dart';
