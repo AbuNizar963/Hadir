@@ -4,13 +4,13 @@
 /// boundary rather than on the legacy flat `pages/` directory.
 library;
 
-export '../../pages/hadir_workspace_page.dart';
-export '../../pages/employee_center_page.dart';
+export 'pages/hadir_workspace_page.dart';
+export 'pages/employee_center_page.dart';
 export 'pages/jibble_history_page_implementation.dart';
 export 'pages/attendance_page_implementation.dart';
 export 'pages/attendance_insights_page_implementation.dart';
 export 'pages/requests_page.dart';
 export 'pages/notifications_page_implementation.dart';
-export '../../pages/profile_page.dart';
-export '../../pages/services_page.dart';
-export '../../pages/ai_assistant_page.dart';
+export 'pages/profile_page.dart';
+export 'pages/services_page.dart';
+export 'pages/ai_assistant_page.dart';
