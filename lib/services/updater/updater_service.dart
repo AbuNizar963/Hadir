@@ -78,10 +78,6 @@ class UpdaterService {
     final currentCode = await currentVersionCode();
     Object? lastError;
 
-    // First use GitHub's normal latest-release redirect. Unlike the REST API,
-    // this endpoint does not consume the unauthenticated GitHub API quota.
-    // GitHub redirects /releases/latest to the actual tag, so the version can
-    // be discovered without credentials or an API token.
     try {
       final latest = await _checkLatestRelease(currentCode);
       if (latest != null) return latest;
@@ -89,9 +85,6 @@ class UpdaterService {
       lastError = error;
     }
 
-    // Keep the REST API as the richer path because it provides release notes
-    // and the exact uploaded APK asset. It remains a fallback for installations
-    // where the latest-release redirect is unavailable.
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         final response = await _dio.get<dynamic>(
@@ -125,8 +118,6 @@ class UpdaterService {
       }
     }
 
-    // Final discovery fallback for networks that allow the public Atom feed
-    // but block the REST API or the latest-release redirect.
     try {
       final fallback = await _checkAtomFeed(currentCode);
       if (fallback != null) return fallback;
@@ -145,7 +136,8 @@ class UpdaterService {
       options: Options(
         responseType: ResponseType.plain,
         followRedirects: false,
-        validateStatus: (status) => status != null && status >= 200 && status < 400,
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 400,
         headers: {
           'Accept': 'text/html,application/xhtml+xml,*/*',
           'User-Agent': 'Hadir-Flutter-Updater',
@@ -156,26 +148,26 @@ class UpdaterService {
     );
 
     final location = response.headers.value('location');
-    final candidates = <String?>[
-      location,
-      response.realUri.toString(),
-      response.data,
+    final candidates = <String>[
+      if (location != null && location.isNotEmpty) location,
+      if (response.data != null) response.data!,
     ];
 
     int? code;
     String? tag;
+    final tagPattern = RegExp(r'(?:^|/)(android-v1\.0\.(\d+))(?:$|[?#&<>" ])');
     for (final candidate in candidates) {
-      if (candidate == null || candidate.isEmpty) continue;
-      final match = RegExp(r'(?:^|/)(android-v1\\.0\\.(\\d+))(?:$|[?#&<>"\\'])')
-          .firstMatch(candidate);
-      if (match != null) {
-        code = int.tryParse(match.group(2) ?? '');
+      final match = tagPattern.firstMatch(candidate);
+      if (match == null) continue;
+      final parsed = int.tryParse(match.group(2) ?? '');
+      if (parsed == null || parsed <= currentCode) continue;
+      if (code == null || parsed > code) {
+        code = parsed;
         tag = match.group(1);
-        if (code != null && tag != null) break;
       }
     }
 
-    if (code == null || tag == null || code <= currentCode) return null;
+    if (code == null || tag == null) return null;
 
     return UpdateInfo(
       versionCode: code,
@@ -196,7 +188,7 @@ class UpdaterService {
       if (release['draft'] == true || release['prerelease'] == true) continue;
 
       final tag = (release['tag_name'] ?? '').toString().trim();
-      final match = RegExp(r'^android-v1\\.0\\.(\\d+)$').firstMatch(tag);
+      final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
       final code = int.tryParse(match?.group(1) ?? '');
       if (code == null || code <= currentCode ||
           (bestCode != null && code <= bestCode)) {
@@ -254,18 +246,20 @@ class UpdaterService {
     if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
 
     final entryPattern = RegExp(
-      r'<entry\\b[\\s\\S]*?<\\/entry>',
+      r'<entry\b[\s\S]*?</entry>',
       caseSensitive: false,
     );
+    final tagPattern = RegExp(
+      r'(?:/|%2F)(android-v1\.0\.(\d+))(?:<|&|"|\?)',
+      caseSensitive: false,
+    );
+
     int? bestCode;
     String? bestTag;
 
     for (final match in entryPattern.allMatches(xml)) {
       final entry = match.group(0) ?? '';
-      final tagMatch = RegExp(
-        r'(?:/|%2F)(android-v1\\.0\\.(\\d+))(?:<|&|"|\\?)',
-        caseSensitive: false,
-      ).firstMatch(entry);
+      final tagMatch = tagPattern.firstMatch(entry);
       final code = int.tryParse(tagMatch?.group(2) ?? '');
       if (code == null || code <= currentCode ||
           (bestCode != null && code <= bestCode)) {
@@ -277,11 +271,10 @@ class UpdaterService {
 
     if (bestCode == null || bestTag == null) return null;
 
-    final downloadUrl = '$_releaseDownloadBase/$bestTag/app-release.apk';
     return UpdateInfo(
       versionCode: bestCode,
       versionName: '1.0.$bestCode',
-      downloadUrl: downloadUrl,
+      downloadUrl: '$_releaseDownloadBase/$bestTag/app-release.apk',
       releaseNotes: '',
     );
   }
@@ -291,7 +284,8 @@ class UpdaterService {
       await _channel.invokeMethod<void>('downloadAndInstall', {
         'versionCode': update.versionCode,
         'downloadUrl': update.downloadUrl,
-        'proxyUrl': 'https://hadir-api.abunizar963.workers.dev/api/mobile/update/apk',
+        'proxyUrl':
+            'https://hadir-api.abunizar963.workers.dev/api/mobile/update/apk',
       });
     } on PlatformException catch (error) {
       if (error.code == 'INSTALL_PERMISSION_REQUIRED') {
