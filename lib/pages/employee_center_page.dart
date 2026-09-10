@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../core/api.dart';
 import '../core/hadir_brand.dart';
@@ -14,6 +15,7 @@ class EmployeeCenterPage extends StatefulWidget {
 }
 
 class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
+  static const _webOrigin = 'https://hadir-9rq.pages.dev';
   final _session = HadirSession();
   Map<String, dynamic>? _device;
   Map<String, dynamic>? _profile;
@@ -289,11 +291,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
         borderRadius: BorderRadius.circular(HadirBrand.radiusXl),
         border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 22,
-            offset: Offset(0, 8),
-          ),
+          BoxShadow(color: Color(0x14000000), blurRadius: 22, offset: Offset(0, 8)),
         ],
       ),
       child: Column(
@@ -311,11 +309,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
                 alignment: Alignment.center,
                 child: Text(
                   name.characters.first,
-                  style: const TextStyle(
-                    color: HadirBrand.primaryDark,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: const TextStyle(color: HadirBrand.primaryDark, fontSize: 30, fontWeight: FontWeight.w900),
                 ),
               ),
               const SizedBox(width: 14),
@@ -323,17 +317,9 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'بطاقة الموظف الرقمية',
-                      style: TextStyle(fontSize: 12, color: HadirBrand.muted),
-                    ),
+                    const Text('بطاقة الموظف الرقمية', style: TextStyle(fontSize: 12, color: HadirBrand.muted)),
                     const SizedBox(height: 4),
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-                    ),
+                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 5),
                     InkWell(
                       onTap: jobNumber == '—'
@@ -341,9 +327,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
                           : () async {
                               await Clipboard.setData(ClipboardData(text: jobNumber));
                               if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('تم نسخ الرقم الوظيفي')),
-                              );
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ الرقم الوظيفي')));
                             },
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
@@ -403,6 +387,11 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
     final jobNumber = _profileText('jobNumber', '—');
     final scheduleType = _profileText('scheduleType', 'ثابت');
     final schedule = scheduleType.toLowerCase().contains('rotation') || scheduleType.contains('مناوب') ? 'تناوبي' : 'اعتيادي';
+    final employeeId = _profileText('id', jobNumber);
+    final verifyUrl = employeeId == '—' || employeeId.isEmpty
+        ? ''
+        : '$_webOrigin/employee/verify/${Uri.encodeComponent(employeeId)}';
+
     return Column(
       children: [
         _sectionTitle('هوية الموظف', 'بطاقتك الرقمية وبيانات الهوية الوظيفية'),
@@ -457,8 +446,42 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
                   Expanded(child: _heroInfo('نوع الدوام', schedule)),
                 ],
               ),
-              const SizedBox(height: 12),
-              _infoBanner(),
+              const SizedBox(height: 14),
+              if (verifyUrl.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: BorderRadius.circular(HadirBrand.radiusLg),
+                    border: Border.all(color: HadirBrand.border),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.qr_code_2_rounded, color: HadirBrand.primary, size: 21),
+                          const SizedBox(width: 7),
+                          Text('QR آمن', style: Theme.of(context).textTheme.titleSmall),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      QrImageView(
+                        data: verifyUrl,
+                        version: QrVersions.auto,
+                        size: 170,
+                        gapless: true,
+                        backgroundColor: Colors.white,
+                        eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
+                        dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text('امسح الرمز للتحقق من هوية الموظف', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: HadirBrand.muted)),
+                    ],
+                  ),
+                ),
+              if (verifyUrl.isEmpty) _infoBanner(),
             ],
           ),
         ),
@@ -496,10 +519,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
         const SizedBox(height: 14),
         _sectionTitle('آخر أيام العمل', 'أحدث عمليات الحضور المسجلة'),
         const SizedBox(height: 10),
-        if (_attendanceMaps.isEmpty)
-          _emptyCard('لا توجد سجلات حضور متاحة حالياً.')
-        else
-          ..._attendanceMaps.take(8).map(_attendanceTile),
+        if (_attendanceMaps.isEmpty) _emptyCard('لا توجد سجلات حضور متاحة حالياً.') else ..._attendanceMaps.take(8).map(_attendanceTile),
       ],
     );
   }
@@ -547,17 +567,9 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
       children: [
         _sectionTitle('النشاط', 'الخط الزمني للعمليات'),
         const SizedBox(height: 10),
-        if (items.isEmpty)
-          _emptyCard('لا توجد عمليات مسجلة بعد.')
-        else
-          ...items.map(_activityTile),
+        if (items.isEmpty) _emptyCard('لا توجد عمليات مسجلة بعد.') else ...items.map(_activityTile),
         const SizedBox(height: 14),
-        _actionBanner(
-          Icons.history_rounded,
-          'سجل العمل الكامل',
-          'فتح صفحة السجل المخصصة مع تفاصيل العمليات.',
-          () => context.go('/history'),
-        ),
+        _actionBanner(Icons.history_rounded, 'سجل العمل الكامل', 'فتح صفحة السجل المخصصة مع تفاصيل العمليات.', () => context.go('/history')),
       ],
     );
   }
@@ -594,17 +606,9 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
       children: [
         _sectionTitle('الطلبات', 'الإجازات والاستئذانات'),
         const SizedBox(height: 10),
-        if (items.isEmpty)
-          _emptyCard('لا توجد طلبات مسجلة حالياً.')
-        else
-          ...items.map(_requestTile),
+        if (items.isEmpty) _emptyCard('لا توجد طلبات مسجلة حالياً.') else ...items.map(_requestTile),
         const SizedBox(height: 12),
-        _actionBanner(
-          Icons.add_task_rounded,
-          'إنشاء طلب',
-          'إرسال طلب إجازة أو استئذان من المسار الحالي.',
-          () => context.go('/requests'),
-        ),
+        _actionBanner(Icons.add_task_rounded, 'إنشاء طلب', 'إرسال طلب إجازة أو استئذان من المسار الحالي.', () => context.go('/requests')),
       ],
     );
   }
@@ -628,23 +632,14 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
           _identityRow(Icons.assignment_outlined, 'عدد الطلبات', '${_requestMaps.length}'),
         ]),
         const SizedBox(height: 12),
-        _actionBanner(
-          Icons.person_rounded,
-          'إدارة الملف الشخصي',
-          'فتح بيانات الحساب من الصفحة المخصصة.',
-          () => context.go('/profile'),
-        ),
+        _actionBanner(Icons.person_rounded, 'إدارة الملف الشخصي', 'فتح بيانات الحساب من الصفحة المخصصة.', () => context.go('/profile')),
       ],
     );
   }
 
   Widget _deviceSecurityCard() {
     final bound = _device?['bound'] == true;
-    final title = _loading
-        ? 'جارٍ التحقق من الجهاز…'
-        : bound
-            ? 'الجهاز مرتبط بالحساب'
-            : 'لم يتم ربط الجهاز بعد';
+    final title = _loading ? 'جارٍ التحقق من الجهاز…' : bound ? 'الجهاز مرتبط بالحساب' : 'لم يتم ربط الجهاز بعد';
     return _card([
       Row(
         children: [
