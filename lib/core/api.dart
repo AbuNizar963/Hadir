@@ -66,6 +66,7 @@ class HadirApi {
 
   Future<Map<String, dynamic>> me() async => _asMap((await dio.get('/api/me')).data);
   Future<Map<String, dynamic>> employeeProfile() async => _asMap((await dio.get('/api/employee/profile')).data);
+  Future<Map<String, dynamic>> updateEmployeeProfile(Map<String, dynamic> body) async => _asMap((await dio.patch('/api/workforce/live', data: body)).data);
   Future<Map<String, dynamic>> employeeDeviceStatus() async => _asMap((await dio.get('/api/device/status')).data);
   Future<List<dynamic>> locations() async => _asList((await dio.get('/api/locations')).data);
   Future<List<dynamic>> attendance({int limit = 500}) async => _asList((await dio.get('/api/attendance', queryParameters: {'limit': limit.clamp(1, 2000)})).data);
