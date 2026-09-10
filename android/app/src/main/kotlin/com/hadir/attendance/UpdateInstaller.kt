@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -34,9 +35,11 @@ class UpdateInstaller(private val context: Context) {
             var error: Throwable? = null
             val apk = File(context.cacheDir, "hadir-update-$versionCode.apk")
             try {
+                apk.delete()
                 for ((index, url) in listOfNotNull(downloadUrl, proxyUrl).withIndex()) {
                     try {
                         download(url, apk, sink)
+                        validateDownloadedApk(apk, versionCode)
                         install(apk)
                         return@Thread
                     } catch (failure: Throwable) {
@@ -62,7 +65,8 @@ class UpdateInstaller(private val context: Context) {
             readTimeout = 120_000
             instanceFollowRedirects = true
             setRequestProperty("User-Agent", "Hadir-Flutter-Updater")
-            setRequestProperty("Cache-Control", "no-cache")
+            setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0")
+            setRequestProperty("Pragma", "no-cache")
         }
         try {
             if (connection.responseCode !in 200..299) error("تعذر تنزيل ملف التحديث")
@@ -96,7 +100,7 @@ class UpdateInstaller(private val context: Context) {
                     }
                 }
             }
-            if (!apk.exists() || apk.length() < 1024) error("تعذر تنزيل ملف التحديث")
+            if (!apk.exists() || apk.length() < 1024) error("ملف التحديث الذي تم تنزيله غير صالح")
             sink?.success(mapOf(
                 "downloadedBytes" to apk.length(),
                 "totalBytes" to if (total > 0) total else apk.length(),
@@ -106,6 +110,35 @@ class UpdateInstaller(private val context: Context) {
             ))
         } finally {
             connection.disconnect()
+        }
+    }
+
+    private fun validateDownloadedApk(apk: File, expectedVersionCode: Long) {
+        if (!apk.exists() || apk.length() < 1024) {
+            throw IllegalStateException("ملف التحديث غير موجود أو تالف")
+        }
+
+        val archiveInfo = context.packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
+            ?: throw IllegalStateException("ملف التحديث ليس APK صالحًا")
+
+        val packageName = archiveInfo.packageName
+        if (packageName != context.packageName) {
+            throw IllegalStateException("ملف التحديث لا يخص تطبيق حاضر")
+        }
+
+        val archiveVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            archiveInfo.longVersionCode
+        } else {
+            @Suppress("DEPRECATION") archiveInfo.versionCode.toLong()
+        }
+
+        if (archiveVersionCode != expectedVersionCode) {
+            throw IllegalStateException("إصدار ملف التحديث لا يطابق الإصدار المطلوب")
+        }
+
+        val installedVersion = currentVersionCode()
+        if (archiveVersionCode <= installedVersion) {
+            throw IllegalStateException("الإصدار الموجود على الجهاز أحدث أو مساوي للتحديث")
         }
     }
 
