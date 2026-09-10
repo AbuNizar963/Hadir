@@ -147,15 +147,11 @@ class _EmployeeMobileShellState extends State<EmployeeMobileShell> {
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         child: Row(
           children: [
-            Container(
+            Image.asset(
+              'assets/branding/hadir_logo_transparent.png',
               width: 38,
               height: 38,
-              decoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: scheme.primary.withValues(alpha: .30)),
-              ),
-              child: Icon(Icons.how_to_reg_rounded, color: scheme.primary, size: 23),
+              fit: BoxFit.contain,
             ),
             const SizedBox(width: 8),
             Column(
