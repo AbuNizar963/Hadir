@@ -54,15 +54,6 @@ class AdminMobileSettingsPage extends StatelessWidget {
           _section(context, Icons.location_on_outlined, 'المواقع و QR', 'مواقع العمل ورموز QR'),
           _section(context, Icons.admin_panel_settings_outlined, 'الأمان والصلاحيات', 'الحسابات والصلاحيات الإدارية'),
           _section(context, Icons.tune_rounded, 'المتقدم والتشخيص', 'التشخيص وإعادة التهيئة والأدوات المتقدمة'),
-          const SizedBox(height: 18),
-          SizedBox(
-            height: 48,
-            child: FilledButton.icon(
-              onPressed: () => context.pop(),
-              icon: const Icon(Icons.check_rounded, size: 19),
-              label: const Text('حفظ الإعدادات', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
-            ),
-          ),
         ],
       ),
     );
@@ -93,11 +84,9 @@ class AdminMobileSettingsPage extends StatelessWidget {
             child: Icon(Icons.business_rounded, color: scheme.primary, size: 42),
           ),
           const SizedBox(height: 10),
-          Text('قسم شرطة الشهباء', style: TextStyle(color: scheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900)),
+          Text('هوية الشركة', style: TextStyle(color: scheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900)),
           const SizedBox(height: 3),
           Text('هوية الشركة · الإعدادات المركزية', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5)),
-          const SizedBox(height: 6),
-          Text('تغيير الشعار', style: TextStyle(color: scheme.error, fontSize: 10, fontWeight: FontWeight.w700)),
         ],
       ),
     );
