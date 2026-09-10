@@ -64,11 +64,26 @@ class _UpdaterBootstrap extends StatefulWidget {
   State<_UpdaterBootstrap> createState() => _UpdaterBootstrapState();
 }
 
-class _UpdaterBootstrapState extends State<_UpdaterBootstrap> {
+class _UpdaterBootstrapState extends State<_UpdaterBootstrap>
+    with WidgetsBindingObserver {
   final _updater = UpdaterService();
+  Timer? _periodicCheck;
   bool _started = false;
   bool _dialogVisible = false;
   bool _checking = false;
+  int? _lastPromptedVersion;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // A long-lived app must not wait for a restart to discover a newly
+    // published APK. Resume checks cover normal foregrounding; this periodic
+    // check covers a user who leaves HADIR open for an extended period.
+    _periodicCheck = Timer.periodic(const Duration(minutes: 15), (_) {
+      unawaited(_checkForUpdate());
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -81,12 +96,24 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap> {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _started) {
+      unawaited(_checkForUpdate());
+    }
+  }
+
   Future<void> _checkForUpdate() async {
     if (!mounted || _dialogVisible || _checking) return;
     _checking = true;
     try {
       final update = await _updater.check();
       if (!mounted || update == null || _dialogVisible) return;
+      // Do not repeatedly interrupt the user for the same release when the
+      // app resumes or the 15-minute background check fires. A newer release
+      // is always eligible to prompt again.
+      if (_lastPromptedVersion == update.versionCode) return;
+      _lastPromptedVersion = update.versionCode;
       _dialogVisible = true;
       await showDialog<void>(
         context: context,
@@ -99,6 +126,13 @@ class _UpdaterBootstrapState extends State<_UpdaterBootstrap> {
       _checking = false;
       _dialogVisible = false;
     }
+  }
+
+  @override
+  void dispose() {
+    _periodicCheck?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override
