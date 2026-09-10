@@ -245,10 +245,10 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   }
 
   Widget _operationalCard() => Container(
-        padding: const EdgeInsets.all(17),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: _surface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: _primary.withValues(alpha: .34)),
           boxShadow: [
             BoxShadow(
@@ -264,7 +264,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
             Text(
               'الحالة التشغيلية الحالية',
               textAlign: TextAlign.right,
-              style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900),
+              style: TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             Row(
