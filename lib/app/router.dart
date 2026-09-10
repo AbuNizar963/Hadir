@@ -1,7 +1,8 @@
-/// Application routing facade.
+/// Canonical application routing entry point.
 ///
-/// The router implementation remains in its current location for this first
-/// structural migration so no feature imports or route behavior are changed.
+/// Keep route composition inside `app/routes/app_router.dart` so navigation
+/// remains centralized while older imports continue to work.
 library;
 
-export '../modern_router.dart' show buildModernRouter;
+export 'routes/app_router.dart' show buildAppRouter, LoginEntryPage, SwipeBackPage;
+
