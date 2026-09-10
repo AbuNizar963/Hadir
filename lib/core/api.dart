@@ -24,10 +24,6 @@ class HadirApi {
 
   Map<String, dynamic> _asMap(dynamic value) {
     if (value is Map) return Map<String, dynamic>.from(value);
-    // Some production gateways can temporarily return an empty JSON array
-    // while a protected administrative resource is being refreshed. Do not
-    // let a Dart cast crash the whole admin screen; callers can render their
-    // empty/loading state and the next refresh will retry the endpoint.
     if (value is List) return <String, dynamic>{};
     return <String, dynamic>{};
   }
@@ -74,6 +70,7 @@ class HadirApi {
   Future<List<dynamic>> locations() async => _asList((await dio.get('/api/locations')).data);
   Future<List<dynamic>> attendance({int limit = 500}) async => _asList((await dio.get('/api/attendance', queryParameters: {'limit': limit.clamp(1, 2000)})).data);
   Future<List<dynamic>> audit({int limit = 500}) async => _asList((await dio.get('/api/audit', queryParameters: {'limit': limit.clamp(1, 2000)})).data);
+  Future<List<dynamic>> escapeEvents({String? employeeId, int limit = 20}) async => _asList((await dio.get('/api/escape-events', queryParameters: {'limit': limit.clamp(1, 500), if (employeeId != null && employeeId.isNotEmpty) 'employeeId': employeeId})).data);
   Future<Map<String, dynamic>> createChallenge({required String type, required double lat, required double lng, required String qrCode, required String deviceId}) async => _asMap((await dio.post('/api/attendance/challenge', data: {'type': type, 'lat': lat, 'lng': lng, 'qrCode': qrCode, 'deviceId': deviceId})).data);
   Future<Map<String, dynamic>> createAttendance(Map<String, dynamic> record) async => _asMap((await dio.post('/api/attendance', data: record)).data);
   Future<List<dynamic>> requests() async => _asList((await dio.get('/api/requests')).data);
@@ -83,16 +80,11 @@ class HadirApi {
   Future<void> deleteNotification({String? id}) async { await dio.delete('/api/notifications', data: {if (id != null) 'id': id}); }
   Future<Map<String, dynamic>> confirmRequest(String id) async => _asMap((await dio.post('/api/requests/$id/confirm')).data);
   Future<void> logout() async { try { await dio.post('/api/auth/logout', data: {}); } catch (_) {} }
-
   Future<Map<String, dynamic>> settings() async => _asMap((await dio.get('/api/settings')).data);
   Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> settings) async => _asMap((await dio.put('/api/settings', data: settings)).data);
-
   Future<Map<String, dynamic>> professionalAttendanceReport({required String from, required String to, String? employeeId}) async => _asMap((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': from, 'to': to, if (employeeId != null && employeeId.isNotEmpty) 'employeeId': employeeId})).data);
   Future<Map<String, dynamic>> professionalAttendanceDrilldown({required String attendanceDay, required String employeeId}) async => _asMap((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': attendanceDay, 'to': attendanceDay, 'employeeId': employeeId, 'drilldown': '1'})).data);
-  Future<List<dynamic>> archivedReports({int limit = 25}) async {
-    final data = _asMap((await dio.get('/api/reports/archive', queryParameters: {'limit': limit.clamp(1, 100)})).data);
-    return _asList(data['reports']);
-  }
+  Future<List<dynamic>> archivedReports({int limit = 25}) async { final data = _asMap((await dio.get('/api/reports/archive', queryParameters: {'limit': limit.clamp(1, 100)})).data); return _asList(data['reports']); }
   Future<List<int>> downloadArchivedReport(String reportId) async => List<int>.from((await dio.get<List<int>>('/api/reports/archive/${Uri.encodeComponent(reportId)}', options: Options(responseType: ResponseType.bytes))).data ?? const <int>[]);
   Future<void> deleteArchivedReport(String reportId) async { await dio.delete('/api/reports/archive/${Uri.encodeComponent(reportId)}'); }
   Future<Map<String, dynamic>> workforceLive() async => _asMap((await dio.get('/api/workforce/live')).data);
