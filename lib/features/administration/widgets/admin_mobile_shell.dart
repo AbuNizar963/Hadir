@@ -60,6 +60,7 @@ class AdminMobileShell extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 390;
     final scheme = Theme.of(context).colorScheme;
     return Container(
+      constraints: const BoxConstraints(minHeight: 72),
       padding: EdgeInsets.fromLTRB(compact ? 8 : 12, 7, compact ? 8 : 12, 7),
       decoration: BoxDecoration(
         color: scheme.surface.withValues(alpha: .96),
