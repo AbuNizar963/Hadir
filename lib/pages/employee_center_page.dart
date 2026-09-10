@@ -278,58 +278,118 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
   Widget _hero() {
     final name = _profileText('name', 'الموظف');
     final jobNumber = _profileText('jobNumber', '—');
+    final status = _profileText('status', 'نشط');
+    final start = _profileText('workStartTime', _profileText('startTime', '08:00'));
+    final end = _profileText('workEndTime', _profileText('endTime', '16:00'));
+    final active = status.toLowerCase() == 'active' || status == 'نشط';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [HadirBrand.primaryDark, HadirBrand.primary],
-        ),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(HadirBrand.radiusXl),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x22064B40),
-            blurRadius: 24,
-            offset: Offset(0, 10),
+            color: Color(0x14000000),
+            blurRadius: 22,
+            offset: Offset(0, 8),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .14),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.badge_rounded, color: Colors.white, size: 29),
+          Row(
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: HadirBrand.soft,
+                  borderRadius: BorderRadius.circular(HadirBrand.radiusMd),
+                  border: Border.all(color: HadirBrand.primary.withValues(alpha: .25)),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  name.characters.first,
+                  style: const TextStyle(
+                    color: HadirBrand.primaryDark,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'بطاقة الموظف الرقمية',
+                      style: TextStyle(fontSize: 12, color: HadirBrand.muted),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 5),
+                    InkWell(
+                      onTap: jobNumber == '—'
+                          ? null
+                          : () async {
+                              await Clipboard.setData(ClipboardData(text: jobNumber));
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('تم نسخ الرقم الوظيفي')),
+                              );
+                            },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(jobNumber, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                            const SizedBox(width: 5),
+                            const Icon(Icons.copy_rounded, size: 14, color: HadirBrand.muted),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'مساحتك في HADIR',
-                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'الرقم الوظيفي: $jobNumber',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12.5),
-                ),
-              ],
-            ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: _heroInfo('الحالة', active ? 'نشط' : status)),
+              const SizedBox(width: 8),
+              Expanded(child: _heroInfo('الدوام', '$start → $end')),
+            ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroInfo(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+      decoration: BoxDecoration(
+        color: HadirBrand.soft,
+        borderRadius: BorderRadius.circular(HadirBrand.radiusMd),
+        border: Border.all(color: HadirBrand.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: HadirBrand.muted)),
+          const SizedBox(height: 3),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
         ],
       ),
     );
@@ -338,19 +398,70 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
   Widget _identityTab() {
     final role = _profileText('role', _profileText('jobTitle', 'موظف'));
     final department = _profileText('department', _profileText('departmentName', 'غير محدد'));
-    final status = _profileText('status', 'نشط');
+    final statusRaw = _profileText('status', 'نشط');
+    final status = statusRaw.toLowerCase() == 'active' ? 'نشط' : statusRaw;
     final jobNumber = _profileText('jobNumber', '—');
+    final scheduleType = _profileText('scheduleType', 'ثابت');
+    final schedule = scheduleType.toLowerCase().contains('rotation') || scheduleType.contains('مناوب') ? 'تناوبي' : 'اعتيادي';
     return Column(
       children: [
-        _sectionTitle('بطاقتك الرقمية', 'بيانات الهوية الوظيفية الأساسية'),
+        _sectionTitle('هوية الموظف', 'بطاقتك الرقمية وبيانات الهوية الوظيفية'),
         const SizedBox(height: 10),
-        _card([
-          _identityRow(Icons.person_outline_rounded, 'الاسم', _profileText('name', 'الموظف')),
-          _identityRow(Icons.badge_outlined, 'الرقم الوظيفي', jobNumber, copy: true),
-          _identityRow(Icons.work_outline_rounded, 'المسمى الوظيفي', role),
-          _identityRow(Icons.business_outlined, 'القسم', department),
-          _identityRow(Icons.verified_outlined, 'الحالة', status),
-        ]),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(HadirBrand.radiusXl),
+            border: Border.all(color: HadirBrand.primary.withValues(alpha: .30)),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 92,
+                    height: 92,
+                    decoration: BoxDecoration(
+                      color: HadirBrand.soft,
+                      borderRadius: BorderRadius.circular(HadirBrand.radiusMd),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _profileText('name', 'م').characters.first,
+                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: HadirBrand.primary),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Hadir · بطاقة موظف', style: TextStyle(fontSize: 11, color: HadirBrand.muted)),
+                        const SizedBox(height: 4),
+                        Text(_profileText('name', 'الموظف'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 4),
+                        Text(department == 'غير محدد' ? role : department, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: HadirBrand.muted)),
+                        const SizedBox(height: 5),
+                        Text(jobNumber, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: .4)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _heroInfo('الحالة', status)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _heroInfo('نوع الدوام', schedule)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _infoBanner(),
+            ],
+          ),
+        ),
         const SizedBox(height: 12),
         _actionBanner(
           Icons.person_rounded,
@@ -365,19 +476,19 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
   Widget _overviewTab() {
     return Column(
       children: [
-        _sectionTitle('نظرة عامة', 'ملخص العمل والالتزام من بيانات الحساب الحالية'),
+        _sectionTitle('نظرة عامة', 'ملخص العمل والالتزام'),
         const SizedBox(height: 10),
         Row(
           children: [
             Expanded(child: _metricCard('أيام الحضور', '$_presentDays', Icons.event_available_outlined)),
             const SizedBox(width: 10),
-            Expanded(child: _metricCard('التأخر', '$_lateCount', Icons.schedule_outlined)),
+            Expanded(child: _metricCard('أيام مكتملة', '${_attendanceMaps.where((x) => _type(x).contains('check-out')).length}', Icons.task_alt_outlined)),
           ],
         ),
         const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(child: _metricCard('العمليات', '${_attendanceMaps.length}', Icons.touch_app_outlined)),
+            Expanded(child: _metricCard('التأخير', '$_lateCount', Icons.schedule_outlined)),
             const SizedBox(width: 10),
             Expanded(child: _metricCard('الطلبات', '${_requestMaps.length}', Icons.assignment_outlined)),
           ],
@@ -388,7 +499,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
         if (_attendanceMaps.isEmpty)
           _emptyCard('لا توجد سجلات حضور متاحة حالياً.')
         else
-          ..._attendanceMaps.take(6).map(_attendanceTile),
+          ..._attendanceMaps.take(8).map(_attendanceTile),
       ],
     );
   }
@@ -404,7 +515,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
     final entries = grouped.entries.take(31).toList();
     return Column(
       children: [
-        _sectionTitle('التقويم', 'الأيام التي ظهرت فيها عمليات الحضور والانصراف'),
+        _sectionTitle('التقويم', 'أيام الحضور والانصراف'),
         const SizedBox(height: 10),
         if (entries.isEmpty)
           _emptyCard('لا توجد أيام حضور مسجلة بعد.')
@@ -418,12 +529,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
                 children: [
                   const Icon(Icons.calendar_today_outlined, color: HadirBrand.primary, size: 21),
                   const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      date == null ? entry.key : _dateText(date),
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                  ),
+                  Expanded(child: Text(date == null ? entry.key : _dateText(date), style: Theme.of(context).textTheme.titleSmall)),
                   _miniBadge(hasIn ? 'حضور' : '—', good: hasIn),
                   const SizedBox(width: 6),
                   _miniBadge(hasOut ? 'انصراف' : '—', good: hasOut),
@@ -439,7 +545,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
     final items = _attendanceMaps.take(40).toList();
     return Column(
       children: [
-        _sectionTitle('النشاط', 'الخط الزمني لآخر عمليات الحساب'),
+        _sectionTitle('النشاط', 'الخط الزمني للعمليات'),
         const SizedBox(height: 10),
         if (items.isEmpty)
           _emptyCard('لا توجد عمليات مسجلة بعد.')
@@ -466,10 +572,10 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
     final rotationOff = _profileText('rotationDaysOff', '—');
     return Column(
       children: [
-        _sectionTitle('الدوام', 'المناوبة وأوقات العمل المسجلة في حسابك'),
+        _sectionTitle('الدوام', 'المناوبة وأوقات العمل'),
         const SizedBox(height: 10),
         _card([
-          _identityRow(Icons.repeat_rounded, 'نوع الدوام', scheduleType),
+          _identityRow(Icons.repeat_rounded, 'نوع الجدول', scheduleType),
           _identityRow(Icons.login_rounded, 'بداية العمل', start),
           _identityRow(Icons.logout_rounded, 'نهاية العمل', end),
           _identityRow(Icons.date_range_outlined, 'أيام العمل', days),
@@ -486,7 +592,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
     final items = _requestMaps.take(30).toList();
     return Column(
       children: [
-        _sectionTitle('الطلبات', 'الإجازات والاستئذانات والطلبات المرسلة'),
+        _sectionTitle('الطلبات', 'الإجازات والاستئذانات'),
         const SizedBox(height: 10),
         if (items.isEmpty)
           _emptyCard('لا توجد طلبات مسجلة حالياً.')
@@ -507,19 +613,27 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
     final bound = _device?['bound'] == true;
     final passkeyCount = (_device?['passkeyCount'] as num?)?.toInt() ?? 0;
     final deviceLabel = _text(_device?['deviceLabel']);
+    final status = bound ? 'مرتبط وآمن' : 'يحتاج مراجعة';
     return Column(
       children: [
-        _sectionTitle('الأمان', 'الحساب والجهاز المرتبطان بالموظف'),
+        _sectionTitle('الأمان', 'الحساب والملف الشخصي'),
         const SizedBox(height: 10),
         _deviceSecurityCard(),
         const SizedBox(height: 12),
         _card([
-          _identityRow(Icons.verified_user_outlined, 'حالة الربط', bound ? 'مرتبط وآمن' : 'يحتاج مراجعة'),
+          _identityRow(Icons.verified_user_outlined, 'حالة الحساب', status),
+          _identityRow(Icons.badge_outlined, 'الرقم الوظيفي', _profileText('jobNumber', '—'), copy: true),
           _identityRow(Icons.phone_android_outlined, 'الجهاز', deviceLabel),
           _identityRow(Icons.fingerprint_rounded, 'مفاتيح الدخول الآمن', passkeyCount == 0 ? 'غير مسجل' : '$passkeyCount'),
+          _identityRow(Icons.assignment_outlined, 'عدد الطلبات', '${_requestMaps.length}'),
         ]),
         const SizedBox(height: 12),
-        _infoBanner(),
+        _actionBanner(
+          Icons.person_rounded,
+          'إدارة الملف الشخصي',
+          'فتح بيانات الحساب من الصفحة المخصصة.',
+          () => context.go('/profile'),
+        ),
       ],
     );
   }
@@ -538,11 +652,7 @@ class _EmployeeCenterPageState extends State<EmployeeCenterPage> {
             width: 46,
             height: 46,
             decoration: const BoxDecoration(color: HadirBrand.soft, shape: BoxShape.circle),
-            child: Icon(
-              bound ? Icons.verified_user_rounded : Icons.security_rounded,
-              color: HadirBrand.primary,
-              size: 23,
-            ),
+            child: Icon(bound ? Icons.verified_user_rounded : Icons.security_rounded, color: HadirBrand.primary, size: 23),
           ),
           const SizedBox(width: 13),
           Expanded(
