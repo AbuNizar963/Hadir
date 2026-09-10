@@ -1,0 +1,39 @@
+name: Apply employee directory parity patch
+
+on:
+  push:
+    branches: [Apps]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: Apps
+          fetch-depth: 2
+      - name: Apply and commit parity patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          workflow = Path('.github/workflows/patch-employee-directory-ui.yml').read_text(encoding='utf-8')
+          start = workflow.index("          python3 - <<'PY'\n") + len("          python3 - <<'PY'\n")
+          end = workflow.index("          PY\n", start)
+          script = workflow[start:end]
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in script.splitlines())
+          Path('/tmp/patch.py').write_text(script, encoding='utf-8')
+          subprocess.run(['python3', '/tmp/patch.py'], check=True)
+          target = Path('lib/pages/admin_management_page.dart')
+          if target.read_text(encoding='utf-8') == subprocess.check_output(['git','show','HEAD:'+str(target)], text=True, encoding='utf-8'):
+              raise SystemExit('No employee directory changes were produced')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/pages/admin_management_page.dart
+          git commit -m 'fix(flutter): align employee management tab with website'
+          git push origin Apps
