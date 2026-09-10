@@ -30,4 +30,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    # HADIR brand asset used by native manager and employee shells.
     - assets/branding/hadir_logo_transparent.png
