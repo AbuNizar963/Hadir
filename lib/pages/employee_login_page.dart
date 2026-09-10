@@ -38,8 +38,8 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
       setState(() => _error = 'أدخل رقم الموظف ورمز الدخول.');
       return;
     }
-    if (!RegExp(r'^\d{4,6}$').hasMatch(password)) {
-      setState(() => _error = 'رمز دخول الموظف يجب أن يتكون من 4 إلى 6 أرقام.');
+    if (password.length < 4) {
+      setState(() => _error = 'رمز دخول الموظف يجب أن يتكون من 4 أحرف أو أرقام على الأقل.');
       return;
     }
     setState(() { _busy = true; _error = null; });
@@ -134,13 +134,13 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                             focusNode: _passFocus,
                             enabled: !_busy,
                             obscureText: _hidden,
-                            keyboardType: TextInputType.number,
+                            keyboardType: TextInputType.text,
                             textInputAction: TextInputAction.done,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
                             onSubmitted: (_) => _login(),
                             decoration: InputDecoration(
                               labelText: 'رمز الدخول',
-                              suffixText: '4–6 أرقام',
+                              hintText: '4 أحرف أو أرقام على الأقل',
+                              suffixText: '4+ أحرف/أرقام',
                               suffixIcon: IconButton(
                                 onPressed: _busy ? null : () => setState(() => _hidden = !_hidden),
                                 icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
