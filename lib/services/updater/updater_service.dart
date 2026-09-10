@@ -40,6 +40,8 @@ class UpdaterService {
   static const _progressChannel = EventChannel('hadir/updater_progress');
   static const _releasesUrl =
       'https://api.github.com/repos/AbuNizar963/Hadir/releases';
+  static const _latestReleaseUrl =
+      'https://github.com/AbuNizar963/Hadir/releases/latest';
   static const _releasesAtomUrl =
       'https://github.com/AbuNizar963/Hadir/releases.atom';
   static const _releaseDownloadBase =
@@ -76,11 +78,20 @@ class UpdaterService {
     final currentCode = await currentVersionCode();
     Object? lastError;
 
-    // The GitHub REST API is intentionally used first because it contains the
-    // release notes and the exact uploaded APK asset. If an installation has
-    // exhausted GitHub's unauthenticated API quota, fall back to the public
-    // releases Atom feed, which is not subject to that API quota. This keeps
-    // update detection working for real devices without credentials.
+    // First use GitHub's normal latest-release redirect. Unlike the REST API,
+    // this endpoint does not consume the unauthenticated GitHub API quota.
+    // GitHub redirects /releases/latest to the actual tag, so the version can
+    // be discovered without credentials or an API token.
+    try {
+      final latest = await _checkLatestRelease(currentCode);
+      if (latest != null) return latest;
+    } catch (error) {
+      lastError = error;
+    }
+
+    // Keep the REST API as the richer path because it provides release notes
+    // and the exact uploaded APK asset. It remains a fallback for installations
+    // where the latest-release redirect is unavailable.
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         final response = await _dio.get<dynamic>(
@@ -104,7 +115,6 @@ class UpdaterService {
         return null;
       } catch (error) {
         lastError = error;
-        // A 403/429 is a quota/rate-limit case; do not waste all retries on it.
         final status = error is DioException ? error.response?.statusCode : null;
         if (status == 403 || status == 429) break;
         if (attempt < 2) {
@@ -115,6 +125,8 @@ class UpdaterService {
       }
     }
 
+    // Final discovery fallback for networks that allow the public Atom feed
+    // but block the REST API or the latest-release redirect.
     try {
       final fallback = await _checkAtomFeed(currentCode);
       if (fallback != null) return fallback;
@@ -123,11 +135,54 @@ class UpdaterService {
       lastError = error;
     }
 
-    // Reaching this point means both release discovery paths failed. The
-    // previous null-aware expression was unreachable because the REST path
-    // only falls through after an exception, which always initializes
-    // lastError. Keep the failure explicit so flutter analyze stays clean.
-    throw lastError!;
+    throw lastError ?? StateError('تعذر التحقق من وجود تحديث');
+  }
+
+  Future<UpdateInfo?> _checkLatestRelease(int currentCode) async {
+    final response = await _dio.get<String>(
+      _latestReleaseUrl,
+      queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
+      options: Options(
+        responseType: ResponseType.plain,
+        followRedirects: false,
+        validateStatus: (status) => status != null && status >= 200 && status < 400,
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,*/*',
+          'User-Agent': 'Hadir-Flutter-Updater',
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache',
+        },
+      ),
+    );
+
+    final location = response.headers.value('location');
+    final candidates = <String?>[
+      location,
+      response.realUri.toString(),
+      response.data,
+    ];
+
+    int? code;
+    String? tag;
+    for (final candidate in candidates) {
+      if (candidate == null || candidate.isEmpty) continue;
+      final match = RegExp(r'(?:^|/)(android-v1\\.0\\.(\\d+))(?:$|[?#&<>"\\'])')
+          .firstMatch(candidate);
+      if (match != null) {
+        code = int.tryParse(match.group(2) ?? '');
+        tag = match.group(1);
+        if (code != null && tag != null) break;
+      }
+    }
+
+    if (code == null || tag == null || code <= currentCode) return null;
+
+    return UpdateInfo(
+      versionCode: code,
+      versionName: '1.0.$code',
+      downloadUrl: '$_releaseDownloadBase/$tag/app-release.apk',
+      releaseNotes: '',
+    );
   }
 
   UpdateInfo? _selectApiRelease(List<dynamic> rawReleases, int currentCode) {
@@ -141,7 +196,7 @@ class UpdaterService {
       if (release['draft'] == true || release['prerelease'] == true) continue;
 
       final tag = (release['tag_name'] ?? '').toString().trim();
-      final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
+      final match = RegExp(r'^android-v1\\.0\\.(\\d+)$').firstMatch(tag);
       final code = int.tryParse(match?.group(1) ?? '');
       if (code == null || code <= currentCode ||
           (bestCode != null && code <= bestCode)) {
@@ -198,10 +253,8 @@ class UpdaterService {
     final xml = response.data ?? '';
     if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
 
-    // GitHub's release feed lists entries newest-first. Scan every entry so
-    // that an unrelated release cannot hide the newest Android release.
     final entryPattern = RegExp(
-      r'<entry\b[\s\S]*?<\/entry>',
+      r'<entry\\b[\\s\\S]*?<\\/entry>',
       caseSensitive: false,
     );
     int? bestCode;
@@ -210,7 +263,7 @@ class UpdaterService {
     for (final match in entryPattern.allMatches(xml)) {
       final entry = match.group(0) ?? '';
       final tagMatch = RegExp(
-        r'(?:/|%2F)(android-v1\.0\.(\d+))(?:<|&|"|\?)',
+        r'(?:/|%2F)(android-v1\\.0\\.(\\d+))(?:<|&|"|\\?)',
         caseSensitive: false,
       ).firstMatch(entry);
       final code = int.tryParse(tagMatch?.group(2) ?? '');
@@ -224,8 +277,7 @@ class UpdaterService {
 
     if (bestCode == null || bestTag == null) return null;
 
-    final downloadUrl =
-        '$_releaseDownloadBase/$bestTag/app-release.apk';
+    final downloadUrl = '$_releaseDownloadBase/$bestTag/app-release.apk';
     return UpdateInfo(
       versionCode: bestCode,
       versionName: '1.0.$bestCode',
