@@ -15,7 +15,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   final _session = HadirSession();
   bool _loading = true;
   String? _error;
-  String _name = 'الإدارة';
   String _role = 'admin';
   List<Map<String, dynamic>> _employees = [];
   List<dynamic> _violations = [];
@@ -29,13 +28,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   Color get _panel => Theme.of(context).colorScheme.surfaceContainerHighest;
   Color get _border => Theme.of(context).colorScheme.outlineVariant;
   Color get _primary => Theme.of(context).colorScheme.primary;
-
-  String get _roleLabel => switch (_role) {
-        'owner' => 'المالك',
-        'manager' => 'المدير',
-        'supervisor' => 'المشرف',
-        _ => 'الإدارة',
-      };
 
   @override
   void initState() {
@@ -78,7 +70,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
 
       if (!mounted) return;
       setState(() {
-        _name = name;
         _role = role;
         _employees = rows;
         _violations = violations;
@@ -132,9 +123,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       }).length;
   int get _leave => _count('LEAVE');
   int get _permission => _count('PERMISSION');
-  int get _openViolations => _violations
-      .where((raw) => raw is Map && '${raw['status'] ?? 'open'}'.toLowerCase() != 'resolved')
-      .length;
   int get _escaped => _latestEscapedIds.length;
 
   Set<String> get _latestEscapedIds {
@@ -328,25 +316,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
             TextButton(onPressed: _load, child: const Text('إعادة')),
           ],
         ),
-      );
-
-  Widget _sectionTitle(String title, String subtitle) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: _ink,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            subtitle,
-            style: TextStyle(color: _muted, fontSize: 10.5),
-          ),
-        ],
       );
 
   Widget _statusGrid() {
