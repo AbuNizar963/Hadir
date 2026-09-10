@@ -52,10 +52,11 @@ class UpdaterService {
     receiveTimeout: const Duration(seconds: 30),
     headers: {
       'Accept': 'application/vnd.github+json',
-      'User-Agent': 'Hadir-Flutter-Updater-484-Test',
+      'User-Agent': 'Hadir-Flutter-Updater',
       'Cache-Control': 'no-cache, no-store, max-age=0',
       'Pragma': 'no-cache',
     },
+    validateStatus: (status) => status != null && status >= 200 && status < 300,
   ));
 
   Stream<UpdateProgress> get progress =>
@@ -78,65 +79,56 @@ class UpdaterService {
   Future<UpdateInfo?> check() async {
     final currentCode = await currentVersionCode();
 
+    // Prefer the complete releases list. This avoids relying on GitHub's
+    // mutable `latest` pointer and lets us select the highest numeric Android
+    // release even when another release was edited or published later.
+    try {
+      final update = await _checkReleaseList(currentCode);
+      if (update != null) return update;
+    } catch (_) {}
+
+    // If the API list is temporarily unavailable, try the latest-release API.
     try {
       final latest = await _checkLatestRelease(currentCode);
       if (latest != null) return latest;
     } catch (_) {}
 
-    for (var attempt = 0; attempt < 3; attempt++) {
-      try {
-        final response = await _dio.get<dynamic>(
-          _releasesUrl,
-          queryParameters: {
-            'per_page': 20,
-            '_t': DateTime.now().millisecondsSinceEpoch,
-          },
-          options: Options(responseType: ResponseType.json),
-        );
-
-        final rawReleases = response.data is String
-            ? jsonDecode(response.data as String)
-            : response.data;
-        if (rawReleases is! List) {
-          throw StateError('استجابة التحديث غير صالحة');
-        }
-
-        final update = _selectApiRelease(rawReleases, currentCode);
-        if (update != null) return update;
-        return null;
-      } catch (error) {
-        final status = error is DioException ? error.response?.statusCode : null;
-        if (status == 403 || status == 429) break;
-        if (attempt < 2) {
-          await Future<void>.delayed(
-            Duration(milliseconds: 1500 * (attempt + 1)),
-          );
-        }
-      }
-    }
-
+    // Final network fallback for environments where GitHub's API is blocked.
     try {
       final fallback = await _checkAtomFeed(currentCode);
       if (fallback != null) return fallback;
       return null;
     } catch (_) {
-      rethrow;
+      return null;
     }
+  }
+
+  Future<UpdateInfo?> _checkReleaseList(int currentCode) async {
+    final response = await _dio.get<dynamic>(
+      _releasesUrl,
+      queryParameters: {
+        'per_page': 100,
+        'page': 1,
+        '_t': DateTime.now().millisecondsSinceEpoch,
+      },
+      options: Options(responseType: ResponseType.json),
+    );
+
+    final rawReleases = response.data is String
+        ? jsonDecode(response.data as String)
+        : response.data;
+    if (rawReleases is! List) {
+      throw StateError('استجابة قائمة التحديثات غير صالحة');
+    }
+
+    return _selectApiRelease(rawReleases, currentCode);
   }
 
   Future<UpdateInfo?> _checkLatestRelease(int currentCode) async {
     final response = await _dio.get<dynamic>(
       _latestReleaseUrl,
       queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
-      options: Options(
-        responseType: ResponseType.json,
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'Hadir-Flutter-Updater',
-          'Cache-Control': 'no-cache, no-store, max-age=0',
-          'Pragma': 'no-cache',
-        },
-      ),
+      options: Options(responseType: ResponseType.json),
     );
 
     final rawRelease = response.data is String
@@ -149,34 +141,7 @@ class UpdaterService {
     final release = Map<String, dynamic>.from(rawRelease);
     if (release['draft'] == true || release['prerelease'] == true) return null;
 
-    final tag = (release['tag_name'] ?? '').toString().trim();
-    final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
-    final code = int.tryParse(match?.group(1) ?? '');
-    if (code == null || code <= currentCode) return null;
-
-    final assets = (release['assets'] as List<dynamic>?) ?? const [];
-    String? downloadUrl;
-    for (final item in assets) {
-      if (item is! Map) continue;
-      final asset = Map<String, dynamic>.from(item);
-      final name = (asset['name'] ?? '').toString();
-      if (name == 'app-release.apk' || name == 'app-release-signed.apk') {
-        final candidate = asset['browser_download_url']?.toString();
-        if (candidate != null && candidate.isNotEmpty) {
-          downloadUrl = candidate;
-          break;
-        }
-      }
-    }
-
-    if (downloadUrl == null || downloadUrl.isEmpty) return null;
-
-    return UpdateInfo(
-      versionCode: code,
-      versionName: '1.0.$code',
-      downloadUrl: downloadUrl,
-      releaseNotes: (release['body'] ?? '').toString().trim(),
-    );
+    return _releaseToUpdate(release, currentCode);
   }
 
   UpdateInfo? _selectApiRelease(List<dynamic> rawReleases, int currentCode) {
@@ -189,43 +154,59 @@ class UpdaterService {
       final release = Map<String, dynamic>.from(rawRelease);
       if (release['draft'] == true || release['prerelease'] == true) continue;
 
-      final tag = (release['tag_name'] ?? '').toString().trim();
-      final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
-      final code = int.tryParse(match?.group(1) ?? '');
-      if (code == null || code <= currentCode ||
-          (bestCode != null && code <= bestCode)) {
-        continue;
-      }
+      final candidate = _releaseToUpdate(release, currentCode);
+      if (candidate == null) continue;
+      if (bestCode != null && candidate.versionCode <= bestCode) continue;
 
-      final assets = (release['assets'] as List<dynamic>?) ?? const [];
-      String? downloadUrl;
-      for (final item in assets) {
-        if (item is! Map) continue;
-        final asset = Map<String, dynamic>.from(item);
-        final name = (asset['name'] ?? '').toString();
-        if (name == 'app-release.apk' || name == 'app-release-signed.apk') {
-          final candidate = asset['browser_download_url']?.toString();
-          if (candidate != null && candidate.isNotEmpty) {
-            downloadUrl = candidate;
-            break;
-          }
-        }
-      }
-      if (downloadUrl == null || downloadUrl.isEmpty) continue;
-
-      bestCode = code;
+      bestCode = candidate.versionCode;
       bestRelease = release;
-      bestDownloadUrl = downloadUrl;
+      bestDownloadUrl = candidate.downloadUrl;
     }
 
     if (bestCode == null || bestRelease == null || bestDownloadUrl == null) {
       return null;
     }
+
     return UpdateInfo(
       versionCode: bestCode,
       versionName: '1.0.$bestCode',
       downloadUrl: bestDownloadUrl,
       releaseNotes: (bestRelease['body'] ?? '').toString().trim(),
+    );
+  }
+
+  UpdateInfo? _releaseToUpdate(
+    Map<String, dynamic> release,
+    int currentCode,
+  ) {
+    final tag = (release['tag_name'] ?? '').toString().trim();
+    final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
+    final code = int.tryParse(match?.group(1) ?? '');
+    if (code == null || code <= currentCode) return null;
+
+    final assets = (release['assets'] as List<dynamic>?) ?? const [];
+    String? downloadUrl;
+    for (final item in assets) {
+      if (item is! Map) continue;
+      final asset = Map<String, dynamic>.from(item);
+      final name = (asset['name'] ?? '').toString().trim();
+      if (name != 'app-release.apk' && name != 'app-release-signed.apk') {
+        continue;
+      }
+      final candidate = asset['browser_download_url']?.toString().trim();
+      if (candidate != null && candidate.isNotEmpty) {
+        downloadUrl = candidate;
+        break;
+      }
+    }
+
+    if (downloadUrl == null || downloadUrl.isEmpty) return null;
+
+    return UpdateInfo(
+      versionCode: code,
+      versionName: '1.0.$code',
+      downloadUrl: downloadUrl,
+      releaseNotes: (release['body'] ?? '').toString().trim(),
     );
   }
 
@@ -245,9 +226,7 @@ class UpdaterService {
     );
 
     final responseData = response.data;
-    final xml = responseData is String
-        ? responseData
-        : responseData.toString();
+    final xml = responseData is String ? responseData : responseData.toString();
     if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
 
     final entryPattern = RegExp(
