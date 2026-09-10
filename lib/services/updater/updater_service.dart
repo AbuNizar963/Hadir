@@ -8,130 +8,114 @@ class UpdateInfo {
     required this.versionCode,
     required this.versionName,
     required this.downloadUrl,
-    this.proxyUrl,
+    required this.releaseNotes,
   });
 
   final int versionCode;
   final String versionName;
   final String downloadUrl;
-  final String? proxyUrl;
+  final String releaseNotes;
 }
 
 class UpdateProgress {
-  const UpdateProgress({required this.received, required this.total});
+  const UpdateProgress({
+    required this.downloadedBytes,
+    required this.totalBytes,
+    required this.percent,
+    required this.elapsedSeconds,
+    this.etaSeconds,
+  });
 
-  final int received;
-  final int total;
-
-  double? get fraction => total > 0 ? received / total : null;
+  final int downloadedBytes;
+  final int totalBytes;
+  final int percent;
+  final int elapsedSeconds;
+  final int? etaSeconds;
 }
 
-class InstallPermissionRequiredException implements Exception {
-  const InstallPermissionRequiredException();
-}
+class InstallPermissionRequiredException implements Exception {}
 
 class UpdaterService {
-  UpdaterService._();
-
-  static const UpdaterService instance = UpdaterService._();
-
-  static const _channel = MethodChannel('com.hadir.app/updater');
-  static const _githubApiReleases =
+  static const _channel = MethodChannel('hadir/updater');
+  static const _progressChannel = EventChannel('hadir/updater_progress');
+  static const _releasesUrl =
       'https://api.github.com/repos/AbuNizar963/Hadir/releases';
-  static const _latestReleaseUrl = 'https://github.com/AbuNizar963/Hadir/releases/latest';
-  static const _atomFeedUrl = 'https://github.com/AbuNizar963/Hadir/releases.atom';
+  static const _latestReleaseUrl =
+      'https://github.com/AbuNizar963/Hadir/releases/latest';
+  static const _releasesAtomUrl =
+      'https://github.com/AbuNizar963/Hadir/releases.atom';
   static const _releaseDownloadBase =
       'https://github.com/AbuNizar963/Hadir/releases/download';
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 30),
-      sendTimeout: const Duration(seconds: 15),
-      followRedirects: true,
-      maxRedirects: 5,
-      headers: const {
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'Hadir-Flutter-Updater',
-        'Cache-Control': 'no-cache, no-store, max-age=0',
-        'Pragma': 'no-cache',
-      },
-    ),
-  );
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 30),
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'Hadir-Flutter-Updater',
+      'Cache-Control': 'no-cache, no-store, max-age=0',
+      'Pragma': 'no-cache',
+    },
+  ));
 
-  Stream<UpdateProgress> get progress => _channel
-      .receiveBroadcastStream()
-      .where((event) => event is Map)
-      .map((event) {
-        final data = Map<dynamic, dynamic>.from(event as Map);
+  Stream<UpdateProgress> get progress =>
+      _progressChannel.receiveBroadcastStream().map((event) {
+        final map = Map<Object?, Object?>.from(event as Map);
         return UpdateProgress(
-          received: (data['received'] as num?)?.toInt() ?? 0,
-          total: (data['total'] as num?)?.toInt() ?? 0,
+          downloadedBytes: (map['downloadedBytes'] as num?)?.toInt() ?? 0,
+          totalBytes: (map['totalBytes'] as num?)?.toInt() ?? 0,
+          percent: (map['percent'] as num?)?.toInt() ?? -1,
+          elapsedSeconds: (map['elapsedSeconds'] as num?)?.toInt() ?? 0,
+          etaSeconds: (map['etaSeconds'] as num?)?.toInt(),
         );
       });
 
   Future<int> currentVersionCode() async {
-    try {
-      final value = await _channel.invokeMethod<num>('currentVersionCode');
-      return value?.toInt() ?? 0;
-    } on MissingPluginException {
-      return 0;
-    } on PlatformException {
-      return 0;
-    }
+    return (await _channel.invokeMethod<num>('currentVersionCode'))?.toInt() ?? 1;
   }
 
   Future<UpdateInfo?> check() async {
     final currentCode = await currentVersionCode();
     Object? lastError;
 
-    for (var attempt = 0; attempt < 3; attempt++) {
-      try {
-        final response = await _dio.get<List<dynamic>>(
-          _githubApiReleases,
-          queryParameters: {
-            'per_page': 20,
-            'page': 1,
-            '_t': DateTime.now().millisecondsSinceEpoch,
-          },
-          options: Options(
-            responseType: ResponseType.json,
-            validateStatus: (status) => status != null && status < 500,
-          ),
-        );
-
-        if (response.statusCode == 403 || response.statusCode == 429) break;
-        if (response.statusCode != null &&
-            response.statusCode! >= 200 &&
-            response.statusCode! < 300) {
-          final data = response.data;
-          if (data != null) {
-            final releases = data
-                .whereType<Map>()
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList(growable: false);
-            final result = _selectApiRelease(releases, currentCode);
-            if (result != null) return result;
-          }
-          return null;
-        }
-      } catch (error) {
-        lastError = error;
-      }
-
-      if (attempt < 2) {
-        await Future<void>.delayed(
-          Duration(milliseconds: 1500 * (attempt + 1)),
-        );
-      }
-    }
-
     try {
-      final fallback = await _checkLatestRelease(currentCode);
-      if (fallback != null) return fallback;
-      return null;
+      final latest = await _checkLatestRelease(currentCode);
+      if (latest != null) return latest;
     } catch (error) {
       lastError = error;
+    }
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final response = await _dio.get<dynamic>(
+          _releasesUrl,
+          queryParameters: {
+            'per_page': 20,
+            '_t': DateTime.now().millisecondsSinceEpoch,
+          },
+          options: Options(responseType: ResponseType.json),
+        );
+
+        final rawReleases = response.data is String
+            ? jsonDecode(response.data as String)
+            : response.data;
+        if (rawReleases is! List) {
+          throw StateError('استجابة التحديث غير صالحة');
+        }
+
+        final update = _selectApiRelease(rawReleases, currentCode);
+        if (update != null) return update;
+        return null;
+      } catch (error) {
+        lastError = error;
+        final status = error is DioException ? error.response?.statusCode : null;
+        if (status == 403 || status == 429) break;
+        if (attempt < 2) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 1500 * (attempt + 1)),
+          );
+        }
+      }
     }
 
     try {
@@ -178,8 +162,8 @@ class UpdaterService {
       final match = tagPattern.firstMatch(candidate);
       if (match == null) continue;
       final parsed = int.tryParse(match.group(2) ?? '');
-      final matchedTag = match.group(1) ?? '';
-      if (parsed == null || matchedTag.isEmpty || parsed <= currentCode) {
+      final matchedTag = match.group(1);
+      if (parsed == null || matchedTag == null || parsed <= currentCode) {
         continue;
       }
       if (code == null || parsed > code) {
@@ -194,97 +178,110 @@ class UpdaterService {
       versionCode: code,
       versionName: '1.0.$code',
       downloadUrl: '$_releaseDownloadBase/$tag/app-release.apk',
-      proxyUrl: '$_releaseDownloadBase/$tag/app-release-signed.apk',
+      releaseNotes: '',
     );
   }
 
-  UpdateInfo? _selectApiRelease(
-    List<Map<String, dynamic>> releases,
-    int currentCode,
-  ) {
-    final pattern = RegExp(r'^android-v1\.0\.(\d+)$');
-    UpdateInfo? best;
+  UpdateInfo? _selectApiRelease(List<dynamic> rawReleases, int currentCode) {
+    Map<String, dynamic>? bestRelease;
+    int? bestCode;
+    String? bestDownloadUrl;
 
-    for (final release in releases) {
+    for (final rawRelease in rawReleases) {
+      if (rawRelease is! Map) continue;
+      final release = Map<String, dynamic>.from(rawRelease);
       if (release['draft'] == true || release['prerelease'] == true) continue;
 
-      final tagName = release['tag_name'];
-      if (tagName is! String) continue;
-      final match = pattern.firstMatch(tagName);
-      if (match == null) continue;
+      final tag = (release['tag_name'] ?? '').toString().trim();
+      final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
+      final code = int.tryParse(match?.group(1) ?? '');
+      if (code == null || code <= currentCode ||
+          (bestCode != null && code <= bestCode)) {
+        continue;
+      }
 
-      final code = int.tryParse(match.group(1) ?? '');
-      if (code == null || code <= currentCode) continue;
-
-      final assets = release['assets'];
-      if (assets is! List) continue;
-
+      final assets = (release['assets'] as List<dynamic>?) ?? const [];
       String? downloadUrl;
-      String? proxyUrl;
-      for (final rawAsset in assets) {
-        if (rawAsset is! Map) continue;
-        final asset = Map<String, dynamic>.from(rawAsset);
-        final name = asset['name'];
-        final url = asset['browser_download_url'];
-        if (name == 'app-release.apk' && url is String && url.isNotEmpty) {
-          downloadUrl = url;
-        }
-        if (name == 'app-release-signed.apk' &&
-            url is String &&
-            url.isNotEmpty) {
-          proxyUrl = url;
+      for (final item in assets) {
+        if (item is! Map) continue;
+        final asset = Map<String, dynamic>.from(item);
+        final name = (asset['name'] ?? '').toString();
+        if (name == 'app-release.apk' || name == 'app-release-signed.apk') {
+          final candidate = asset['browser_download_url']?.toString();
+          if (candidate != null && candidate.isNotEmpty) {
+            downloadUrl = candidate;
+            break;
+          }
         }
       }
+      if (downloadUrl == null || downloadUrl.isEmpty) continue;
 
-      if (downloadUrl == null) continue;
-
-      final candidate = UpdateInfo(
-        versionCode: code,
-        versionName: '1.0.$code',
-        downloadUrl: downloadUrl,
-        proxyUrl: proxyUrl,
-      );
-      if (best == null || candidate.versionCode > best.versionCode) {
-        best = candidate;
-      }
+      bestCode = code;
+      bestRelease = release;
+      bestDownloadUrl = downloadUrl;
     }
 
-    return best;
+    if (bestCode == null || bestRelease == null || bestDownloadUrl == null) {
+      return null;
+    }
+    return UpdateInfo(
+      versionCode: bestCode,
+      versionName: '1.0.$bestCode',
+      downloadUrl: bestDownloadUrl,
+      releaseNotes: (bestRelease['body'] ?? '').toString().trim(),
+    );
   }
 
   Future<UpdateInfo?> _checkAtomFeed(int currentCode) async {
     final response = await _dio.get<String>(
-      _atomFeedUrl,
+      _releasesAtomUrl,
       queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
-      options: Options(responseType: ResponseType.plain),
+      options: Options(
+        responseType: ResponseType.plain,
+        headers: {
+          'Accept': 'application/atom+xml, application/xml, text/xml, */*',
+          'User-Agent': 'Hadir-Flutter-Updater',
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache',
+        },
+      ),
     );
 
-    final entryPattern = RegExp(r'<entry\b[\s\S]*?</entry>');
+    final xml = response.data;
+    if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
+
+    final entryPattern = RegExp(
+      r'<entry\b[\s\S]*?</entry>',
+      caseSensitive: false,
+    );
     final tagPattern = RegExp(
       r'(?:/|%2F)(android-v1\.0\.(\d+))(?:<|&|"|\?)',
+      caseSensitive: false,
     );
 
     int? bestCode;
     String? bestTag;
-    for (final entry in entryPattern.allMatches(response.data)) {
-      final text = entry.group(0) ?? '';
-      final match = tagPattern.firstMatch(text);
-      if (match == null) continue;
-      final code = int.tryParse(match.group(2) ?? '');
-      final tag = match.group(1);
-      if (code == null || tag == null || code <= currentCode) continue;
-      if (bestCode == null || code > bestCode) {
-        bestCode = code;
-        bestTag = tag;
+
+    for (final match in entryPattern.allMatches(xml)) {
+      final entry = match.group(0) ?? '';
+      final tagMatch = tagPattern.firstMatch(entry);
+      final code = int.tryParse(tagMatch?.group(2) ?? '');
+      final tag = tagMatch?.group(1);
+      if (code == null || tag == null || code <= currentCode ||
+          (bestCode != null && code <= bestCode)) {
+        continue;
       }
+      bestCode = code;
+      bestTag = tag;
     }
 
     if (bestCode == null || bestTag == null) return null;
+
     return UpdateInfo(
       versionCode: bestCode,
       versionName: '1.0.$bestCode',
       downloadUrl: '$_releaseDownloadBase/$bestTag/app-release.apk',
-      proxyUrl: '$_releaseDownloadBase/$bestTag/app-release-signed.apk',
+      releaseNotes: '',
     );
   }
 
@@ -293,37 +290,18 @@ class UpdaterService {
       await _channel.invokeMethod<void>('downloadAndInstall', {
         'versionCode': update.versionCode,
         'downloadUrl': update.downloadUrl,
-        'proxyUrl': update.proxyUrl,
+        'proxyUrl':
+            'https://hadir-api.abunizar963.workers.dev/api/mobile/update/apk',
       });
     } on PlatformException catch (error) {
       if (error.code == 'INSTALL_PERMISSION_REQUIRED') {
-        throw const InstallPermissionRequiredException();
+        throw InstallPermissionRequiredException();
       }
-      rethrow;
+      throw StateError(error.message ?? 'تعذر تثبيت التحديث');
     }
   }
 
   Future<void> openInstallPermissionSettings() async {
     await _channel.invokeMethod<void>('openInstallPermissionSettings');
-  }
-
-  Future<bool> canInstallUnknownApps() async {
-    try {
-      return await _channel.invokeMethod<bool>('canInstallUnknownApps') ?? false;
-    } on MissingPluginException {
-      return false;
-    } on PlatformException {
-      return false;
-    }
-  }
-
-  String? decodeJsonString(dynamic value) {
-    if (value is! String || value.isEmpty) return null;
-    try {
-      final decoded = jsonDecode(value);
-      return decoded is String ? decoded : null;
-    } catch (_) {
-      return null;
-    }
   }
 }
