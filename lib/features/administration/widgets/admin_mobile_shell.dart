@@ -166,19 +166,20 @@ class AdminMobileShell extends StatelessWidget {
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         foregroundColor: scheme.onSurface,
-        padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 8, vertical: compact ? 6 : 7),
+        fixedSize: Size(compact ? 70 : 80, 48),
+        padding: EdgeInsets.zero,
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .85)),
         backgroundColor: scheme.surface.withValues(alpha: .55),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: compact ? 16 : 18),
-          const SizedBox(width: 3),
-          Text(label, style: TextStyle(fontSize: compact ? 8 : 9, fontWeight: FontWeight.w800)),
+          Icon(icon, size: 20),
+          const SizedBox(height: 2),
+          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, height: 1)),
         ],
       ),
     );
