@@ -15,7 +15,6 @@ const _danger = Color(0xFFB94A3D);
 
 class AttendanceInsightsPage extends StatefulWidget {
   const AttendanceInsightsPage({super.key});
-
   @override
   State<AttendanceInsightsPage> createState() => _AttendanceInsightsPageState();
 }
@@ -66,15 +65,14 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
   }
 
   Duration _durationFor(List<Map<String, dynamic>> records) {
-    Duration total = Duration.zero;
+    var total = Duration.zero;
     DateTime? checkIn;
     for (final record in records) {
       final time = DateTime.tryParse('${record['timestamp']}')?.toLocal();
       if (time == null) continue;
-      final type = record['type'];
-      if (type == 'check-in') {
+      if (record['type'] == 'check-in') {
         checkIn = time;
-      } else if (type == 'check-out' && checkIn != null && !time.isBefore(checkIn)) {
+      } else if (record['type'] == 'check-out' && checkIn != null && !time.isBefore(checkIn)) {
         total += time.difference(checkIn);
         checkIn = null;
       }
@@ -86,19 +84,16 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     return total;
   }
 
-  String _hours(Duration d) {
-    if (d == Duration.zero) return '0س';
-    return '${d.inHours}س ${d.inMinutes.remainder(60)}د';
-  }
+  String _hours(Duration duration) => duration == Duration.zero ? '0س' : '${duration.inHours}س ${duration.inMinutes.remainder(60)}د';
 
   int _daysWithActivity(List<Map<String, dynamic>> records) => records
-      .map((record) => DateTime.tryParse('${record['timestamp']}')?.toLocal())
+      .map((r) => DateTime.tryParse('${r['timestamp']}')?.toLocal())
       .whereType<DateTime>()
       .map((d) => '${d.year}-${d.month}-${d.day}')
       .toSet()
       .length;
 
-  int _countType(List<Map<String, dynamic>> records, String type) => records.where((record) => record['type'] == type).length;
+  int _countType(List<Map<String, dynamic>> records, String type) => records.where((r) => r['type'] == type).length;
 
   bool _hasOpenShift(List<Map<String, dynamic>> records) {
     DateTime? checkIn;
@@ -128,7 +123,13 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
         final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
         return at.compareTo(bt);
       });
-      return _DaySummary(day: entry.key, duration: _durationFor(rows), checkIns: _countType(rows, 'check-in'), checkOuts: _countType(rows, 'check-out'), open: _hasOpenShift(rows));
+      return _DaySummary(
+        day: entry.key,
+        duration: _durationFor(rows),
+        checkIns: _countType(rows, 'check-in'),
+        checkOuts: _countType(rows, 'check-out'),
+        open: _hasOpenShift(rows),
+      );
     }).toList();
     result.sort((a, b) => b.day.compareTo(a.day));
     return result;
@@ -172,7 +173,13 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
               const SizedBox(height: 6),
               const Text('صورة سريعة عن ساعات دوامك وحركاتك', style: TextStyle(color: _ink, fontSize: 22, fontWeight: FontWeight.w900)),
               const SizedBox(height: 18),
-              if (_loading) ...[const _InsightSkeleton(), const SizedBox(height: 10), const _InsightSkeleton()] else if (_error != null) ...[_MessageCard(_error!, Icons.cloud_off_rounded)] else ...[
+              if (_loading) ...[
+                const _InsightSkeleton(),
+                const SizedBox(height: 10),
+                const _InsightSkeleton(),
+              ] else if (_error != null) ...[
+                _MessageCard(_error!, Icons.cloud_off_rounded),
+              ] else ...[
                 _SummaryCard(title: 'هذا الشهر', hours: _hours(monthDuration), days: '$activeDays يوم نشط', movements: '${month.length} حركة'),
                 const SizedBox(height: 10),
                 _SummaryCard(title: 'هذا الأسبوع', hours: _hours(_durationFor(week)), days: '${_daysWithActivity(week)} يوم نشط', movements: '${week.length} حركة'),
@@ -192,7 +199,13 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
-                  child: const Row(children: [Icon(Icons.info_outline_rounded, color: _green, size: 19), SizedBox(width: 9), Expanded(child: Text('الأرقام مبنية على حركات الحضور الفعلية التي يعيدها النظام، وليست تقديرات من الواجهة.', style: TextStyle(color: _greenDark, fontSize: 10.5, height: 1.5, fontWeight: FontWeight.w600)))],),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, color: _green, size: 19),
+                      SizedBox(width: 9),
+                      Expanded(child: Text('الأرقام مبنية على حركات الحضور الفعلية التي يعيدها النظام، وليست تقديرات من الواجهة.', style: TextStyle(color: _greenDark, fontSize: 10.5, height: 1.5, fontWeight: FontWeight.w600))),
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -212,15 +225,22 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
-      child: Row(children: [
-        Container(width: 42, height: 42, decoration: BoxDecoration(color: checkout ? const Color(0xFFFFEFED) : _soft, borderRadius: BorderRadius.circular(14)), child: Icon(checkout ? Icons.logout_rounded : Icons.login_rounded, color: checkout ? _danger : _green)),
-        const SizedBox(width: 11),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(checkout ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(time == null ? 'وقت غير معروف' : intl.DateFormat('EEEE، d MMMM · HH:mm', 'ar').format(time), style: const TextStyle(color: _muted, fontSize: 10.5)),
-        ])),
-      ]),
+      child: Row(
+        children: [
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: checkout ? const Color(0xFFFFEFED) : _soft, borderRadius: BorderRadius.circular(14)), child: Icon(checkout ? Icons.logout_rounded : Icons.login_rounded, color: checkout ? _danger : _green)),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(checkout ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(time == null ? 'وقت غير معروف' : intl.DateFormat('EEEE، d MMMM · HH:mm', 'ar').format(time), style: const TextStyle(color: _muted, fontSize: 10.5)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -244,10 +264,16 @@ class _DailyActivity extends StatelessWidget {
     final visible = summaries.take(10).toList();
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
-      child: Column(children: [
-        for (var i = 0; i < visible.length; i++) ...[_DailyRow(summary: visible[i], hours: hours), if (i != visible.length - 1) const Divider(height: 1, indent: 16, endIndent: 16, color: _line)],
-        if (summaries.length > visible.length) Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 12), child: Text('يظهر آخر 10 أيام نشطة من أصل ${summaries.length}.', style: const TextStyle(color: _muted, fontSize: 10))),
-      ]),
+      child: Column(
+        children: [
+          for (var i = 0; i < visible.length; i++) ...[
+            _DailyRow(summary: visible[i], hours: hours),
+            if (i != visible.length - 1) const Divider(height: 1, indent: 16, endIndent: 16, color: _line),
+          ],
+          if (summaries.length > visible.length)
+            Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 12), child: Text('يظهر آخر 10 أيام نشطة من أصل ${summaries.length}.', style: const TextStyle(color: _muted, fontSize: 10))),
+        ],
+      ),
     );
   }
 }
@@ -258,21 +284,16 @@ class _DailyRow extends StatelessWidget {
   const _DailyRow({required this.summary, required this.hours});
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-    child: Row(children: [
-      Container(width: 40, height: 40, decoration: BoxDecoration(color: summary.open ? const Color(0xFFFFF7E6) : _soft, borderRadius: BorderRadius.circular(13)), child: Icon(summary.open ? Icons.access_time_filled_rounded : Icons.calendar_today_rounded, color: summary.open ? const Color(0xFF9A6A18) : _green, size: 18)),
-      const SizedBox(width: 10),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(summary.day), style: const TextStyle(color: _ink, fontSize: 11.5, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 4),
-        Text('${summary.checkIns} حضور · ${summary.checkOuts} انصراف', style: const TextStyle(color: _muted, fontSize: 9.5)),
-      ])),
-      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        Text(hours(summary.duration), style: const TextStyle(color: _green, fontSize: 12.5, fontWeight: FontWeight.w900)),
-        if (summary.open) ...[const SizedBox(height: 3), const Text('دوام مفتوح', style: TextStyle(color: Color(0xFF9A6A18), fontSize: 8.5, fontWeight: FontWeight.w800))],
-      ]),
-    ]),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+        child: Row(
+          children: [
+            Container(width: 40, height: 40, decoration: BoxDecoration(color: summary.open ? const Color(0xFFFFF7E6) : _soft, borderRadius: BorderRadius.circular(13)), child: Icon(summary.open ? Icons.access_time_filled_rounded : Icons.calendar_today_rounded, color: summary.open ? const Color(0xFF9A6A18) : _green, size: 18)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(summary.day), style: const TextStyle(color: _ink, fontSize: 11.5, fontWeight: FontWeight.w900)), const SizedBox(height: 4), Text('${summary.checkIns} حضور · ${summary.checkOuts} انصراف', style: const TextStyle(color: _muted, fontSize: 9.5))])),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(hours(summary.duration), style: const TextStyle(color: _green, fontSize: 12.5, fontWeight: FontWeight.w900)), if (summary.open) ...[const SizedBox(height: 3), const Text('دوام مفتوح', style: TextStyle(color: Color(0xFF9A6A18), fontSize: 8.5, fontWeight: FontWeight.w800))]]),
+          ],
+        ),
+      );
 }
 
 class _SummaryCard extends StatelessWidget {
@@ -283,13 +304,15 @@ class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.title, required this.hours, required this.days, required this.movements});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(17),
-    decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_green, _greenDark]), borderRadius: BorderRadius.circular(22), boxShadow: const [BoxShadow(color: Color(0x1C0B6B5A), blurRadius: 22, offset: Offset(0, 9))]),
-    child: Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)), const SizedBox(height: 6), Text(hours, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900))]),
-      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(days, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)), const SizedBox(height: 5), Text(movements, style: const TextStyle(color: Colors.white70, fontSize: 10))]),
-    ]),
-  );
+        padding: const EdgeInsets.all(17),
+        decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [_green, _greenDark]), borderRadius: BorderRadius.circular(22), boxShadow: const [BoxShadow(color: Color(0x1C0B6B5A), blurRadius: 22, offset: Offset(0, 9))]),
+        child: Row(
+          children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)), const SizedBox(height: 6), Text(hours, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900))])),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(days, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)), const SizedBox(height: 5), Text(movements, style: const TextStyle(color: Colors.white70, fontSize: 10))]),
+          ],
+        ),
+      );
 }
 
 class _AverageCard extends StatelessWidget {
@@ -297,15 +320,17 @@ class _AverageCard extends StatelessWidget {
   const _AverageCard({required this.value});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
-    child: Row(children: [
-      Container(width: 38, height: 38, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.insights_rounded, color: _green, size: 20)),
-      const SizedBox(width: 10),
-      const Expanded(child: Text('متوسط ساعات اليوم النشط', style: TextStyle(color: _ink, fontSize: 11.5, fontWeight: FontWeight.w800))),
-      Text(value, style: const TextStyle(color: _green, fontSize: 14, fontWeight: FontWeight.w900)),
-    ]),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
+        child: Row(
+          children: [
+            Container(width: 38, height: 38, decoration: BoxDecoration(color: _soft, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.insights_rounded, color: _green, size: 20)),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('متوسط ساعات اليوم النشط', style: TextStyle(color: _ink, fontSize: 11.5, fontWeight: FontWeight.w800))),
+            Text(value, style: const TextStyle(color: _green, fontSize: 14, fontWeight: FontWeight.w900)),
+          ],
+        ),
+      );
 }
 
 class _MovementBreakdown extends StatelessWidget {
@@ -315,16 +340,23 @@ class _MovementBreakdown extends StatelessWidget {
   const _MovementBreakdown({required this.checkIns, required this.checkOuts, required this.openShift});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(15),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
-    child: Column(children: [
-      const Row(children: [Icon(Icons.swap_vert_rounded, color: _green, size: 20), SizedBox(width: 8), Text('تفصيل الحركات هذا الشهر', style: TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w900))]),
-      const SizedBox(height: 13),
-      Row(children: [Expanded(child: _MovementStat(icon: Icons.login_rounded, label: 'حضور', value: '$checkIns')), const SizedBox(width: 9), Expanded(child: _MovementStat(icon: Icons.logout_rounded, label: 'انصراف', value: '$checkOuts', danger: true))]),
-      const SizedBox(height: 10),
-      Container(width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), decoration: BoxDecoration(color: openShift ? const Color(0xFFFFF7E6) : _soft, borderRadius: BorderRadius.circular(14)), child: Row(children: [Icon(openShift ? Icons.access_time_filled_rounded : Icons.check_circle_rounded, size: 18, color: openShift ? const Color(0xFF9A6A18) : _green), const SizedBox(width: 8), Expanded(child: Text(openShift ? 'يوجد دوام مفتوح لم يُسجّل انصرافه بعد.' : 'لا يوجد دوام مفتوح حاليًا.', style: TextStyle(color: openShift ? const Color(0xFF795515) : _greenDark, fontSize: 10.5, fontWeight: FontWeight.w700)))]) ),
-    ]),
-  );
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
+        child: Column(
+          children: [
+            const Row(children: [Icon(Icons.swap_vert_rounded, color: _green, size: 20), SizedBox(width: 8), Text('تفصيل الحركات هذا الشهر', style: TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w900))]),
+            const SizedBox(height: 13),
+            Row(children: [Expanded(child: _MovementStat(icon: Icons.login_rounded, label: 'حضور', value: '$checkIns')), const SizedBox(width: 9), Expanded(child: _MovementStat(icon: Icons.logout_rounded, label: 'انصراف', value: '$checkOuts', danger: true))]),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(color: openShift ? const Color(0xFFFFF7E6) : _soft, borderRadius: BorderRadius.circular(14)),
+              child: Row(children: [Icon(openShift ? Icons.access_time_filled_rounded : Icons.check_circle_rounded, size: 18, color: openShift ? const Color(0xFF9A6A18) : _green), const SizedBox(width: 8), Expanded(child: Text(openShift ? 'يوجد دوام مفتوح لم يُسجّل انصرافه بعد.' : 'لا يوجد دوام مفتوح حاليًا.', style: TextStyle(color: openShift ? const Color(0xFF795515) : _greenDark, fontSize: 10.5, fontWeight: FontWeight.w700)))]),
+            ),
+          ],
+        ),
+      );
 }
 
 class _MovementStat extends StatelessWidget {
@@ -335,26 +367,30 @@ class _MovementStat extends StatelessWidget {
   const _MovementStat({required this.icon, required this.label, required this.value, this.danger = false});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-    decoration: BoxDecoration(color: danger ? const Color(0xFFFFF5F3) : _soft, borderRadius: BorderRadius.circular(15)),
-    child: Row(children: [Icon(icon, color: danger ? _danger : _green, size: 18), const SizedBox(width: 8), Expanded(child: Text(label, style: const TextStyle(color: _muted, fontSize: 10.5, fontWeight: FontWeight.w700))), Text(value, style: TextStyle(color: danger ? _danger : _green, fontSize: 15, fontWeight: FontWeight.w900))]),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(color: danger ? const Color(0xFFFFEFED) : _soft, borderRadius: BorderRadius.circular(15)),
+        child: Row(children: [Icon(icon, color: danger ? _danger : _green, size: 18), const SizedBox(width: 8), Expanded(child: Text(label, style: const TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700))), Text(value, style: TextStyle(color: danger ? _danger : _green, fontSize: 15, fontWeight: FontWeight.w900))]),
+      );
 }
 
 class _MessageCard extends StatelessWidget {
-  final String text;
+  final String message;
   final IconData icon;
-  const _MessageCard(this.text, this.icon);
+  const _MessageCard(this.message, this.icon);
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
-    child: Row(children: [Icon(icon, color: _green), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(color: _muted, fontSize: 11, height: 1.4)))]),
-  );
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
+        child: Row(children: [Icon(icon, color: _green, size: 20), const SizedBox(width: 10), Expanded(child: Text(message, style: const TextStyle(color: _muted, fontSize: 11, height: 1.5, fontWeight: FontWeight.w600)))]),
+      );
 }
 
 class _InsightSkeleton extends StatelessWidget {
   const _InsightSkeleton();
   @override
-  Widget build(BuildContext context) => Container(height: 96, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)));
+  Widget build(BuildContext context) => Container(
+        height: 92,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
+        child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.2, color: _green))),
+      );
 }
