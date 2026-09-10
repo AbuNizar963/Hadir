@@ -1,4 +1,4 @@
-/// Administration report archive compatibility entry point.
+/// Administration report archive public entry point.
 library;
 
-export '../../../pages/admin_report_archive_page.dart';
+export 'admin_report_archive_implementation.dart';
