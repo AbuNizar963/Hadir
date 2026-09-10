@@ -150,7 +150,7 @@ class UpdaterService {
     final location = response.headers.value('location');
     final candidates = <String>[
       if (location != null && location.isNotEmpty) location,
-      if (response.data != null) response.data!,
+      response.data,
     ];
 
     int? code;
