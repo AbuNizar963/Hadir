@@ -148,9 +148,10 @@ class UpdaterService {
     );
 
     final location = response.headers.value('location');
+    final body = response.data as String? ?? '';
     final candidates = <String>[
       if (location != null && location.isNotEmpty) location,
-      response.data,
+      body,
     ];
 
     int? code;
@@ -172,12 +173,14 @@ class UpdaterService {
       }
     }
 
-    if (code == null || tag == null) return null;
+    final resolvedCode = code;
+    final resolvedTag = tag;
+    if (resolvedCode == null || resolvedTag == null) return null;
 
     return UpdateInfo(
-      versionCode: code,
-      versionName: '1.0.$code',
-      downloadUrl: '$_releaseDownloadBase/$tag/app-release.apk',
+      versionCode: resolvedCode,
+      versionName: '1.0.$resolvedCode',
+      downloadUrl: '$_releaseDownloadBase/$resolvedTag/app-release.apk',
       releaseNotes: '',
     );
   }
@@ -221,14 +224,20 @@ class UpdaterService {
       bestDownloadUrl = downloadUrl;
     }
 
-    if (bestCode == null || bestRelease == null || bestDownloadUrl == null) {
+    final resolvedCode = bestCode;
+    final resolvedRelease = bestRelease;
+    final resolvedDownloadUrl = bestDownloadUrl;
+    if (resolvedCode == null ||
+        resolvedRelease == null ||
+        resolvedDownloadUrl == null) {
       return null;
     }
+
     return UpdateInfo(
-      versionCode: bestCode,
-      versionName: '1.0.$bestCode',
-      downloadUrl: bestDownloadUrl,
-      releaseNotes: (bestRelease['body'] ?? '').toString().trim(),
+      versionCode: resolvedCode,
+      versionName: '1.0.$resolvedCode',
+      downloadUrl: resolvedDownloadUrl,
+      releaseNotes: (resolvedRelease['body'] ?? '').toString().trim(),
     );
   }
 
@@ -247,7 +256,7 @@ class UpdaterService {
       ),
     );
 
-    final xml = response.data;
+    final xml = response.data as String? ?? '';
     if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
 
     final entryPattern = RegExp(
@@ -275,12 +284,14 @@ class UpdaterService {
       bestTag = tag;
     }
 
-    if (bestCode == null || bestTag == null) return null;
+    final resolvedCode = bestCode;
+    final resolvedTag = bestTag;
+    if (resolvedCode == null || resolvedTag == null) return null;
 
     return UpdateInfo(
-      versionCode: bestCode,
-      versionName: '1.0.$bestCode',
-      downloadUrl: '$_releaseDownloadBase/$bestTag/app-release.apk',
+      versionCode: resolvedCode,
+      versionName: '1.0.$resolvedCode',
+      downloadUrl: '$_releaseDownloadBase/$resolvedTag/app-release.apk',
       releaseNotes: '',
     );
   }
