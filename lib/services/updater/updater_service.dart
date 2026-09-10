@@ -79,15 +79,15 @@ class UpdaterService {
   Future<UpdateInfo?> check() async {
     final currentCode = await currentVersionCode();
 
-    // Prefer the complete releases list. This avoids relying on GitHub's
-    // mutable `latest` pointer and lets us select the highest numeric Android
-    // release even when another release was edited or published later.
+    // Scan every release page. GitHub orders releases by publication/update
+    // time, not by the numeric Android version, so a fixed first page is not
+    // sufficient for a repository with a long release history.
     try {
-      final update = await _checkReleaseList(currentCode);
+      final update = await _checkAllReleasePages(currentCode);
       if (update != null) return update;
     } catch (_) {}
 
-    // If the API list is temporarily unavailable, try the latest-release API.
+    // If the paginated API is temporarily unavailable, try the latest-release API.
     try {
       final latest = await _checkLatestRelease(currentCode);
       if (latest != null) return latest;
@@ -103,25 +103,42 @@ class UpdaterService {
     }
   }
 
-  Future<UpdateInfo?> _checkReleaseList(int currentCode) async {
-    final response = await _dio.get<dynamic>(
-      _releasesUrl,
-      queryParameters: {
-        'per_page': 100,
-        'page': 1,
-        '_t': DateTime.now().millisecondsSinceEpoch,
-      },
-      options: Options(responseType: ResponseType.json),
-    );
+  Future<UpdateInfo?> _checkAllReleasePages(int currentCode) async {
+    const perPage = 100;
+    UpdateInfo? best;
 
-    final rawReleases = response.data is String
-        ? jsonDecode(response.data as String)
-        : response.data;
-    if (rawReleases is! List) {
-      throw StateError('استجابة قائمة التحديثات غير صالحة');
+    for (var page = 1; page <= 100; page++) {
+      final response = await _dio.get<dynamic>(
+        _releasesUrl,
+        queryParameters: {
+          'per_page': perPage,
+          'page': page,
+          '_t': DateTime.now().millisecondsSinceEpoch,
+        },
+        options: Options(responseType: ResponseType.json),
+      );
+
+      final rawReleases = response.data is String
+          ? jsonDecode(response.data as String)
+          : response.data;
+      if (rawReleases is! List) {
+        throw StateError('استجابة قائمة التحديثات غير صالحة');
+      }
+
+      if (rawReleases.isEmpty) break;
+
+      final pageBest = _selectApiRelease(rawReleases, currentCode);
+      if (pageBest != null &&
+          (best == null || pageBest.versionCode > best.versionCode)) {
+        best = pageBest;
+      }
+
+      // A short page is the end of the collection. This also prevents
+      // unnecessary requests when the repository has fewer than 100 releases.
+      if (rawReleases.length < perPage) break;
     }
 
-    return _selectApiRelease(rawReleases, currentCode);
+    return best;
   }
 
   Future<UpdateInfo?> _checkLatestRelease(int currentCode) async {
