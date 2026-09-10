@@ -332,7 +332,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
           content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('الإدارة', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11, fontWeight: FontWeight.w800)),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(value: type, decoration: const InputDecoration(labelText: 'نوع الطلب'), items: const [DropdownMenuItem(value: 'permission', child: Text('استئذان')), DropdownMenuItem(value: 'leave', child: Text('إجازة')), DropdownMenuItem(value: 'checkout', child: Text('انصراف مبكر'))], onChanged: (v) => setDialogState(() { type = v ?? 'permission'; if (type == 'checkout') end = start; })),
+            DropdownButtonFormField<String>(initialValue: type, decoration: const InputDecoration(labelText: 'نوع الطلب'), items: const [DropdownMenuItem(value: 'permission', child: Text('استئذان')), DropdownMenuItem(value: 'leave', child: Text('إجازة')), DropdownMenuItem(value: 'checkout', child: Text('انصراف مبكر'))], onChanged: (v) => setDialogState(() { type = v ?? 'permission'; if (type == 'checkout') end = start; })),
             if (!isCheckout) ...[
               const SizedBox(height: 12),
               _dateField(context, 'تاريخ البداية', start, (v) => setDialogState(() { start = v; if (end.isBefore(start)) end = start; })),
@@ -353,10 +353,15 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
               try {
                 final token = await _session.token();
                 await HadirApi(token: token).createRequest(type: type, reason: reason, startDate: _dateKey(start), endDate: _dateKey(end));
+                if (!dialogContext.mounted) return;
                 setDialogState(() => sent = true);
-                if (mounted) { await Future<void>.delayed(const Duration(milliseconds: 500)); if (Navigator.of(dialogContext).canPop()) Navigator.of(dialogContext).pop(); _load(); }
+                await Future<void>.delayed(const Duration(milliseconds: 500));
+                if (!dialogContext.mounted) return;
+                if (Navigator.of(dialogContext).canPop()) Navigator.of(dialogContext).pop();
+                if (mounted) _load();
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(HadirApi.errorMessage(e))));
+                if (!dialogContext.mounted) return;
+                ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(HadirApi.errorMessage(e))));
               }
             }, child: Text(sent ? 'تم إرسال الطلب' : 'إرسال الطلب')),
           ],
@@ -633,8 +638,6 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   String _time(dynamic row) { final d = _stamp(row); return d == null ? '—' : intl.DateFormat('HH:mm').format(d); }
   int _number(dynamic value, int fallback) => int.tryParse('$value') ?? fallback;
   String _minutesLabel(int minutes) => minutes >= 60 ? '${minutes ~/ 60} ساعة و${minutes % 60} دقيقة' : '$minutes دقيقة';
-
-  _LoadingCard _loadingCard() => const _LoadingCard();
 
   Widget _messageCard(BuildContext context, String text, IconData icon) {
     final scheme = Theme.of(context).colorScheme;
