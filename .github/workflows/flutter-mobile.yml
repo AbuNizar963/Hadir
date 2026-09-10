@@ -23,7 +23,7 @@ on:
       - 'analysis_options.yaml'
       - '.github/workflows/flutter-mobile.yml'
 
-# Dashboard analyzer repair verification
+# Final dashboard analyzer verification
 jobs:
   android:
     runs-on: ubuntu-latest
