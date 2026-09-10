@@ -41,7 +41,7 @@ class UpdaterService {
   static const _releasesUrl =
       'https://api.github.com/repos/AbuNizar963/Hadir/releases';
   static const _latestReleaseUrl =
-      'https://github.com/AbuNizar963/Hadir/releases/latest';
+      'https://api.github.com/repos/AbuNizar963/Hadir/releases/latest';
   static const _releasesAtomUrl =
       'https://github.com/AbuNizar963/Hadir/releases.atom';
   static const _releaseDownloadBase =
@@ -129,12 +129,9 @@ class UpdaterService {
       _latestReleaseUrl,
       queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
       options: Options(
-        responseType: ResponseType.plain,
-        followRedirects: false,
-        validateStatus: (status) =>
-            status != null && status >= 200 && status < 400,
+        responseType: ResponseType.json,
         headers: {
-          'Accept': 'text/html,application/xhtml+xml,*/*',
+          'Accept': 'application/vnd.github+json',
           'User-Agent': 'Hadir-Flutter-Updater',
           'Cache-Control': 'no-cache, no-store, max-age=0',
           'Pragma': 'no-cache',
@@ -142,39 +139,43 @@ class UpdaterService {
       ),
     );
 
-    final location = response.headers.value('location');
-    final responseData = response.data;
-    final responseText = responseData is String
-        ? responseData
-        : responseData.toString();
-    final candidates = <String>[
-      if (location != null && location.isNotEmpty) location,
-      responseText,
-    ];
+    final rawRelease = response.data is String
+        ? jsonDecode(response.data as String)
+        : response.data;
+    if (rawRelease is! Map) {
+      throw StateError('استجابة أحدث إصدار غير صالحة');
+    }
 
-    int? code;
-    String? tag;
-    final tagPattern = RegExp(
-      r'(?:^|/)(android-v1\.0\.(\d+))(?:$|[?#&<>" ])',
-    );
-    for (final candidate in candidates) {
-      final match = tagPattern.firstMatch(candidate);
-      if (match == null) continue;
-      final parsed = int.tryParse(match.group(2) ?? '');
-      if (parsed == null || parsed <= currentCode) continue;
-      if (code == null || parsed > code) {
-        code = parsed;
-        tag = match.group(1);
+    final release = Map<String, dynamic>.from(rawRelease);
+    if (release['draft'] == true || release['prerelease'] == true) return null;
+
+    final tag = (release['tag_name'] ?? '').toString().trim();
+    final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
+    final code = int.tryParse(match?.group(1) ?? '');
+    if (code == null || code <= currentCode) return null;
+
+    final assets = (release['assets'] as List<dynamic>?) ?? const [];
+    String? downloadUrl;
+    for (final item in assets) {
+      if (item is! Map) continue;
+      final asset = Map<String, dynamic>.from(item);
+      final name = (asset['name'] ?? '').toString();
+      if (name == 'app-release.apk' || name == 'app-release-signed.apk') {
+        final candidate = asset['browser_download_url']?.toString();
+        if (candidate != null && candidate.isNotEmpty) {
+          downloadUrl = candidate;
+          break;
+        }
       }
     }
 
-    if (code == null || tag == null) return null;
+    if (downloadUrl == null || downloadUrl.isEmpty) return null;
 
     return UpdateInfo(
       versionCode: code,
       versionName: '1.0.$code',
-      downloadUrl: '$_releaseDownloadBase/$tag/app-release.apk',
-      releaseNotes: '',
+      downloadUrl: downloadUrl,
+      releaseNotes: (release['body'] ?? '').toString().trim(),
     );
   }
 
