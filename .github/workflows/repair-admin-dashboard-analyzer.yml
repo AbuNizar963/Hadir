@@ -1,3 +1,4 @@
+# rerun analyzer repair
 name: Repair admin dashboard analyzer
 on:
   push:
