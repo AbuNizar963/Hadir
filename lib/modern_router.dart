@@ -14,7 +14,6 @@ import 'pages/admin_management_page.dart';
 import 'pages/admin_operations_page.dart';
 import 'pages/admin_reports_page.dart';
 import 'pages/admin_report_archive_page.dart';
-import 'pages/admin_settings_page.dart';
 import 'pages/attendance_page.dart';
 import 'pages/attendance_insights_page.dart';
 import 'pages/employee_center_page.dart';
