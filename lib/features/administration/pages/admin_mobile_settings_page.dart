@@ -20,7 +20,7 @@ class AdminMobileSettingsPage extends StatelessWidget {
           ),
         ),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
             Text(
               'HADIR  ·  OWNER',
@@ -76,7 +76,7 @@ class AdminMobileSettingsPage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 13),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: .42),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: scheme.primary.withValues(alpha: .20)),
         boxShadow: [
           BoxShadow(color: scheme.primary.withValues(alpha: .06), blurRadius: 18, spreadRadius: 1),
@@ -111,6 +111,9 @@ class AdminMobileSettingsPage extends StatelessWidget {
         color: scheme.surfaceContainerHighest.withValues(alpha: .40),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: scheme.outlineVariant.withValues(alpha: .55)),
+        boxShadow: [
+          BoxShadow(color: scheme.primary.withValues(alpha: .035), blurRadius: 12, spreadRadius: 0),
+        ],
       ),
       child: ListTile(
         dense: true,
