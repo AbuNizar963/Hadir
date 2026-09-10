@@ -71,14 +71,14 @@ class AdminMobileShell extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: compact ? 38 : 42,
-                  height: compact ? 38 : 42,
+                  width: compact ? 34 : 38,
+                  height: compact ? 34 : 38,
                   decoration: BoxDecoration(
                     color: scheme.primary.withValues(alpha: .10),
                     shape: BoxShape.circle,
                     border: Border.all(color: scheme.primary.withValues(alpha: .55), width: 1.2),
                   ),
-                  child: Icon(Icons.wb_sunny_rounded, color: scheme.primary, size: compact ? 22 : 24),
+                  child: Icon(Icons.wb_sunny_rounded, color: scheme.primary, size: compact ? 20 : 22),
                 ),
                 const SizedBox(width: 7),
                 Column(
