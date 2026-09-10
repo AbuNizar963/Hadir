@@ -1,1 +1,1 @@
-// RESTORE REQUIRED: retrieve current content before replacement.
+__RESTORE_PENDING__
