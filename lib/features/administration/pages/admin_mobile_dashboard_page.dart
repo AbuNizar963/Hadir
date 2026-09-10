@@ -131,6 +131,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         return status == 'REST' || status == 'NOT_STARTED';
       }).length;
   int get _leave => _count('LEAVE');
+  int get _permission => _count('PERMISSION');
   int get _openViolations => _violations
       .where((raw) => raw is Map && '${raw['status'] ?? 'open'}'.toLowerCase() != 'resolved')
       .length;
@@ -169,6 +170,8 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
           return status == 'REST' || status == 'NOT_STARTED';
         case 'leave':
           return status == 'LEAVE';
+        case 'permission':
+          return status == 'PERMISSION';
         case 'escaped':
           return escapedIds.contains(id);
         default:
@@ -206,7 +209,8 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
     if (label == 'هارب' || label == 'غائب') return const Color(0xFFB42318);
     if (label == 'متأخر') return const Color(0xFFB54708);
     if (label == 'حاضر') return _primary;
-    if (label == 'إجازة') return const Color(0xFF6941C6);
+    if (label == 'إجازة') return const Color(0xFF9B72D0);
+    if (label == 'إذن') return const Color(0xFF4CC9F0);
     return const Color(0xFF2563A6);
   }
 
@@ -220,7 +224,9 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       case 'escaped':
         return const Color(0xFFB42318);
       case 'leave':
-        return const Color(0xFF6941C6);
+        return const Color(0xFF9B72D0);
+      case 'permission':
+        return const Color(0xFF4CC9F0);
       case 'rest':
         return const Color(0xFF2563A6);
       default:
@@ -241,33 +247,13 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
             children: [
-              Text(
-                '$_roleLabel · لوحة القيادة',
-                style: TextStyle(
-                  color: _ink,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _name == 'الإدارة'
-                    ? 'نظرة مباشرة على حالة الدوام · ${_today()}'
-                    : '$_name · ${_today()}',
-                style: TextStyle(color: _muted, fontSize: 12),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               _operationalCard(),
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 _errorCard(),
               ],
               const SizedBox(height: 18),
-              _sectionTitle(
-                'حالات الدوام',
-                'بيانات مباشرة من D1 · الموظفون + الحضور + الطلبات',
-              ),
-              const SizedBox(height: 10),
               _statusGrid(),
               const SizedBox(height: 20),
               _employeeSection(rows),
@@ -303,18 +289,16 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                 children: [
                   Text(
                     'الحالة التشغيلية الحالية',
-                    style: TextStyle(color: _ink, fontWeight: FontWeight.w900),
+                    textAlign: TextAlign.right,
+                    style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Text(
                     _loading
                         ? 'جاري مزامنة حالة الدوام من D1…'
-                        : '$_present حاضر · $_absent غائب · $_late متأخر · $_openViolations مخالفات مفتوحة',
-                    style: TextStyle(
-                      color: _muted,
-                      fontSize: 11,
-                      height: 1.45,
-                    ),
+                        : 'هذه لوحة تشغيل مباشرة لليوم الحالي. الموظف يقيم وفق جدول دوامه الفعلي؛ يوم الراحة لا يُحتسب غيابًا، والوتيرة التناوبية المعتمدة تبقى فعالة طوال فترة العمل.',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(color: _muted, fontSize: 12, height: 1.65),
                   ),
                 ],
               ),
@@ -373,6 +357,7 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       _StatusCardData('الراحة', _rest, Icons.coffee_rounded, 'rest'),
       _StatusCardData('الإجازات', _leave, Icons.event_available_rounded, 'leave'),
       _StatusCardData('الهروب', _escaped, Icons.shield_outlined, 'escaped'),
+      _StatusCardData('الاستئذان', _permission, Icons.lightbulb_outline_rounded, 'permission'),
     ];
     return GridView.builder(
       shrinkWrap: true,
@@ -380,8 +365,8 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.7,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.48,
       ),
       itemCount: cards.length,
       itemBuilder: (_, index) {
@@ -394,50 +379,42 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
           child: Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
-              color: active ? _panel : _surface,
-              borderRadius: BorderRadius.circular(17),
+              color: Color.alphaBlend(color.withValues(alpha: active ? .08 : .025), _surface),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: active ? color.withValues(alpha: .32) : _border,
+                color: color.withValues(alpha: active ? .65 : .48),
+                width: active ? 1.8 : 1.25,
               ),
             ),
-            child: Row(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(card.icon, color: color, size: 21),
+                Text(
+                  card.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900),
                 ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        card.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: _muted,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                        ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(15),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${card.value}',
-                        style: TextStyle(
-                          color: _ink,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
+                      child: Icon(card.icon, color: color, size: 25),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${card.value}',
+                      style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.w900),
+                    ),
+                  ],
                 ),
               ],
             ),
