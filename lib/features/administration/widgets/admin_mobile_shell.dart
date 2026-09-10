@@ -100,11 +100,11 @@ class AdminMobileShell extends StatelessWidget {
               ],
             ),
           ),
-          _headerButton(context, icon: Icons.wb_sunny_outlined, label: 'الطقس', compact: compact, onTap: () => context.push('/weather')),
+          _headerButton(context, icon: Icons.menu_rounded, label: 'القائمة', compact: compact, onTap: () => _showOptions(context)),
           const SizedBox(width: 4),
           _headerButton(context, icon: Icons.notifications_none_rounded, label: 'الإشعارات', compact: compact, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()))),
           const SizedBox(width: 4),
-          _headerButton(context, icon: Icons.menu_rounded, label: 'القائمة', compact: compact, onTap: () => _showOptions(context)),
+          _headerButton(context, icon: Icons.wb_sunny_outlined, label: 'الطقس', compact: compact, onTap: () => context.push('/weather')),
         ],
       ),
     );
