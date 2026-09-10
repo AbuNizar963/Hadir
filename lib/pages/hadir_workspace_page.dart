@@ -20,6 +20,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   bool _loading = true;
   String? _error;
   DateTime _now = DateTime.now();
+  String? _sessionToken;
   Map<String, dynamic> _employee = <String, dynamic>{};
   List<dynamic> _attendance = const [];
   List<dynamic> _requests = const [];
@@ -66,6 +67,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       ]);
       if (!mounted) return;
       setState(() {
+        _sessionToken = token;
         _employee = employee;
         _attendance = results[0] as List<dynamic>;
         _requests = results[1] as List<dynamic>;
@@ -284,10 +286,12 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Widget _workInfo(BuildContext context) {
     final schedule = _schedule();
     final today = _todayAttendance();
-    final status = _status(schedule, _openSession(today), today.any((r) => _type(r) == 'check-in'), _activeEscape(), _todayApprovedRequests().any((r) => _requestType(r) == 'leave'), _todayApprovedRequests().any((r) => _requestType(r) == 'permission'));
+    final approved = _todayApprovedRequests();
+    final status = _status(schedule, _openSession(today), today.any((r) => _type(r) == 'check-in'), _activeEscape(), approved.any((r) => _requestType(r) == 'leave'), approved.any((r) => _requestType(r) == 'permission'));
+    final type = '${_employee['scheduleType'] ?? 'ADMIN'}'.toUpperCase();
     return _section(context, 'معلومات الدوام', 'حالتك الحالية', Column(children: [
       _info(context, Icons.calendar_today_outlined, 'الفترة', _periodLabel(schedule)),
-      _info(context, Icons.schedule_rounded, 'الجدول', _scheduleLabel(schedule)),
+      _info(context, Icons.schedule_rounded, type == 'ROTATION' ? 'وقت المناوبة' : 'الفترة', _scheduleLabel(schedule) == 'مناوبة تناوبية' ? _rotationDurationLabel() : _periodLabel(schedule)),
       _info(context, Icons.verified_outlined, 'الحالة', status),
       _info(context, Icons.location_on_outlined, 'الموقع', _locationName()),
       _info(context, Icons.devices_other_rounded, 'الجهاز', _deviceLabel()),
@@ -327,6 +331,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(builder: (context, setDialogState) {
         final isCheckout = type == 'checkout';
+        final startLabel = type == 'leave' ? 'تاريخ بداية الإجازة' : 'تاريخ بداية الإذن';
+        final endLabel = type == 'leave' ? 'تاريخ نهاية الإجازة' : 'تاريخ نهاية الإذن';
         return AlertDialog(
           title: const Text('طلب جديد'),
           content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -335,9 +341,9 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
             DropdownButtonFormField<String>(initialValue: type, decoration: const InputDecoration(labelText: 'نوع الطلب'), items: const [DropdownMenuItem(value: 'permission', child: Text('استئذان')), DropdownMenuItem(value: 'leave', child: Text('إجازة')), DropdownMenuItem(value: 'checkout', child: Text('انصراف مبكر'))], onChanged: (v) => setDialogState(() { type = v ?? 'permission'; if (type == 'checkout') end = start; })),
             if (!isCheckout) ...[
               const SizedBox(height: 12),
-              _dateField(context, 'تاريخ البداية', start, (v) => setDialogState(() { start = v; if (end.isBefore(start)) end = start; })),
+              _dateField(context, startLabel, start, (v) => setDialogState(() { start = v; if (end.isBefore(start)) end = start; })),
               const SizedBox(height: 10),
-              _dateField(context, 'تاريخ النهاية', end, (v) => setDialogState(() { end = v; })),
+              _dateField(context, endLabel, end, (v) => setDialogState(() { end = v; })),
             ] else ...[
               const SizedBox(height: 12),
               Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: .45), borderRadius: BorderRadius.circular(12)), child: const Text('الانصراف المبكر مرتبط بيوم الدوام الحالي ولا يحتاج إلى فترة متعددة الأيام.', style: TextStyle(fontSize: 11))),
@@ -425,7 +431,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   Widget _avatar(BuildContext context, String? url, String name, {double size = 56, bool light = false}) {
     final scheme = Theme.of(context).colorScheme;
-    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900)))));
+    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900)))));
     return Container(width: size, height: size, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14), border: Border.all(color: scheme.primary.withValues(alpha: .28))), child: child);
   }
 
@@ -443,7 +449,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     return token == null ? null : '${HadirApi.baseUrl}/api/employees/${Uri.encodeComponent(id)}/avatar';
   }
 
-  String? _sessionTokenCached() => null;
+  String? _sessionTokenCached() => _sessionToken;
 
   String _locationName() {
     final id = '${_employee['locationId'] ?? ''}'.trim();
@@ -582,6 +588,12 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     return '—';
   }
 
+  String _rotationDurationLabel() {
+    final on = _number(_employee['rotationDaysOn'], 4).clamp(1, 31);
+    final off = _number(_employee['rotationDaysOff'], 4).clamp(0, 31);
+    return '$on أيام عمل + $off أيام راحة';
+  }
+
   String _countdown(Map<String, dynamic> s) {
     final start = s['start'];
     final end = s['end'];
@@ -589,6 +601,21 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     String label = '';
     if (s['kind'] == 'NOT_STARTED' && start is DateTime) { target = start; label = 'بداية أول مناوبة'; }
     else if (s['isWorkDay'] == true && end is DateTime && end.isAfter(_now)) { target = end; label = 'تنتهي المناوبة خلال'; }
+    else if (s['kind'] == 'OFF') {
+      final raw = '${_employee['rotationStartDate'] ?? ''}'.split('T').first;
+      final parsed = DateTime.tryParse(raw);
+      if (parsed != null) {
+        final on = _number(_employee['rotationDaysOn'], 4).clamp(1, 31);
+        final off = _number(_employee['rotationDaysOff'], 4).clamp(0, 31);
+        final cycle = on + off;
+        final dayStart = DateTime(parsed.year, parsed.month, parsed.day);
+        final diff = DateTime(_now.year, _now.month, _now.day).difference(dayStart).inDays;
+        final cycleDay = diff % cycle;
+        final next = dayStart.add(Duration(days: diff + (cycle - cycleDay)));
+        target = _localTime(next, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
+        label = 'تبدأ المناوبة القادمة خلال';
+      }
+    }
     if (target == null) return '';
     final d = target.difference(_now);
     final total = d.inSeconds.clamp(0, 999999999);
@@ -612,8 +639,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   dynamic _activeEscape() {
     for (final row in _escapeEvents) {
       if (row is! Map) continue;
-      final status = '${row['status'] ?? row['state'] ?? ''}'.toLowerCase();
-      if (status == 'active' || status == 'open' || status == 'escaped') return row;
+      final status = '${row['status'] ?? ''}'.toLowerCase();
+      if (status == 'escaped') return row;
     }
     return null;
   }
