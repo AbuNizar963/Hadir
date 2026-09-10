@@ -73,31 +73,31 @@ class AdminMobileSettingsPage extends StatelessWidget {
   Widget _companyCard(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 13),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: .42),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: scheme.primary.withValues(alpha: .20)),
         boxShadow: [
-          BoxShadow(color: scheme.primary.withValues(alpha: .06), blurRadius: 20, spreadRadius: 1),
+          BoxShadow(color: scheme.primary.withValues(alpha: .06), blurRadius: 18, spreadRadius: 1),
         ],
       ),
       child: Column(
         children: [
           Container(
-            width: 86,
-            height: 86,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
               color: scheme.primary.withValues(alpha: .10),
               shape: BoxShape.circle,
-              border: Border.all(color: scheme.primary.withValues(alpha: .35), width: 1.5),
+              border: Border.all(color: scheme.primary.withValues(alpha: .35), width: 1.2),
             ),
-            child: Icon(Icons.business_rounded, color: scheme.primary, size: 42),
+            child: Icon(Icons.business_rounded, color: scheme.primary, size: 28),
           ),
-          const SizedBox(height: 10),
-          Text('هوية الشركة', style: TextStyle(color: scheme.onSurface, fontSize: 19, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 3),
-          Text('هوية الشركة · الإعدادات المركزية', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5)),
+          const SizedBox(height: 7),
+          Text('هوية الشركة', style: TextStyle(color: scheme.onSurface, fontSize: 15, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 2),
+          Text('هوية الشركة · الإعدادات المركزية', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5)),
         ],
       ),
     );
