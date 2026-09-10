@@ -166,29 +166,13 @@ class _ManagerEmployeesDirectoryPageState extends State<ManagerEmployeesDirector
 
   Future<void> _workforce(Map<String, dynamic> employee) async {
     final id = '${employee['id'] ?? ''}';
-    var vip = employee['isVip'] == true;
-    var autoIn = employee['autoCheckIn'] == true;
-    var autoOut = employee['autoCheckOut'] == true;
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (c) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('قوى العمل · ${employee['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w900)),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            SwitchListTile(contentPadding: EdgeInsets.zero, value: vip, title: const Text('موظف VIP'), onChanged: (v) => setDialogState(() => vip = v)),
-            SwitchListTile(contentPadding: EdgeInsets.zero, value: autoIn, title: const Text('التحضير التلقائي'), onChanged: (v) => setDialogState(() => autoIn = v)),
-            SwitchListTile(contentPadding: EdgeInsets.zero, value: autoOut, title: const Text('الانصراف التلقائي'), onChanged: (v) => setDialogState(() => autoOut = v)),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
-            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('حفظ')),
-          ],
-        ),
-      ),
-    );
-    if (saved == true) {
-      await _request('PATCH', '/api/workforce/live', data: {'employeeId': id, 'isVip': vip, 'autoCheckIn': autoIn, 'autoCheckOut': autoOut});
-    }
+    final enabled = employee['isVip'] != true;
+    await _request('PATCH', '/api/workforce/live', data: {
+      'employeeId': id,
+      'isVip': enabled,
+      'autoCheckIn': enabled,
+      'autoCheckOut': enabled,
+    });
   }
 
   Future<void> _attendance(Map<String, dynamic> employee, String type) async {
@@ -416,13 +400,15 @@ class _ManagerEmployeesDirectoryPageState extends State<ManagerEmployeesDirector
     if (device) actions.add(_action('الجهاز', Icons.smartphone_rounded, () => _resetDevice(e), Theme.of(context).hintColor));
 
     final name = '${e['name'] ?? 'بدون اسم'}';
-    final initial = name.trim().isEmpty ? 'م' : name.trim().substring(0, 1);
+    final initials = name.trim().split(RegExp(r'\s+')).where((x) => x.isNotEmpty).take(2).map((x) => x.substring(0, 1)).join();
+    final initial = initials.isEmpty ? 'م' : initials;
+    final earlyCheckout = (e['earlyCheckoutGraceMinutes'] ?? e['earlyCheckoutMinutes'] ?? 0) is num ? ((e['earlyCheckoutGraceMinutes'] ?? e['earlyCheckoutMinutes'] ?? 0) as num).toInt() : int.tryParse('${e['earlyCheckoutGraceMinutes'] ?? e['earlyCheckoutMinutes'] ?? 0}') ?? 0;
     return Card(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: .7))), child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [CircleAvatar(radius: 20, backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: .10), child: Text(initial, style: TextStyle(fontWeight: FontWeight.w900, color: Theme.of(context).colorScheme.primary))), const SizedBox(width: 9), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900)), Text('${e['jobNumber'] ?? ''}', style: TextStyle(fontSize: 10, color: Theme.of(context).hintColor))])), Wrap(spacing: 3, children: [Container(margin: const EdgeInsets.only(top: 8), width: 8, height: 8, decoration: BoxDecoration(color: stateColor, shape: BoxShape.circle)), _badge(employeeStatus == 'active' ? 'فعال' : 'موقوف', employeeStatus == 'active' ? Colors.green : Colors.red), if (e['isVip'] == true) _badge('★ VIP', Colors.amber.shade700)])]),
       const SizedBox(height: 9),
       GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, childAspectRatio: 2.9, crossAxisSpacing: 5, mainAxisSpacing: 5, children: [_info('الدوام', rotation ? 'تناوبي' : 'إداري'), _info('الموقع', _locationName('${e['locationId'] ?? ''}')), _info('الوقت', rotation ? '${e['rotationDaysOn'] ?? 0} عمل / ${e['rotationDaysOff'] ?? 0} راحة' : '${e['workStartTime'] ?? '--:--'} → ${e['workEndTime'] ?? '--:--'}'), _info('الحالة الميدانية', escapeStatus == 'escaped' ? 'هارب من العمل' : escapeStatus == 'returned' ? 'عاد للعمل' : 'طبيعي')]),
       const SizedBox(height: 7),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Flexible(child: Text('التأخير: ${e['gracePeriodMinutes'] ?? 0} دقيقة', style: const TextStyle(fontSize: 9))), Flexible(child: Text('الانصراف المبكر: ${e['earlyCheckoutGraceMinutes'] ?? e['earlyCheckoutMinutes'] ?? 0} دقيقة', textAlign: TextAlign.end, style: const TextStyle(fontSize: 9)))]),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Flexible(child: Text('التأخير: ${e['gracePeriodMinutes'] ?? 0} دقيقة', style: const TextStyle(fontSize: 9))), Flexible(child: Text(earlyCheckout == 0 ? 'الانصراف المبكر: بعد انتهاء الدوام' : 'الانصراف المبكر: $earlyCheckout دقيقة', textAlign: TextAlign.end, style: const TextStyle(fontSize: 9)))]),
       const SizedBox(height: 7),
       Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .22), borderRadius: BorderRadius.circular(11)), child: Row(children: [OutlinedButton.icon(onPressed: () => _workforce(e), icon: const Icon(Icons.star_rounded, size: 15), label: const Text('VIP', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900))), const SizedBox(width: 7), Expanded(child: Text(e['isVip'] == true ? 'تحضير + انصراف تلقائي' : 'تشغيل تلقائي عند التفعيل', style: TextStyle(fontSize: 9, color: Theme.of(context).hintColor)))])),
       const SizedBox(height: 7),
