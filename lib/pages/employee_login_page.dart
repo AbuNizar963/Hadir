@@ -38,8 +38,8 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
       setState(() => _error = 'أدخل رقم الموظف ورمز الدخول.');
       return;
     }
-    if (!RegExp(r'^\d{6}\$').hasMatch(password)) {
-      setState(() => _error = 'رمز دخول الموظف يجب أن يتكون من 6 أرقام بالضبط.');
+    if (!RegExp(r'^\d{4,6}$').hasMatch(password)) {
+      setState(() => _error = 'رمز دخول الموظف يجب أن يتكون من 4 إلى 6 أرقام.');
       return;
     }
     setState(() { _busy = true; _error = null; });
@@ -140,7 +140,7 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                             onSubmitted: (_) => _login(),
                             decoration: InputDecoration(
                               labelText: 'رمز الدخول',
-                              suffixText: '6 أرقام',
+                              suffixText: '4–6 أرقام',
                               suffixIcon: IconButton(
                                 onPressed: _busy ? null : () => setState(() => _hidden = !_hidden),
                                 icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
