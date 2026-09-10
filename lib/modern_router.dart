@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'core/api.dart';
 import 'core/session.dart';
 import 'features/administration/pages/admin_mobile_home_page.dart';
+import 'features/administration/pages/admin_mobile_settings_page.dart';
 import 'features/administration/widgets/admin_mobile_shell.dart';
 import 'features/employee/widgets/employee_mobile_shell.dart';
 import 'pages/admin_audit_page.dart';
@@ -116,7 +117,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/admin/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/admin/reports/archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
     GoRoute(path: '/admin/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
-    GoRoute(path: '/admin/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
+    GoRoute(path: '/admin/settings', builder: (_, __) => const SwipeBackPage(child: AdminMobileSettingsPage())),
     GoRoute(path: '/manager', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
     GoRoute(path: '/manager-home', redirect: (_, __) => '/manager'),
     GoRoute(path: '/manager/employees', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
@@ -126,7 +127,7 @@ GoRouter buildModernRouter() => GoRouter(
     GoRoute(path: '/manager/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
     GoRoute(path: '/manager/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
     GoRoute(path: '/manager/report-archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
-    GoRoute(path: '/manager/settings', builder: (_, __) => const SwipeBackPage(child: AdminSettingsPage())),
+    GoRoute(path: '/manager/settings', builder: (_, __) => const SwipeBackPage(child: AdminMobileSettingsPage())),
     GoRoute(path: '/home', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
     GoRoute(path: '/employee', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
