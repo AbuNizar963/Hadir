@@ -123,7 +123,11 @@ class UpdaterService {
       lastError = error;
     }
 
-    throw lastError ?? StateError('تعذر التحقق من التحديث');
+    // Reaching this point means both release discovery paths failed. The
+    // previous null-aware expression was unreachable because the REST path
+    // only falls through after an exception, which always initializes
+    // lastError. Keep the failure explicit so flutter analyze stays clean.
+    throw lastError!;
   }
 
   UpdateInfo? _selectApiRelease(List<dynamic> rawReleases, int currentCode) {
