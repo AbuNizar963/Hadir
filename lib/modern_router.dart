@@ -1,5 +1,7 @@
 import 'package:go_router/go_router.dart';
 
+import 'app/routes/app_router.dart';
+
 /// Compatibility facade for the application router.
 ///
 /// The canonical router implementation now lives under `app/routes/`.
