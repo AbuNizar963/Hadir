@@ -1,4 +1,4 @@
-/// Administration role workspace compatibility entry point.
+/// Administration role workspace public entry point.
 library;
 
-export '../../../pages/admin_role_workspace_page.dart';
+export 'admin_role_workspace_implementation.dart';
