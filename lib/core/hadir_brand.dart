@@ -1,37 +1,37 @@
 import 'package:flutter/material.dart';
 
 /// HADIR visual tokens mirrored from the web application's CSS design system.
-/// The dark palette is the web application's default visual source of truth.
+/// Keep these values shared so every Flutter page inherits the same visual language.
 class HadirBrand {
-  static const darkBackground = Color(0xFF0C1018);
-  static const darkCard = Color(0xFF151923);
+  // Website dark CSS tokens converted from HSL.
+  static const darkBackground = Color(0xFF0C1017);
+  static const darkCard = Color(0xFF151A22);
   static const darkPanel = Color(0xFF1F232E);
-  static const darkText = Color(0xFFF2F5F7);
+  static const darkText = Color(0xFFF1F4F7);
   static const darkMuted = Color(0xFFA4AAB7);
-  static const darkBorder = Color(0xFF292F3D);
-  static const darkInput = Color(0xFF252A37);
-  static const darkPrimary = Color(0xFF2BCA90);
-  static const darkPrimaryForeground = Color(0xFF022216);
+  static const darkBorder = Color(0xFF292E3D);
+  static const darkInput = Color(0xFF252A36);
+  static const darkPrimary = Color(0xFF2AC991);
+  static const darkPrimaryForeground = Color(0xFF031F15);
   static const darkSecondary = Color(0xFF1F232E);
-  static const darkAccent = Color(0xFF2BBDEE);
-  static const darkWarning = Color(0xFFF6A823);
-  static const darkDanger = Color(0xFFDF3A3A);
+  static const darkAccent = Color(0xFF32BEEB);
+  static const darkWarning = Color(0xFFF4A91F);
+  static const darkDanger = Color(0xFFE33D3D);
 
-  // Exact light-mode equivalents of the website's CSS HSL tokens.
+  // Website light CSS tokens converted from HSL.
   static const lightBackground = Color(0xFFF7F9FC);
   static const lightCard = Color(0xFFFFFFFF);
-  static const lightPanel = Color(0xFFEDF0F3);
+  static const lightPanel = Color(0xFFEFF2F5);
   static const lightText = Color(0xFF151B28);
-  static const lightMuted = Color(0xFF5E6673);
+  static const lightMuted = Color(0xFF5C6471);
   static const lightBorder = Color(0xFFCED5DE);
-  static const lightInput = Color(0xFFDAE0E7);
-  static const lightPrimary = Color(0xFF22A072);
-  static const lightAccent = Color(0xFF2293B7);
-  static const lightDanger = Color(0xFFD62937);
-  static const lightWarning = Color(0xFFDEA00A);
+  static const lightInput = Color(0xFFDCE1E7);
+  static const lightPrimary = Color(0xFF229F70);
+  static const lightAccent = Color(0xFF2092B5);
+  static const lightDanger = Color(0xFFD52A38);
+  static const lightWarning = Color(0xFFDE9E0B);
 
-  // Backward-compatible aliases for existing pages. Keep these compile-time
-  // constants because several existing widgets use them inside const trees.
+  // Backward-compatible aliases used by existing pages.
   static const background = darkBackground;
   static const card = darkCard;
   static const panel = darkPanel;
@@ -89,11 +89,20 @@ class HadirBrand {
       visualDensity: VisualDensity.standard,
       fontFamily: 'Cairo',
       splashFactory: NoSplash.splashFactory,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
-        backgroundColor: background,
+        backgroundColor: background.withValues(alpha: .96),
         surfaceTintColor: Colors.transparent,
         foregroundColor: foreground,
       ),
@@ -104,7 +113,7 @@ class HadirBrand {
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.black.withValues(alpha: dark ? .20 : .08),
         shape: RoundedRectangleBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(radiusMd)),
+          borderRadius: const BorderRadius.all(Radius.circular(radiusLg)),
           side: BorderSide(color: outline.withValues(alpha: .72)),
         ),
       ),
