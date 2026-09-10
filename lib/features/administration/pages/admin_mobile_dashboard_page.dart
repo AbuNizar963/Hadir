@@ -249,7 +249,14 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         decoration: BoxDecoration(
           color: _surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _border),
+          border: Border.all(color: _primary.withValues(alpha: .34)),
+          boxShadow: [
+            BoxShadow(
+              color: _primary.withValues(alpha: .08),
+              blurRadius: 18,
+              spreadRadius: 1,
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
