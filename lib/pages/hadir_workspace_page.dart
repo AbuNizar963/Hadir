@@ -106,8 +106,6 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
             children: [
               _hero(context),
               const SizedBox(height: 12),
-              _statusCard(context),
-              const SizedBox(height: 12),
               _actions(context),
               const SizedBox(height: 12),
               _summary(context),
@@ -139,31 +137,38 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     return _card(
       context,
       padding: const EdgeInsets.all(20),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _avatar(context, avatar, name, size: 56),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('مرحبًا بك', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)),
-                const SizedBox(height: 2),
-                Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontSize: 17, fontWeight: FontWeight.w900, height: 1.25)),
-                const SizedBox(height: 4),
-                Text([if (job.isNotEmpty) job, location].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              Text(intl.DateFormat('HH:mm').format(_now), style: TextStyle(color: scheme.onSurface, fontSize: 18, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 3),
-              Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(_now), style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5)),
+              _avatar(context, avatar, name, size: 56),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('مرحبًا بك', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)),
+                    const SizedBox(height: 2),
+                    Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontSize: 17, fontWeight: FontWeight.w900, height: 1.25)),
+                    const SizedBox(height: 4),
+                    Text([if (job.isNotEmpty) job, location].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(intl.DateFormat('HH:mm').format(_now), style: TextStyle(color: scheme.onSurface, fontSize: 18, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 3),
+                  Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(_now), style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5)),
+                ],
+              ),
             ],
           ),
+          const SizedBox(height: 18),
+          _statusCard(context),
         ],
       ),
     );
@@ -183,71 +188,70 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final detail = _statusDetail(status);
     final countdown = _countdown(schedule);
     final late = _lateMinutes(schedule, checkedIn);
-    return _card(
-      context,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('حالة اليوم', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Text(status, style: TextStyle(color: scheme.onSurface, fontSize: 22, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 4),
-                  Text(detail, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5, height: 1.45)),
-                ]),
-              ),
-              _statusIcon(context, status),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-            decoration: BoxDecoration(color: scheme.secondaryContainer.withValues(alpha: .42), borderRadius: BorderRadius.circular(14)),
-            child: Column(children: [
-              _detailRow(context, Icons.calendar_month_outlined, 'الدوام', _scheduleLabel(schedule)),
-              const SizedBox(height: 8),
-              _detailRow(context, Icons.access_time_rounded, 'الفترة', _periodLabel(schedule)),
-              const SizedBox(height: 8),
-              _detailRow(context, Icons.location_on_outlined, 'الموقع', _locationName()),
-            ]),
-          ),
-          if (countdown.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _pill(context, Icons.timer_outlined, countdown),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('حالة اليوم', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(status, style: TextStyle(color: scheme.onSurface, fontSize: 22, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                Text(detail, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5, height: 1.45)),
+              ]),
+            ),
+            _statusIcon(context, status),
           ],
-          if (late > 0) ...[
-            const SizedBox(height: 10),
-            _warning(context, 'تأخر بمقدار ${_minutesLabel(late)} عن بداية الفترة.'),
-          ],
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(color: scheme.secondaryContainer.withValues(alpha: .42), borderRadius: BorderRadius.circular(14)),
+          child: Column(children: [
+            _detailRow(context, Icons.calendar_month_outlined, 'الدوام', _scheduleLabel(schedule)),
+            const SizedBox(height: 8),
+            _detailRow(context, Icons.access_time_rounded, 'الفترة', _periodLabel(schedule)),
+            const SizedBox(height: 8),
+            _detailRow(context, Icons.location_on_outlined, 'الموقع', _locationName()),
+          ]),
+        ),
+        if (countdown.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _pill(context, Icons.timer_outlined, countdown),
         ],
-      ),
+        if (late > 0) ...[
+          const SizedBox(height: 10),
+          _warning(context, 'تأخر بمقدار ${_minutesLabel(late)} عن بداية الفترة.'),
+        ],
+      ],
     );
   }
 
   Widget _actions(BuildContext context) {
+    final schedule = _schedule();
     final today = _todayAttendance();
     final open = _openSession(today);
     final approved = _todayApprovedRequests();
     final escape = _activeEscape();
     final hasLeave = approved.any((r) => _requestType(r) == 'leave');
     final hasPermission = approved.any((r) => _requestType(r) == 'permission');
-    final canIn = _schedule()['isWorkDay'] == true && open == null && !today.any((r) => _type(r) == 'check-in') && !hasLeave && !hasPermission && escape == null;
+    final canIn = schedule['isWorkDay'] == true && open == null && !today.any((r) => _type(r) == 'check-in') && !hasLeave && !hasPermission && escape == null;
     final canOut = open != null;
+    final checkInSubtitle = schedule['isWorkDay'] != true ? 'أنت في الراحة' : open != null ? 'الدوام جارٍ' : canIn ? 'مسح رمز QR' : 'غير متاح الآن';
+    final checkOutSubtitle = open != null ? 'إنهاء الدوام الآن' : today.any((r) => _type(r) == 'check-out') ? 'تم تسجيل الانصراف' : 'بعد تسجيل الحضور';
     return Row(
       children: [
-        Expanded(child: _action(context, Icons.arrow_downward_rounded, 'تسجيل حضور', canIn ? 'بدء الدوام' : 'غير متاح الآن', canIn, () => context.push('/employee/scan/check-in'))),
+        Expanded(child: _action(context, '↓', 'تسجيل حضور', checkInSubtitle, canIn, () => context.push('/employee/scan/check-in'))),
         const SizedBox(width: 12),
-        Expanded(child: _action(context, Icons.arrow_upward_rounded, 'تسجيل انصراف', canOut ? 'إنهاء الدوام' : 'بعد تسجيل الحضور', canOut, () => context.push('/employee/scan/check-out'), accent: true)),
+        Expanded(child: _action(context, '↑', 'تسجيل انصراف', checkOutSubtitle, canOut, () => context.push('/employee/scan/check-out'), accent: true)),
       ],
     );
   }
 
-  Widget _action(BuildContext context, IconData icon, String title, String subtitle, bool enabled, VoidCallback onTap, {bool accent = false}) {
+  Widget _action(BuildContext context, String glyph, String title, String subtitle, bool enabled, VoidCallback onTap, {bool accent = false}) {
     final scheme = Theme.of(context).colorScheme;
     final tint = accent ? scheme.secondary : scheme.primary;
     return Material(
@@ -261,7 +265,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: enabled ? tint.withValues(alpha: .35) : scheme.outlineVariant.withValues(alpha: .72))),
           child: Row(children: [
-            Container(width: 40, height: 40, decoration: BoxDecoration(color: tint.withValues(alpha: enabled ? .12 : .055), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: enabled ? tint : scheme.onSurfaceVariant, size: 20)),
+            Container(width: 40, height: 40, decoration: BoxDecoration(color: tint.withValues(alpha: enabled ? .12 : .055), borderRadius: BorderRadius.circular(12)), child: Center(child: Text(glyph, style: TextStyle(color: enabled ? tint : scheme.onSurfaceVariant, fontSize: 23, fontWeight: FontWeight.w900, height: 1)))),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(title, style: TextStyle(color: enabled ? scheme.onSurface : scheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(subtitle, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5))])),
           ]),
@@ -476,13 +480,24 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   dynamic _event(List<dynamic> rows, String type) {
-    for (final row in rows) if (_type(row) == type) return row;
-    return null;
+    dynamic latest;
+    DateTime? latestStamp;
+    for (final row in rows) {
+      if (_type(row) != type) continue;
+      final stamp = _stamp(row);
+      if (stamp != null && (latestStamp == null || stamp.isAfter(latestStamp))) {
+        latest = row;
+        latestStamp = stamp;
+      }
+    }
+    return latest;
   }
 
   dynamic _openSession(List<dynamic> rows) {
+    final sorted = rows.where((row) => _stamp(row) != null).toList()
+      ..sort((a, b) => _stamp(a)!.compareTo(_stamp(b)!));
     dynamic lastIn;
-    for (final row in rows) {
+    for (final row in sorted) {
       final type = _type(row);
       if (type == 'check-in') lastIn = row;
       if (type == 'check-out' && lastIn != null) lastIn = null;
@@ -491,13 +506,23 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   String _workDuration(List<dynamic> rows) {
-    final inEvent = _event(rows, 'check-in');
-    final outEvent = _event(rows, 'check-out');
-    final start = _stamp(inEvent);
-    final end = _stamp(outEvent) ?? (_openSession(rows) != null ? _now : null);
-    if (start == null || end == null || end.isBefore(start)) return '—';
-    final minutes = end.difference(start).inMinutes;
-    return '${minutes ~/ 60}:${(minutes % 60).toString().padLeft(2, '0')}';
+    final sorted = rows.where((row) => _stamp(row) != null).toList()
+      ..sort((a, b) => _stamp(a)!.compareTo(_stamp(b)!));
+    DateTime? start;
+    var total = Duration.zero;
+    for (final row in sorted) {
+      final stamp = _stamp(row);
+      if (stamp == null) continue;
+      if (_type(row) == 'check-in') {
+        start = stamp;
+      } else if (_type(row) == 'check-out' && start != null && !stamp.isBefore(start)) {
+        total += stamp.difference(start);
+        start = null;
+      }
+    }
+    if (start != null) total += _now.difference(start);
+    if (total.isNegative || total.inMinutes <= 0) return '—';
+    return '${total.inHours}:${(total.inMinutes % 60).toString().padLeft(2, '0')}';
   }
 
   String _status(Map<String, dynamic> schedule, dynamic open, bool checkedIn, dynamic escape, bool leave, bool permission) {
@@ -534,6 +559,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final start = _localTime(day, '${_employee['workStartTime'] ?? '09:00'}');
     var end = _localTime(day, '${_employee['workEndTime'] ?? '16:00'}');
     if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
+    if (_now.isAfter(end)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'previousStart': start, 'previousEnd': end};
     return {'isWorkDay': true, 'kind': 'ADMIN', 'start': start, 'end': end};
   }
 
@@ -608,6 +634,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
         final on = _number(_employee['rotationDaysOn'], 4).clamp(1, 31);
         final off = _number(_employee['rotationDaysOff'], 4).clamp(0, 31);
         final cycle = on + off;
+        if (cycle <= 0) return '';
         final dayStart = DateTime(parsed.year, parsed.month, parsed.day);
         final diff = DateTime(_now.year, _now.month, _now.day).difference(dayStart).inDays;
         final cycleDay = diff % cycle;
