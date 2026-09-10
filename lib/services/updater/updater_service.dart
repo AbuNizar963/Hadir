@@ -40,6 +40,10 @@ class UpdaterService {
   static const _progressChannel = EventChannel('hadir/updater_progress');
   static const _releasesUrl =
       'https://api.github.com/repos/AbuNizar963/Hadir/releases';
+  static const _releasesAtomUrl =
+      'https://github.com/AbuNizar963/Hadir/releases.atom';
+  static const _releaseDownloadBase =
+      'https://github.com/AbuNizar963/Hadir/releases/download';
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 10),
@@ -69,10 +73,16 @@ class UpdaterService {
   }
 
   Future<UpdateInfo?> check() async {
+    final currentCode = await currentVersionCode();
     Object? lastError;
+
+    // The GitHub REST API is intentionally used first because it contains the
+    // release notes and the exact uploaded APK asset. If an installation has
+    // exhausted GitHub's unauthenticated API quota, fall back to the public
+    // releases Atom feed, which is not subject to that API quota. This keeps
+    // update detection working for real devices without credentials.
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        final currentCode = await currentVersionCode();
         final response = await _dio.get<dynamic>(
           _releasesUrl,
           queryParameters: {
@@ -85,58 +95,139 @@ class UpdaterService {
         final rawReleases = response.data is String
             ? jsonDecode(response.data as String)
             : response.data;
-        if (rawReleases is! List) return null;
-
-        Map<String, dynamic>? bestRelease;
-        int? bestCode;
-        String? bestDownloadUrl;
-
-        for (final rawRelease in rawReleases) {
-          if (rawRelease is! Map) continue;
-          final release = Map<String, dynamic>.from(rawRelease);
-          if (release['draft'] == true || release['prerelease'] == true) continue;
-
-          final tag = (release['tag_name'] ?? '').toString().trim();
-          final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
-          final code = int.tryParse(match?.group(1) ?? '');
-          if (code == null || code <= currentCode || (bestCode != null && code <= bestCode)) continue;
-
-          final assets = (release['assets'] as List<dynamic>?) ?? const [];
-          String? downloadUrl;
-          for (final item in assets) {
-            if (item is! Map) continue;
-            final asset = Map<String, dynamic>.from(item);
-            final name = (asset['name'] ?? '').toString();
-            if (name == 'app-release.apk' || name == 'app-release-signed.apk') {
-              final candidate = asset['browser_download_url']?.toString();
-              if (candidate != null && candidate.isNotEmpty) {
-                downloadUrl = candidate;
-                break;
-              }
-            }
-          }
-          if (downloadUrl == null || downloadUrl.isEmpty) continue;
-
-          bestCode = code;
-          bestRelease = release;
-          bestDownloadUrl = downloadUrl;
+        if (rawReleases is! List) {
+          throw StateError('استجابة التحديث غير صالحة');
         }
 
-        if (bestCode == null || bestRelease == null || bestDownloadUrl == null) return null;
-        return UpdateInfo(
-          versionCode: bestCode,
-          versionName: '1.0.$bestCode',
-          downloadUrl: bestDownloadUrl,
-          releaseNotes: (bestRelease['body'] ?? '').toString().trim(),
-        );
+        final update = _selectApiRelease(rawReleases, currentCode);
+        if (update != null) return update;
+        return null;
       } catch (error) {
         lastError = error;
+        // A 403/429 is a quota/rate-limit case; do not waste all retries on it.
+        final status = error is DioException ? error.response?.statusCode : null;
+        if (status == 403 || status == 429) break;
         if (attempt < 2) {
-          await Future<void>.delayed(Duration(milliseconds: 1500 * (attempt + 1)));
+          await Future<void>.delayed(
+            Duration(milliseconds: 1500 * (attempt + 1)),
+          );
         }
       }
     }
+
+    try {
+      final fallback = await _checkAtomFeed(currentCode);
+      if (fallback != null) return fallback;
+      return null;
+    } catch (error) {
+      lastError = error;
+    }
+
     throw lastError ?? StateError('تعذر التحقق من التحديث');
+  }
+
+  UpdateInfo? _selectApiRelease(List<dynamic> rawReleases, int currentCode) {
+    Map<String, dynamic>? bestRelease;
+    int? bestCode;
+    String? bestDownloadUrl;
+
+    for (final rawRelease in rawReleases) {
+      if (rawRelease is! Map) continue;
+      final release = Map<String, dynamic>.from(rawRelease);
+      if (release['draft'] == true || release['prerelease'] == true) continue;
+
+      final tag = (release['tag_name'] ?? '').toString().trim();
+      final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
+      final code = int.tryParse(match?.group(1) ?? '');
+      if (code == null || code <= currentCode ||
+          (bestCode != null && code <= bestCode)) {
+        continue;
+      }
+
+      final assets = (release['assets'] as List<dynamic>?) ?? const [];
+      String? downloadUrl;
+      for (final item in assets) {
+        if (item is! Map) continue;
+        final asset = Map<String, dynamic>.from(item);
+        final name = (asset['name'] ?? '').toString();
+        if (name == 'app-release.apk' || name == 'app-release-signed.apk') {
+          final candidate = asset['browser_download_url']?.toString();
+          if (candidate != null && candidate.isNotEmpty) {
+            downloadUrl = candidate;
+            break;
+          }
+        }
+      }
+      if (downloadUrl == null || downloadUrl.isEmpty) continue;
+
+      bestCode = code;
+      bestRelease = release;
+      bestDownloadUrl = downloadUrl;
+    }
+
+    if (bestCode == null || bestRelease == null || bestDownloadUrl == null) {
+      return null;
+    }
+    return UpdateInfo(
+      versionCode: bestCode,
+      versionName: '1.0.$bestCode',
+      downloadUrl: bestDownloadUrl,
+      releaseNotes: (bestRelease['body'] ?? '').toString().trim(),
+    );
+  }
+
+  Future<UpdateInfo?> _checkAtomFeed(int currentCode) async {
+    final response = await _dio.get<String>(
+      _releasesAtomUrl,
+      queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
+      options: Options(
+        responseType: ResponseType.plain,
+        headers: {
+          'Accept': 'application/atom+xml, application/xml, text/xml, */*',
+          'User-Agent': 'Hadir-Flutter-Updater',
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache',
+        },
+      ),
+    );
+
+    final xml = response.data ?? '';
+    if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
+
+    // GitHub's release feed lists entries newest-first. Scan every entry so
+    // that an unrelated release cannot hide the newest Android release.
+    final entryPattern = RegExp(
+      r'<entry\b[\s\S]*?<\/entry>',
+      caseSensitive: false,
+    );
+    int? bestCode;
+    String? bestTag;
+
+    for (final match in entryPattern.allMatches(xml)) {
+      final entry = match.group(0) ?? '';
+      final tagMatch = RegExp(
+        r'(?:/|%2F)(android-v1\.0\.(\d+))(?:<|&|"|\?)',
+        caseSensitive: false,
+      ).firstMatch(entry);
+      final code = int.tryParse(tagMatch?.group(2) ?? '');
+      if (code == null || code <= currentCode ||
+          (bestCode != null && code <= bestCode)) {
+        continue;
+      }
+      bestCode = code;
+      bestTag = tagMatch?.group(1);
+    }
+
+    if (bestCode == null || bestTag == null) return null;
+
+    final downloadUrl =
+        '$_releaseDownloadBase/$bestTag/app-release.apk';
+    return UpdateInfo(
+      versionCode: bestCode,
+      versionName: '1.0.$bestCode',
+      downloadUrl: downloadUrl,
+      releaseNotes: '',
+    );
   }
 
   Future<void> downloadAndInstall(UpdateInfo update) async {
