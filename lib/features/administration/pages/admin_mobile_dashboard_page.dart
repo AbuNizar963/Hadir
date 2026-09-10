@@ -271,37 +271,38 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: _border),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: _primary.withValues(alpha: .12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(Icons.monitor_heart_outlined, color: _primary),
+            Text(
+              'الحالة التشغيلية الحالية',
+              textAlign: TextAlign.right,
+              style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'الحالة التشغيلية الحالية',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(color: _ink, fontSize: 19, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Text(
                     _loading
                         ? 'جاري مزامنة حالة الدوام من D1…'
                         : 'هذه لوحة تشغيل مباشرة لليوم الحالي. الموظف يقيم وفق جدول دوامه الفعلي؛ يوم الراحة لا يُحتسب غيابًا، والوتيرة التناوبية المعتمدة تبقى فعالة طوال فترة العمل.',
                     textAlign: TextAlign.right,
                     style: TextStyle(color: _muted, fontSize: 12, height: 1.65),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 14),
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: _primary.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(Icons.monitor_heart_outlined, color: _primary, size: 28),
+                ),
+              ],
             ),
           ],
         ),
