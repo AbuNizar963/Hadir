@@ -49,6 +49,16 @@ jobs:
               [ "$created_epoch" -ge "$cutoff" ] || continue
               [ "$name" != "Auto Retry Failed Apps Actions" ] || continue
 
+              # Historical one-off repair workflows are intentionally deleted and
+              # must never be resurrected by the automatic retry mechanism.
+              case "$name" in
+                Repair\ *|.github/workflows/repair-*)
+                  echo "Skipping historical temporary repair workflow: ${name} (${run_id})"
+                  skipped=$((skipped + 1))
+                  continue
+                  ;;
+              esac
+
               echo "Retrying all failed jobs: ${name} (${run_id})"
               if gh api --method POST \
                 -H 'Accept: application/vnd.github+json' \
