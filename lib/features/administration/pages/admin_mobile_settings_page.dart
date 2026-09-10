@@ -37,7 +37,7 @@ class AdminMobileSettingsPage extends StatelessWidget {
               'الإعدادات',
               style: TextStyle(
                 color: scheme.onSurface,
-                fontSize: 28,
+                fontSize: 24,
                 height: 1.1,
                 fontWeight: FontWeight.w900,
               ),
