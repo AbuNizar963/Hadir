@@ -1,5 +1,4 @@
-/// Manager requests page feature entry point.
-///
-/// The implementation remains behind the legacy compatibility path until the
-/// page can be moved without changing its public API or behavior.
+/// Administration manager requests compatibility entry point.
+library;
+
 export '../../../pages/manager_requests_page.dart';
