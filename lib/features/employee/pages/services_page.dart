@@ -1,7 +1,6 @@
-/// Employee services feature entry point.
+/// Compatibility facade for the employee services screen.
 ///
-/// The complete existing implementation remains in the legacy path while the
-/// feature boundary is established. It can be moved without changing callers.
+/// The complete implementation lives inside the employee feature boundary.
 library;
 
-export '../../../pages/services_page.dart';
+export 'services_page_implementation.dart';
