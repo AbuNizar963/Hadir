@@ -301,8 +301,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       approved.any((r) => _requestType(r) == 'permission'),
     );
     final isRotation = '${_employee['scheduleType'] ?? 'ADMIN'}'.toUpperCase() == 'ROTATION';
-    final period = _periodLabel(schedule);
-    final time = schedule['kind'] == 'ROTATION' ? _rotationDurationLabel() : period;
+    final period = isRotation ? _rotationDurationLabel() : _periodLabel(schedule);
+    final time = _periodLabel(schedule);
     final rows = <Widget>[
       _info(context, Icons.badge_outlined, 'نوع الدوام', isRotation ? 'تناوبي' : 'إداري'),
       _info(context, Icons.calendar_today_outlined, 'الفترة', period),
@@ -501,7 +501,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   Widget _avatar(BuildContext context, String? url, String name, {double size = 56, bool light = false}) {
     final scheme = Theme.of(context).colorScheme;
-    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900)))));
+    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))));
     return Container(width: size, height: size, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14), border: Border.all(color: scheme.primary.withValues(alpha: .28))), child: child);
   }
 
@@ -531,6 +531,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   String _deviceLabel() {
+    final direct = '${_employee['deviceLabel'] ?? _device['deviceLabel'] ?? ''}'.trim();
+    if (direct.isNotEmpty) return direct;
     final status = '${_device['status'] ?? _device['state'] ?? ''}'.trim().toLowerCase();
     if (status == 'bound' || status == 'active' || status == 'verified') return 'مرتبط بالحساب';
     if (status.isNotEmpty) return status;
