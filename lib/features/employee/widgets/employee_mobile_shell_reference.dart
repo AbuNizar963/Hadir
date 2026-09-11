@@ -184,11 +184,11 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
   }
 
   Widget _navBar(ColorScheme scheme, int selected) {
-    const items = [
+    final items = [
       (LucideIcons.layoutDashboard, LucideIcons.layoutDashboard, 'لوحة الموظف'),
       (LucideIcons.building2, LucideIcons.building2, 'مركز الموظف'),
       (LucideIcons.clock3, LucideIcons.clock3, 'سجل العمل'),
-      (LucideIcons.userRound, LucideIcons.userRound, 'الملف الشخصي'),
+      (LucideIcons.user, LucideIcons.user, 'الملف الشخصي'),
     ];
     return Container(
       decoration: BoxDecoration(color: scheme.surface, border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .65)))),
