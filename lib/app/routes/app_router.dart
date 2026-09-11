@@ -169,7 +169,7 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
     final isAdminArea = path == '/admin' || path.startsWith('/admin/') || path == '/manager' || path.startsWith('/manager/');
-    final isEmployeeArea = path == '/home' || path == '/employee' || path.startsWith('/employee/');
+    final isEmployeeArea = path == '/home' || path == '/employee' || path == '/center' || path == '/employee/center' || path == '/employee/premium' || path == '/attendance' || path == '/history' || path == '/employee/history' || path == '/insights' || path == '/requests' || path == '/notifications' || path == '/employee/notifications' || path == '/profile' || path == '/employee/profile' || path == '/services' || path == '/weather' || path == '/prayer' || path == '/ai' || path.startsWith('/employee/scan/');
     final content = isAdminArea ? AdminMobileShell(child: widget.child) : isEmployeeArea ? EmployeeMobileShell(child: widget.child) : widget.child;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
