@@ -135,7 +135,7 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
 
   Widget _tool(IconData icon, String label, VoidCallback onTap, ColorScheme scheme, {int badge = 0, bool active = false}) {
     return SizedBox(
-      width: 78,
+      width: 80,
       height: 48,
       child: Stack(
         clipBehavior: Clip.none,
@@ -147,7 +147,7 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
               onTap: onTap,
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                width: 78,
+                width: 80,
                 height: 48,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
@@ -216,7 +216,7 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
         height: 54,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? scheme.primary.withValues(alpha: .13) : Colors.transparent,
+          color: active ? scheme.primary.withValues(alpha: .15) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: active ? Border.all(color: scheme.primary.withValues(alpha: .35)) : null,
         ),
