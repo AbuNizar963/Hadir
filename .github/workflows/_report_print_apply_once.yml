@@ -9,7 +9,6 @@ permissions:
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, 'feat(reports): match web report and native print') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -21,10 +20,14 @@ jobs:
           test -s lib/features/administration/pages/admin_reports_implementation.dart
           test -s lib/features/employee/pages/profile_page_reference_implementation_v2.dart
           git diff --check
-      - name: Commit source patch
+      - name: Commit source patch when needed
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add pubspec.yaml lib/features/administration/pages/admin_reports_implementation.dart lib/features/employee/pages/profile_page_reference_implementation_v2.dart
+          if git diff --cached --quiet; then
+            echo 'Patch already applied.'
+            exit 0
+          fi
           git commit -m 'feat(reports): match web report and native print'
           git push origin Apps
