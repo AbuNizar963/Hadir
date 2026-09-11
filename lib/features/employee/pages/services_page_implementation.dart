@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/session.dart';
 
@@ -252,7 +253,7 @@ class _ServicesPageState extends State<ServicesPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
         children: [
-          _sectionHeader('الطقس', 'بيانات حية حسب موقعك الحالي.', Icons.cloud_outlined),
+          _sectionHeader('الطقس', 'بيانات حية حسب موقعك الحالي.', LucideIcons.cloudSun),
           const SizedBox(height: 18),
           Container(
             padding: const EdgeInsets.all(22),
@@ -300,13 +301,13 @@ class _ServicesPageState extends State<ServicesPage> {
           const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(child: _infoCard(Icons.wb_sunny_outlined, 'الشروق', sunrise)),
+              Expanded(child: _infoCard(LucideIcons.sunrise, 'الشروق', sunrise)),
               const SizedBox(width: 12),
-              Expanded(child: _infoCard(Icons.nightlight_outlined, 'الغروب', sunset)),
+              Expanded(child: _infoCard(LucideIcons.sunset, 'الغروب', sunset)),
             ],
           ),
           const SizedBox(height: 14),
-          _infoCard(Icons.speed_rounded, 'الضغط الجوي', '${current['pressure_msl'] ?? '—'} hPa'),
+          _infoCard(LucideIcons.gauge, 'الضغط الجوي', '${current['pressure_msl'] ?? '—'} hPa'),
         ],
       ),
     );
@@ -397,7 +398,7 @@ class _ServicesPageState extends State<ServicesPage> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-          child: _sectionHeader('Hadir AI', 'مساعدك الذكي لخدمات حاضر.', Icons.auto_awesome_rounded),
+          child: _sectionHeader('Hadir AI', 'مساعدك الذكي لخدمات حاضر.', LucideIcons.sparkles),
         ),
         Expanded(
           child: _messages.isEmpty
@@ -467,7 +468,7 @@ class _ServicesPageState extends State<ServicesPage> {
         child: Scaffold(
           appBar: AppBar(
             title: const Text('الخدمات', style: TextStyle(fontWeight: FontWeight.w900)),
-            actions: [IconButton(onPressed: _loadLocationServices, tooltip: 'تحديث', icon: const Icon(Icons.refresh_rounded))],
+            actions: [IconButton(onPressed: _loadLocationServices, tooltip: 'تحديث', icon: const Icon(LucideIcons.refreshCw))],
           ),
           body: _loading
               ? const _ServicesSkeleton()
@@ -480,9 +481,9 @@ class _ServicesPageState extends State<ServicesPage> {
             selectedIndex: _tab,
             onDestinationSelected: (value) => setState(() => _tab = value),
             destinations: const [
-              NavigationDestination(icon: Icon(Icons.cloud_outlined), selectedIcon: Icon(Icons.cloud_rounded), label: 'الطقس'),
+              NavigationDestination(icon: Icon(LucideIcons.cloudSun), selectedIcon: Icon(LucideIcons.cloudSun), label: 'الطقس'),
               NavigationDestination(icon: Icon(Icons.mosque_outlined), selectedIcon: Icon(Icons.mosque_rounded), label: 'الصلاة'),
-              NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), selectedIcon: Icon(Icons.auto_awesome_rounded), label: 'Hadir AI'),
+              NavigationDestination(icon: Icon(LucideIcons.sparkles), selectedIcon: Icon(LucideIcons.sparkles), label: 'Hadir AI'),
             ],
           ),
         ),
@@ -501,7 +502,7 @@ class _AiHint extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)),
-      child: Row(children: [const Icon(Icons.arrow_back_rounded, size: 19, color: _brand), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(fontWeight: FontWeight.w700, color: _ink)))]),
+      child: Row(children: [const Icon(LucideIcons.arrowLeft, size: 19, color: _brand), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(fontWeight: FontWeight.w700, color: _ink)))]),
     );
   }
 }
@@ -545,7 +546,7 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center, style: const TextStyle(color: _muted, height: 1.5)),
             const SizedBox(height: 18),
-            FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
+            FilledButton.icon(onPressed: onRetry, icon: const Icon(LucideIcons.refreshCw), label: const Text('إعادة المحاولة')),
           ],
         ),
       ),
