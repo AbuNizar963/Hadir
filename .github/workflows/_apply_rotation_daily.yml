@@ -1,0 +1,46 @@
+name: Apply Rotation Daily Patch
+on:
+  push:
+    branches: [fix/rotation-daily-attendance]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, 'apply rotation daily attendance') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Apply exact source patches from the audited patch script
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          workflow = Path('.github/workflows/_patch_rotation_daily.yml').read_text()
+          marker = '          python3 - <<\'PY\'\n'
+          start = workflow.index(marker) + len(marker)
+          end = workflow.index('          PY\n', start)
+          script = textwrap.dedent(workflow[start:end])
+          exec(compile(script, '<rotation-daily-patch>', 'exec'), {})
+          PY
+          git diff --check
+      - name: Validate backend
+        working-directory: backend
+        run: |
+          npm install --package-lock=false
+          npm run check
+      - name: Validate frontend
+        run: |
+          npm install
+          npm run build
+      - name: Commit final source and remove all temporary workflows
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/_patch_rotation_daily.yml .github/workflows/_apply_rotation_daily.yml .github/workflows/_fix_temp_validation2.yml .github/workflows/_fix_temp_validation.yml || true
+          git add backend/schema.sql backend/migrations/0020_rotation_daily_attendance.sql backend/src/employee-save-production-gateway.ts backend/src/index.ts backend/src/attendance-engine.ts backend/src/attendance-engine-commands.ts backend/src/professional-attendance-fact-builder.ts src/types/index.ts src/pages/ManagerEmployees.tsx
+          git diff --cached --check
+          git commit -m "apply rotation daily attendance"
+          git push
