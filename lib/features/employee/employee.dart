@@ -7,6 +7,8 @@ library;
 export 'pages/hadir_workspace_page_implementation.dart';
 export 'pages/employee_center_page_implementation.dart';
 export 'pages/jibble_history_page_implementation.dart';
+export 'pages/jibble_workspace_page_implementation.dart';
+export 'pages/modern_home_page_implementation.dart';
 export 'pages/attendance_page_implementation.dart';
 export 'pages/attendance_insights_page_implementation.dart';
 export 'pages/requests_page_implementation.dart';
