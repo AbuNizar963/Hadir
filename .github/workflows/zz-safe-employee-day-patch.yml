@@ -1,0 +1,54 @@
+name: Safe employee day patch
+
+on:
+  push:
+    branches:
+      - fix/apps-employee-damascus-day-ui
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[employee-day-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact employee day patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('lib/features/employee/pages/hadir_workspace_page_implementation.dart')
+          s = p.read_text(encoding='utf-8')
+          replacements = [
+            ("DateTime _now = DateTime.now();", "DateTime _now = DateTime.now();\n\n  DateTime get _damascusDateTime => _now.toUtc().add(const Duration(hours: 3));"),
+            ("api.dailyStatus(date: _dateKey(DateTime.now()))", "api.dailyStatus(date: _dateKey(_damascusDateTime))"),
+            ("intl.DateFormat('HH:mm').format(_now)", "intl.DateFormat('HH:mm').format(_damascusDateTime)"),
+            ("intl.DateFormat('EEEE، d MMMM', 'ar').format(_now)", "intl.DateFormat('EEEE، d MMMM', 'ar').format(_damascusDateTime)"),
+            ("DateTime start = DateTime(_now.year, _now.month, _now.day);", "final damascusToday = _damascusDateTime;\n    DateTime start = DateTime(damascusToday.year, damascusToday.month, damascusToday.day);"),
+            ("firstDate: DateTime(_now.year, _now.month, _now.day), lastDate: DateTime(_now.year + 3)", "firstDate: DateTime(_damascusDateTime.year, _damascusDateTime.month, _damascusDateTime.day), lastDate: DateTime(_damascusDateTime.year + 3)"),
+            ("final day = _dateKey(_now);\n    return _attendance.where", "final day = _dateKey(_damascusDateTime);\n    return _attendance.where"),
+            ("List<dynamic> _todayApprovedRequests() {\n    final day = _dateKey(_now);", "List<dynamic> _todayApprovedRequests() {\n    final day = _dateKey(_damascusDateTime);"),
+          ]
+          for old, new in replacements:
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'EXPECTED_ONCE_FAILED: {count}: {old}')
+              s = s.replace(old, new, 1)
+          if len(s.splitlines()) < 800 or not s.rstrip().endswith('}'):
+              raise SystemExit('STRUCTURAL_GUARD_FAILED')
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Verify diff and commit
+        run: |
+          git diff --check
+          git diff --stat
+          git diff -- lib/features/employee/pages/hadir_workspace_page_implementation.dart
+          git status --short
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/features/employee/pages/hadir_workspace_page_implementation.dart
+          git commit -m 'fix: use Damascus day in employee workspace [employee-day-patched]'
+          git push
