@@ -304,22 +304,47 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final period = isRotation ? _rotationDurationLabel() : _periodLabel(schedule);
     final time = _periodLabel(schedule);
     final rows = <Widget>[
-      _info(context, Icons.badge_outlined, 'نوع الدوام', isRotation ? 'تناوبي' : 'إداري'),
-      _info(context, Icons.calendar_today_outlined, 'الفترة', period),
-      _info(context, Icons.schedule_rounded, isRotation ? 'وقت المناوبة' : 'الفترة', time),
-      _info(context, Icons.verified_outlined, 'الحالة', status),
-      _info(context, Icons.location_on_outlined, 'الموقع', _locationName()),
-      _info(context, Icons.devices_other_rounded, 'الجهاز', _deviceLabel()),
+      _info(context, 'نوع الدوام', isRotation ? 'تناوبي' : 'إداري'),
+      _info(context, 'الفترة', period),
+      _info(context, isRotation ? 'وقت المناوبة' : 'الفترة', time),
+      _info(context, 'الحالة', status),
+      _info(context, 'الموقع', _locationName()),
+      _info(context, 'الجهاز', _deviceLabel()),
     ];
     return _card(
       context,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('معلومات الدوام', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 3),
-          Text('حالتك الحالية', style: TextStyle(color: scheme.onSurface, fontSize: 15, fontWeight: FontWeight.w900)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('معلومات الدوام', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+                    const SizedBox(height: 2),
+                    Text('حالتك الحالية', style: TextStyle(color: scheme.onSurface, fontSize: 16, fontWeight: FontWeight.w900)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: (schedule['isWorkDay'] == true ? scheme.primary : scheme.secondary).withValues(alpha: .13),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: (schedule['isWorkDay'] == true ? scheme.primary : scheme.secondary).withValues(alpha: .18)),
+                ),
+                child: Text(
+                  schedule['isWorkDay'] == true ? 'يوم عمل' : 'راحة',
+                  style: TextStyle(color: schedule['isWorkDay'] == true ? scheme.primary : scheme.secondary, fontSize: 10, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 15),
           GridView.builder(
             shrinkWrap: true,
@@ -327,9 +352,9 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
             itemCount: rows.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              crossAxisSpacing: 23,
-              mainAxisSpacing: 11,
-              mainAxisExtent: 50,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              mainAxisExtent: 58,
             ),
             itemBuilder: (_, index) => rows[index],
           ),
@@ -443,33 +468,24 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     return Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: scheme.secondaryContainer.withValues(alpha: .38), borderRadius: BorderRadius.circular(12)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: scheme.primary, size: 17), const SizedBox(height: 7), Text(title, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 8.5)), const SizedBox(height: 2), Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w900, fontSize: 10.5))]));
   }
 
-  Widget _info(BuildContext context, IconData icon, String title, String value) {
+  Widget _info(BuildContext context, String title, String value) {
     final scheme = Theme.of(context).colorScheme;
-    return Row(
-      textDirection: TextDirection.rtl,
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: scheme.primary.withValues(alpha: .10),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: scheme.primary, size: 16),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 8.5)),
-              const SizedBox(height: 2),
-              Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontSize: 9.5, fontWeight: FontWeight.w800, height: 1.15)),
-            ],
-          ),
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: .38),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .72)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)),
+          const SizedBox(height: 3),
+          Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontSize: 14, fontWeight: FontWeight.w700, height: 1.2)),
+        ],
+      ),
     );
   }
 
