@@ -89,6 +89,8 @@ function employeeOut(row: any, policyMinutes = 0) {
     id: String(row.id), jobNumber: String(row.job_number || ""), name: String(row.name || ""), pinHash: "", status: row.status,
     deviceId: row.device_id, deviceLabel: row.device_label, createdAt: row.created_at, scheduleType: row.schedule_type,
     rotationStartDate: row.rotation_start_date, avatar: row.avatar || null, workStartTime: row.work_start_time, workEndTime: row.work_end_time,
+    rotationDailyAttendanceEnabled: Boolean(row.rotation_daily_attendance_enabled), rotationDailyAttendanceTime: row.rotation_daily_attendance_time || null,
+    rotationDailyAttendanceGraceMinutes: Number(row.rotation_daily_attendance_grace_minutes ?? 0),
     gracePeriodMinutes: Number(row.grace_period_minutes ?? 0), earlyCheckoutGraceMinutes: policyMinutes,
     role: row.role, locationId: row.location_id, rotationDaysOn: row.rotation_days_on, rotationDaysOff: row.rotation_days_off,
     specialties, workDays, isVip: Boolean(row.is_vip), autoCheckIn: Boolean(row.auto_check_in), autoCheckOut: Boolean(row.auto_check_out),
@@ -111,6 +113,9 @@ async function saveEmployee(req: Request, env: Env, id: string, a: Actor, o: str
   if (body.gracePeriodMinutes !== undefined) { const n = Number(body.gracePeriodMinutes); if (!Number.isInteger(n) || n < 0 || n > 180) return json({ error: "مهلة التأخر يجب أن تكون بين 0 و180 دقيقة" }, 400, o); sets.push("grace_period_minutes=?"); values.push(n); }
   if (body.rotationDaysOn !== undefined) { const n = Number(body.rotationDaysOn); if (!Number.isInteger(n) || n < 1 || n > 31) return json({ error: "أيام المناوبة غير صحيحة" }, 400, o); sets.push("rotation_days_on=?"); values.push(n); }
   if (body.rotationDaysOff !== undefined) { const n = Number(body.rotationDaysOff); if (!Number.isInteger(n) || n < 0 || n > 31) return json({ error: "أيام الراحة غير صحيحة" }, 400, o); sets.push("rotation_days_off=?"); values.push(n); }
+  if (body.rotationDailyAttendanceEnabled !== undefined) { sets.push("rotation_daily_attendance_enabled=?"); values.push(body.rotationDailyAttendanceEnabled ? 1 : 0); }
+  if (body.rotationDailyAttendanceTime !== undefined) { const value = body.rotationDailyAttendanceTime == null || body.rotationDailyAttendanceTime === "" ? null : String(body.rotationDailyAttendanceTime); if (value && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return json({ error: "وقت التسجيل اليومي غير صالح" }, 400, o); sets.push("rotation_daily_attendance_time=?"); values.push(value); }
+  if (body.rotationDailyAttendanceGraceMinutes !== undefined) { const n = Number(body.rotationDailyAttendanceGraceMinutes); if (!Number.isInteger(n) || n < 0 || n > 180) return json({ error: "مهلة التسجيل اليومي يجب أن تكون بين 0 و180 دقيقة" }, 400, o); sets.push("rotation_daily_attendance_grace_minutes=?"); values.push(n); }
   if (body.specialties !== undefined) { sets.push("specialties_json=?"); values.push(JSON.stringify(Array.isArray(body.specialties) ? body.specialties : [])); }
   if (body.workDays !== undefined) { sets.push("work_days_json=?"); values.push(JSON.stringify(Array.isArray(body.workDays) ? body.workDays : [])); }
   if (body.jobNumber !== undefined) {

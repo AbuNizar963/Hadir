@@ -35,6 +35,9 @@ type FormState = {
   rotationDaysOn: number;
   rotationDaysOff: number;
   rotationStartDate: string;
+  rotationDailyAttendanceEnabled: boolean;
+  rotationDailyAttendanceTime: string;
+  rotationDailyAttendanceGraceMinutes: string;
   locationId: string;
   specialties: string;
 };
@@ -53,6 +56,9 @@ const emptyForm: FormState = {
   rotationDaysOn: 7,
   rotationDaysOff: 7,
   rotationStartDate: "",
+  rotationDailyAttendanceEnabled: false,
+  rotationDailyAttendanceTime: "12:00",
+  rotationDailyAttendanceGraceMinutes: "",
   locationId: "",
   specialties: "general",
 };
@@ -79,6 +85,9 @@ function formFrom(e: Employee): FormState {
     rotationDaysOn: e.rotationDaysOn ?? 7,
     rotationDaysOff: e.rotationDaysOff ?? 7,
     rotationStartDate: e.rotationStartDate || "",
+    rotationDailyAttendanceEnabled: Boolean(e.rotationDailyAttendanceEnabled),
+    rotationDailyAttendanceTime: e.rotationDailyAttendanceTime || "12:00",
+    rotationDailyAttendanceGraceMinutes: e.rotationDailyAttendanceGraceMinutes == null ? "" : String(e.rotationDailyAttendanceGraceMinutes),
     locationId: e.locationId || "",
     specialties: (e.specialties || []).join(", "),
   };
@@ -332,7 +341,11 @@ export default function ManagerEmployees() {
         gracePeriodMinutes: grace, workDays: form.workDays,
         rotationDaysOn: Math.max(1, Number(form.rotationDaysOn) || 7),
         rotationDaysOff: Math.max(0, Number(form.rotationDaysOff) || 7),
-        rotationStartDate: form.rotationStartDate || null, locationId: form.locationId || null, specialties,
+        rotationStartDate: form.rotationStartDate || null,
+        rotationDailyAttendanceEnabled: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled,
+        rotationDailyAttendanceTime: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? form.rotationDailyAttendanceTime : null,
+        rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceGraceMinutes) || 0)) : 0,
+        locationId: form.locationId || null, specialties,
       };
       if (pin) payload.pin = pin;
       let savedEmployeeId = editingId;
@@ -343,6 +356,7 @@ export default function ManagerEmployees() {
         } else {
           const created = await createBackendEmployee({ ...payload, pin, avatar: null });
           savedEmployeeId = created.employee?.id || null;
+          if (savedEmployeeId) await updateBackendEmployee(savedEmployeeId, payload);
         }
         if (savedEmployeeId) await saveCheckoutPolicy(savedEmployeeId, earlyCheckoutGrace);
       } else if (editingId) {
@@ -356,6 +370,7 @@ export default function ManagerEmployees() {
           scheduleType: form.scheduleType, workStartTime: form.workStartTime, workEndTime: form.workEndTime,
           gracePeriodMinutes: grace, earlyCheckoutGraceMinutes: earlyCheckoutGrace, workDays: form.workDays, rotationDaysOn: form.rotationDaysOn,
           rotationDaysOff: form.rotationDaysOff, rotationStartDate: form.rotationStartDate || null,
+          rotationDailyAttendanceEnabled: form.rotationDailyAttendanceEnabled, rotationDailyAttendanceTime: form.rotationDailyAttendanceEnabled ? form.rotationDailyAttendanceTime : null, rotationDailyAttendanceGraceMinutes: Number(form.rotationDailyAttendanceGraceMinutes) || 0,
           locationId: form.locationId || null, specialties, avatar: null,
         };
         saveEmployees([employee, ...employees]);
@@ -442,7 +457,7 @@ export default function ManagerEmployees() {
             <div className="mt-4 grid gap-4 md:grid-cols-3"><Field label="فترة السماح بالتأخير" hint="يبدأ الحقل فارغًا؛ اكتب 6 مباشرة وليس 06."><input className="input mono w-full" type="number" min="0" inputMode="numeric" placeholder="مثال: 6" value={form.grace} onChange={(e) => setField("grace", e.target.value)} /></Field><Field label="فترة السماح بالانصراف المبكر" hint="مثال: 60 = يسمح بالانصراف قبل نهاية الدوام بـ60 دقيقة دون طلب استئذان."><input className="input mono w-full" type="number" min="0" max="1440" inputMode="numeric" placeholder="مثال: 60" value={form.earlyCheckoutGrace} onChange={(e) => setField("earlyCheckoutGrace", e.target.value)} /></Field><Field label="موقع العمل"><select className="input w-full" value={form.locationId} onChange={(e) => setField("locationId", e.target.value)}><option value="">المقر الرئيسي</option>{locations.filter((l) => String(l.name || "").trim() !== "المقر الرئيسي").map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Field></div>
             <div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="نوع العمل" hint="تؤخذ من تخصصات الشركة التي يضيفها المالك"><CompanySpecialtySelect value={form.specialties} onChange={v => setForm(prev => ({ ...prev, specialties: v }))} /></Field><div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-3 text-[11px] leading-5 text-muted-foreground"><span className="font-bold text-foreground">قاعدة الانصراف:</span> إذا كانت القيمة 60 دقيقة ونهاية الدوام 16:00، يستطيع الموظف تسجيل الانصراف من 15:00. قبل ذلك يحتاج إلى موافقة الإدارة على طلب انصراف مبكر.</div></div>
             {form.scheduleType === "ADMIN" && <div className="mt-4"><div className="mb-2 text-xs font-bold">أيام الدوام</div><div className="flex flex-wrap gap-2">{days.map((d, i) => <button key={d} type="button" className={form.workDays.includes(i) ? "btn-primary text-xs" : "btn-secondary text-xs"} onClick={() => toggleDay(i)}>{d}</button>)}</div></div>}
-            {form.scheduleType === "ROTATION" && <div className="mt-4 grid gap-4 rounded-2xl border border-border/60 bg-background/20 p-4 md:grid-cols-3"><Field label="أيام العمل"><select className="input w-full" value={form.rotationDaysOn} onChange={(e) => setField("rotationDaysOn", Number(e.target.value))}>{rotationDays.map((d) => <option key={d} value={d}>{d} يوم</option>)}</select></Field><Field label="أيام الراحة"><select className="input w-full" value={form.rotationDaysOff} onChange={(e) => setField("rotationDaysOff", Number(e.target.value))}><option value={0}>بدون راحة</option>{rotationDays.map((d) => <option key={d} value={d}>{d} يوم</option>)}</select></Field><Field label="تاريخ أول مناوبة"><input className="input w-full" type="date" value={form.rotationStartDate} onChange={(e) => setField("rotationStartDate", e.target.value)} /></Field></div>}
+            {form.scheduleType === "ROTATION" && <div className="mt-4 space-y-4 rounded-2xl border border-border/60 bg-background/20 p-4"><div className="grid gap-4 md:grid-cols-3"><Field label="أيام العمل"><select className="input w-full" value={form.rotationDaysOn} onChange={(e) => setField("rotationDaysOn", Number(e.target.value))}>{rotationDays.map((d) => <option key={d} value={d}>{d} يوم</option>)}</select></Field><Field label="أيام الراحة"><select className="input w-full" value={form.rotationDaysOff} onChange={(e) => setField("rotationDaysOff", Number(e.target.value))}><option value={0}>بدون راحة</option>{rotationDays.map((d) => <option key={d} value={d}>{d} يوم</option>)}</select></Field><Field label="تاريخ أول مناوبة"><input className="input w-full" type="date" value={form.rotationStartDate} onChange={(e) => setField("rotationStartDate", e.target.value)} /></Field></div><div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-3"><label className="flex items-start gap-3"><input type="checkbox" className="mt-1 h-4 w-4" checked={form.rotationDailyAttendanceEnabled} onChange={(e) => setField("rotationDailyAttendanceEnabled", e.target.checked)} /><span><span className="block text-sm font-bold">تسجيل حضور يومي أثناء المناوبة</span><span className="mt-1 block text-[11px] leading-5 text-muted-foreground">عند التفعيل يجب على الموظف تسجيل حضوره مرة واحدة كل يوم عمل تناوبي. إذا لم يسجل ضمن الوقت والمهلة المحددين يصبح غائبًا.</span></span></label>{form.rotationDailyAttendanceEnabled && <div className="mt-3 grid gap-4 md:grid-cols-2"><Field label="وقت التسجيل اليومي" hint="مثال: 12:00 — لا يسمح بالتسجيل قبل هذا الوقت."><input className="input mono w-full" type="time" value={form.rotationDailyAttendanceTime} onChange={(e) => setField("rotationDailyAttendanceTime", e.target.value)} /></Field><Field label="مهلة التسجيل بعد الوقت" hint="مثال: 15 = يسمح بالتسجيل من 12:00 حتى 12:15 فقط."><input className="input mono w-full" type="number" min="0" max="180" inputMode="numeric" placeholder="مثال: 15" value={form.rotationDailyAttendanceGraceMinutes} onChange={(e) => setField("rotationDailyAttendanceGraceMinutes", e.target.value)} /></Field></div>}</div></div>}
             <div className="sticky bottom-0 z-10 mt-5 -mx-5 flex justify-end border-t border-border/70 bg-card/95 px-5 py-4 backdrop-blur sm:-mx-6"><button type="button" className="btn-primary min-w-36" disabled={saving} onClick={() => void submit()}>{saving ? "جاري الحفظ…" : editingId ? "حفظ التعديل" : "إضافة الموظف"}</button></div>
             {error && <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
           </section>
