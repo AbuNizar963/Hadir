@@ -1,4 +1,4 @@
-export type DailyStatusCode = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "NOT_STARTED" | "INVALID" | "OPEN";
+export type DailyStatusCode = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "ESCAPED" | "NOT_STARTED" | "INVALID" | "OPEN";
 
 export type DailyStatusRow = {
   attendanceDay: string;
@@ -24,9 +24,12 @@ type DailyStatusResponse = {
 
 const API_URL = "https://hadir-api.abunizar963.workers.dev";
 const ADMIN_TOKEN_KEY = "hadir.api.token.admin";
+const EMPLOYEE_TOKEN_KEY = "hadir.api.token.employee";
 
 export async function getDailyStatus(day: string): Promise<DailyStatusResponse> {
-  const token = typeof window === "undefined" ? "" : localStorage.getItem(ADMIN_TOKEN_KEY) || "";
+  const token = typeof window === "undefined"
+    ? ""
+    : localStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem(EMPLOYEE_TOKEN_KEY) || "";
   const headers = new Headers();
   if (token) headers.set("authorization", `Bearer ${token}`);
   let response: Response;
