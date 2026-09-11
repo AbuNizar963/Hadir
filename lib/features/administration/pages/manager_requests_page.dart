@@ -1,4 +1,4 @@
-/// Administration manager requests compatibility entry point.
+/// Administration manager requests entry point.
 library;
 
-export '../../../pages/manager_requests_page.dart';
+export 'manager_requests_page_implementation.dart';
