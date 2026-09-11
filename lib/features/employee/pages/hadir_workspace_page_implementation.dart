@@ -20,6 +20,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   bool _loading = true;
   String? _error;
   DateTime _now = DateTime.now();
+
+  DateTime get _damascusDateTime => _now.toUtc().add(const Duration(hours: 3));
   String? _sessionToken;
   String? _canonicalStatus;
   Map<String, dynamic> _employee = <String, dynamic>{};
@@ -59,7 +61,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       final me = await meFuture;
       final employee = _employeeMap(profile, me);
       final id = '${employee['id'] ?? employee['employeeId'] ?? ''}'.trim();
-      final canonicalStatusFuture = api.dailyStatus(date: _dateKey(DateTime.now())).catchError((_) => <String, dynamic>{});
+      final canonicalStatusFuture = api.dailyStatus(date: _dateKey(_damascusDateTime)).catchError((_) => <String, dynamic>{});
       final results = await Future.wait<dynamic>([
         attendanceFuture,
         requestsFuture,
@@ -173,9 +175,9 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(intl.DateFormat('HH:mm').format(_now), style: TextStyle(color: scheme.onSurface, fontSize: 18, fontWeight: FontWeight.w900)),
+                  Text(intl.DateFormat('HH:mm').format(_damascusDateTime), style: TextStyle(color: scheme.onSurface, fontSize: 18, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 3),
-                  Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(_now), style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5)),
+                  Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(_damascusDateTime), style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5)),
                 ],
               ),
             ],
@@ -401,7 +403,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Future<void> _showRequestDialog() async {
     String type = 'permission';
     String reason = '';
-    DateTime start = DateTime(_now.year, _now.month, _now.day);
+    final damascusToday = _damascusDateTime;
+    DateTime start = DateTime(damascusToday.year, damascusToday.month, damascusToday.day);
     DateTime end = start;
     final controller = TextEditingController();
     var sent = false;
@@ -463,7 +466,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Widget _dateField(BuildContext context, String label, DateTime value, ValueChanged<DateTime> onChanged) {
     return InkWell(
       onTap: () async {
-        final picked = await showDatePicker(context: context, initialDate: value, firstDate: DateTime(_now.year, _now.month, _now.day), lastDate: DateTime(_now.year + 3), locale: const Locale('ar'));
+        final picked = await showDatePicker(context: context, initialDate: value, firstDate: DateTime(_damascusDateTime.year, _damascusDateTime.month, _damascusDateTime.day), lastDate: DateTime(_damascusDateTime.year + 3), locale: const Locale('ar'));
         if (picked != null) onChanged(picked);
       },
       borderRadius: BorderRadius.circular(12),
@@ -569,7 +572,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   List<dynamic> _todayAttendance() {
-    final day = _dateKey(_now);
+    final day = _dateKey(_damascusDateTime);
     return _attendance.where((x) {
       final stamp = _stamp(x);
       return stamp != null && _dateKey(stamp) == day;
@@ -806,7 +809,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   List<dynamic> _todayApprovedRequests() {
-    final day = _dateKey(_now);
+    final day = _dateKey(_damascusDateTime);
     return _requests.where((r) {
       if (r is! Map) return false;
       final status = '${r['status'] ?? ''}'.toLowerCase();
