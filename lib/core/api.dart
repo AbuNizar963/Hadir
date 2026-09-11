@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 class HadirApi {
   static const baseUrl = 'https://hadir-api.abunizar963.workers.dev';
@@ -84,11 +86,29 @@ class HadirApi {
   Future<Map<String, dynamic>> settings() async => _asMap((await dio.get('/api/settings')).data);
   Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> settings) async => _asMap((await dio.put('/api/settings', data: settings)).data);
   Future<String> uploadCompanyLogo(String filePath) async {
-    final response = await dio.post('/api/company/logo', data: FormData.fromMap({'file': await MultipartFile.fromFile(filePath, filename: 'company-logo.jpg')}));
-    final data = _asMap(response.data);
-    final url = data['url']?.toString();
-    if (url == null || url.isEmpty) throw StateError('لم يُرجع الخادم رابط شعار صالح.');
-    return url;
+    final compressed = await FlutterImageCompress.compressWithFile(
+      filePath,
+      minWidth: 1024,
+      minHeight: 1024,
+      quality: 88,
+      format: CompressFormat.webp,
+      autoCorrectionAngle: true,
+      keepExif: false,
+    );
+    if (compressed == null || compressed.isEmpty) throw StateError('تعذر تحويل الشعار إلى WebP.');
+    final tempDir = await Directory.systemTemp.createTemp('hadir-company-logo-');
+    final webpFile = File('${tempDir.path}/company-logo.webp');
+    try {
+      await webpFile.writeAsBytes(compressed, flush: true);
+      final response = await dio.post('/api/company/logo', data: FormData.fromMap({'file': await MultipartFile.fromFile(webpFile.path, filename: 'company-logo.webp')}));
+      final data = _asMap(response.data);
+      final url = data['url']?.toString();
+      if (url == null || url.isEmpty) throw StateError('لم يُرجع الخادم رابط شعار صالح.');
+      return url;
+    } finally {
+      await webpFile.delete().catchError((_) => webpFile);
+      await tempDir.delete().catchError((_) => tempDir);
+    }
   }
   Future<void> deleteCompanyLogo() async { await dio.delete('/api/company/logo'); }
   Future<Map<String, dynamic>> professionalAttendanceReport({required String from, required String to, String? employeeId}) async => _asMap((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': from, 'to': to, if (employeeId != null && employeeId.isNotEmpty) 'employeeId': employeeId})).data);
