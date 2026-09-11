@@ -1,0 +1,39 @@
+name: _safe_patch_rotation_frontend
+on:
+  push:
+    branches: [fix/rotation-frontend-continuous-end]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply exact patch and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/lib/schedule.ts')
+          s=p.read_text()
+          old='''  const end = localDateTimeUtc(addLocalDaysToKey(dayKey(periodStart), info.daysOn), employee.workEndTime || employee.workStartTime || "09:00");'''
+          new='''  const end = new Date(periodStart.getTime() + info.daysOn * DAY_MS);'''
+          if s.count(old) != 1:
+              raise SystemExit(f'expected exactly one target, found {s.count(old)}')
+          p.write_text(s.replace(old,new))
+          PY
+          grep -F 'const end = new Date(periodStart.getTime() + info.daysOn * DAY_MS);' src/lib/schedule.ts
+          if grep -F 'const end = localDateTimeUtc(addLocalDaysToKey(dayKey(periodStart), info.daysOn), employee.workEndTime || employee.workStartTime || "09:00");' src/lib/schedule.ts; then exit 1; fi
+          git diff --check
+          git diff -- src/lib/schedule.ts
+      - name: Commit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/lib/schedule.ts
+          git commit -m 'fix: keep rotation work period continuous through cycle end'
+          git push
