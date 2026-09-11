@@ -107,10 +107,10 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
   const dayCount = validatePeriod(from, to);
   const sourceRows = await loadFacts(env, from, to, employeeId);
   const rows = sourceRows.filter((row) => VALID_STATUSES.has(row.status)).map(toPublicRow);
-  const employees = new Map<string, { employeeId: string; employeeName: string; jobNumber: string | null; days: number; present: number; late: number; absent: number; leave: number; permission: number; rest: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>();
+  const employees = new Map<string, { employeeId: string; employeeName: string; jobNumber: string | null; days: number; present: number; late: number; absent: number; leave: number; permission: number; rest: number; escaped: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>();
   const daily = new Map<string, any>();
   const exceptionCounts: Record<string, number> = {};
-  let present = 0, late = 0, absent = 0, leave = 0, permission = 0, rest = 0, notStarted = 0, invalid = 0, open = 0;
+  let present = 0, late = 0, absent = 0, leave = 0, permission = 0, rest = 0, escaped = 0, notStarted = 0, invalid = 0, open = 0;
   let workedMinutes = 0, expectedMinutes = 0, lateMinutes = 0, earlyLeaveMinutes = 0, overtimeMinutes = 0;
   const qualityCounts: Record<string, number> = {};
   const sourceCounts: Record<string, number> = {};
@@ -122,6 +122,7 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
     else if (row.status === "LEAVE") leave++;
     else if (row.status === "PERMISSION") permission++;
     else if (row.status === "REST") rest++;
+    else if (row.status === "ESCAPED") escaped++;
     else if (row.status === "NOT_STARTED") notStarted++;
     else if (row.status === "INVALID") invalid++;
     if (row.open) open++;
@@ -134,7 +135,7 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
     qualityCounts[row.historicalDataQuality] = (qualityCounts[row.historicalDataQuality] || 0) + 1;
     sourceCounts[row.attendanceSource] = (sourceCounts[row.attendanceSource] || 0) + 1;
 
-    const current = employees.get(row.employeeId) || { employeeId: row.employeeId, employeeName: row.employeeName, jobNumber: row.jobNumber, days: 0, present: 0, late: 0, absent: 0, leave: 0, permission: 0, rest: 0, open: 0, workedMinutes: 0, expectedMinutes: 0, lateMinutes: 0, earlyLeaveMinutes: 0, overtimeMinutes: 0 };
+    const current = employees.get(row.employeeId) || { employeeId: row.employeeId, employeeName: row.employeeName, jobNumber: row.jobNumber, days: 0, present: 0, late: 0, absent: 0, leave: 0, permission: 0, rest: 0, escaped: 0, open: 0, workedMinutes: 0, expectedMinutes: 0, lateMinutes: 0, earlyLeaveMinutes: 0, overtimeMinutes: 0 };
     current.days++;
     if (row.status === "PRESENT") current.present++;
     if (row.status === "LATE") current.late++;
@@ -142,6 +143,7 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
     if (row.status === "LEAVE") current.leave++;
     if (row.status === "PERMISSION") current.permission++;
     if (row.status === "REST") current.rest++;
+    if (row.status === "ESCAPED") current.escaped++;
     if (row.open) current.open++;
     current.workedMinutes += Number(row.workedMinutes || 0);
     current.expectedMinutes += Number(row.expectedMinutes || 0);
@@ -150,13 +152,14 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
     current.overtimeMinutes += row.overtimeMinutes;
     employees.set(row.employeeId, current);
 
-    const series = daily.get(row.attendanceDay) || { attendanceDay: row.attendanceDay, present: 0, late: 0, absent: 0, leave: 0, permission: 0, rest: 0, open: 0, workedMinutes: 0, expectedMinutes: 0, lateMinutes: 0, earlyLeaveMinutes: 0, overtimeMinutes: 0 };
+    const series = daily.get(row.attendanceDay) || { attendanceDay: row.attendanceDay, present: 0, late: 0, absent: 0, leave: 0, permission: 0, rest: 0, escaped: 0, open: 0, workedMinutes: 0, expectedMinutes: 0, lateMinutes: 0, earlyLeaveMinutes: 0, overtimeMinutes: 0 };
     if (row.status === "PRESENT") series.present++;
     if (row.status === "LATE") series.late++;
     if (row.status === "ABSENT") series.absent++;
     if (row.status === "LEAVE") series.leave++;
     if (row.status === "PERMISSION") series.permission++;
     if (row.status === "REST") series.rest++;
+    if (row.status === "ESCAPED") series.escaped++;
     if (row.open) series.open++;
     series.workedMinutes += Number(row.workedMinutes || 0);
     series.expectedMinutes += Number(row.expectedMinutes || 0);
@@ -184,7 +187,7 @@ export async function buildProfessionalAttendanceReport(env: Env, from: string, 
     summary: {
       employees: employees.size,
       employeeDays: rows.length,
-      present, late, absent, leave, permission, rest, notStarted, invalid, open,
+      present, late, absent, leave, permission, rest, escaped, notStarted, invalid, open,
       workedMinutes, expectedMinutes, workVarianceMinutes, lateMinutes, earlyLeaveMinutes, overtimeMinutes,
       attendanceRate, punctualityRate,
     },
