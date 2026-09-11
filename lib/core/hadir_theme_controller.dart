@@ -11,7 +11,9 @@ class HadirThemeController extends ChangeNotifier {
   static const _storageKey = 'hadir_theme_mode';
   static const _storage = FlutterSecureStorage();
 
-  ThemeMode _mode = ThemeMode.dark;
+  // The reference web app defaults to the system theme. This keeps the Flutter
+  // app aligned with the reference screenshots instead of forcing dark mode.
+  ThemeMode _mode = ThemeMode.system;
   bool _loaded = false;
 
   ThemeMode get mode => _mode;
@@ -24,7 +26,7 @@ class HadirThemeController extends ChangeNotifier {
     } else if (saved == 'dark') {
       _mode = ThemeMode.dark;
     } else {
-      _mode = ThemeMode.dark;
+      _mode = ThemeMode.system;
     }
     _loaded = true;
     notifyListeners();
