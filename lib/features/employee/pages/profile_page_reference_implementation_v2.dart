@@ -1,8 +1,12 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../../../core/api.dart';
 import '../../../core/hadir_brand.dart';
@@ -145,6 +149,25 @@ class _EmployeeProfileReferencePageV2State extends State<EmployeeProfileReferenc
     ]);
   }
 
+  Future<void> _printDigitalCard() async {
+    final name = _text('name', 'الموظف');
+    final job = _text('jobNumber', _text('username'));
+    final id = _text('id', job);
+    final verifyUrl = id == '—' ? '' : '$_webOrigin/employee/verify/${Uri.encodeComponent(id)}';
+    if (verifyUrl.isEmpty) return;
+    try {
+      final qrData = await QrPainter(data: verifyUrl, version: QrVersions.auto, gapless: true).toImageData(480, format: ui.ImageByteFormat.png);
+      if (qrData == null) throw Exception('QR');
+      final regular = await PdfGoogleFonts.notoSansArabicRegular();
+      final bold = await PdfGoogleFonts.notoSansArabicBold();
+      final pdf = pw.Document();
+      pdf.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: const pw.EdgeInsets.all(40), build: (_) => pw.Directionality(textDirection: pw.TextDirection.rtl, child: pw.Center(child: pw.Container(width: 360, padding: const pw.EdgeInsets.all(24), decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColor.fromInt(0xFFDCE6E2)), borderRadius: pw.BorderRadius.circular(18)), child: pw.Column(children: [pw.Text('HADIR', style: pw.TextStyle(font: bold, fontSize: 14, color: PdfColor.fromInt(0xFF0B6B5A))), pw.SizedBox(height: 5), pw.Text('الهوية الرقمية', style: pw.TextStyle(font: bold, fontSize: 20)), pw.SizedBox(height: 16), pw.Text(name, style: pw.TextStyle(font: bold, fontSize: 22)), pw.SizedBox(height: 5), pw.Text('موظف · الرقم الوظيفي $job', style: pw.TextStyle(font: regular, fontSize: 10, color: PdfColors.grey700)), pw.SizedBox(height: 18), pw.Image(pw.MemoryImage(qrData.buffer.asUint8List()), width: 190, height: 190), pw.SizedBox(height: 8), pw.Text('امسح الرمز للتحقق من هوية الموظف', style: pw.TextStyle(font: regular, fontSize: 9, color: PdfColors.grey700)), pw.SizedBox(height: 16), pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [pw.Text('الحالة: نشط', style: pw.TextStyle(font: bold, fontSize: 9, color: PdfColor.fromInt(0xFF0B6B5A))), pw.Text('التحقق: QR آمن', style: pw.TextStyle(font: bold, fontSize: 9))])])))));
+      await Printing.layoutPdf(name: 'hadir-digital-card-$job.pdf', onLayout: (_) async => pdf.save());
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تجهيز البطاقة للطباعة. حاول مرة أخرى.')));
+    }
+  }
+
   Widget _digitalCard() {
     final name = _text('name', 'الموظف');
     final job = _text('jobNumber', _text('username'));
@@ -163,7 +186,7 @@ class _EmployeeProfileReferencePageV2State extends State<EmployeeProfileReferenc
         const Text('امسح الرمز للتحقق من هوية الموظف', style: TextStyle(color: HadirBrand.muted, fontSize: 9.5)),
       ])),
       const SizedBox(height: 10),
-      SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('طباعة البطاقة متاحة من نسخة الويب حالياً.'))), icon: const Icon(LucideIcons.printer, size: 18), label: const Text('طباعة البطاقة', style: TextStyle(fontWeight: FontWeight.w900)))),
+      SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: _printDigitalCard, icon: const Icon(LucideIcons.printer, size: 18), label: const Text('طباعة البطاقة', style: TextStyle(fontWeight: FontWeight.w900)))),
     ]));
   }
 
