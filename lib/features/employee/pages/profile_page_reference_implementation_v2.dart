@@ -156,12 +156,53 @@ class _EmployeeProfileReferencePageV2State extends State<EmployeeProfileReferenc
     final verifyUrl = id == '—' ? '' : '$_webOrigin/employee/verify/${Uri.encodeComponent(id)}';
     if (verifyUrl.isEmpty) return;
     try {
-      final qrData = await QrPainter(data: verifyUrl, version: QrVersions.auto, gapless: true).toImageData(480, format: ui.ImageByteFormat.png);
+      final qrData = await QrPainter(data: verifyUrl, version: QrVersions.auto, gapless: true)
+          .toImageData(480, format: ui.ImageByteFormat.png);
       if (qrData == null) throw Exception('QR');
       final regular = await PdfGoogleFonts.notoSansArabicRegular();
       final bold = await PdfGoogleFonts.notoSansArabicBold();
       final pdf = pw.Document();
-      pdf.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: const pw.EdgeInsets.all(40), build: (_) => pw.Directionality(textDirection: pw.TextDirection.rtl, child: pw.Center(child: pw.Container(width: 360, padding: const pw.EdgeInsets.all(24), decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColor.fromInt(0xFFDCE6E2)), borderRadius: pw.BorderRadius.circular(18)), child: pw.Column(children: [pw.Text('HADIR', style: pw.TextStyle(font: bold, fontSize: 14, color: PdfColor.fromInt(0xFF0B6B5A))), pw.SizedBox(height: 5), pw.Text('الهوية الرقمية', style: pw.TextStyle(font: bold, fontSize: 20)), pw.SizedBox(height: 16), pw.Text(name, style: pw.TextStyle(font: bold, fontSize: 22)), pw.SizedBox(height: 5), pw.Text('موظف · الرقم الوظيفي $job', style: pw.TextStyle(font: regular, fontSize: 10, color: PdfColors.grey700)), pw.SizedBox(height: 18), pw.Image(pw.MemoryImage(qrData.buffer.asUint8List()), width: 190, height: 190), pw.SizedBox(height: 8), pw.Text('امسح الرمز للتحقق من هوية الموظف', style: pw.TextStyle(font: regular, fontSize: 9, color: PdfColors.grey700)), pw.SizedBox(height: 16), pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [pw.Text('الحالة: نشط', style: pw.TextStyle(font: bold, fontSize: 9, color: PdfColor.fromInt(0xFF0B6B5A))), pw.Text('التحقق: QR آمن', style: pw.TextStyle(font: bold, fontSize: 9))])])))));
+      final card = pw.Container(
+        width: 360,
+        padding: const pw.EdgeInsets.all(24),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: PdfColor.fromInt(0xFFDCE6E2)),
+          borderRadius: pw.BorderRadius.circular(18),
+        ),
+        child: pw.Column(
+          children: [
+            pw.Text('HADIR', style: pw.TextStyle(font: bold, fontSize: 14, color: PdfColor.fromInt(0xFF0B6B5A))),
+            pw.SizedBox(height: 5),
+            pw.Text('الهوية الرقمية', style: pw.TextStyle(font: bold, fontSize: 20)),
+            pw.SizedBox(height: 16),
+            pw.Text(name, style: pw.TextStyle(font: bold, fontSize: 22)),
+            pw.SizedBox(height: 5),
+            pw.Text('موظف · الرقم الوظيفي $job', style: pw.TextStyle(font: regular, fontSize: 10, color: PdfColors.grey700)),
+            pw.SizedBox(height: 18),
+            pw.Image(pw.MemoryImage(qrData.buffer.asUint8List()), width: 190, height: 190),
+            pw.SizedBox(height: 8),
+            pw.Text('امسح الرمز للتحقق من هوية الموظف', style: pw.TextStyle(font: regular, fontSize: 9, color: PdfColors.grey700)),
+            pw.SizedBox(height: 16),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('الحالة: نشط', style: pw.TextStyle(font: bold, fontSize: 9, color: PdfColor.fromInt(0xFF0B6B5A))),
+                pw.Text('التحقق: QR آمن', style: pw.TextStyle(font: bold, fontSize: 9)),
+              ],
+            ),
+          ],
+        ),
+      );
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          build: (_) => pw.Directionality(
+            textDirection: pw.TextDirection.rtl,
+            child: pw.Center(child: card),
+          ),
+        ),
+      );
       await Printing.layoutPdf(name: 'hadir-digital-card-$job.pdf', onLayout: (_) async => pdf.save());
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تجهيز البطاقة للطباعة. حاول مرة أخرى.')));
