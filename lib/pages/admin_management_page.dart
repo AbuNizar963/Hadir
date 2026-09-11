@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'admin_management_page_legacy.dart' as legacy;
+import '../features/administration/pages/admin_management_page_implementation.dart' as implementation;
 import 'manager_employees_directory_page.dart';
 
-/// Keeps the complete existing management implementation for every management
-/// route, while the dedicated manager employees tab uses the website-aligned
-/// employee directory UI.
+/// Compatibility entry point retained for existing imports.
+///
+/// The complete management implementation lives inside the administration
+/// feature. The dedicated manager employees route keeps its specialized
+/// employee-directory screen.
 class AdminManagementPage extends StatelessWidget {
   const AdminManagementPage({super.key});
 
@@ -16,6 +18,6 @@ class AdminManagementPage extends StatelessWidget {
     if (path == '/manager/employees') {
       return const ManagerEmployeesDirectoryPage();
     }
-    return const legacy.AdminManagementPage();
+    return const implementation.AdminManagementPage();
   }
 }
