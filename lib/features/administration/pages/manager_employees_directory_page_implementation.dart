@@ -274,8 +274,8 @@ class _ManagerEmployeesDirectoryPageState extends State<ManagerEmployeesDirector
     var start = '${employee['workStartTime'] ?? '08:00'}';
     var finish = '${employee['workEndTime'] ?? '16:00'}';
     var location = '${employee['locationId'] ?? ''}';
-    var rotationOn = int.tryParse('${employee['rotationDaysOn'] ?? 7}') ?? 7;
-    var rotationOff = int.tryParse('${employee['rotationDaysOff'] ?? 7}') ?? 7;
+    var rotationOn = int.tryParse('${employee['rotationDaysOn'] ?? 4}') ?? 4;
+    var rotationOff = int.tryParse('${employee['rotationDaysOff'] ?? 4}') ?? 4;
     var workDays = <int>{if (employee['workDays'] is List) ...(employee['workDays'] as List).map((x) => int.tryParse('$x')).whereType<int>()};
     if (workDays.isEmpty) workDays = {0, 1, 2, 3, 4};
 
@@ -463,7 +463,7 @@ class _ManagerEmployeesDirectoryPageState extends State<ManagerEmployeesDirector
     final ok = await showDialog<bool>(context: context, builder: (c) => AlertDialog(title: const Text('إضافة موظف جديد', style: TextStyle(fontWeight: FontWeight.w900)), content: SingleChildScrollView(child: Column(children: [_field(name, 'اسم الموظف', 'اكتب الاسم الكامل'), const SizedBox(height: 8), _field(job, 'الرقم الوظيفي', 'مثال: D718075'), const SizedBox(height: 8), _field(pin, 'رمز PIN', '4 أحرف/أرقام على الأقل', obscure: true), const SizedBox(height: 8), _field(grace, 'سماح التأخير', 'دقائق', number: true), const SizedBox(height: 8), _field(early, 'سماح الانصراف المبكر', 'دقائق', number: true), const SizedBox(height: 8), _field(specialties, 'نوع العمل / التخصصات', 'general, technician')])), actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('إضافة الموظف'))])) ?? false;
     if (ok && name.text.trim().isNotEmpty && job.text.trim().isNotEmpty && pin.text.trim().length >= 4) {
       try {
-        final response = await _dio.post('/api/employees', data: {'name': name.text.trim(), 'jobNumber': job.text.trim(), 'pin': pin.text.trim(), 'status': 'active', 'scheduleType': 'ADMIN', 'workStartTime': '08:00', 'workEndTime': '16:00', 'gracePeriodMinutes': int.tryParse(grace.text) ?? 0, 'workDays': [0, 1, 2, 3, 4], 'rotationDaysOn': 7, 'rotationDaysOff': 7, 'rotationStartDate': null, 'locationId': null, 'specialties': specialties.text.split(',').map((x) => x.trim()).where((x) => x.isNotEmpty).toList(), 'avatar': null});
+        final response = await _dio.post('/api/employees', data: {'name': name.text.trim(), 'jobNumber': job.text.trim(), 'pin': pin.text.trim(), 'status': 'active', 'scheduleType': 'ADMIN', 'workStartTime': '08:00', 'workEndTime': '16:00', 'gracePeriodMinutes': int.tryParse(grace.text) ?? 0, 'workDays': [0, 1, 2, 3, 4], 'rotationDaysOn': 4, 'rotationDaysOff': 4, 'rotationStartDate': null, 'locationId': null, 'specialties': specialties.text.split(',').map((x) => x.trim()).where((x) => x.isNotEmpty).toList(), 'avatar': null});
         final data = response.data;
         final created = data is Map ? data['employee'] : null;
         if (created is Map && '${created['id'] ?? ''}'.isNotEmpty) await _dio.put('/api/employees/${created['id']}/checkout-policy', data: {'earlyCheckoutMinutes': int.tryParse(early.text) ?? 0});
