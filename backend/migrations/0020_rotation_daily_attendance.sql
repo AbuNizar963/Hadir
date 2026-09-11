@@ -3,6 +3,7 @@
 -- Final validation trigger; no schema change.
 -- Workflow trigger only; migration remains unchanged.
 -- Final apply trigger.
+-- Source runner trigger.
 ALTER TABLE employees ADD COLUMN rotation_daily_attendance_enabled INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE employees ADD COLUMN rotation_daily_attendance_time TEXT;
 ALTER TABLE employees ADD COLUMN rotation_daily_attendance_grace_minutes INTEGER NOT NULL DEFAULT 0;
