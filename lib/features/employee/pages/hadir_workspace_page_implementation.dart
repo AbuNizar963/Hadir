@@ -21,6 +21,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   String? _error;
   DateTime _now = DateTime.now();
   String? _sessionToken;
+  String? _canonicalStatus;
   Map<String, dynamic> _employee = <String, dynamic>{};
   List<dynamic> _attendance = const [];
   List<dynamic> _requests = const [];
@@ -58,13 +59,24 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       final me = await meFuture;
       final employee = _employeeMap(profile, me);
       final id = '${employee['id'] ?? employee['employeeId'] ?? ''}'.trim();
+      final canonicalStatusFuture = api.dailyStatus(date: _dateKey(DateTime.now())).catchError((_) => <String, dynamic>{});
       final results = await Future.wait<dynamic>([
         attendanceFuture,
         requestsFuture,
         locationsFuture,
         deviceFuture,
         api.escapeEvents(employeeId: id.isEmpty ? null : id, limit: 20),
+        canonicalStatusFuture,
       ]);
+      String? canonicalStatus;
+      final canonical = results[5];
+      if (canonical is Map) {
+        final employees = canonical['employees'];
+        if (employees is List && employees.isNotEmpty && employees.first is Map) {
+          final value = employees.first['status'];
+          if (value is String && value.trim().isNotEmpty) canonicalStatus = value.trim().toUpperCase();
+        }
+      }
       if (!mounted) return;
       setState(() {
         _sessionToken = token;
@@ -74,6 +86,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
         _locations = results[2] as List<dynamic>;
         _device = results[3] is Map ? Map<String, dynamic>.from(results[3] as Map) : <String, dynamic>{};
         _escapeEvents = results[4] as List<dynamic>;
+        _canonicalStatus = canonicalStatus;
         _loading = false;
       });
     } catch (e) {
@@ -610,6 +623,20 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   String _status(Map<String, dynamic> schedule, dynamic open, bool checkedIn, dynamic escape, bool leave, bool permission) {
+    final canonical = _canonicalStatus;
+    if (canonical != null) {
+      return switch (canonical) {
+        'PRESENT' => 'حاضر',
+        'LATE' => 'متأخر',
+        'ABSENT' => 'غائب',
+        'REST' => 'راحة',
+        'LEAVE' => 'إجازة',
+        'PERMISSION' => 'إذن',
+        'ESCAPED' => 'هارب',
+        'NOT_STARTED' => 'لم تبدأ المناوبة',
+        _ => 'غائب',
+      };
+    }
     if (escape != null) return 'هارب';
     if (leave) return 'إجازة';
     if (permission) return 'إذن';
