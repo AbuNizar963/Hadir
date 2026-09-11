@@ -1,6 +1,8 @@
 name: _safe_patch_future_status
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - fix/daily-status-future-schedule
 permissions:
   contents: write
 jobs:
