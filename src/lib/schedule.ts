@@ -61,7 +61,7 @@ export function getEmployeeWorkPeriod(employee: Employee | null | undefined, tar
   if (info.phase === "NOT_STARTED") return { isWorkDay: false, kind: "NOT_STARTED", start: null, end: null, label: "لم تبدأ المناوبة بعد", detail: `تبدأ أول مناوبة في ${employee.rotationStartDate} الساعة ${formatTime(info.firstStart)}` };
   if (info.phase === "OFF") return { isWorkDay: false, kind: "OFF", start: null, end: null, label: "راحة تناوبية", detail: `اليوم ${normalizeDigits(String(info.cycleDay - info.daysOn + 1))} من ${normalizeDigits(String(info.daysOff))} في الراحة` };
   const periodStart = info.periodStart;
-  const end = localDateTimeUtc(addLocalDaysToKey(dayKey(periodStart), info.daysOn), employee.workEndTime || employee.workStartTime || "09:00");
+  const end = new Date(periodStart.getTime() + info.daysOn * DAY_MS);
   return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "مناوبة تناوبية", detail: `من ${formatDateTime(periodStart)} → ${formatDateTime(end)}` };
 }
 
