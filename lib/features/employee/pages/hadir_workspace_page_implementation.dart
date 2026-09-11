@@ -288,18 +288,54 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   Widget _workInfo(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final schedule = _schedule();
     final today = _todayAttendance();
     final approved = _todayApprovedRequests();
-    final status = _status(schedule, _openSession(today), today.any((r) => _type(r) == 'check-in'), _activeEscape(), approved.any((r) => _requestType(r) == 'leave'), approved.any((r) => _requestType(r) == 'permission'));
-    final type = '${_employee['scheduleType'] ?? 'ADMIN'}'.toUpperCase();
-    return _section(context, 'معلومات الدوام', 'حالتك الحالية', Column(children: [
-      _info(context, Icons.calendar_today_outlined, 'الفترة', _periodLabel(schedule)),
-      _info(context, Icons.schedule_rounded, type == 'ROTATION' ? 'وقت المناوبة' : 'الفترة', _scheduleLabel(schedule) == 'مناوبة تناوبية' ? _rotationDurationLabel() : _periodLabel(schedule)),
+    final status = _status(
+      schedule,
+      _openSession(today),
+      today.any((r) => _type(r) == 'check-in'),
+      _activeEscape(),
+      approved.any((r) => _requestType(r) == 'leave'),
+      approved.any((r) => _requestType(r) == 'permission'),
+    );
+    final isRotation = '${_employee['scheduleType'] ?? 'ADMIN'}'.toUpperCase() == 'ROTATION';
+    final period = _periodLabel(schedule);
+    final time = schedule['kind'] == 'ROTATION' ? _rotationDurationLabel() : period;
+    final rows = <Widget>[
+      _info(context, Icons.badge_outlined, 'نوع الدوام', isRotation ? 'تناوبي' : 'إداري'),
+      _info(context, Icons.calendar_today_outlined, 'الفترة', period),
+      _info(context, Icons.schedule_rounded, isRotation ? 'وقت المناوبة' : 'الفترة', time),
       _info(context, Icons.verified_outlined, 'الحالة', status),
       _info(context, Icons.location_on_outlined, 'الموقع', _locationName()),
       _info(context, Icons.devices_other_rounded, 'الجهاز', _deviceLabel()),
-    ]));
+    ];
+    return _card(
+      context,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('معلومات الدوام', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 3),
+          Text('حالتك الحالية', style: TextStyle(color: scheme.onSurface, fontSize: 15, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 15),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: rows.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 23,
+              mainAxisSpacing: 11,
+              mainAxisExtent: 50,
+            ),
+            itemBuilder: (_, index) => rows[index],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _requestBanner(BuildContext context) {
@@ -409,7 +445,32 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   Widget _info(BuildContext context, IconData icon, String title, String value) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [Container(width: 31, height: 31, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: scheme.primary, size: 16)), const SizedBox(width: 9), Expanded(child: Text(title, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10))), Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontSize: 10.5, fontWeight: FontWeight.w800)))]));
+    return Row(
+      textDirection: TextDirection.rtl,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: scheme.primary.withValues(alpha: .10),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: scheme.primary, size: 16),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 8.5)),
+              const SizedBox(height: 2),
+              Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontSize: 9.5, fontWeight: FontWeight.w800, height: 1.15)),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _detailRow(BuildContext context, IconData icon, String title, String value) {
@@ -440,7 +501,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   Widget _avatar(BuildContext context, String? url, String name, {double size = 56, bool light = false}) {
     final scheme = Theme.of(context).colorScheme;
-    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900)))));
+    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))));
     return Container(width: size, height: size, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14), border: Border.all(color: scheme.primary.withValues(alpha: .28))), child: child);
   }
 
