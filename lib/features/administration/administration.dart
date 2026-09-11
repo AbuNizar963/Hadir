@@ -16,4 +16,5 @@ export 'pages/admin_role_workspace_page.dart';
 export 'pages/manager_requests_page.dart';
 export 'pages/employee_transfer_page.dart';
 export 'pages/manager_employees_directory_page.dart';
+export 'pages/manager_workforce_page.dart';
 export '../authentication/pages/admin_login_page.dart';
