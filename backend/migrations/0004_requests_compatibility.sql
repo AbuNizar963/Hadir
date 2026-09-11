@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS requests (
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','confirmed','cancelled')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   reviewed_at TEXT,
-  reviewed_by TEXT
+  reviewed_by TEXT,
+  start_date TEXT,
+  end_date TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_requests_employee ON requests(employee_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_requests_status ON requests(status, created_at DESC);
