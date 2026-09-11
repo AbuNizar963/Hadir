@@ -16,6 +16,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       OWNER_RECOVERY_CODE: ${{ secrets.OWNER_RECOVERY_CODE }}
+      OWNER_USERNAME: ${{ secrets.OWNER_USERNAME }}
+      OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
       VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
       VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
       VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
@@ -65,6 +67,27 @@ jobs:
       - name: Apply remote D1 migrations
         working-directory: backend
         run: npx wrangler d1 migrations apply Hadir --remote
+
+      - name: Verify daily attendance status schema
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema="$(npx wrangler d1 execute Hadir --remote --json --command 'SELECT sql FROM sqlite_master WHERE type = "table" AND name = "daily_attendance_status";')"
+          printf '%s\n' "$schema"
+          python - "$schema" <<'PY'
+          import json, sys
+          data = json.loads(sys.argv[1])
+          rows = []
+          for result in data if isinstance(data, list) else []:
+              rows.extend(result.get("results") or [])
+          sql = " ".join(str(row.get("sql") or "") for row in rows).upper()
+          required = ["ESCAPED", "OPEN", "PRESENT", "LATE", "ABSENT", "REST", "LEAVE", "PERMISSION", "NOT_STARTED", "INVALID"]
+          missing = [value for value in required if value not in sql]
+          if missing:
+              raise SystemExit(f"ERROR: daily_attendance_status production CHECK/schema is missing: {missing}")
+          print("daily_attendance_status production schema contains every canonical status.")
+          PY
 
       - name: Verify and repair auth session schema
         working-directory: backend
@@ -177,6 +200,61 @@ jobs:
           normalized_headers="$(printf '%s\n' "$headers" | tr -d '\r')"
           printf '%s\n' "$normalized_headers" | grep -Fqi "access-control-allow-origin: $PRODUCTION_APP_ORIGIN"
           printf '%s\n' "$normalized_headers" | grep -Fqi 'access-control-allow-credentials: true'
+
+      - name: Verify production daily status and reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$OWNER_USERNAME"
+          test -n "$OWNER_PASSWORD"
+          today="$(TZ=Asia/Damascus date +%F)"
+          curl -fsS --retry 5 --retry-delay 2 \
+            -X POST \
+            -H 'content-type: application/json' \
+            -H 'x-device-id: github-actions-report-smoke' \
+            --data "$(python -c 'import json,os; print(json.dumps({"username":os.environ["OWNER_USERNAME"],"password":os.environ["OWNER_PASSWORD"]}))')" \
+            https://hadir-api.abunizar963.workers.dev/api/auth/login \
+            -o /tmp/login.json
+          python - /tmp/login.json <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as f:
+              data = json.load(f)
+          token = str(data.get("token") or "")
+          if not token:
+              raise SystemExit(f"ERROR: production owner login did not return a token: {data.get('error')}")
+          with open("/tmp/hadir-token", "w", encoding="utf-8") as f:
+              f.write(token)
+          PY
+          token="$(cat /tmp/hadir-token)"
+          curl -fsS --retry 5 --retry-delay 2 \
+            -H "authorization: Bearer $token" \
+            "https://hadir-api.abunizar963.workers.dev/api/manager/daily-status?date=$today" \
+            -o /tmp/daily-status.json
+          python - /tmp/daily-status.json <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as f:
+              data = json.load(f)
+          if data.get("error"):
+              raise SystemExit(f"ERROR: production daily-status returned an error: {data['error']}")
+          if not isinstance(data.get("employees"), list):
+              raise SystemExit("ERROR: production daily-status did not return an employees array.")
+          print(f"daily-status smoke test passed: {len(data['employees'])} employees returned.")
+          PY
+          curl -fsS --retry 5 --retry-delay 2 \
+            -H "authorization: Bearer $token" \
+            "https://hadir-api.abunizar963.workers.dev/api/reports/professional-attendance?from=$today&to=$today" \
+            -o /tmp/professional-report.json
+          python - /tmp/professional-report.json <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as f:
+              data = json.load(f)
+          if data.get("error"):
+              raise SystemExit(f"ERROR: production professional report returned an error: {data['error']}")
+          if data.get("ok") is not True:
+              raise SystemExit(f"ERROR: production professional report is not ok: {data}")
+          print(f"professional attendance report smoke test passed for {data.get('from')}..{data.get('to')}.")
+          PY
+          rm -f /tmp/hadir-token /tmp/login.json /tmp/daily-status.json /tmp/professional-report.json
 
       - name: Verify bootstrap compatibility
         shell: bash
