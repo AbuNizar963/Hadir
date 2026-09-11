@@ -1,4 +1,4 @@
-/// Administration employee transfer compatibility entry point.
+/// Administration employee transfer entry point.
 library;
 
-export '../../../pages/employee_transfer_page.dart';
+export 'employee_transfer_page_implementation.dart';
