@@ -6,4 +6,4 @@ library;
 
 export 'pages/admin_login_page.dart';
 export 'pages/employee_login_page.dart';
-export '../../pages/landing_page.dart';
+export 'pages/landing_page_implementation.dart';
