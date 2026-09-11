@@ -91,11 +91,15 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
         child: Row(children: [
           _brand(scheme),
           const SizedBox(width: 8),
-          _tool(Icons.cloud_outlined, 'الطقس', () => context.push('/weather'), scheme),
+          _tool(Icons.menu_rounded, 'القائمة', () => setState(() => _menuOpen = !_menuOpen), scheme, active: _menuOpen),
           const SizedBox(width: 6),
           _tool(Icons.notifications_none_rounded, 'الإشعارات', () async { await context.push('/notifications'); _refreshUnread(); }, scheme, badge: _unread),
           const SizedBox(width: 6),
-          _tool(_menuOpen ? Icons.close_rounded : Icons.menu_rounded, 'القائمة', () => setState(() => _menuOpen = !_menuOpen), scheme, active: _menuOpen),
+          _tool(Icons.cloud_outlined, 'الطقس', () => context.push('/weather'), scheme),
+          const SizedBox(width: 6),
+          _tool(Icons.explore_outlined, 'القبلة', () => context.push('/prayer'), scheme),
+          const SizedBox(width: 6),
+          _tool(Icons.smart_toy_outlined, 'المساعد', () => context.push('/ai'), scheme),
         ]),
       ),
     );
