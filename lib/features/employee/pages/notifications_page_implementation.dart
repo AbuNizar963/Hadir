@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/hadir_brand.dart';
 import '../../../services/notifications_service.dart';
@@ -75,7 +76,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           title: const Text('الإشعارات', style: TextStyle(fontWeight: FontWeight.w900)),
           actions: [
             if (unread > 0)
-              IconButton(onPressed: _allRead, icon: const Icon(Icons.done_all_rounded), tooltip: 'تحديد الكل كمقروء'),
+              IconButton(onPressed: _allRead, icon: const Icon(LucideIcons.checkCheck), tooltip: 'تحديد الكل كمقروء'),
           ],
         ),
         body: loading
@@ -92,7 +93,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         const SizedBox(height: 12),
                         TextField(
                           onChanged: (value) => setState(() => _query = value),
-                          decoration: const InputDecoration(hintText: 'بحث في الإشعارات…', prefixIcon: Icon(Icons.search_rounded)),
+                          decoration: const InputDecoration(hintText: 'بحث في الإشعارات…', prefixIcon: Icon(LucideIcons.search)),
                         ),
                         const SizedBox(height: 10),
                         SingleChildScrollView(
@@ -130,7 +131,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         child: Padding(
           padding: const EdgeInsets.all(15),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(width: 46, height: 46, decoration: BoxDecoration(color: accent.withValues(alpha: .10), borderRadius: BorderRadius.circular(HadirBrand.radiusMd)), child: Icon(n.read ? Icons.notifications_none_rounded : Icons.notifications_active_rounded, color: accent)),
+            Container(width: 46, height: 46, decoration: BoxDecoration(color: accent.withValues(alpha: .10), borderRadius: BorderRadius.circular(HadirBrand.radiusMd)), child: Icon(n.read ? LucideIcons.bell : LucideIcons.bellRing, color: accent)),
             const SizedBox(width: 13),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [Expanded(child: Text(n.title, style: TextStyle(fontWeight: n.read ? FontWeight.w700 : FontWeight.w900, fontSize: 15))), if (!n.read) Container(width: 8, height: 8, decoration: BoxDecoration(color: accent, shape: BoxShape.circle))]),
@@ -157,13 +158,13 @@ class _UnreadBanner extends StatelessWidget {
   final int unread;
   const _UnreadBanner({required this.unread});
   @override
-  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(15), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(HadirBrand.radiusMd)), child: Icon(Icons.mark_email_unread_rounded, color: Theme.of(context).colorScheme.primary)), const SizedBox(width: 12), Expanded(child: Text(unread == 0 ? 'لا توجد إشعارات جديدة' : '$unread إشعار غير مقروء', style: const TextStyle(fontWeight: FontWeight.w900)))])));
+  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(15), child: Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(HadirBrand.radiusMd)), child: Icon(LucideIcons.mailOpen, color: Theme.of(context).colorScheme.primary)), const SizedBox(width: 12), Expanded(child: Text(unread == 0 ? 'لا توجد إشعارات جديدة' : '$unread إشعار غير مقروء', style: const TextStyle(fontWeight: FontWeight.w900)))])));
 }
 
 class _EmptyNotifications extends StatelessWidget {
   const _EmptyNotifications();
   @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 70), child: Column(children: [Icon(Icons.notifications_none_rounded, size: 54, color: Theme.of(context).colorScheme.primary), const SizedBox(height: 14), const Text('لا توجد إشعارات مطابقة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(height: 5), const Text('جرّب تغيير البحث أو الفلتر.') ]));
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 70), child: Column(children: [Icon(LucideIcons.bell, size: 54, color: Theme.of(context).colorScheme.primary), const SizedBox(height: 14), const Text('لا توجد إشعارات مطابقة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(height: 5), const Text('جرّب تغيير البحث أو الفلتر.') ]));
 }
 
 class _Error extends StatelessWidget {
@@ -171,5 +172,5 @@ class _Error extends StatelessWidget {
   final VoidCallback retry;
   const _Error({required this.message, required this.retry});
   @override
-  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.cloud_off_rounded, size: 48), const SizedBox(height: 12), Text(message, textAlign: TextAlign.center), const SizedBox(height: 14), FilledButton(onPressed: retry, child: const Text('إعادة المحاولة'))])));
+  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(LucideIcons.cloudOff, size: 48), const SizedBox(height: 12), Text(message, textAlign: TextAlign.center), const SizedBox(height: 14), FilledButton(onPressed: retry, child: const Text('إعادة المحاولة'))])));
 }
