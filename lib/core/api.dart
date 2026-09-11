@@ -70,7 +70,7 @@ class HadirApi {
   Future<Map<String, dynamic>> employeeDeviceStatus() async => _asMap((await dio.get('/api/device/status')).data);
   Future<List<dynamic>> locations() async => _asList((await dio.get('/api/locations')).data);
   Future<List<dynamic>> attendance({int limit = 500}) async => _asList((await dio.get('/api/attendance', queryParameters: {'limit': limit.clamp(1, 2000)})).data);
-  Future<List<dynamic>> audit({int limit = 500}) async => _asList((await dio.get('/api/audit', queryParameters: {'limit': limit.clamp(1, 2000)})).data);
+  Future<List<dynamic>> audit({int limit = 500}) async => _asList((await dio.get('/api/audit', queryParameters: {'limit': limit.clamp(1, 500)})).data);
   Future<List<dynamic>> escapeEvents({String? employeeId, int limit = 20}) async => _asList((await dio.get('/api/escape-events', queryParameters: {'limit': limit.clamp(1, 500), if (employeeId != null && employeeId.isNotEmpty) 'employeeId': employeeId})).data);
   Future<Map<String, dynamic>> createChallenge({required String type, required double lat, required double lng, required String qrCode, required String deviceId}) async => _asMap((await dio.post('/api/attendance/challenge', data: {'type': type, 'lat': lat, 'lng': lng, 'qrCode': qrCode, 'deviceId': deviceId})).data);
   Future<Map<String, dynamic>> createAttendance(Map<String, dynamic> record) async => _asMap((await dio.post('/api/attendance', data: record)).data);
@@ -83,6 +83,14 @@ class HadirApi {
   Future<void> logout() async { try { await dio.post('/api/auth/logout', data: {}); } catch (_) {} }
   Future<Map<String, dynamic>> settings() async => _asMap((await dio.get('/api/settings')).data);
   Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> settings) async => _asMap((await dio.put('/api/settings', data: settings)).data);
+  Future<String> uploadCompanyLogo(String filePath) async {
+    final response = await dio.post('/api/company/logo', data: FormData.fromMap({'file': await MultipartFile.fromFile(filePath, filename: 'company-logo.jpg')}));
+    final data = _asMap(response.data);
+    final url = data['url']?.toString();
+    if (url == null || url.isEmpty) throw StateError('لم يُرجع الخادم رابط شعار صالح.');
+    return url;
+  }
+  Future<void> deleteCompanyLogo() async { await dio.delete('/api/company/logo'); }
   Future<Map<String, dynamic>> professionalAttendanceReport({required String from, required String to, String? employeeId}) async => _asMap((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': from, 'to': to, if (employeeId != null && employeeId.isNotEmpty) 'employeeId': employeeId})).data);
   Future<Map<String, dynamic>> professionalAttendanceDrilldown({required String attendanceDay, required String employeeId}) async => _asMap((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': attendanceDay, 'to': attendanceDay, 'employeeId': employeeId, 'drilldown': '1'})).data);
   Future<List<dynamic>> archivedReports({int limit = 25}) async { final data = _asMap((await dio.get('/api/reports/archive', queryParameters: {'limit': limit.clamp(1, 100)})).data); return _asList(data['reports']); }
