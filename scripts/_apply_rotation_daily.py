@@ -1,7 +1,9 @@
 from pathlib import Path
 
 def replace(path, old, new, count=1):
-    p=Path(path); text=p.read_text(); n=text.count(old)
+    p=Path(path); text=p.read_text()
+    if new in text: return
+    n=text.count(old)
     if n != count: raise SystemExit(f'{path}: expected {count} matches, found {n}')
     p.write_text(text.replace(old,new,count))
 
