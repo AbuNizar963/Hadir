@@ -78,7 +78,8 @@ GoRouter buildAppRouter() => GoRouter(
       '/notifications', '/employee/notifications', '/profile', '/employee/profile',
       '/services', '/weather', '/prayer', '/ai',
     };
-    if (currentEmployeeToken == null && employeePaths.contains(location)) return '/login';
+    final isEmployeeScan = location.startsWith('/employee/scan/');
+    if (currentEmployeeToken == null && (employeePaths.contains(location) || isEmployeeScan)) return '/login';
     return null;
   },
   errorBuilder: (_, __) => const _NotFoundPage(),
