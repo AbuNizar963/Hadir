@@ -362,7 +362,12 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
               if (reason.isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب سبب الطلب أولاً.'))); return; }
               try {
                 final token = await _session.token();
-                await HadirApi(token: token).createRequest(type: type, reason: reason, startDate: _dateKey(start), endDate: _dateKey(end));
+                await HadirApi(token: token).createRequest(
+                  type: type,
+                  reason: reason,
+                  startDate: isCheckout ? null : _dateKey(start),
+                  endDate: isCheckout ? null : _dateKey(end),
+                );
                 if (!dialogContext.mounted) return;
                 setDialogState(() => sent = true);
                 await Future<void>.delayed(const Duration(milliseconds: 500));
@@ -435,7 +440,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   Widget _avatar(BuildContext context, String? url, String name, {double size = 56, bool light = false}) {
     final scheme = Theme.of(context).colorScheme;
-    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))))) ;
+    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900)))));
     return Container(width: size, height: size, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14), border: Border.all(color: scheme.primary.withValues(alpha: .28))), child: child);
   }
 
@@ -532,7 +537,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     if (open != null) return _lateMinutes(schedule, checkedIn) > 0 ? 'متأخر' : 'حاضر';
     if (schedule['isWorkDay'] == true) {
       if (checkedIn) return 'حاضر';
-      if (_now.isAfter(schedule['start'] as DateTime)) return 'غائب';
+      final start = schedule['start'];
+      if (start is DateTime && _damascusNow().isAfter(start)) return 'غائب';
       return 'لم تبدأ المناوبة';
     }
     return 'راحة';
@@ -550,20 +556,22 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   };
 
   Map<String, dynamic> _schedule() {
+    final now = _damascusNow();
     final type = '${_employee['scheduleType'] ?? 'ADMIN'}'.toUpperCase();
-    if (type == 'ROTATION') return _rotationSchedule();
+    if (type == 'ROTATION') return _rotationSchedule(now);
     final workDays = _workDays();
-    final weekday = _now.weekday % 7;
+    final weekday = now.weekday % 7;
     if (!workDays.contains(weekday)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null};
-    final day = DateTime(_now.year, _now.month, _now.day);
+    final day = DateTime(now.year, now.month, now.day);
     final start = _localTime(day, '${_employee['workStartTime'] ?? '09:00'}');
     var end = _localTime(day, '${_employee['workEndTime'] ?? '16:00'}');
     if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
-    if (_now.isAfter(end)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'previousStart': start, 'previousEnd': end};
+    if (now.isAfter(end)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'previousStart': start, 'previousEnd': end};
     return {'isWorkDay': true, 'kind': 'ADMIN', 'start': start, 'end': end};
   }
 
-  Map<String, dynamic> _rotationSchedule() {
+  Map<String, dynamic> _rotationSchedule([DateTime? target]) {
+    final now = target ?? _damascusNow();
     final raw = '${_employee['rotationStartDate'] ?? ''}'.split('T').first;
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return {'isWorkDay': false, 'kind': 'INVALID', 'start': null, 'end': null};
@@ -571,16 +579,21 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final daysOff = _number(_employee['rotationDaysOff'], 4).clamp(0, 31);
     final cycle = daysOn + daysOff;
     final first = _localTime(DateTime(parsed.year, parsed.month, parsed.day), '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
-    if (_now.isBefore(first)) return {'isWorkDay': false, 'kind': 'NOT_STARTED', 'start': first, 'end': null};
+    if (now.isBefore(first)) return {'isWorkDay': false, 'kind': 'NOT_STARTED', 'start': first, 'end': null};
     final dayStart = DateTime(parsed.year, parsed.month, parsed.day);
-    final diff = DateTime(_now.year, _now.month, _now.day).difference(dayStart).inDays;
+    final diff = DateTime(now.year, now.month, now.day).difference(dayStart).inDays;
+    if (diff < 0) return {'isWorkDay': false, 'kind': 'NOT_STARTED', 'start': first, 'end': null};
     final cycleDay = diff % cycle;
     final periodDay = dayStart.add(Duration(days: diff - cycleDay));
-    if (cycleDay >= daysOn) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
-    final start = _localTime(periodDay, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}').add(Duration(days: cycleDay));
-    var end = _localTime(periodDay.add(Duration(days: daysOn)), '${_employee['rotationEndTime'] ?? _employee['workEndTime'] ?? _employee['workStartTime'] ?? '09:00'}');
-    if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
-    return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    final start = _localTime(periodDay, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
+    final end = _localTime(periodDay.add(Duration(days: daysOn)), '${_employee['rotationEndTime'] ?? _employee['workEndTime'] ?? _employee['workStartTime'] ?? '09:00'}');
+    if (cycleDay < daysOn) {
+      return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    }
+    if (cycleDay == daysOn && now.isBefore(end)) {
+      return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    }
+    return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
   }
 
   List<int> _workDays() {
@@ -590,6 +603,11 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       if (result.isNotEmpty) return result;
     }
     return [0, 1, 2, 3, 4];
+  }
+
+  DateTime _damascusNow() {
+    final utc = _now.toUtc();
+    return utc.add(const Duration(hours: 3));
   }
 
   DateTime _localTime(DateTime day, String value) {
@@ -626,7 +644,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     DateTime? target;
     String label = '';
     if (s['kind'] == 'NOT_STARTED' && start is DateTime) { target = start; label = 'بداية أول مناوبة'; }
-    else if (s['isWorkDay'] == true && end is DateTime && end.isAfter(_now)) { target = end; label = 'تنتهي المناوبة خلال'; }
+    else if (s['isWorkDay'] == true && end is DateTime && end.isAfter(_damascusNow())) { target = end; label = 'تنتهي المناوبة خلال'; }
     else if (s['kind'] == 'OFF') {
       final raw = '${_employee['rotationStartDate'] ?? ''}'.split('T').first;
       final parsed = DateTime.tryParse(raw);
@@ -636,7 +654,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
         final cycle = on + off;
         if (cycle <= 0) return '';
         final dayStart = DateTime(parsed.year, parsed.month, parsed.day);
-        final diff = DateTime(_now.year, _now.month, _now.day).difference(dayStart).inDays;
+        final now = _damascusNow();
+        final diff = DateTime(now.year, now.month, now.day).difference(dayStart).inDays;
         final cycleDay = diff % cycle;
         final next = dayStart.add(Duration(days: diff + (cycle - cycleDay)));
         target = _localTime(next, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
@@ -644,7 +663,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       }
     }
     if (target == null) return '';
-    final d = target.difference(_now);
+    final d = target.difference(_damascusNow());
     final total = d.inSeconds.clamp(0, 999999999);
     final h = total ~/ 3600;
     final m = (total % 3600) ~/ 60;
@@ -655,7 +674,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   int _lateMinutes(Map<String, dynamic> s, bool checkedIn) {
     if (!checkedIn || s['start'] is! DateTime) return 0;
     final start = s['start'] as DateTime;
-    if (_now.isBefore(start)) return 0;
+    final now = _damascusNow();
+    if (now.isBefore(start)) return 0;
     final event = _event(_todayAttendance(), 'check-in');
     final stamp = _stamp(event);
     if (stamp == null || !stamp.isAfter(start)) return 0;
