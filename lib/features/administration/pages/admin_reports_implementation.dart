@@ -185,7 +185,10 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
       final buffer = StringBuffer();
       buffer.writeln('التاريخ,الموظف,الرقم الوظيفي,الحالة,الحضور,الانصراف,الساعات,التأخر,المغادرة المبكرة,الإضافي');
       for (final row in rows) {
-        String clean(dynamic value) => '"${'${value ?? ''}'.replaceAll('"', '""')}"';
+        String clean(dynamic value) {
+          final text = '${value ?? ''}'.replaceAll('"', '""');
+          return '"$text"';
+        }
         buffer.writeln([
           clean(row['attendanceDay']),
           clean(row['employeeName']),
