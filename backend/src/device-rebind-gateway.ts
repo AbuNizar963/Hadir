@@ -55,6 +55,24 @@ function dailyCors(request: Request, env: Env) {
   };
 }
 
+function damascusDayNow() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Damascus",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+function employeeDailyStatusRequest(request: Request, actor: any) {
+  if (String(actor?.role || "").toLowerCase() !== "staff") return request;
+  const url = new URL(request.url);
+  url.searchParams.set("date", damascusDayNow());
+  return new Request(url, request);
+}
+
 function dailyError(message: string, request: Request, env: Env, status = 500) {
   return new Response(JSON.stringify({ error: message }), {
     status,
@@ -121,7 +139,7 @@ export default {
         const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
         const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
         const result = normalizedPath === "/api/manager/daily-status"
-          ? await handleDailyStatus(request, env, actor)
+          ? await handleDailyStatus(employeeDailyStatusRequest(request, actor), env, actor)
           : normalizedPath === "/api/reports/professional-attendance"
             ? await handleProfessionalAttendanceReport(request, env, actor)
             : await handleProfessionalAttendanceReport(request, env, actor);
