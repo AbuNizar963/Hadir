@@ -1,0 +1,32 @@
+name: Safe Rotation End Patch
+on:
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch exact rotation boundary
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/lib/schedule.ts')
+          s = p.read_text()
+          old = '''  if (cycleDay === daysOn) {\n    const periodEnd = localDateTimeUtc(addLocalDaysToKey(periodStartDay, daysOn), employee.workEndTime || employee.workStartTime || "09:00");\n    if (target.getTime() < periodEnd.getTime()) return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: daysOn - 1, phase: "WORK" };\n  }\n'''
+          if old not in s:
+              raise SystemExit('expected rotation boundary block not found')
+          s = s.replace(old, '')
+          p.write_text(s)
+          PY
+          git diff --check
+          git diff -- src/lib/schedule.ts
+          git status --short
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/lib/schedule.ts
+          git commit -m 'fix: end rotation exactly at next cycle boundary'
+          git push origin HEAD
