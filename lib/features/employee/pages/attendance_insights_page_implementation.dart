@@ -34,7 +34,10 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
   Future<void> _load() async {
     try {
       final api = HadirApi(token: await _session.token());
-      final records = await api.attendance(limit: 100);
+      // The backend deliberately returns the current shift for limits <= 500.
+      // Insights need historical data, so use the full endpoint range just as
+      // the reference client does for employee dashboards.
+      final records = await api.attendance(limit: 2000);
       if (!mounted) return;
       setState(() {
         _records = records.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
