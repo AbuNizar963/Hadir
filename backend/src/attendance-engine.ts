@@ -38,7 +38,7 @@ export async function handleDailyStatus(req:Request,env:Env,actor:any,persist=fa
     const requestActive=(r:any)=>{const start=String(r.startDate||r.createdAt||"").slice(0,10);const end=String(r.endDate||r.startDate||r.createdAt||"").slice(0,10);return start<=day&&day<=end;};
     const leaveIds=new Set(requests.filter((r:any)=>String(r.type).toLowerCase()==="leave"&&requestActive(r)).map((r:any)=>String(r.employeeId)));
     const permissionIds=new Set(requests.filter((r:any)=>String(r.type).toLowerCase()==="permission"&&requestActive(r)).map((r:any)=>String(r.employeeId)));
-    const historicalFrom=localDateTimeUtc(addDays(day,-7),"00:00").toISOString();
+    const maxRotationOn=Math.max(1,...employees.map((e:any)=>String(e.scheduleType||"").trim().toUpperCase()==="ROTATION"?Math.max(1,Math.floor(Number(e.rotationDaysOn??4))):1));const historicalFrom=localDateTimeUtc(addDays(day,-Math.max(7,maxRotationOn-1)),"00:00").toISOString();
     const historical=await env.DB.prepare("SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(historicalFrom,to).all<any>();
     const historicalByEmployee=new Map<string,any[]>();for(const row of historical.results||[]){const id=String(row.employeeId||"");if(id){const list=historicalByEmployee.get(id)||[];list.push(row);historicalByEmployee.set(id,list);}}
     const result=scopedEmployees.map(employee=>{
