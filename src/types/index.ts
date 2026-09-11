@@ -14,6 +14,9 @@ export interface Employee {
   scheduleType?: ScheduleType; rotationStartDate?: string | null; avatar?: string | null;
   workStartTime?: string; workEndTime?: string;
   rotationStartTime?: string; rotationEndTime?: string;
+  rotationDailyAttendanceEnabled?: boolean;
+  rotationDailyAttendanceTime?: string | null;
+  rotationDailyAttendanceGraceMinutes?: number;
   gracePeriodMinutes?: number;
   earlyCheckoutGraceMinutes?: number;
   role?: UserRole; locationId?: string | null; rotationDaysOn?: number; rotationDaysOff?: number;
