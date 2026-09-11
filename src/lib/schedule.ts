@@ -114,10 +114,6 @@ function getRotationInfo(employee: Employee, target: Date): { firstStart: Date; 
   const periodStartDay = addLocalDaysToKey(startDay, cycleIndex * cycleLength);
   const periodStart = localDateTimeUtc(periodStartDay, employee.workStartTime || employee.rotationStartTime || "09:00");
   if (cycleDay < daysOn) return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: cycleDay, phase: "WORK" };
-  if (cycleDay === daysOn) {
-    const periodEnd = localDateTimeUtc(addLocalDaysToKey(periodStartDay, daysOn), employee.workEndTime || employee.workStartTime || "09:00");
-    if (target.getTime() < periodEnd.getTime()) return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: daysOn - 1, phase: "WORK" };
-  }
   return { firstStart, periodStart, daysOn, daysOff, cycleDay, workDay: 0, phase: "OFF" };
 }
 
