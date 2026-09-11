@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/hadir_theme_controller.dart';
 import '../../../services/notifications_service.dart';
@@ -95,15 +96,15 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
         child: Row(children: [
           _brand(scheme),
           const SizedBox(width: 8),
-          _tool(Icons.menu_rounded, 'القائمة', () => setState(() => _menuOpen = !_menuOpen), scheme, active: _menuOpen),
+          _tool(LucideIcons.menu, 'القائمة', () => setState(() => _menuOpen = !_menuOpen), scheme, active: _menuOpen),
           const SizedBox(width: 6),
-          _tool(Icons.notifications_none_rounded, 'الإشعارات', () async { await context.push('/notifications'); _refreshUnread(); }, scheme, badge: _unread),
+          _tool(LucideIcons.bell, 'الإشعارات', () async { await context.push('/notifications'); _refreshUnread(); }, scheme, badge: _unread),
           const SizedBox(width: 6),
-          _tool(Icons.cloud_outlined, 'الطقس', () => context.push('/weather'), scheme),
+          _tool(LucideIcons.cloudSun, 'الطقس', () => context.push('/weather'), scheme),
           const SizedBox(width: 6),
-          _tool(Icons.explore_outlined, 'القبلة', () => context.push('/prayer'), scheme),
+          _tool(LucideIcons.compass, 'القبلة', () => context.push('/prayer'), scheme),
           const SizedBox(width: 6),
-          _tool(Icons.smart_toy_outlined, 'المساعد', () => context.push('/ai'), scheme),
+          _tool(LucideIcons.bot, 'المساعد', () => context.push('/ai'), scheme),
         ]),
       ),
     );
@@ -184,10 +185,10 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
 
   Widget _navBar(ColorScheme scheme, int selected) {
     const items = [
-      (Icons.dashboard_outlined, Icons.dashboard_rounded, 'لوحة الموظف'),
-      (Icons.business_outlined, Icons.business_rounded, 'مركز الموظف'),
-      (Icons.access_time_outlined, Icons.access_time_filled, 'سجل العمل'),
-      (Icons.person_outline_rounded, Icons.person_rounded, 'الملف الشخصي'),
+      (LucideIcons.layoutDashboard, LucideIcons.layoutDashboard, 'لوحة الموظف'),
+      (LucideIcons.building2, LucideIcons.building2, 'مركز الموظف'),
+      (LucideIcons.clock3, LucideIcons.clock3, 'سجل العمل'),
+      (LucideIcons.userRound, LucideIcons.userRound, 'الملف الشخصي'),
     ];
     return Container(
       decoration: BoxDecoration(color: scheme.surface, border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .65)))),
@@ -265,8 +266,8 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
       child: Wrap(
         spacing: 6,
         children: [
-          TextButton.icon(onPressed: () => _theme(context), icon: const Icon(Icons.palette_outlined, size: 18), label: const Text('المظهر')),
-          TextButton.icon(onPressed: _logout, icon: Icon(Icons.logout_rounded, color: scheme.error, size: 18), label: Text('تسجيل خروج', style: TextStyle(color: scheme.error, fontWeight: FontWeight.w700))),
+          TextButton.icon(onPressed: () => _theme(context), icon: const Icon(LucideIcons.palette, size: 18), label: const Text('المظهر')),
+          TextButton.icon(onPressed: _logout, icon: Icon(LucideIcons.logOut, color: scheme.error, size: 18), label: Text('تسجيل خروج', style: TextStyle(color: scheme.error, fontWeight: FontWeight.w700))),
         ],
       ),
     );
@@ -279,9 +280,9 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(leading: const Icon(Icons.dark_mode_outlined), title: const Text('داكن'), onTap: () { HadirThemeController.instance.setMode(ThemeMode.dark); Navigator.pop(context); }),
-            ListTile(leading: const Icon(Icons.light_mode_outlined), title: const Text('فاتح'), onTap: () { HadirThemeController.instance.setMode(ThemeMode.light); Navigator.pop(context); }),
-            ListTile(leading: const Icon(Icons.monitor_outlined), title: const Text('تلقائي'), onTap: () { HadirThemeController.instance.setMode(ThemeMode.system); Navigator.pop(context); }),
+            ListTile(leading: const Icon(LucideIcons.moon), title: const Text('داكن'), onTap: () { HadirThemeController.instance.setMode(ThemeMode.dark); Navigator.pop(context); }),
+            ListTile(leading: const Icon(LucideIcons.sun), title: const Text('فاتح'), onTap: () { HadirThemeController.instance.setMode(ThemeMode.light); Navigator.pop(context); }),
+            ListTile(leading: const Icon(LucideIcons.monitor), title: const Text('تلقائي'), onTap: () { HadirThemeController.instance.setMode(ThemeMode.system); Navigator.pop(context); }),
           ],
         ),
       ),
