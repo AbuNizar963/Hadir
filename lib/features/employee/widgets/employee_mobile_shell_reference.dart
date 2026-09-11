@@ -169,7 +169,7 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
               top: -2,
               right: -2,
               child: Container(
-                minWidth: 18,
+                constraints: const BoxConstraints(minWidth: 18),
                 height: 18,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 alignment: Alignment.center,
