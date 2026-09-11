@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/api.dart';
@@ -43,6 +46,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
   String? error;
   String? editingLocation;
   bool addingLocation = false;
+  bool logoBusy = false;
+  String? pendingLogoPath;
   String bulkAction = '';
 
   @override
@@ -132,6 +137,57 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
       if (mounted) setState(() => error = HadirApi.errorMessage(e));
     } finally {
       if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> pickCompanyLogo() async {
+    if (busy || logoBusy) return;
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 88);
+      if (image == null || !mounted) return;
+      setState(() => pendingLogoPath = image.path);
+    } catch (e) {
+      if (mounted) toast('تعذر اختيار الشعار: ${HadirApi.errorMessage(e)}', danger: true);
+    }
+  }
+
+  Future<void> saveCompanyLogo() async {
+    final path = pendingLogoPath;
+    if (path == null || logoBusy) return;
+    setState(() => logoBusy = true);
+    try {
+      final apiClient = await api();
+      if (apiClient == null) return;
+      await apiClient.uploadCompanyLogo(path);
+      final remote = await apiClient.settings();
+      if (!mounted) return;
+      setState(() { settings = Map<String, dynamic>.from(remote); pendingLogoPath = null; });
+      toast('تم حفظ شعار الشركة مركزيًا');
+    } catch (e) {
+      if (mounted) toast('تعذر حفظ الشعار: ${HadirApi.errorMessage(e)}', danger: true);
+    } finally {
+      if (mounted) setState(() => logoBusy = false);
+    }
+  }
+
+  Future<void> removeCompanyLogo() async {
+    if (logoBusy) return;
+    final confirmed = await confirm('إزالة شعار الشركة', 'سيتم إزالة الشعار المركزي من R2 وإخفاؤه من هوية الجهة.');
+    if (!confirmed) return;
+    setState(() => logoBusy = true);
+    try {
+      final apiClient = await api();
+      if (apiClient == null) return;
+      await apiClient.deleteCompanyLogo();
+      final remote = await apiClient.settings();
+      if (!mounted) return;
+      setState(() { settings = Map<String, dynamic>.from(remote); pendingLogoPath = null; });
+      toast('تمت إزالة شعار الشركة');
+    } catch (e) {
+      if (mounted) toast('تعذر إزالة الشعار: ${HadirApi.errorMessage(e)}', danger: true);
+    } finally {
+      if (mounted) setState(() => logoBusy = false);
     }
   }
 
@@ -367,7 +423,11 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                 shape: BoxShape.circle,
                 border: Border.all(color: green.withValues(alpha: .25), width: 2),
               ),
-              child: Image.asset('assets/branding/hadir_logo_transparent.png'),
+              child: ClipOval(
+                child: (settings['brandLogo']?.toString().trim().isNotEmpty ?? false)
+                    ? Image.network(settings['brandLogo'].toString(), fit: BoxFit.contain, errorBuilder: (_, __, ___) => Image.asset('assets/branding/hadir_logo_transparent.png'))
+                    : Image.asset('assets/branding/hadir_logo_transparent.png'),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -448,6 +508,28 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                 Icons.business_outlined,
               ),
               const SizedBox(height: 10),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: inner, borderRadius: BorderRadius.circular(18), border: Border.all(color: green.withValues(alpha: .18))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Row(children: [iconBox(Icons.image_outlined), const SizedBox(width: 9), const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('الشعار الرسمي', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+                    Text('الشعار الذي يظهر كهوية الشركة داخل النظام', style: TextStyle(color: muted, fontSize: 9.5)),
+                  ]))]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Container(width: 72, height: 72, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF070C16), borderRadius: BorderRadius.circular(16), border: Border.all(color: line)), child: pendingLogoPath != null ? Image.file(File(pendingLogoPath!), fit: BoxFit.contain) : ((settings['brandLogo']?.toString().trim().isNotEmpty ?? false) ? Image.network(settings['brandLogo'].toString(), fit: BoxFit.contain, errorBuilder: (_, __, ___) => Image.asset('assets/branding/hadir_logo_transparent.png')) : Image.asset('assets/branding/hadir_logo_transparent.png'))),
+                    const SizedBox(width: 10),
+                    Expanded(child: Wrap(spacing: 7, runSpacing: 7, children: [
+                      OutlinedButton.icon(onPressed: logoBusy ? null : pickCompanyLogo, icon: const Icon(Icons.add_photo_alternate_outlined, size: 17), label: Text(settings['brandLogo']?.toString().trim().isNotEmpty ?? false ? 'تغيير الشعار' : 'اختيار الشعار')),
+                      if (pendingLogoPath != null) FilledButton.icon(onPressed: logoBusy ? null : saveCompanyLogo, icon: const Icon(Icons.check_rounded, size: 17), label: const Text('حفظ الشعار'), style: FilledButton.styleFrom(backgroundColor: green, foregroundColor: Colors.black)),
+                      if (settings['brandLogo']?.toString().trim().isNotEmpty ?? false) TextButton.icon(onPressed: logoBusy ? null : removeCompanyLogo, icon: const Icon(Icons.delete_outline_rounded, size: 17), label: const Text('إزالة'), style: TextButton.styleFrom(foregroundColor: red)),
+                    ])),
+                  ]),
+                  if (pendingLogoPath != null) const Padding(padding: EdgeInsets.only(top: 8), child: Text('تم تجهيز صورة جديدة. اضغط «حفظ الشعار» لرفعها إلى R2.', textAlign: TextAlign.right, style: TextStyle(color: cyan, fontSize: 9.5))),
+                ]),
+              ),
               field(
                 'اسم الشركة / الجهة',
                 settings['brandName']?.toString() ?? '',
