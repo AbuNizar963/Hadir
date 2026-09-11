@@ -517,7 +517,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   Widget _avatar(BuildContext context, String? url, String name, {double size = 56, bool light = false}) {
     final scheme = Theme.of(context).colorScheme;
-    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900)))));
+    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))));
     return Container(width: size, height: size, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14), border: Border.all(color: scheme.primary.withValues(alpha: .28))), child: child);
   }
 
@@ -763,12 +763,19 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   }
 
   dynamic _activeEscape() {
+    DateTime? latestStamp;
+    Map<String, dynamic>? latest;
     for (final row in _escapeEvents) {
       if (row is! Map) continue;
-      final status = '${row['status'] ?? ''}'.toLowerCase();
-      if (status == 'escaped') return row;
+      final stamp = _stamp(row);
+      if (stamp == null) continue;
+      if (latestStamp == null || stamp.isAfter(latestStamp)) {
+        latestStamp = stamp;
+        latest = Map<String, dynamic>.from(row);
+      }
     }
-    return null;
+    if (latest == null) return null;
+    return '${latest['status'] ?? ''}'.trim().toLowerCase() == 'escaped' ? latest : null;
   }
 
   List<dynamic> _todayApprovedRequests() {
