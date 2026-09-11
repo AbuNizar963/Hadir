@@ -112,8 +112,8 @@ class _EmployeeTransferPageState extends State<EmployeeTransferPage> {
           workDays: e['workDays'] is List
               ? (e['workDays'] as List).map((v) => int.tryParse('$v')).whereType<int>().toList()
               : const [0, 1, 2, 3, 4],
-          rotationDaysOn: int.tryParse('${e['rotationDaysOn'] ?? 7}') ?? 7,
-          rotationDaysOff: int.tryParse('${e['rotationDaysOff'] ?? 7}') ?? 7,
+          rotationDaysOn: int.tryParse('${e['rotationDaysOn'] ?? 4}') ?? 4,
+          rotationDaysOff: int.tryParse('${e['rotationDaysOff'] ?? 4}') ?? 4,
           rotationStartDate: '${e['rotationStartDate'] ?? ''}'.trim().isEmpty ? null : '${e['rotationStartDate']}',
           locationId: '${e['locationId'] ?? ''}'.trim().isEmpty ? null : '${e['locationId']}',
           specialties: specialties is List ? specialties.map((v) => '$v').toList() : ['${specialties ?? 'general'}'],
