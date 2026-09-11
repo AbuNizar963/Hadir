@@ -1,6 +1,8 @@
 name: Safe patch grace and rotation
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - fix/grace-report-sync-and-rotation-period
 permissions:
   contents: write
 jobs:
