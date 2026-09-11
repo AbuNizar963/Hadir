@@ -1,9 +1,6 @@
 /// Attendance feature surface.
-///
-/// Existing page implementations are preserved while the project moves to
-/// feature-oriented organization incrementally.
 library;
 
-export '../../pages/attendance_page.dart';
-export '../../pages/attendance_insights_page.dart';
-export '../../pages/jibble_history_page.dart';
+export '../employee/pages/attendance_page_implementation.dart';
+export '../employee/pages/attendance_insights_page_implementation.dart';
+export '../employee/pages/jibble_history_page_implementation.dart';
