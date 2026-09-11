@@ -529,8 +529,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     if (escape != null) return 'هارب';
     if (leave) return 'إجازة';
     if (permission) return 'إذن';
+    if (open != null) return _lateMinutes(schedule, checkedIn) > 0 ? 'متأخر' : 'حاضر';
     if (schedule['isWorkDay'] == true) {
-      if (open != null) return _lateMinutes(schedule, checkedIn) > 0 ? 'متأخر' : 'حاضر';
       if (checkedIn) return 'حاضر';
       if (_now.isAfter(schedule['start'] as DateTime)) return 'غائب';
       return 'لم تبدأ المناوبة';
