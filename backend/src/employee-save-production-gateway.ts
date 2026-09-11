@@ -1,6 +1,7 @@
 import base, { HadirRealtime } from "./device-rebind-gateway";
 import { generateDailyReportPdf } from "./report-pdf";
 import { handleReportArchive } from "./report-archive";
+import { refreshProfessionalAttendanceFact } from "./professional-attendance-fact-builder";
 
 type Env = {
   DB: D1Database;
@@ -147,6 +148,10 @@ async function saveEmployee(req: Request, env: Env, id: string, a: Actor, o: str
   const updated = await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();
   const policy = await env.DB.prepare("SELECT early_checkout_minutes AS minutes FROM employee_checkout_policies WHERE employee_id=? LIMIT 1").bind(id).first<any>();
   const result = employeeOut(updated, Number(policy?.minutes || 0));
+  if (sets.length || body.earlyCheckoutGraceMinutes !== undefined) {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: env.APP_TIMEZONE || "Asia/Damascus", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    await refreshProfessionalAttendanceFact(env, today, { id, role: "staff" }, id);
+  }
   if (body.isVip !== undefined || body.autoCheckIn !== undefined || body.autoCheckOut !== undefined) {
     await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), id, result.jobNumber, a.name, "workforce-controls", "success", "تحديث إعدادات الموظف من لوحة الموظفين", now(), req.headers.get("x-device-id") || "OWNER_PANEL", req.headers.get("CF-Connecting-IP") || "unknown").run().catch(() => undefined);
   }
