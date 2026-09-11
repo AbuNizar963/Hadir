@@ -1,0 +1,36 @@
+name: Fix Temporary Patch Validation
+on:
+  push:
+    branches: [fix/rotation-daily-attendance]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, 'fix temporary patch validation') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Patch temporary workflow validation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/_patch_rotation_daily.yml')
+          text=p.read_text()
+          old='''      - name: Validate backend and frontend\n        run: |\n          cd backend\n          npm install --package-lock=false\n          npx tsc --noEmit\n          cd ..\n          npm install\n          npm run build\n'''
+          new='''      - name: Validate backend\n        working-directory: backend\n        run: |\n          npm install --package-lock=false\n          npm run check\n      - name: Validate frontend\n        run: |\n          npm install\n          npm run build\n'''
+          if text.count(old)!=1: raise SystemExit('temporary workflow validation block not found exactly once')
+          p.write_text(text.replace(old,new,1))
+          PY
+          git diff --check
+      - name: Commit and remove this fixer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/_fix_temp_validation.yml
+          git add .github/workflows/_patch_rotation_daily.yml
+          git diff --cached --check
+          git commit -m "fix temporary patch validation"
+          git push
