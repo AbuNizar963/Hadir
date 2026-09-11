@@ -31,10 +31,11 @@ jobs:
         run: |
           npm install --package-lock=false
           npm run check
-      - name: Validate frontend
+      - name: Validate frontend bundle
         run: |
-          npm install
-          npm run build
+          npm install --no-audit --no-fund
+          npx vite build
+          node scripts/verify-production-build.mjs
       - name: Commit final source and remove all temporary workflows
         run: |
           git config user.name "github-actions[bot]"
