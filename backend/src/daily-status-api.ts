@@ -2,7 +2,7 @@ type Env = { DB: D1Database; APP_ORIGIN?: string };
 
 const TZ = "Asia/Damascus";
 const DAY_MS = 86_400_000;
-type Status = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "NOT_STARTED" | "INVALID";
+type Status = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "ESCAPED" | "NOT_STARTED" | "INVALID";
 type EmployeeRow = { id:string; name:string; jobNumber:string; status:string; scheduleType:string; workStartTime:string|null; workEndTime:string|null; workDaysJson:string|null; rotationStartDate:string|null; rotationDaysOn:number|null; rotationDaysOff:number|null; gracePeriodMinutes:number|null; isVip:number|null; autoCheckIn:number|null; autoCheckOut:number|null };
 type DailyStatusStoredRow = { employeeId:string; status:string; checkInAt:string|null; checkOutAt:string|null; scheduleType:string };
 const CORS_HEADERS={"access-control-allow-origin":"*","access-control-allow-headers":"authorization, content-type","access-control-allow-methods":"GET, OPTIONS","cache-control":"no-store"};
@@ -19,8 +19,6 @@ function rotationParams(employee:EmployeeRow){const startDay=String(employee.rot
 function rotationScheduleAt(employee:EmployeeRow,instant:Date){const p=rotationParams(employee);if(!p)return{work:false,status:"INVALID" as const,start:null,end:null};const elapsed=instant.getTime()-p.firstStart.getTime();if(elapsed<0)return{work:false,status:"NOT_STARTED" as const,start:null,end:null};const cycleIndex=Math.floor(elapsed/p.cycleMs),within=elapsed-cycleIndex*p.cycleMs,periodStart=new Date(p.firstStart.getTime()+cycleIndex*p.cycleMs),periodEnd=new Date(periodStart.getTime()+p.workMs);if(within>=p.workMs)return{work:false,status:"REST" as const,start:periodStart,end:periodEnd};return{work:true,status:"WORK" as const,start:periodStart,end:periodEnd};}
 function scheduleFor(employee:EmployeeRow,day:string){const kind=String(employee.scheduleType||"ADMIN").trim().toUpperCase();if(kind!=="ROTATION"){const weekday=new Date(dayNumber(day)*DAY_MS).getUTCDay();if(!workDays(employee).includes(weekday))return{work:false,status:"REST" as const,start:null,end:null};const start=localDateTimeUtc(day,employee.workStartTime||"09:00");const rawEnd=localDateTimeUtc(day,employee.workEndTime||"16:00");const end=rawEnd.getTime()<=start.getTime()?new Date(rawEnd.getTime()+DAY_MS):rawEnd;return{work:true,status:"WORK" as const,start,end};}
   const p=rotationParams(employee);if(!p)return{work:false,status:"INVALID" as const,start:null,end:null};
-  // A rotation report date represents the rotation period that starts on that
-  // calendar date at the employee's shift start time, not midnight-to-midnight.
   const dayAnchor=localDateTimeUtc(day,employee.workStartTime||"09:00");
   return rotationScheduleAt(employee,dayAnchor);
 }
@@ -28,13 +26,18 @@ function scheduleFor(employee:EmployeeRow,day:string){const kind=String(employee
 export async function handleDailyStatus(req:Request,env:Env,actor:any){
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS_HEADERS});
   if(req.method!=="GET")return json({error:"الطريقة غير مدعومة"},405);
-  if(!actor||!["owner","manager","supervisor"].includes(String(actor.role)))return json({error:"غير مصرح"},403);
+  if(!actor||!["owner","manager","supervisor","staff"].includes(String(actor.role)))return json({error:"غير مصرح"},403);
   const url=new URL(req.url),requestedDay=String(url.searchParams.get("date")||"").trim(),day=/^\d{4}-\d{2}-\d{2}$/.test(requestedDay)?requestedDay:dayKey(new Date()),nextDay=addDays(day,1),from=localDateTimeUtc(addDays(day,-8),"00:00").toISOString(),to=localDateTimeUtc(addDays(day,9),"00:00").toISOString();
   try{
     const employeeQuery=await env.DB.prepare("SELECT e.id,e.name,e.job_number AS jobNumber,e.status,e.schedule_type AS scheduleType,e.work_start_time AS workStartTime,e.work_end_time AS workEndTime,e.work_days_json AS workDaysJson,e.rotation_start_date AS rotationStartDate,e.rotation_days_on AS rotationDaysOn,e.rotation_days_off AS rotationDaysOff,e.grace_period_minutes AS gracePeriodMinutes,e.is_vip AS isVip,e.auto_check_in AS autoCheckIn,e.auto_check_out AS autoCheckOut FROM employees e WHERE e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?) ORDER BY e.name").bind(localDateTimeUtc(day,"00:00").toISOString(),localDateTimeUtc(nextDay,"00:00").toISOString()).all<EmployeeRow>();
     const attendanceQuery=await env.DB.prepare("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(from,to).all<any>();
     const requestQuery=await env.DB.prepare("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission')").all<any>();
+    const now=new Date(),today=dayKey(now),escapeCutoff=day===today?now:localDateTimeUtc(nextDay,"00:00");
+    const escapeQuery=await env.DB.prepare("SELECT employee_id AS employeeId,status,timestamp FROM escape_events WHERE timestamp<? ORDER BY timestamp DESC").bind(escapeCutoff.toISOString()).all<any>();
+    const latestEscapeByEmployee=new Map<string,any>();
+    for(const row of escapeQuery.results||[]){const id=String(row.employeeId||"");if(id&&!latestEscapeByEmployee.has(id))latestEscapeByEmployee.set(id,row);}
     const employees=employeeQuery.results||[], attendance=attendanceQuery.results||[], requests=requestQuery.results||[];
+    const scopedEmployees=String(actor.role)==="staff"?employees.filter(employee=>String(employee.id)===String(actor.id)):employees;
     const byEmployee=new Map<string,any[]>();for(const row of attendance){const id=String(row.employeeId||"");if(id){const list=byEmployee.get(id)||[];list.push(row);byEmployee.set(id,list);}}
     const requestActive=(r:any)=>{const start=String(r.startDate||r.createdAt||"").slice(0,10);const end=String(r.endDate||r.startDate||r.createdAt||"").slice(0,10);return start<=day&&day<=end;};
     const leaveIds=new Set(requests.filter((r:any)=>String(r.type).toLowerCase()==="leave"&&requestActive(r)).map((r:any)=>String(r.employeeId)));
@@ -42,8 +45,7 @@ export async function handleDailyStatus(req:Request,env:Env,actor:any){
     const historicalFrom=localDateTimeUtc(addDays(day,-7),"00:00").toISOString();
     const historical=await env.DB.prepare("SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(historicalFrom,to).all<any>();
     const historicalByEmployee=new Map<string,any[]>();for(const row of historical.results||[]){const id=String(row.employeeId||"");if(id){const list=historicalByEmployee.get(id)||[];list.push(row);historicalByEmployee.set(id,list);}}
-    const now=new Date(),today=dayKey(now);
-    const result=employees.map(employee=>{
+    const result=scopedEmployees.map(employee=>{
       const id=String(employee.id),isRotation=String(employee.scheduleType||"").trim().toUpperCase()==="ROTATION";let schedule=isRotation&&day===today?rotationScheduleAt(employee,now):scheduleFor(employee,day);const rows=byEmployee.get(id)||[];let checkIn=null;let checkOut=null;
       if(isRotation){
         const periodStart=schedule.start;
@@ -58,14 +60,15 @@ export async function handleDailyStatus(req:Request,env:Env,actor:any){
         checkOut=[...rows].reverse().find(r=>String(r.type)==="check-out")||null;
       }
       const isScheduledVip=Number(employee.isVip)===1&&Number(employee.autoCheckIn)===1&&schedule.work&&!leaveIds.has(id)&&!permissionIds.has(id);
-      let status:Status;if(leaveIds.has(id))status="LEAVE";else if(permissionIds.has(id))status="PERMISSION";else if(schedule.status==="REST")status="REST";else if(schedule.status==="NOT_STARTED")status="NOT_STARTED";else if(schedule.status==="INVALID")status="INVALID";else if(checkIn){const grace=Number.isFinite(Number(employee.gracePeriodMinutes))?Math.max(0,Number(employee.gracePeriodMinutes)):10;status=isRotation?"PRESENT":(schedule.start&&Date.parse(String(checkIn.timestamp))>schedule.start.getTime()+grace*60000?"LATE":"PRESENT");}else if(isScheduledVip)status="PRESENT";else if(day===today&&schedule.end&&now.getTime()>=schedule.end.getTime())status="REST";else if(day===today&&schedule.start&&now.getTime()<schedule.start.getTime())status="NOT_STARTED";else if(!schedule.work)status="REST";else status="ABSENT";
+      const latestEscape=latestEscapeByEmployee.get(id);
+      let status:Status;if(latestEscape&&String(latestEscape.status||"").trim().toLowerCase()==="escaped")status="ESCAPED";else if(leaveIds.has(id))status="LEAVE";else if(permissionIds.has(id))status="PERMISSION";else if(schedule.status==="REST")status="REST";else if(schedule.status==="NOT_STARTED")status="NOT_STARTED";else if(schedule.status==="INVALID")status="INVALID";else if(checkIn){const grace=Number.isFinite(Number(employee.gracePeriodMinutes))?Math.max(0,Number(employee.gracePeriodMinutes)):10;status=isRotation?"PRESENT":(schedule.start&&Date.parse(String(checkIn.timestamp))>schedule.start.getTime()+grace*60000?"LATE":"PRESENT");}else if(isScheduledVip)status="PRESENT";else if(day===today&&schedule.end&&now.getTime()>=schedule.end.getTime())status="REST";else if(day===today&&schedule.start&&now.getTime()<schedule.start.getTime())status="NOT_STARTED";else if(!schedule.work)status="REST";else status="ABSENT";
       const vipCheckIn=isScheduledVip&&!checkIn?schedule.start?.toISOString()||null:checkIn?.timestamp||null;
       const vipCheckOut=isScheduledVip&&Number(employee.autoCheckOut)===1&&!checkOut&&schedule.end&&(day<today||(day===today&&now.getTime()>=schedule.end.getTime()))?schedule.end.toISOString():checkOut?.timestamp||null;
       return{attendanceDay:day,employeeId:id,employeeName:String(employee.name||""),jobNumber:String(employee.jobNumber||""),status,scheduleType:String(employee.scheduleType||"ADMIN").toUpperCase(),checkInAt:vipCheckIn,checkOutAt:vipCheckOut,scheduledStart:schedule.start?.toISOString()||null,scheduledEnd:schedule.end?.toISOString()||null};
     });
     const computedAt=new Date().toISOString();
     if(result.length){
-      const storedQuery=await env.DB.prepare("SELECT employee_id AS employeeId,status,check_in_at AS checkInAt,check_out_at AS checkOutAt,schedule_type AS scheduleType FROM daily_attendance_status WHERE attendance_day=?").bind(day).all<DailyStatusStoredRow>();
+      const storedQuery=await env.DB.prepare("SELECT employee_id AS employeeId,status,check_in_at AS checkInAt,check_out_at AS checkOutAt,schedule_type AS scheduleType FROM daily_attendance_status WHERE attendance_day=? AND employee_id IN (SELECT id FROM employees)").bind(day).all<DailyStatusStoredRow>();
       const stored=new Map((storedQuery.results||[]).map(row=>[String(row.employeeId),row]));
       const changed=result.filter(row=>{const previous=stored.get(row.employeeId);return !previous||String(previous.status||"")!==row.status||String(previous.checkInAt||"")!==String(row.checkInAt||"")||String(previous.checkOutAt||"")!==String(row.checkOutAt||"")||String(previous.scheduleType||"")!==row.scheduleType;});
       if(changed.length)await env.DB.batch(changed.map(row=>env.DB.prepare("INSERT INTO daily_attendance_status(attendance_day,employee_id,status,check_in_at,check_out_at,schedule_type,computed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(attendance_day,employee_id) DO UPDATE SET status=excluded.status,check_in_at=excluded.check_in_at,check_out_at=excluded.check_out_at,schedule_type=excluded.schedule_type,computed_at=excluded.computed_at").bind(row.attendanceDay,row.employeeId,row.status,row.checkInAt,row.checkOutAt,row.scheduleType,computedAt)));
