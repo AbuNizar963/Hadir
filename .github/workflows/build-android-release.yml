@@ -29,22 +29,6 @@ jobs:
         with:
           ref: ${{ inputs.source_ref || github.ref_name }}
           fetch-depth: 1
-      - name: Repair malformed digital-card print source before build
-        shell: bash
-        run: |
-          set -euo pipefail
-          TARGET='lib/features/employee/pages/profile_page_reference_implementation_v2.dart'
-          if grep -qF '])])))));)' "$TARGET"; then
-            sed -i 's/])])))));)/])])))));/' "$TARGET"
-            git diff --check
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add "$TARGET"
-            git commit -m 'fix(employee): repair digital card print syntax'
-            git push origin HEAD:Apps
-          else
-            echo 'Digital-card print source does not contain the known malformed terminator.'
-          fi
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
