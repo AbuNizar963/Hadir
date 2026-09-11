@@ -18,6 +18,7 @@ class _ManagerWorkforceControlsPageState extends State<ManagerWorkforceControlsP
   late final Dio _dio;
 
   bool _loading = true;
+  bool _owner = false;
   String? _error;
   String _query = '';
   List<Map<String, dynamic>> _employees = [];
@@ -71,6 +72,15 @@ class _ManagerWorkforceControlsPageState extends State<ManagerWorkforceControlsP
     return result;
   }
 
+  bool _isOwner(dynamic data) {
+    if (data is Map) {
+      final user = data['user'];
+      final role = data['role'] ?? (user is Map ? user['role'] : null);
+      return '${role ?? ''}'.toLowerCase() == 'owner';
+    }
+    return false;
+  }
+
   Future<void> _load({bool spinner = true}) async {
     if (spinner && mounted) setState(() { _loading = true; _error = null; });
     try {
@@ -78,13 +88,15 @@ class _ManagerWorkforceControlsPageState extends State<ManagerWorkforceControlsP
       if (token == null || token.isEmpty) throw Exception('انتهت جلسة الإدارة.');
       _dio.options.headers['Authorization'] = 'Bearer $token';
       final results = await Future.wait([
+        _dio.get('/api/me'),
         _dio.get('/api/employees'),
         _dio.get('/api/manager/workforce-controls'),
       ]);
       if (!mounted) return;
       setState(() {
-        _employees = _asList(results[0].data);
-        _controls = _asControls(results[1].data);
+        _owner = _isOwner(results[0].data);
+        _employees = _asList(results[1].data);
+        _controls = _asControls(results[2].data);
         _loading = false;
         _error = null;
       });
@@ -97,10 +109,11 @@ class _ManagerWorkforceControlsPageState extends State<ManagerWorkforceControlsP
     final id = '${employee['id'] ?? ''}';
     final control = _controls[id];
     final value = control?[field] ?? employee[field];
-    return value == true;
+    return value == true || value == 1 || value == '1';
   }
 
   Future<void> _toggle(Map<String, dynamic> employee, String field) async {
+    if (!_owner) return;
     final id = '${employee['id'] ?? ''}';
     if (id.isEmpty) return;
     final next = !_value(employee, field);
@@ -124,7 +137,7 @@ class _ManagerWorkforceControlsPageState extends State<ManagerWorkforceControlsP
     final busy = _busyEmployee == id && _busyField == field;
     return Expanded(
       child: OutlinedButton.icon(
-        onPressed: busy ? null : () => _toggle(employee, field),
+        onPressed: !_owner || busy ? null : () => _toggle(employee, field),
         icon: busy ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(icon, size: 16),
         label: Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900)),
         style: OutlinedButton.styleFrom(
@@ -194,7 +207,7 @@ class _ManagerWorkforceControlsPageState extends State<ManagerWorkforceControlsP
               const SizedBox(height: 3),
               const Text('قوى العمل', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               const SizedBox(height: 2),
-              Text('تحكم مستقل في VIP والتحضير التلقائي والانصراف التلقائي.', style: TextStyle(fontSize: 10, color: Theme.of(context).hintColor)),
+              Text(_owner ? 'تحكم مستقل في VIP والتحضير التلقائي والانصراف التلقائي مع الإجراءات المباشرة للمالك.' : 'للقراءة والمراقبة فقط. التحكم في VIP والتلقائي محجوز للمالك.', style: TextStyle(fontSize: 10, color: Theme.of(context).hintColor)),
               const SizedBox(height: 10),
               TextField(onChanged: (v) => setState(() => _query = v), decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'بحث بالاسم أو الرقم', isDense: true)),
             ])),
