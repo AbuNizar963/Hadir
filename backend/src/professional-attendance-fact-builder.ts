@@ -12,7 +12,7 @@ function tzParts(date: Date) { const parts = new Intl.DateTimeFormat("en-CA", { 
 function timezoneOffsetMinutes(day: string) { const noonUtc = new Date(`${day}T12:00:00Z`); const local = tzParts(noonUtc); return Math.round((Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute) - noonUtc.getTime()) / 60000); }
 function localMidnightUtc(day: string) { return new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), 0, 0) - timezoneOffsetMinutes(day) * 60000); }
 function localDayNow() { const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()); const get = (type: string) => parts.find((p) => p.type === type)?.value || ""; return `${get("year")}-${get("month")}-${get("day")}`; }
-async function materializeDay(env: Env, day: string, actor: any, employeeId?: string) {
+export async function materializeDay(env: Env, day: string, actor: any, employeeId?: string) {
   const request = new Request(`https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}`, { method: "GET" });
   const response = await handleDailyStatus(request, env, actor); if (!response.ok) throw new Error(`تعذر حساب حالة الدوام لليوم ${day}`);
   const payload = await response.json() as any; const employees = Array.isArray(payload.employees) ? payload.employees : []; const filtered = employees.filter((e: any) => !employeeId || String(e.employeeId) === employeeId); if (!filtered.length) return 0;
@@ -38,4 +38,24 @@ async function materializeDay(env: Env, day: string, actor: any, employeeId?: st
   }
   if (statements.length) await env.DB.batch(statements); return statements.length;
 }
+
+export async function refreshProfessionalAttendanceFact(env: Env, day: string, actor: any, employeeId: string) {
+  if (!DAY_RE.test(day) || !String(employeeId || "").trim()) return 0;
+  try {
+    return await materializeDay(env, day, actor, employeeId);
+  } catch (error) {
+    console.error("professional attendance fact refresh failed", { day, employeeId, error });
+    return 0;
+  }
+}
+
+export async function refreshProfessionalAttendanceFacts(env: Env, from: string, to: string, actor: any, employeeId: string) {
+  if (!DAY_RE.test(from) || !DAY_RE.test(to) || from > to || !String(employeeId || "").trim()) return 0;
+  const days = daysBetween(from, to);
+  if (days < 1 || days > 366) return 0;
+  let written = 0;
+  for (let i = 0; i < days; i += 1) written += await refreshProfessionalAttendanceFact(env, addDays(from, i), actor, employeeId);
+  return written;
+}
+
 export async function ensureProfessionalAttendanceFacts(env: Env, from: string, to: string, actor: any, employeeId?: string) { if (!DAY_RE.test(from) || !DAY_RE.test(to)) throw new Error("الفترة الزمنية غير صالحة"); const days = daysBetween(from, to); if (days < 1 || days > 366) throw new Error("الفترة الزمنية تتجاوز الحد المسموح (366 يومًا)"); let written = 0; for (let i = 0; i < days; i += 1) written += await materializeDay(env, addDays(from, i), actor, employeeId); return written; }
