@@ -29,7 +29,10 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
     if (mounted) setState(() { _loading = true; _error = null; });
     try {
       final api = HadirApi(token: await _session.token());
-      final records = await api.attendance(limit: 100);
+      // The employee attendance endpoint returns only the current shift for
+      // limits <= 500. The history screen needs the full available period,
+      // matching the reference web client which requests 1000+ records.
+      final records = await api.attendance(limit: 2000);
       if (!mounted) return;
       setState(() {
         _records = records;
