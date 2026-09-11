@@ -13,8 +13,18 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Apply audited source patch
-        run: python3 scripts/_apply_rotation_daily.py
+      - name: Make audited patch idempotent and apply it
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/_apply_rotation_daily.py')
+          text=p.read_text()
+          old="""def replace(path, old, new, count=1):\n    p=Path(path); text=p.read_text(); n=text.count(old)\n    if n != count: raise SystemExit(f'{path}: expected {count} matches, found {n}')\n    p.write_text(text.replace(old,new,count))"""
+          new="""def replace(path, old, new, count=1):\n    p=Path(path); text=p.read_text()\n    if new in text: return\n    n=text.count(old)\n    if n != count: raise SystemExit(f'{path}: expected {count} matches, found {n}')\n    p.write_text(text.replace(old,new,count))"""
+          if text.count(old)!=1: raise SystemExit('patch helper not found exactly once')
+          p.write_text(text.replace(old,new,1))
+          PY
+          python3 scripts/_apply_rotation_daily.py
       - name: Check diff
         run: git diff --check
       - name: Validate backend
