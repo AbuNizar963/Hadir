@@ -19,7 +19,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Timer? _ticker;
   bool _loading = true;
   String? _error;
-  DateTime _now = _damascusNow();
+  DateTime _now = DateTime.now();
   String? _sessionToken;
   Map<String, dynamic> _employee = <String, dynamic>{};
   List<dynamic> _attendance = const [];
@@ -32,7 +32,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _now = _damascusNow());
+      if (mounted) setState(() => _now = DateTime.now());
     });
     _load();
   }
@@ -41,11 +41,6 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   void dispose() {
     _ticker?.cancel();
     super.dispose();
-  }
-
-  DateTime _damascusNow() {
-    final utc = DateTime.now().toUtc();
-    return utc.add(const Duration(hours: 3));
   }
 
   Future<void> _load() async {
@@ -338,339 +333,215 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     var sent = false;
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('طلب جديد'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: type,
-                      decoration: const InputDecoration(labelText: 'نوع الطلب'),
-                      items: const [
-                        DropdownMenuItem(value: 'permission', child: Text('استئذان')),
-                        DropdownMenuItem(value: 'leave', child: Text('إجازة')),
-                      ],
-                      onChanged: (v) => setDialogState(() => type = v ?? type),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: controller,
-                      minLines: 2,
-                      maxLines: 4,
-                      decoration: const InputDecoration(labelText: 'السبب', border: OutlineInputBorder()),
-                      onChanged: (v) => reason = v,
-                    ),
-                    const SizedBox(height: 12),
-                    _requestDateField(context, 'من', start, (value) => setDialogState(() => start = value)),
-                    const SizedBox(height: 8),
-                    _requestDateField(context, 'إلى', end, (value) => setDialogState(() => end = value)),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('إلغاء')),
-                FilledButton(
-                  onPressed: sent ? null : () async {
-                    if (reason.trim().isEmpty) {
-                      ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('اكتب سبب الطلب أولاً.')));
-                      return;
-                    }
-                    setDialogState(() => sent = true);
-                    try {
-                      final token = _sessionToken ?? await _session.token();
-                      final api = HadirApi(token: token);
-                      await api.createRequest(type: type, reason: reason.trim(), startDate: _dateKey(start), endDate: _dateKey(end));
-                      if (!mounted) return;
-                      if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-                      await _load();
-                      if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('تم إرسال الطلب بنجاح.')));
-                    } catch (e) {
-                      if (!dialogContext.mounted) return;
-                      setDialogState(() => sent = false);
-                      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(HadirApi.errorMessage(e))));
-                    }
-                  },
-                  child: const Text('إرسال الطلب'),
-                ),
-              ],
-            );
-          },
+      builder: (dialogContext) => StatefulBuilder(builder: (context, setDialogState) {
+        final isCheckout = type == 'checkout';
+        final startLabel = type == 'leave' ? 'تاريخ بداية الإجازة' : 'تاريخ بداية الإذن';
+        final endLabel = type == 'leave' ? 'تاريخ نهاية الإجازة' : 'تاريخ نهاية الإذن';
+        return AlertDialog(
+          title: const Text('طلب جديد'),
+          content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('الإدارة', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(initialValue: type, decoration: const InputDecoration(labelText: 'نوع الطلب'), items: const [DropdownMenuItem(value: 'permission', child: Text('استئذان')), DropdownMenuItem(value: 'leave', child: Text('إجازة')), DropdownMenuItem(value: 'checkout', child: Text('انصراف مبكر'))], onChanged: (v) => setDialogState(() { type = v ?? 'permission'; if (type == 'checkout') end = start; })),
+            if (!isCheckout) ...[
+              const SizedBox(height: 12),
+              _dateField(context, startLabel, start, (v) => setDialogState(() { start = v; if (end.isBefore(start)) end = start; })),
+              const SizedBox(height: 10),
+              _dateField(context, endLabel, end, (v) => setDialogState(() { end = v; })),
+            ] else ...[
+              const SizedBox(height: 12),
+              Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: .45), borderRadius: BorderRadius.circular(12)), child: const Text('الانصراف المبكر مرتبط بيوم الدوام الحالي ولا يحتاج إلى فترة متعددة الأيام.', style: TextStyle(fontSize: 11))),
+            ],
+            const SizedBox(height: 12),
+            TextField(controller: controller, maxLines: 4, decoration: const InputDecoration(labelText: 'السبب', alignLabelWithHint: true, border: OutlineInputBorder())),
+          ])),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('إلغاء')),
+            FilledButton(onPressed: sent ? null : () async {
+              reason = controller.text.trim();
+              if (reason.isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب سبب الطلب أولاً.'))); return; }
+              try {
+                final token = await _session.token();
+                await HadirApi(token: token).createRequest(
+                  type: type,
+                  reason: reason,
+                  startDate: isCheckout ? null : _dateKey(start),
+                  endDate: isCheckout ? null : _dateKey(end),
+                );
+                if (!dialogContext.mounted) return;
+                setDialogState(() => sent = true);
+                await Future<void>.delayed(const Duration(milliseconds: 500));
+                if (!dialogContext.mounted) return;
+                if (Navigator.of(dialogContext).canPop()) Navigator.of(dialogContext).pop();
+                if (mounted) _load();
+              } catch (e) {
+                if (!dialogContext.mounted) return;
+                ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(HadirApi.errorMessage(e))));
+              }
+            }, child: Text(sent ? 'تم إرسال الطلب' : 'إرسال الطلب')),
+          ],
         );
-      },
+      }),
     );
     controller.dispose();
   }
 
-  Widget _requestDateField(BuildContext context, String label, DateTime value, ValueChanged<DateTime> onChanged) {
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.calendar_month_outlined),
-      title: Text(label),
-      subtitle: Text(intl.DateFormat('yyyy-MM-dd').format(value)),
+  Widget _dateField(BuildContext context, String label, DateTime value, ValueChanged<DateTime> onChanged) {
+    return InkWell(
       onTap: () async {
-        final picked = await showDatePicker(context: context, initialDate: value, firstDate: DateTime(_now.year - 1), lastDate: DateTime(_now.year + 2));
+        final picked = await showDatePicker(context: context, initialDate: value, firstDate: DateTime(_now.year, _now.month, _now.day), lastDate: DateTime(_now.year + 3), locale: const Locale('ar'));
         if (picked != null) onChanged(picked);
       },
-    );
-  }
-
-  Widget _card(BuildContext context, {required Widget child, EdgeInsetsGeometry? padding}) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: padding ?? const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .62)),
-        boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: .06), blurRadius: 20, offset: const Offset(0, 8))],
-      ),
-      child: child,
+      borderRadius: BorderRadius.circular(12),
+      child: InputDecorator(decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()), child: Text(intl.DateFormat('yyyy-MM-dd').format(value))),
     );
   }
 
   Widget _section(BuildContext context, String title, String subtitle, Widget child) {
     final scheme = Theme.of(context).colorScheme;
-    return _card(context, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(title, style: TextStyle(color: scheme.onSurface, fontSize: 14, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 2),
-      Text(subtitle, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5)),
-      const SizedBox(height: 13),
-      child,
-    ]));
+    return _card(context, padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(color: scheme.onSurface, fontSize: 15, fontWeight: FontWeight.w900)), const SizedBox(height: 2), Text(subtitle, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5)), const SizedBox(height: 12), child]));
   }
 
-  Widget _stat(BuildContext context, String label, String value, IconData icon) {
+  Widget _stat(BuildContext context, String title, String value, IconData icon) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(color: scheme.secondaryContainer.withValues(alpha: .28), borderRadius: BorderRadius.circular(13)),
-      child: Column(children: [
-        Icon(icon, size: 17, color: scheme.primary),
-        const SizedBox(height: 5),
-        Text(label, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 8.5)),
-        const SizedBox(height: 2),
-        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontSize: 10.5, fontWeight: FontWeight.w900)),
-      ]),
-    );
+    return Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: scheme.secondaryContainer.withValues(alpha: .38), borderRadius: BorderRadius.circular(12)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon, color: scheme.primary, size: 17), const SizedBox(height: 7), Text(title, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 8.5)), const SizedBox(height: 2), Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w900, fontSize: 10.5))]));
   }
 
-  Widget _info(BuildContext context, IconData icon, String label, String value) {
+  Widget _info(BuildContext context, IconData icon, String title, String value) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(children: [
-        Icon(icon, size: 18, color: scheme.primary),
-        const SizedBox(width: 9),
-        Expanded(child: Text(label, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10))),
-        const SizedBox(width: 8),
-        Flexible(child: Text(value, textAlign: TextAlign.end, style: TextStyle(color: scheme.onSurface, fontSize: 10.5, fontWeight: FontWeight.w800))),
-      ]),
-    );
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [Container(width: 31, height: 31, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: scheme.primary, size: 16)), const SizedBox(width: 9), Expanded(child: Text(title, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10))), Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontSize: 10.5, fontWeight: FontWeight.w800)))]));
   }
 
-  Widget _detailRow(BuildContext context, IconData icon, String label, String value) {
+  Widget _detailRow(BuildContext context, IconData icon, String title, String value) {
     final scheme = Theme.of(context).colorScheme;
-    return Row(children: [
-      Icon(icon, size: 16, color: scheme.primary),
-      const SizedBox(width: 8),
-      Expanded(child: Text(label, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5))),
-      Flexible(child: Text(value, textAlign: TextAlign.end, style: TextStyle(color: scheme.onSurface, fontSize: 9.5, fontWeight: FontWeight.w800))),
-    ]);
+    return Row(children: [Icon(icon, size: 15, color: scheme.primary), const SizedBox(width: 7), Text(title, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 9.5)), const Spacer(), Flexible(child: Text(value, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurface, fontSize: 9.5, fontWeight: FontWeight.w800)))]);
   }
 
   Widget _pill(BuildContext context, IconData icon, String text) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .08), borderRadius: BorderRadius.circular(99)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 15, color: scheme.primary), const SizedBox(width: 6), Flexible(child: Text(text, style: TextStyle(color: scheme.primary, fontSize: 9.5, fontWeight: FontWeight.w800)))])
-    );
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .08), borderRadius: BorderRadius.circular(99), border: Border.all(color: scheme.primary.withValues(alpha: .18))), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 15, color: scheme.primary), const SizedBox(width: 6), Flexible(child: Text(text, style: TextStyle(color: scheme.primary, fontSize: 10, fontWeight: FontWeight.w800)))]));
   }
 
   Widget _warning(BuildContext context, String text) {
     final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: scheme.errorContainer.withValues(alpha: .45), borderRadius: BorderRadius.circular(12)),
-      child: Text(text, style: TextStyle(color: scheme.onErrorContainer, fontSize: 9.5, fontWeight: FontWeight.w700)),
-    );
+    return Container(width: double.infinity, padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: scheme.errorContainer.withValues(alpha: .55), borderRadius: BorderRadius.circular(12)), child: Row(children: [Icon(Icons.warning_amber_rounded, size: 16, color: scheme.error), const SizedBox(width: 7), Expanded(child: Text(text, style: TextStyle(color: scheme.onErrorContainer, fontSize: 10)))]));
   }
 
   Widget _statusIcon(BuildContext context, String status) {
     final scheme = Theme.of(context).colorScheme;
-    final icon = switch (status) {
-      'حاضر' => Icons.check_circle_rounded,
-      'متأخر' => Icons.schedule_rounded,
-      'غائب' => Icons.person_off_rounded,
-      'إجازة' => Icons.beach_access_rounded,
-      'إذن' => Icons.event_available_rounded,
-      'هارب' => Icons.warning_rounded,
-      _ => Icons.hourglass_empty_rounded,
-    };
-    return Icon(icon, color: scheme.primary, size: 30);
+    final Color color;
+    final IconData icon;
+    if (status == 'حاضر' || status == 'متأخر') { color = scheme.primary; icon = Icons.work_history_rounded; }
+    else if (status == 'هارب') { color = scheme.error; icon = Icons.warning_amber_rounded; }
+    else if (status == 'إجازة' || status == 'إذن') { color = scheme.secondary; icon = Icons.event_available_rounded; }
+    else { color = scheme.onSurfaceVariant; icon = Icons.access_time_rounded; }
+    return Container(width: 48, height: 48, decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: color));
   }
 
-  Widget _avatar(BuildContext context, String url, String name, {double size = 56}) {
+  Widget _avatar(BuildContext context, String? url, String name, {double size = 56, bool light = false}) {
     final scheme = Theme.of(context).colorScheme;
-    final initials = name.trim().isEmpty ? 'م' : name.trim().substring(0, 1);
-    if (url.isEmpty) {
-      return Container(width: size, height: size, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .12), shape: BoxShape.circle), child: Center(child: Text(initials, style: TextStyle(color: scheme.primary, fontSize: size * .32, fontWeight: FontWeight.w900))));
-    }
-    return ClipOval(child: Image.network(url, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: size, height: size, color: scheme.primary.withValues(alpha: .12), child: Center(child: Text(initials, style: TextStyle(color: scheme.primary, fontSize: size * .32, fontWeight: FontWeight.w900)))));
+    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900)))));
+    return Container(width: size, height: size, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14), border: Border.all(color: scheme.primary.withValues(alpha: .28))), child: child);
   }
 
-  String _avatarUrl() {
-    for (final key in ['avatarUrl', 'avatar', 'photoUrl', 'imageUrl']) {
-      final value = '${_employee[key] ?? ''}'.trim();
-      if (value.isNotEmpty) return value;
-    }
-    return '';
+  Widget _card(BuildContext context, {required Widget child, EdgeInsets padding = const EdgeInsets.all(16)}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(padding: padding, decoration: BoxDecoration(color: scheme.surfaceContainerHighest.withValues(alpha: .55), borderRadius: BorderRadius.circular(16), border: Border.all(color: scheme.outlineVariant.withValues(alpha: .72)), boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: .035), blurRadius: 14, offset: const Offset(0, 5))]), child: child);
   }
+
+  String? _avatarUrl() {
+    final direct = '${_employee['avatarUrl'] ?? _employee['avatar'] ?? ''}'.trim();
+    if (direct.startsWith('http')) return direct;
+    final id = '${_employee['id'] ?? _employee['employeeId'] ?? ''}'.trim();
+    if (id.isEmpty) return null;
+    final token = _sessionTokenCached();
+    return token == null ? null : '${HadirApi.baseUrl}/api/employees/${Uri.encodeComponent(id)}/avatar';
+  }
+
+  String? _sessionTokenCached() => _sessionToken;
 
   String _locationName() {
-    final currentId = '${_employee['locationId'] ?? _employee['location_id'] ?? ''}'.trim();
-    for (final item in _locations) {
-      if (item is! Map) continue;
-      final map = Map<String, dynamic>.from(item);
-      final id = '${map['id'] ?? map['locationId'] ?? ''}'.trim();
-      if (currentId.isNotEmpty && id == currentId) return '${map['name'] ?? map['title'] ?? 'الموقع'}';
+    final id = '${_employee['locationId'] ?? ''}'.trim();
+    if (id.isEmpty) return 'المقر الرئيسي';
+    for (final row in _locations) {
+      if (row is Map && '${row['id'] ?? ''}' == id) return '${row['name'] ?? 'الموقع المخصص'}';
     }
-    final direct = '${_employee['locationName'] ?? _employee['location'] ?? ''}'.trim();
-    return direct.isEmpty ? 'غير محدد' : direct;
+    return 'الموقع المخصص';
   }
 
   String _deviceLabel() {
-    if (_device.isEmpty) return 'غير مسجل';
-    final verified = _device['verified'] == true || _device['isVerified'] == true;
-    final name = '${_device['deviceName'] ?? _device['name'] ?? _device['model'] ?? ''}'.trim();
-    if (verified && name.isNotEmpty) return '$name · موثق';
-    if (verified) return 'موثق';
-    if (name.isNotEmpty) return '$name · غير موثق';
-    return 'غير موثق';
+    final status = '${_device['status'] ?? _device['state'] ?? ''}'.trim().toLowerCase();
+    if (status == 'bound' || status == 'active' || status == 'verified') return 'مرتبط بالحساب';
+    if (status.isNotEmpty) return status;
+    return 'مرتبط بالحساب';
   }
 
   List<dynamic> _todayAttendance() {
-    final key = _dateKey(_now);
-    return _attendance.where((e) {
-      if (e is! Map) return false;
-      final m = Map<String, dynamic>.from(e);
-      final raw = '${m['date'] ?? m['attendanceDate'] ?? m['createdAt'] ?? m['timestamp'] ?? ''}';
-      return _dateKey(_parseDate(raw) ?? _now) == key;
+    final day = _dateKey(_now);
+    return _attendance.where((x) {
+      final stamp = _stamp(x);
+      return stamp != null && _dateKey(stamp) == day;
     }).toList();
   }
 
-  List<dynamic> _todayApprovedRequests() {
-    final key = _dateKey(_now);
-    return _requests.where((e) {
-      if (e is! Map) return false;
-      final m = Map<String, dynamic>.from(e);
-      final status = '${m['status'] ?? ''}'.toLowerCase();
-      if (!['approved', 'مقبول', 'approved_by_manager'].contains(status)) return false;
-      final start = _parseDate('${m['startDate'] ?? m['start_date'] ?? m['date'] ?? ''}');
-      final end = _parseDate('${m['endDate'] ?? m['end_date'] ?? m['date'] ?? ''}') ?? start;
-      if (start == null) return false;
-      final target = DateTime(_now.year, _now.month, _now.day);
-      final a = DateTime(start.year, start.month, start.day);
-      final b = DateTime((end ?? start).year, (end ?? start).month, (end ?? start).day);
-      return !target.isBefore(a) && !target.isAfter(b) && _dateKey(target) == key;
-    }).toList();
-  }
-
-  Map<String, dynamic>? _openSession(List<dynamic> items) {
-    Map<String, dynamic>? latestIn;
-    for (final e in items) {
-      if (e is! Map) continue;
-      final m = Map<String, dynamic>.from(e);
-      if (_type(m) == 'check-in') latestIn = m;
-      if (_type(m) == 'check-out' && latestIn != null) latestIn = null;
+  dynamic _event(List<dynamic> rows, String type) {
+    dynamic latest;
+    DateTime? latestStamp;
+    for (final row in rows) {
+      if (_type(row) != type) continue;
+      final stamp = _stamp(row);
+      if (stamp != null && (latestStamp == null || stamp.isAfter(latestStamp))) {
+        latest = row;
+        latestStamp = stamp;
+      }
     }
-    return latestIn;
+    return latest;
   }
 
-  Map<String, dynamic>? _event(List<dynamic> items, String type) {
-    Map<String, dynamic>? result;
-    for (final e in items) {
-      if (e is Map && _type(e) == type) result = Map<String, dynamic>.from(e);
+  dynamic _openSession(List<dynamic> rows) {
+    final sorted = rows.where((row) => _stamp(row) != null).toList()
+      ..sort((a, b) => _stamp(a)!.compareTo(_stamp(b)!));
+    dynamic lastIn;
+    for (final row in sorted) {
+      final type = _type(row);
+      if (type == 'check-in') lastIn = row;
+      if (type == 'check-out' && lastIn != null) lastIn = null;
     }
-    return result;
+    return lastIn;
   }
 
-  String _type(dynamic value) {
-    if (value is! Map) return '';
-    final m = Map<String, dynamic>.from(value);
-    final type = '${m['type'] ?? m['eventType'] ?? m['action'] ?? ''}'.toLowerCase();
-    if (type.contains('in') || type.contains('حضور')) return 'check-in';
-    if (type.contains('out') || type.contains('انصراف')) return 'check-out';
-    return type;
+  String _workDuration(List<dynamic> rows) {
+    final sorted = rows.where((row) => _stamp(row) != null).toList()
+      ..sort((a, b) => _stamp(a)!.compareTo(_stamp(b)!));
+    DateTime? start;
+    var total = Duration.zero;
+    for (final row in sorted) {
+      final stamp = _stamp(row);
+      if (stamp == null) continue;
+      if (_type(row) == 'check-in') {
+        start = stamp;
+      } else if (_type(row) == 'check-out' && start != null && !stamp.isBefore(start)) {
+        total += stamp.difference(start);
+        start = null;
+      }
+    }
+    if (start != null) total += _now.difference(start);
+    if (total.isNegative || total.inMinutes <= 0) return '—';
+    return '${total.inHours}:${(total.inMinutes % 60).toString().padLeft(2, '0')}';
   }
 
-  String _requestType(dynamic value) {
-    if (value is! Map) return '';
-    final m = Map<String, dynamic>.from(value);
-    final type = '${m['type'] ?? m['requestType'] ?? ''}'.toLowerCase();
-    if (type.contains('leave') || type.contains('إجاز')) return 'leave';
-    if (type.contains('permission') || type.contains('إذن')) return 'permission';
-    return type;
-  }
-
-  String _time(Map<String, dynamic>? event) {
-    if (event == null) return '—';
-    final raw = '${event['timestamp'] ?? event['createdAt'] ?? event['time'] ?? event['date'] ?? ''}';
-    final parsed = _parseDate(raw);
-    return parsed == null ? '—' : intl.DateFormat('HH:mm').format(parsed);
-  }
-
-  String _workDuration(List<dynamic> items) {
-    final start = _parseDate('${_event(items, 'check-in')?['timestamp'] ?? _event(items, 'check-in')?['createdAt'] ?? ''}');
-    final end = _parseDate('${_event(items, 'check-out')?['timestamp'] ?? _event(items, 'check-out')?['createdAt'] ?? ''}');
-    if (start == null) return '—';
-    final duration = (end ?? _now).difference(start);
-    if (duration.isNegative) return '—';
-    final h = duration.inHours;
-    final m = duration.inMinutes % 60;
-    return '${h}س ${m}د';
-  }
-
-  String _status(Map<String, dynamic> schedule, Map<String, dynamic>? open, bool checkedIn, Map<String, dynamic>? escape, bool leave, bool permission) {
+  String _status(Map<String, dynamic> schedule, dynamic open, bool checkedIn, dynamic escape, bool leave, bool permission) {
     if (escape != null) return 'هارب';
     if (leave) return 'إجازة';
     if (permission) return 'إذن';
-    if (open != null) return 'حاضر';
-    if (checkedIn) return 'حاضر';
-    if (schedule['kind'] == 'NOT_STARTED') return 'لم تبدأ المناوبة';
-    if (schedule['isWorkDay'] != true) return 'راحة';
-    final start = schedule['start'];
-    if (start is DateTime && _now.isAfter(start)) return 'غائب';
-    return 'لم تبدأ';
-  }
-
-  int _lateMinutes(Map<String, dynamic> schedule, bool checkedIn) {
-    if (!checkedIn || schedule['isWorkDay'] != true) return 0;
-    final start = schedule['start'];
-    if (start is! DateTime) return 0;
-    final inEvent = _event(_todayAttendance(), 'check-in');
-    if (inEvent == null) return 0;
-    final at = _parseDate('${inEvent['timestamp'] ?? inEvent['createdAt'] ?? inEvent['time'] ?? ''}');
-    if (at == null || !at.isAfter(start)) return 0;
-    return at.difference(start).inMinutes;
-  }
-
-  Map<String, dynamic>? _activeEscape() {
-    if (_escapeEvents.isEmpty) return null;
-    for (final e in _escapeEvents.reversed) {
-      if (e is! Map) continue;
-      final m = Map<String, dynamic>.from(e);
-      final status = '${m['status'] ?? m['type'] ?? ''}'.toLowerCase();
-      if (status.contains('return') || status.contains('returned') || status.contains('عودة')) return null;
-      return m;
+    if (open != null) return _lateMinutes(schedule, checkedIn) > 0 ? 'متأخر' : 'حاضر';
+    if (schedule['isWorkDay'] == true) {
+      if (checkedIn) return 'حاضر';
+      final start = schedule['start'];
+      if (start is DateTime && _damascusNow().isAfter(start)) return 'غائب';
+      return 'لم تبدأ المناوبة';
     }
-    return null;
+    return 'راحة';
   }
 
   String _statusDetail(String status) => switch (status) {
@@ -685,20 +556,22 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   };
 
   Map<String, dynamic> _schedule() {
+    final now = _damascusNow();
     final type = '${_employee['scheduleType'] ?? 'ADMIN'}'.toUpperCase();
-    if (type == 'ROTATION') return _rotationSchedule();
+    if (type == 'ROTATION') return _rotationSchedule(now);
     final workDays = _workDays();
-    final weekday = _now.weekday % 7;
+    final weekday = now.weekday % 7;
     if (!workDays.contains(weekday)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null};
-    final day = DateTime(_now.year, _now.month, _now.day);
+    final day = DateTime(now.year, now.month, now.day);
     final start = _localTime(day, '${_employee['workStartTime'] ?? '09:00'}');
     var end = _localTime(day, '${_employee['workEndTime'] ?? '16:00'}');
     if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
-    if (_now.isAfter(end)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'previousStart': start, 'previousEnd': end};
+    if (now.isAfter(end)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'previousStart': start, 'previousEnd': end};
     return {'isWorkDay': true, 'kind': 'ADMIN', 'start': start, 'end': end};
   }
 
-  Map<String, dynamic> _rotationSchedule() {
+  Map<String, dynamic> _rotationSchedule([DateTime? target]) {
+    final now = target ?? _damascusNow();
     final raw = '${_employee['rotationStartDate'] ?? ''}'.split('T').first;
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return {'isWorkDay': false, 'kind': 'INVALID', 'start': null, 'end': null};
@@ -706,16 +579,21 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final daysOff = _number(_employee['rotationDaysOff'], 4).clamp(0, 31);
     final cycle = daysOn + daysOff;
     final first = _localTime(DateTime(parsed.year, parsed.month, parsed.day), '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
-    if (_now.isBefore(first)) return {'isWorkDay': false, 'kind': 'NOT_STARTED', 'start': first, 'end': null};
+    if (now.isBefore(first)) return {'isWorkDay': false, 'kind': 'NOT_STARTED', 'start': first, 'end': null};
     final dayStart = DateTime(parsed.year, parsed.month, parsed.day);
-    final diff = DateTime(_now.year, _now.month, _now.day).difference(dayStart).inDays;
+    final diff = DateTime(now.year, now.month, now.day).difference(dayStart).inDays;
+    if (diff < 0) return {'isWorkDay': false, 'kind': 'NOT_STARTED', 'start': first, 'end': null};
     final cycleDay = diff % cycle;
     final periodDay = dayStart.add(Duration(days: diff - cycleDay));
-    if (cycleDay >= daysOn) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
     final start = _localTime(periodDay, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
-    var end = _localTime(periodDay.add(Duration(days: daysOn)), '${_employee['rotationEndTime'] ?? _employee['workEndTime'] ?? _employee['rotationStartTime'] ?? '09:00'}');
-    if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
-    return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    final end = _localTime(periodDay.add(Duration(days: daysOn)), '${_employee['rotationEndTime'] ?? _employee['workEndTime'] ?? _employee['workStartTime'] ?? '09:00'}');
+    if (cycleDay < daysOn) {
+      return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    }
+    if (cycleDay == daysOn && now.isBefore(end)) {
+      return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    }
+    return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
   }
 
   List<int> _workDays() {
@@ -725,6 +603,11 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       if (result.isNotEmpty) return result;
     }
     return [0, 1, 2, 3, 4];
+  }
+
+  DateTime _damascusNow() {
+    final utc = _now.toUtc();
+    return utc.add(const Duration(hours: 3));
   }
 
   DateTime _localTime(DateTime day, String value) {
@@ -761,7 +644,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     DateTime? target;
     String label = '';
     if (s['kind'] == 'NOT_STARTED' && start is DateTime) { target = start; label = 'بداية أول مناوبة'; }
-    else if (s['isWorkDay'] == true && end is DateTime && end.isAfter(_now)) { target = end; label = 'تنتهي المناوبة خلال'; }
+    else if (s['isWorkDay'] == true && end is DateTime && end.isAfter(_damascusNow())) { target = end; label = 'تنتهي المناوبة خلال'; }
     else if (s['kind'] == 'OFF') {
       final raw = '${_employee['rotationStartDate'] ?? ''}'.split('T').first;
       final parsed = DateTime.tryParse(raw);
@@ -769,50 +652,75 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
         final on = _number(_employee['rotationDaysOn'], 4).clamp(1, 31);
         final off = _number(_employee['rotationDaysOff'], 4).clamp(0, 31);
         final cycle = on + off;
-        final diff = DateTime(_now.year, _now.month, _now.day).difference(DateTime(parsed.year, parsed.month, parsed.day)).inDays;
+        if (cycle <= 0) return '';
+        final dayStart = DateTime(parsed.year, parsed.month, parsed.day);
+        final now = _damascusNow();
+        final diff = DateTime(now.year, now.month, now.day).difference(dayStart).inDays;
         final cycleDay = diff % cycle;
-        final nextStart = DateTime(_now.year, _now.month, _now.day).add(Duration(days: cycle - cycleDay));
-        target = _localTime(nextStart, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
-        label = 'بداية المناوبة القادمة';
+        final next = dayStart.add(Duration(days: diff + (cycle - cycleDay)));
+        target = _localTime(next, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
+        label = 'تبدأ المناوبة القادمة خلال';
       }
     }
-    if (target == null || !target.isAfter(_now)) return '';
-    final d = target.difference(_now);
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    final sec = d.inSeconds % 60;
-    return '$label: ${h}س ${m}د ${sec}ث';
+    if (target == null) return '';
+    final d = target.difference(_damascusNow());
+    final total = d.inSeconds.clamp(0, 999999999);
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final sec = total % 60;
+    return '$label ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
   }
 
-  String _minutesLabel(int value) => value < 60 ? '$value دقيقة' : '${value ~/ 60}س ${value % 60}د';
-
-  String _dateKey(DateTime value) => '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
-
-  DateTime? _parseDate(String value) {
-    if (value.trim().isEmpty) return null;
-    final parsed = DateTime.tryParse(value);
-    if (parsed == null) return null;
-    return parsed.toUtc().add(const Duration(hours: 3));
+  int _lateMinutes(Map<String, dynamic> s, bool checkedIn) {
+    if (!checkedIn || s['start'] is! DateTime) return 0;
+    final start = s['start'] as DateTime;
+    final now = _damascusNow();
+    if (now.isBefore(start)) return 0;
+    final event = _event(_todayAttendance(), 'check-in');
+    final stamp = _stamp(event);
+    if (stamp == null || !stamp.isAfter(start)) return 0;
+    final grace = _number(_employee['gracePeriodMinutes'], 10);
+    return ((stamp.difference(start).inMinutes) - grace).clamp(0, 1440);
   }
 
+  dynamic _activeEscape() {
+    for (final row in _escapeEvents) {
+      if (row is! Map) continue;
+      final status = '${row['status'] ?? ''}'.toLowerCase();
+      if (status == 'escaped') return row;
+    }
+    return null;
+  }
+
+  List<dynamic> _todayApprovedRequests() {
+    final day = _dateKey(_now);
+    return _requests.where((r) {
+      if (r is! Map) return false;
+      final status = '${r['status'] ?? ''}'.toLowerCase();
+      if (status != 'approved' && status != 'confirmed') return false;
+      final start = DateTime.tryParse('${r['startDate'] ?? r['createdAt'] ?? ''}'.split('T').first);
+      final end = DateTime.tryParse('${r['endDate'] ?? r['startDate'] ?? r['createdAt'] ?? ''}'.split('T').first);
+      final current = DateTime.tryParse(day);
+      return start != null && end != null && current != null && !current.isBefore(start) && !current.isAfter(end);
+    }).toList();
+  }
+
+  String _requestType(dynamic row) => '${row is Map ? row['type'] ?? '' : ''}'.toLowerCase();
+  String _type(dynamic row) => '${row is Map ? row['type'] ?? '' : ''}'.toLowerCase();
+  DateTime? _stamp(dynamic row) => row is Map ? DateTime.tryParse('${row['timestamp'] ?? row['createdAt'] ?? ''}') : null;
+  String _dateKey(DateTime date) => intl.DateFormat('yyyy-MM-dd').format(date);
+  String _time(dynamic row) { final d = _stamp(row); return d == null ? '—' : intl.DateFormat('HH:mm').format(d); }
   int _number(dynamic value, int fallback) => int.tryParse('$value') ?? fallback;
+  String _minutesLabel(int minutes) => minutes >= 60 ? '${minutes ~/ 60} ساعة و${minutes % 60} دقيقة' : '$minutes دقيقة';
 
   Widget _messageCard(BuildContext context, String text, IconData icon) {
     final scheme = Theme.of(context).colorScheme;
-    return _card(context, child: Row(children: [Icon(icon, color: scheme.error), const SizedBox(width: 10), Expanded(child: Text(text, style: TextStyle(color: scheme.onSurface, fontSize: 10.5)))]));
+    return _card(context, child: Row(children: [Icon(icon, color: scheme.error), const SizedBox(width: 10), Expanded(child: Text(text, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)))]));
   }
 }
 
 class _LoadingCard extends StatelessWidget {
   const _LoadingCard();
-
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 72,
-      decoration: BoxDecoration(color: scheme.surfaceContainerHighest.withValues(alpha: .35), borderRadius: BorderRadius.circular(16)),
-      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-    );
-  }
+  Widget build(BuildContext context) => Container(height: 92, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .45), borderRadius: BorderRadius.circular(16)), child: const Center(child: CircularProgressIndicator()));
 }
