@@ -383,12 +383,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
                     try {
                       final token = _sessionToken ?? await _session.token();
                       final api = HadirApi(token: token);
-                      await api.createRequest(
-                        type: type,
-                        reason: reason.trim(),
-                        startDate: _dateKey(start),
-                        endDate: _dateKey(end),
-                      );
+                      await api.createRequest(type: type, reason: reason.trim(), startDate: _dateKey(start), endDate: _dateKey(end));
                       if (!mounted) return;
                       if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                       await _load();
@@ -418,12 +413,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       title: Text(label),
       subtitle: Text(intl.DateFormat('yyyy-MM-dd').format(value)),
       onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: value,
-          firstDate: DateTime(_now.year - 1),
-          lastDate: DateTime(_now.year + 2),
-        );
+        final picked = await showDatePicker(context: context, initialDate: value, firstDate: DateTime(_now.year - 1), lastDate: DateTime(_now.year + 2));
         if (picked != null) onChanged(picked);
       },
     );
