@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/hadir_theme_controller.dart';
 import '../../../services/notifications_service.dart';
@@ -188,7 +188,7 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
       (LucideIcons.layoutDashboard, LucideIcons.layoutDashboard, 'لوحة الموظف'),
       (LucideIcons.building2, LucideIcons.building2, 'مركز الموظف'),
       (LucideIcons.clock3, LucideIcons.clock3, 'سجل العمل'),
-      (LucideIcons.user, LucideIcons.user, 'الملف الشخصي'),
+      (LucideIcons.userRound, LucideIcons.userRound, 'الملف الشخصي'),
     ];
     return Container(
       decoration: BoxDecoration(color: scheme.surface, border: Border(bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .65)))),
