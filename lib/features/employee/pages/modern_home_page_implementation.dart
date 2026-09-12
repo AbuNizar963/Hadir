@@ -53,19 +53,23 @@ class _ModernHomePageState extends State<ModernHomePage> {
       final token = await _session.token();
       final api = HadirApi(token: token);
       final today = intl.DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final results = await Future.wait([
+      final base = await Future.wait([
         api.me(),
         api.attendance(limit: 100),
-        api.dailyStatus(date: today),
       ]);
-      final me = results[0] as Map<String, dynamic>;
+      Map<String, dynamic>? daily;
+      try {
+        daily = await api.dailyStatus(date: today);
+      } catch (_) {
+        daily = null;
+      }
+      final me = base[0] as Map<String, dynamic>;
       final user = me['user'];
-      final daily = results[2] as Map<String, dynamic>;
       if (!mounted) return;
       setState(() {
         _name = user is Map ? '${user['name'] ?? 'الموظف'}' : 'الموظف';
-        _attendance = results[1] as List<dynamic>;
-        _dailyStatus = _extractDailyStatus(daily);
+        _attendance = base[1] as List<dynamic>;
+        _dailyStatus = daily == null ? null : _extractDailyStatus(daily!);
         _loading = false;
         _error = null;
       });
@@ -87,14 +91,26 @@ class _ModernHomePageState extends State<ModernHomePage> {
   Map<String, dynamic>? _extractDailyStatus(Map<String, dynamic> response) {
     final employees = response['employees'];
     if (employees is! List) return null;
-    final row = employees.whereType<Map>().cast<Map>().map(Map<String, dynamic>.from).firstWhere(
-      (item) => item['employeeId'] != null,
-      orElse: () => <String, dynamic>{},
-    );
+    final row = employees
+        .whereType<Map>()
+        .map(Map<String, dynamic>.from)
+        .firstWhere(
+          (item) => item['employeeId'] != null,
+          orElse: () => <String, dynamic>{},
+        );
     return row.isEmpty ? null : row;
   }
 
-  String get _canonicalStatus => '${_dailyStatus?['status'] ?? ''}'.trim().toUpperCase();
+  String get _canonicalStatus {
+    final value = '${_dailyStatus?['status'] ?? ''}'.trim().toUpperCase();
+    if (value.isNotEmpty) return value;
+    final records = _todayRecords;
+    if (records.isEmpty) return '';
+    final latest = records.last['type'];
+    if (latest == 'check-in') return 'OPEN';
+    if (latest == 'check-out') return 'PRESENT';
+    return '';
+  }
 
   String get _statusLabel {
     switch (_canonicalStatus) {
@@ -290,24 +306,16 @@ class _ModernHomePageState extends State<ModernHomePage> {
   }
 
   Widget _scheduleCard() {
-    final start = _dailyStatus?['scheduleStart']?.toString();
-    final end = _dailyStatus?['scheduleEnd']?.toString();
-    final scheduleText = start != null && end != null ? '${_formatTime(start)} - ${_formatTime(end)}' : 'جدول العمل';
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
       child: Row(children: [
         Container(width: 42, height: 42, decoration: BoxDecoration(color: _brandSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.schedule_outlined, color: _brand, size: 21)),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('جدول العمل', style: const TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(scheduleText, style: const TextStyle(color: _muted, fontSize: 10.5))])),
+        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('جدول العمل', style: TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w900)), SizedBox(height: 3), Text('يتم تحديد الجدول والحالة من نظام الدوام المركزي.', style: TextStyle(color: _muted, fontSize: 10.5))])),
         const Icon(Icons.chevron_left_rounded, color: _muted),
       ]),
     );
-  }
-
-  String _formatTime(String value) {
-    final parsed = DateTime.tryParse(value)?.toLocal();
-    return parsed == null ? value : intl.DateFormat('HH:mm', 'ar').format(parsed);
   }
 
   Widget _dashboardActions() {
