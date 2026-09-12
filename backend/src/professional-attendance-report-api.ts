@@ -142,8 +142,9 @@ export async function handleProfessionalAttendanceReport(req: Request, env: Env,
       return json(detail, 200, origin);
     }
 
-    // Report reads are deliberately read-only. Reporting facts are materialized
-    // by attendance/request mutations or explicit backfill operations, not by GET.
+    // The report contract is strictly read-only: GET may SELECT existing facts
+    // and source rows, but it never materializes, backfills, INSERTs, UPDATEs,
+    // DELETEs, or creates database objects.
     const report = await buildProfessionalAttendanceReport(env, from, to, employeeId);
     return json(report, 200, origin);
   } catch (error) {
