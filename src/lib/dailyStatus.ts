@@ -6,6 +6,7 @@ export type DailyStatusRow = {
   employeeName: string;
   jobNumber: string;
   status: DailyStatusCode;
+  statusLabel: string;
   scheduleType: "ADMIN" | "ROTATION" | string;
   checkInAt: string | null;
   checkOutAt: string | null;
