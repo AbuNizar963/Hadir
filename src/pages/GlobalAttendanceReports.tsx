@@ -12,7 +12,7 @@ import { BarChart3, CalendarDays, Clock3, Download, FileSpreadsheet, FileText, R
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import type { Employee } from "@/types";
 
-const labels: Record<string, string> = { PRESENT: "حاضر", LATE: "متأخر", ABSENT: "غياب", LEAVE: "إجازة", PERMISSION: "استئذان", REST: "راحة", NOT_STARTED: "لم يبدأ", INVALID: "غير صالح" };
+const labels: Record<string, string> = { PRESENT: "حاضر", LATE: "متأخر", ABSENT: "غياب", LEAVE: "إجازة", PERMISSION: "استئذان", REST: "راحة", ESCAPED: "انصراف دون تسجيل", NOT_STARTED: "لم يبدأ", INVALID: "غير صالح", OPEN: "دوام مفتوح" };
 const fmt = (m: number) => `${Math.floor(Math.max(0, m) / 60)}س ${Math.round(Math.max(0, m) % 60)}د`;
 const damascusToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus" }).format(new Date());
 const time = (value: unknown) => value ? new Date(String(value)).toLocaleString("ar", { timeZone: "Asia/Damascus", dateStyle: "medium", timeStyle: "medium" }) : "—";
@@ -58,8 +58,10 @@ export default function GlobalAttendanceReports() {
   const employeeSummary = report?.analytics.employeeSummaries || [];
   const exceptions = report?.analytics.exceptions || [];
   const statusData = report ? [
-    { name: "حاضر", value: report.summary.present }, { name: "متأخر", value: report.summary.late }, { name: "غياب", value: report.summary.absent },
-    { name: "إجازة", value: report.summary.leave }, { name: "استئذان", value: report.summary.permission }, { name: "راحة", value: report.summary.rest },
+    { name: labels.PRESENT, value: report.summary.present }, { name: labels.LATE, value: report.summary.late }, { name: labels.ABSENT, value: report.summary.absent },
+    { name: labels.LEAVE, value: report.summary.leave }, { name: labels.PERMISSION, value: report.summary.permission }, { name: labels.REST, value: report.summary.rest },
+    { name: labels.ESCAPED, value: report.dataQuality.byStatus.ESCAPED || 0 }, { name: labels.NOT_STARTED, value: report.summary.notStarted },
+    { name: labels.INVALID, value: report.summary.invalid }, { name: labels.OPEN, value: report.summary.open },
   ].filter((x) => x.value > 0) : [];
   const rankedEmployees = useMemo(() => [...employeeSummary].sort((a, b) => (b.absent * 1000 + b.lateMinutes + b.overtimeMinutes) - (a.absent * 1000 + a.lateMinutes + a.overtimeMinutes)), [employeeSummary]);
 
@@ -95,7 +97,6 @@ export default function GlobalAttendanceReports() {
         <Card className="bg-muted/30"><CardContent className="flex flex-wrap justify-between gap-2 p-4 text-xs text-muted-foreground"><span>المصدر: {report.integrity.sourceOfTruth} ← {report.integrity.rawSource}</span><span>الإصدار {report.reportVersion} · {report.timezone} · {report.dataQuality.complete ? "جودة مكتملة" : "توجد بيانات تحتاج مراجعة"}</span></CardContent></Card>
       </>}
     </div>
-
     <Dialog open={detail !== null || detailLoading || detailError !== null} onOpenChange={(open) => { if (!open && !detailLoading) { setDetail(null); setDetailError(null); } }}>
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto" dir="rtl">
         <DialogHeader><DialogTitle>تفصيل سجل الحضور</DialogTitle><DialogDescription>تفصيل قراءة فقط مرتبط بسجل التقرير ومصادره الأصلية.</DialogDescription></DialogHeader>
