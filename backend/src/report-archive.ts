@@ -39,7 +39,7 @@ export async function archiveClosedMonth(env:Env,now=new Date()){
   if(!env.REPORT_ARCHIVES)throw new Error("R2 binding REPORT_ARCHIVES غير موجود");
   const timezone=String(env.APP_TIMEZONE||"Asia/Damascus"),period=previousMonthPeriod(now,timezone),id=`attendance_period_${period.from}`,key=archiveKey(period);
   const existing=await claimArchive(env,id,period.from,period.to,key);
-  if(existing?.status==="LOCKED")return{ok:true,archived:false,reason:"already_locked",id,key,period};
+  if(existing?.status==="LOCKED"||existing?.status==="DELETED")return{ok:true,archived:false,reason:existing.status==="LOCKED"?"already_locked":"deleted_by_admin",id,key,period};
   const report=await buildProfessionalAttendanceReport(env,period.from,period.to);
   const snapshotHash=await sha256Hex(jsonBytes({from:report.from,to:report.to,rows:report.rows,reportVersion:report.reportVersion}));
   const bytes=new Uint8Array(makeWorkbook(report)),hash=await sha256Hex(bytes),fileName=key.split("/").pop()||key;
@@ -51,3 +51,13 @@ export async function archiveClosedMonth(env:Env,now=new Date()){
 }
 export async function listReportArchives(env:Env,limit=25){const safeLimit=Math.min(100,Math.max(1,Math.floor(limit)));const result=await env.DB.prepare("SELECT report_id,report_type,period_from,period_to,employee_id,generated_at,generated_by,generated_by_name,report_version,data_snapshot_hash,status,file_key,file_name,file_size,mime_type,file_sha256,created_at,locked_at,locked_by,revision FROM report_archives WHERE status='LOCKED' ORDER BY period_from DESC LIMIT ?").bind(safeLimit).all<ArchiveRow>();return result.results||[];}
 export async function getReportArchive(env:Env,id:string){return await env.DB.prepare("SELECT * FROM report_archives WHERE report_id=? AND status='LOCKED' LIMIT 1").bind(id).first<ArchiveRow>();}
+export async function deleteReportArchive(env:Env,id:string){
+  if(!env.REPORT_ARCHIVES)throw new Error("R2 binding REPORT_ARCHIVES غير موجود");
+  const archive=await getReportArchive(env,id);
+  if(!archive)return{ok:false,reason:"not_found" as const};
+  await env.REPORT_ARCHIVES.delete(archive.file_key);
+  const remaining=await env.REPORT_ARCHIVES.head(archive.file_key);
+  if(remaining)throw new Error("تعذر حذف ملف الأرشيف من R2");
+  await env.DB.prepare("UPDATE report_archives SET status='DELETED' WHERE report_id=? AND status='LOCKED'").bind(id).run();
+  return{ok:true,deleted:true,reportId:id,fileKey:archive.file_key};
+}
