@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../core/api.dart';
+import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
 
 const _brand = Color(0xFF0B6B5A);
@@ -52,7 +53,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
     try {
       final token = await _session.token();
       final api = HadirApi(token: token);
-      final today = intl.DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final today = intl.DateFormat('yyyy-MM-dd').format(HadirTime.now());
       final base = await Future.wait([
         api.me(),
         api.attendance(limit: 100),
@@ -136,12 +137,12 @@ class _ModernHomePageState extends State<ModernHomePage> {
   }
 
   List<Map<String, dynamic>> get _todayRecords {
-    final today = DateTime.now();
+    final today = HadirTime.now();
     final records = _attendance
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .where((item) {
-          final value = DateTime.tryParse('${item['timestamp']}')?.toLocal();
+          final value = HadirTime.fromTimestamp(item['timestamp']);
           return value != null && value.year == today.year && value.month == today.month && value.day == today.day;
         })
         .toList();
@@ -158,7 +159,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
     Duration total = Duration.zero;
     DateTime? checkIn;
     for (final item in records) {
-      final time = DateTime.tryParse('${item['timestamp']}')?.toLocal();
+      final time = HadirTime.fromTimestamp(item['timestamp']);
       if (time == null) continue;
       if (item['type'] == 'check-in') {
         checkIn = time;
@@ -169,7 +170,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
       }
     }
     if (checkIn != null) {
-      final duration = DateTime.now().difference(checkIn);
+      final duration = HadirTime.now().difference(checkIn);
       if (!duration.isNegative) total += duration;
     }
     final hours = total.inHours;
@@ -180,12 +181,12 @@ class _ModernHomePageState extends State<ModernHomePage> {
   DateTime? get _lastActivityTime {
     final records = _todayRecords;
     if (records.isEmpty) return null;
-    return DateTime.tryParse('${records.last['timestamp']}')?.toLocal();
+    return HadirTime.fromTimestamp(records.last['timestamp']);
   }
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
+    final now = HadirTime.now();
     final firstName = _name.trim().split(RegExp(r'\s+')).first;
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -353,7 +354,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
   Widget _activityTile(dynamic item) {
     final record = Map<String, dynamic>.from(item as Map);
     final checkout = record['type'] == 'check-out';
-    final time = DateTime.tryParse('${record['timestamp']}')?.toLocal();
+    final time = HadirTime.fromTimestamp(record['timestamp']);
     final distance = double.tryParse('${record['distanceMeters']}');
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
