@@ -1,4 +1,5 @@
 import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
+import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
 
 type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string };
 
@@ -8,7 +9,7 @@ const CORS = (origin: string) => ({
   "access-control-allow-origin": origin,
   "access-control-allow-credentials": "true",
   "access-control-allow-headers": "authorization, content-type",
-  "access-control-allow-methods": "GET, OPTIONS",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
   "cache-control": "no-store",
   vary: "Origin",
 });
@@ -103,11 +104,7 @@ async function buildProfessionalAttendanceDrilldown(env: Env, attendanceDay: str
       computedAt: fact.computed_at,
       scheduleSnapshot,
     },
-    sources: {
-      attendance,
-      requests,
-      audit,
-    },
+    sources: { attendance, requests, audit },
     trace: {
       attendanceEventIds,
       requestIds,
@@ -126,7 +123,6 @@ export async function handleProfessionalAttendanceReport(req: Request, env: Env,
   const origin = requestOrigin || String(env.APP_ORIGINS || env.APP_ORIGIN || "*").split(",")[0].trim() || "*";
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS(origin) });
-  if (req.method !== "GET") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
   if (!actor || !["owner", "manager", "supervisor"].includes(String(actor.role))) return json({ error: "غير مصرح" }, 403, origin);
 
   const from = String(url.searchParams.get("from") || "").trim();
@@ -135,6 +131,14 @@ export async function handleProfessionalAttendanceReport(req: Request, env: Env,
   if (!DAY_RE.test(from) || !DAY_RE.test(to)) return json({ error: "الفترة الزمنية غير صالحة" }, 400, origin);
 
   try {
+    if (req.method === "POST") {
+      const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
+      if (!Number.isFinite(days) || days < 1 || days > 366) return json({ error: "الفترة الزمنية تتجاوز الحد المسموح (366 يومًا)" }, 400, origin);
+      const written = await ensureProfessionalAttendanceFacts(env, from, to, actor, employeeId);
+      return json({ ok: true, from, to, employeeId: employeeId || null, written, message: "تم تحديث طبقة التقارير من المحرك المركزي." }, 200, origin);
+    }
+    if (req.method !== "GET") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
+
     if (url.searchParams.get("drilldown") === "1") {
       if (from !== to || !employeeId) return json({ error: "التفصيل يحتاج يومًا واحدًا وموظفًا محددًا" }, 400, origin);
       const detail = await buildProfessionalAttendanceDrilldown(env, from, employeeId);
