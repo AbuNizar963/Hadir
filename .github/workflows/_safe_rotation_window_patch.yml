@@ -1,0 +1,45 @@
+name: Safe Rotation Window Patch
+on:
+  push:
+    branches:
+      - fix/apps-rotation-daily-window-sync
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/apps-rotation-daily-window-sync
+          fetch-depth: 0
+      - name: Patch and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('lib/features/employee/pages/hadir_workspace_page_implementation.dart')
+          s = p.read_text(encoding='utf-8')
+          old = """      final checkpoint = _localTime(DateTime(now.year, now.month, now.day), dailyTime);\n      final rawGrace = _number(_employee['rotationDailyAttendanceGraceMinutes'], 0).clamp(0, 180);\n      final graceEnd = checkpoint.add(Duration(minutes: rawGrace));\n      return {'isWorkDay': true, 'kind': 'ROTATION_DAILY', 'start': checkpoint, 'end': graceEnd, 'rotationStart': start, 'rotationEnd': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff, 'dailyAttendanceEnabled': true, 'dailyAttendanceTime': dailyTime, 'dailyAttendanceGraceMinutes': rawGrace};"""
+          new = """      final checkpoint = _localTime(DateTime(now.year, now.month, now.day), dailyTime);\n      final rawGrace = _number(_employee['rotationDailyAttendanceGraceMinutes'], 0).clamp(0, 180);\n      final graceEnd = checkpoint.add(Duration(minutes: rawGrace));\n      final checkpointInRotation = !checkpoint.isBefore(start) && checkpoint.isBefore(end);\n      if (!checkpointInRotation) return {'isWorkDay': true, 'kind': 'ROTATION_DAILY_INVALID', 'start': null, 'end': null, 'rotationStart': start, 'rotationEnd': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};\n      return {'isWorkDay': true, 'kind': 'ROTATION_DAILY', 'start': checkpoint, 'end': graceEnd, 'rotationStart': start, 'rotationEnd': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff, 'dailyAttendanceEnabled': true, 'dailyAttendanceTime': dailyTime, 'dailyAttendanceGraceMinutes': rawGrace};"""
+          if s.count(old) != 1:
+              raise SystemExit(f'expected exactly one target block, found {s.count(old)}')
+          s2 = s.replace(old, new)
+          if s2 == s:
+              raise SystemExit('patch made no change')
+          p.write_text(s2, encoding='utf-8', newline='')
+          lines = s2.count('\n') + (0 if s2.endswith('\n') else 1)
+          if lines < 800:
+              raise SystemExit(f'file unexpectedly short after patch: {lines} lines')
+          PY
+          git diff --check
+          git diff --stat
+          git diff -- lib/features/employee/pages/hadir_workspace_page_implementation.dart
+          test "$(grep -c "checkpointInRotation" lib/features/employee/pages/hadir_workspace_page_implementation.dart)" -eq 1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/features/employee/pages/hadir_workspace_page_implementation.dart .github/workflows/_safe_rotation_window_patch.yml
+          git commit -m "fix(employee): keep daily attendance window inside rotation [skip ci]"
+          git push origin HEAD:fix/apps-rotation-daily-window-sync
