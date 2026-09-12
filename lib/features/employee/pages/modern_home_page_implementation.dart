@@ -69,7 +69,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
       setState(() {
         _name = user is Map ? '${user['name'] ?? 'الموظف'}' : 'الموظف';
         _attendance = base[1] as List<dynamic>;
-        _dailyStatus = daily == null ? null : _extractDailyStatus(daily!);
+        _dailyStatus = daily == null ? null : _extractDailyStatus(daily);
         _loading = false;
         _error = null;
       });
