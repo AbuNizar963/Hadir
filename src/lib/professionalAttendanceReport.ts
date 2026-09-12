@@ -1,10 +1,12 @@
+export type ProfessionalAttendanceStatus = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "ESCAPED" | "NOT_STARTED" | "INVALID" | "OPEN";
+
 export type ProfessionalAttendanceRow = {
   attendanceDay: string;
   employeeId: string;
   employeeName: string;
   jobNumber: string | null;
   locationId: string | null;
-  status: string;
+  status: ProfessionalAttendanceStatus;
   attendanceSource: "AUTOMATIC_VIP" | "AUTOMATIC" | "MANUAL_OWNER" | "MANUAL_EMPLOYEE" | "MIXED" | "UNKNOWN";
   scheduleType: string;
   scheduledStart: string | null;
@@ -46,6 +48,7 @@ export type ProfessionalAttendanceReport = {
     leave: number;
     permission: number;
     rest: number;
+    escaped: number;
     notStarted: number;
     invalid: number;
     open: number;
@@ -59,11 +62,11 @@ export type ProfessionalAttendanceReport = {
     punctualityRate: number;
   };
   analytics: {
-    dailySeries: Array<{ attendanceDay: string; present: number; late: number; absent: number; leave: number; permission: number; rest: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>;
-    employeeSummaries: Array<{ employeeId: string; employeeName: string; jobNumber: string | null; days: number; present: number; late: number; absent: number; leave: number; permission: number; rest: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>;
+    dailySeries: Array<{ attendanceDay: string; present: number; late: number; absent: number; leave: number; permission: number; rest: number; escaped: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>;
+    employeeSummaries: Array<{ employeeId: string; employeeName: string; jobNumber: string | null; days: number; present: number; late: number; absent: number; leave: number; permission: number; rest: number; escaped: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>;
     exceptionCounts: Record<string, number>;
     attendanceSourceCounts: Record<string, number>;
-    exceptions: Array<{ attendanceDay: string; employeeId: string; employeeName: string; jobNumber: string | null; code: string; status: string; attendanceSource: ProfessionalAttendanceRow["attendanceSource"]; minutes: number; attendanceEventIds: string[]; requestIds: string[]; auditIds: string[] }>;
+    exceptions: Array<{ attendanceDay: string; employeeId: string; employeeName: string; jobNumber: string | null; code: string; status: ProfessionalAttendanceStatus; attendanceSource: ProfessionalAttendanceRow["attendanceSource"]; minutes: number; attendanceEventIds: string[]; requestIds: string[]; auditIds: string[] }>;
   };
   rows: ProfessionalAttendanceRow[];
   dataQuality: { byStatus: Record<string, number>; complete: boolean };
@@ -80,7 +83,7 @@ export type ProfessionalAttendanceDrilldown = {
     employeeName: string;
     jobNumber: string | null;
     locationId: string | null;
-    status: string;
+    status: ProfessionalAttendanceStatus;
     attendanceSource: ProfessionalAttendanceRow["attendanceSource"];
     scheduleType: string;
     scheduledStart: string | null;
