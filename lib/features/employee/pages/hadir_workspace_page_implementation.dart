@@ -692,7 +692,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final start = _localTime(day, '${_employee['workStartTime'] ?? '09:00'}');
     var end = _localTime(day, '${_employee['workEndTime'] ?? '16:00'}');
     if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
-    if (now.isAfter(end)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'previousStart': start, 'previousEnd': end};
+    if (!now.isBefore(end)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'previousStart': start, 'previousEnd': end};
     return {'isWorkDay': true, 'kind': 'ADMIN', 'start': start, 'end': end};
   }
 
