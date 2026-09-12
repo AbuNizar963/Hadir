@@ -36,6 +36,16 @@ void main() {
       expect(state.kind, 'OFF');
       expect(state.label, 'إجازة أسبوعية');
     });
+
+    test('uses the web defaults when work days and hours are omitted', () {
+      final state = service.resolve(
+        {'scheduleType': 'ADMIN'},
+        target: HadirTime.date(2026, 9, 13, 10),
+      );
+
+      expect(state.isWorkDay, isTrue);
+      expect(state.detail, '09:00 → 16:00');
+    });
   });
 
   group('ROTATION schedule', () {
@@ -57,6 +67,7 @@ void main() {
       expect(state.kind, 'ROTATION');
       expect(state.cycleDay, 2);
       expect(state.cycleTotal, 8);
+      expect(state.detail, contains('07:00'));
     });
 
     test('resolves the configured off period', () {
@@ -77,6 +88,16 @@ void main() {
       );
 
       expect(state.kind, 'NOT_STARTED');
+      expect(state.isWorkDay, isFalse);
+    });
+
+    test('rejects an invalid rotation start-date format', () {
+      final state = service.resolve(
+        {...employee, 'rotationStartDate': '01-09-2026'},
+        target: HadirTime.date(2026, 9, 2, 10),
+      );
+
+      expect(state.kind, 'INVALID');
       expect(state.isWorkDay, isFalse);
     });
   });
