@@ -23,8 +23,10 @@ const json = (data: unknown, status = 200, origin = "*") => new Response(JSON.st
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": origin,
     "access-control-allow-credentials": "true",
-    "access-control-allow-headers": "content-type, authorization, x-device-id",
+    "access-control-allow-headers": "content-type, authorization, x-device-id, x-requested-with",
     "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
+    "access-control-max-age": "86400",
+    "vary": "Origin",
     "cache-control": "no-store",
   },
 });
@@ -47,6 +49,22 @@ function origin(req: Request, env: Env) {
   if (incoming && configured.includes(incoming)) return incoming;
   if (!configured.length && incoming && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(incoming)) return incoming;
   return configured[0] || "*";
+}
+
+function preflight(req: Request, env: Env, o: string) {
+  const requestedHeaders = String(req.headers.get("access-control-request-headers") || "").trim();
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "access-control-allow-origin": o,
+      "access-control-allow-credentials": "true",
+      "access-control-allow-headers": requestedHeaders || "content-type, authorization, x-device-id, x-requested-with",
+      "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
+      "access-control-max-age": "86400",
+      "vary": "Origin, Access-Control-Request-Headers, Access-Control-Request-Method",
+      "cache-control": "no-store",
+    },
+  });
 }
 
 function token(req: Request) {
@@ -88,8 +106,7 @@ function employeeOut(row: any, policyMinutes = 0) {
     deviceId: row.device_id, deviceLabel: row.device_label, createdAt: row.created_at, scheduleType: row.schedule_type,
     rotationStartDate: row.rotation_start_date, avatar: row.avatar || null, workStartTime: row.work_start_time, workEndTime: row.work_end_time,
     rotationDailyAttendanceEnabled: Boolean(row.rotation_daily_attendance_enabled), rotationDailyAttendanceTime: row.rotation_daily_attendance_time || null,
-    rotationDailyAttendanceGraceMinutes: Number(row.rotation_daily_attendance_grace_minutes ?? 0),
-    gracePeriodMinutes: Number(row.grace_period_minutes ?? 0), earlyCheckoutGraceMinutes: policyMinutes,
+    rotationDailyAttendanceGraceMinutes: Number(row.rotation_daily_attendance_grace_minutes ?? 0), gracePeriodMinutes: Number(row.grace_period_minutes ?? 0), earlyCheckoutGraceMinutes: policyMinutes,
     role: row.role, locationId: row.location_id, rotationDaysOn: row.rotation_days_on, rotationDaysOff: row.rotation_days_off,
     specialties, workDays, isVip: Boolean(row.is_vip), autoCheckIn: Boolean(row.auto_check_in), autoCheckOut: Boolean(row.auto_check_out),
   };
@@ -165,15 +182,9 @@ export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     const o = origin(req, env);
     if (!isAllowedOrigin(req, env)) return json({ error: "مصدر الطلب غير مسموح به." }, 403, o);
+    if (req.method === "OPTIONS") return preflight(req, env, o);
     const url = new URL(req.url);
     if (url.pathname.replace(/\/$/, "") === "/api/reports/daily/pdf") {
-      if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: {
-        "access-control-allow-origin": o,
-        "access-control-allow-credentials": "true",
-        "access-control-allow-headers": "content-type, authorization, x-device-id",
-        "access-control-allow-methods": "POST,OPTIONS",
-        "cache-control": "no-store",
-      }});
       const a = await actor(req, env);
       if (!a) return json({ error: "غير مصرح" }, 401, o);
       return generateDailyReportPdf(req, env, o);
@@ -182,7 +193,12 @@ export default {
     if (match && req.method === "PATCH") {
       const a = await actor(req, env);
       if (!a) return json({ error: "غير مصرح" }, 401, o);
-      return saveEmployee(req, env, decodeURIComponent(match[1]), a, o);
+      try {
+        return await saveEmployee(req, env, decodeURIComponent(match[1]), a, o);
+      } catch (error) {
+        console.error("employee save failed", { employeeId: decodeURIComponent(match[1]), error });
+        return json({ error: "تعذر حفظ بيانات الموظف", detail: error instanceof Error ? error.message : String(error) }, 500, o);
+      }
     }
     return base.fetch(req, env, ctx);
   },
