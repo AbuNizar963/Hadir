@@ -12,6 +12,9 @@ class HadirTime {
   /// Current wall-clock time in the HADIR business timezone.
   static DateTime now() => tz.TZDateTime.now(_location);
 
+  /// Constructs a date/time in the HADIR business timezone.
+  static DateTime date(int year, int month, [int day = 1]) => tz.TZDateTime(_location, year, month, day);
+
   /// Converts an API timestamp (an absolute instant) to Damascus wall time.
   /// API timestamps are expected to carry an explicit UTC/offset designator.
   static DateTime? fromTimestamp(Object? raw) {
