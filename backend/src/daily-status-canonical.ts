@@ -7,6 +7,9 @@ type CanonicalRow = {
   status: string;
   scheduleType: string;
   scheduledStart: string | null;
+  checkInAt?: string | null;
+  checkOutAt?: string | null;
+  attendanceDay?: string;
 };
 
 function dayKey(date: Date) {
@@ -28,11 +31,10 @@ function normalizeCurrentDay(rows: CanonicalRow[], employees: any[], now: Date) 
     const grace = Math.max(0, Math.min(180, Number(employee.grace_period_minutes ?? 10)));
     const start = Date.parse(String(row.scheduledStart));
     if (!Number.isFinite(start)) return row;
-    const day = today;
     if (row.status === "ABSENT" && now.getTime() < start + grace * 60000) {
       return { ...row, status: "NOT_STARTED" };
     }
-    if (row.status === "REST" && now.getTime() >= start + grace * 60000 && dayKey(new Date(start)) === day) {
+    if (row.status === "REST" && now.getTime() >= start + grace * 60000 && dayKey(new Date(start)) === today) {
       return { ...row, status: "ABSENT" };
     }
     return row;
@@ -50,7 +52,15 @@ export async function handleDailyStatus(req: Request, env: any, actor: any, pers
     if (!ids.length) return response;
     const placeholders = ids.map(() => "?").join(",");
     const employees = await env.DB.prepare(`SELECT id,grace_period_minutes FROM employees WHERE id IN (${placeholders})`).bind(...ids).all<any>();
-    payload.employees = normalizeCurrentDay(payload.employees as CanonicalRow[], employees.results || [], new Date());
+    const before = payload.employees as CanonicalRow[];
+    const after = normalizeCurrentDay(before, employees.results || [], new Date());
+    if (persist) {
+      const changed = after.filter((row, index) => String(row.status) !== String(before[index]?.status));
+      if (changed.length) {
+        await env.DB.batch(changed.map((row) => env.DB.prepare("UPDATE daily_attendance_status SET status=?,computed_at=? WHERE attendance_day=? AND employee_id=?").bind(row.status, new Date().toISOString(), day, row.employeeId)));
+      }
+    }
+    payload.employees = after;
     payload.counts = payload.employees.reduce((acc: Record<string, number>, row: any) => {
       acc[row.status] = (acc[row.status] || 0) + 1;
       return acc;
