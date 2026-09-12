@@ -2,6 +2,8 @@ from pathlib import Path
 
 p = Path("lib/features/employee/pages/hadir_workspace_page_implementation.dart")
 s = p.read_text(encoding="utf-8")
+if "ROTATION_DAILY" in s:
+    raise SystemExit(0)
 
 old = """    final canIn = schedule['isWorkDay'] == true && open == null && !today.any((r) => _type(r) == 'check-in') && !hasLeave && !hasPermission && escape == null;
     final canOut = open != null;
