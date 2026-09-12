@@ -128,7 +128,12 @@ class _ModernHomePageState extends State<ModernHomePage> {
     }
   }
 
-  bool get _clockedIn => _canonicalStatus == 'OPEN' || _canonicalStatus == 'PRESENT' || _canonicalStatus == 'LATE';
+  // The canonical daily status describes the attendance state; the checkout
+  // action must additionally require an actual open attendance session.
+  bool get _clockedIn {
+    final records = _todayRecords;
+    return records.isNotEmpty && records.last['type'] == 'check-in';
+  }
 
   List<Map<String, dynamic>> get _todayRecords {
     final today = DateTime.now();
