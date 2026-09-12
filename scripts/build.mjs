@@ -47,7 +47,16 @@ run("node", ["scripts/patch-manager-settings-locations-dedicated.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-fixes.mjs"]);
 run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-screen.mjs"]);
-run("node", ["scripts/patch-manager-dashboard-dedicated-status.mjs"]);
+
+const managerDashboardSource = readFileSync(new URL("../src/pages/ManagerDashboard.tsx", import.meta.url), "utf8");
+const canonicalManagerDashboard = managerDashboardSource.includes("The backend attendance engine is the single source of truth")
+  && !managerDashboardSource.includes('import { getBackendEscapeEvents } from "@/lib/backend";');
+if (canonicalManagerDashboard) {
+  console.log("ManagerDashboard canonical patch: source already consumes central attendance-engine status; legacy build patch skipped safely.");
+} else {
+  run("node", ["scripts/patch-manager-dashboard-dedicated-status.mjs"]);
+}
+
 run("node", ["scripts/patch-manager-menu-autoclose-on-scroll.mjs"]);
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
 run("node", ["scripts/patch-employee-home-shift-info.mjs"]);
