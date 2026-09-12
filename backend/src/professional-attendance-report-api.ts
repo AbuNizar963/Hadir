@@ -42,7 +42,7 @@ function classifyAttendanceSource(attendance: Record<string, unknown>[]) {
     const qrCode = String(row.qr_code || "");
     if (deviceId === "AUTO_VIP" || qrCode === "AUTO_VIP") sources.add("AUTOMATIC_VIP");
     else if (qrCode === "AUTO_DIRECT" || deviceId === "ADMIN_DIRECT:التلقائي") sources.add("AUTOMATIC");
-    else if (deviceId === "ADMIN_DIRECT" || qrCode === "ADMIN_DIRECT") sources.add("MANUAL_OWNER");
+    else if (deviceId.startsWith("ADMIN_DIRECT:") || deviceId === "ADMIN_DIRECT" || qrCode === "ADMIN_DIRECT") sources.add("MANUAL_OWNER");
     else sources.add("MANUAL_EMPLOYEE");
   }
   if (!sources.size) return "UNKNOWN";
