@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/hadir_brand.dart';
+import '../../../core/hadir_time.dart';
 import '../../../services/notifications_service.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -147,7 +148,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   String _date(DateTime d) {
-    final local = d.toLocal();
+    final local = HadirTime.fromTimestamp(d);
+    if (local == null) return '—';
     return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} • ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
