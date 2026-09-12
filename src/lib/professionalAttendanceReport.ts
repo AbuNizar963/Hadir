@@ -138,6 +138,20 @@ export async function getProfessionalAttendanceReport(from: string, to: string, 
   return data as ProfessionalAttendanceReport;
 }
 
+export async function backfillProfessionalAttendanceReport(from: string, to: string, employeeId?: string) {
+  const query = new URLSearchParams({ from, to });
+  if (employeeId) query.set("employeeId", employeeId);
+  const response = await fetch(`${API_URL}/api/reports/professional-attendance?${query.toString()}`, {
+    method: "POST",
+    headers: { ...adminHeaders(), "content-type": "application/json" },
+    credentials: "include",
+    cache: "no-store",
+  });
+  const data = await response.json().catch(() => null) as { ok?: boolean; written?: number; message?: string; error?: string } | null;
+  if (!response.ok) throw new Error(String(data?.error || `HTTP ${response.status}`));
+  return data || { ok: true, written: 0 };
+}
+
 export async function getProfessionalAttendanceDrilldown(attendanceDay: string, employeeId: string) {
   const query = new URLSearchParams({ from: attendanceDay, to: attendanceDay, employeeId, drilldown: "1" });
   const response = await fetch(`${API_URL}/api/reports/professional-attendance?${query.toString()}`, {
