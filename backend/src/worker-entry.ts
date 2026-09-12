@@ -11,6 +11,7 @@ async function archiveActor(request:Request,env:Env){const token=(readCookie(req
 function cors(request:Request,env:Env){return String(env.APP_ORIGIN||request.headers.get("origin")||"*").split(",")[0].trim()||"*";}
 function json(data:unknown,status:number,o:string){return new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","access-control-allow-origin":o,"access-control-allow-credentials":"true","cache-control":"no-store"}});}
 function archiveAllowed(a:any){return !!a&&["owner","manager","supervisor"].includes(String(a.role).toLowerCase());}
+function archiveDeleteAllowed(a:any){return !!a&&String(a.role).toLowerCase()==="owner";}
 
 export default {
   async fetch(request:Request,env:Env,ctx:ExecutionContext){
@@ -25,6 +26,7 @@ export default {
       const a=await archiveActor(request,env); if(!archiveAllowed(a))return json({error:"غير مصرح"},403,o);
       const id=decodeURIComponent(match[1]);
       if(request.method==="DELETE"){
+        if(!archiveDeleteAllowed(a))return json({error:"حذف أرشيف التقارير متاح للمالك فقط"},403,o);
         if(!env.REPORT_ARCHIVES)return json({error:"R2 binding REPORT_ARCHIVES غير موجود"},503,o);
         try{const result=await deleteReportArchive(env,id);if(!result.ok)return json({error:"الأرشيف غير موجود أو تم حذفه مسبقًا"},404,o);return json({ok:true,deleted:true,reportId:id},200,o);}catch(error){console.error("[report-archive] delete failed",error);return json({error:error instanceof Error?error.message:"تعذر حذف الأرشيف"},500,o);}
       }
