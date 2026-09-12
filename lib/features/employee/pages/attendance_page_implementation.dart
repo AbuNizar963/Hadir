@@ -1535,6 +1535,7 @@ class _AttendancePageState extends State<AttendancePage>
       decoration: BoxDecoration(
         color: const Color(0xFFF7FAF8),
         borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xFFE7EFEC)),
       ),
       child: Column(
         children: [
