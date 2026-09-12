@@ -46,6 +46,40 @@ void main() {
       expect(state.isWorkDay, isTrue);
       expect(state.detail, '09:00 → 16:00');
     });
+
+    test('reports web-compatible rest status after the configured end time', () {
+      final state = service.resolveStatus(
+        {
+          'scheduleType': 'ADMIN',
+          'workDays': [0, 1, 2, 3, 4],
+          'workStartTime': '08:30',
+          'workEndTime': '16:00',
+        },
+        target: HadirTime.date(2026, 9, 13, 16),
+      );
+
+      expect(state.isWorkDay, isFalse);
+      expect(state.kind, 'OFF');
+      expect(state.label, 'فترة راحة');
+      expect(state.detail, 'انتهى دوام اليوم');
+    });
+
+    test('reports web-compatible active status during configured hours', () {
+      final state = service.resolveStatus(
+        {
+          'scheduleType': 'ADMIN',
+          'workDays': [0, 1, 2, 3, 4],
+          'workStartTime': '08:30',
+          'workEndTime': '16:00',
+        },
+        target: HadirTime.date(2026, 9, 13, 10),
+      );
+
+      expect(state.isWorkDay, isTrue);
+      expect(state.kind, 'ADMIN');
+      expect(state.label, 'في المناوبة');
+      expect(state.detail, 'يوم عمل (إداري)');
+    });
   });
 
   group('ROTATION schedule', () {
@@ -99,6 +133,34 @@ void main() {
 
       expect(state.kind, 'INVALID');
       expect(state.isWorkDay, isFalse);
+    });
+
+    test('reports the active rotation day using web status wording', () {
+      final state = service.resolveStatus(
+        employee,
+        target: HadirTime.date(2026, 9, 2, 10),
+      );
+
+      expect(state.isWorkDay, isTrue);
+      expect(state.kind, 'ROTATION');
+      expect(state.label, 'في المناوبة');
+      expect(state.detail, 'اليوم 2 من 4 في المناوبة');
+      expect(state.cycleDay, 2);
+      expect(state.cycleTotal, 8);
+    });
+
+    test('reports the rotation rest day using web status wording', () {
+      final state = service.resolveStatus(
+        employee,
+        target: HadirTime.date(2026, 9, 5, 10),
+      );
+
+      expect(state.isWorkDay, isFalse);
+      expect(state.kind, 'OFF');
+      expect(state.label, 'فترة راحة');
+      expect(state.detail, 'اليوم 1 من 4 في الراحة');
+      expect(state.cycleDay, 5);
+      expect(state.cycleTotal, 8);
     });
   });
 }
