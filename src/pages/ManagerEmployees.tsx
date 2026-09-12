@@ -317,14 +317,6 @@ export default function ManagerEmployees() {
     finally { setRequestSaving(false); }
   };
 
-  const saveCheckoutPolicy = async (employeeId: string, minutes: number) => {
-    const token = localStorage.getItem("hadir.api.token.admin") || "";
-    const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
-    const response = await fetch(`${api}/api/employees/${encodeURIComponent(employeeId)}/checkout-policy`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, credentials: "include", body: JSON.stringify({ earlyCheckoutMinutes: minutes }), cache: "no-store" });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "تعذر حفظ فترة السماح بالانصراف المبكر.");
-  };
-
   const submit = async () => {
     const name = form.name.trim(); const jobNumber = form.jobNumber.trim(); const pin = form.pin.trim();
     if (!name || !jobNumber) { const message = "اسم الموظف والرقم الوظيفي مطلوبان."; setError(message); toast.warning(message); return; }
@@ -350,14 +342,19 @@ export default function ManagerEmployees() {
       };
       if (pin) payload.pin = pin;
       let savedEmployeeId = editingId;
+      let savedEmployee: Employee | null = null;
       if (backendEnabled) {
         if (editingId) {
           const result = await updateBackendEmployee(editingId, payload);
           savedEmployeeId = result.employee?.id || editingId;
+          savedEmployee = result.employee || null;
         } else {
           const created = await createBackendEmployee({ ...payload, pin, avatar: null });
           savedEmployeeId = created.employee?.id || null;
-          if (savedEmployeeId) await updateBackendEmployee(savedEmployeeId, payload);
+          if (savedEmployeeId) {
+            const updated = await updateBackendEmployee(savedEmployeeId, payload);
+            savedEmployee = updated.employee || null;
+          }
         }
       } else if (editingId) {
         const current = employees.find((e) => e.id === editingId);
@@ -375,7 +372,9 @@ export default function ManagerEmployees() {
         };
         saveEmployees([employee, ...employees]);
       }
-      setForm(emptyForm); setEditingId(null); setShowForm(false); await load(false);
+      if (savedEmployee) setEmployees((prev) => editingId ? prev.map((item) => item.id === savedEmployee!.id ? savedEmployee! : item) : [savedEmployee!, ...prev.filter((item) => item.id !== savedEmployee!.id)]);
+      setForm(emptyForm); setEditingId(null); setShowForm(false);
+      void load(false);
       toast.success(editingId ? "تم تحديث الموظف بنجاح" : "تم إضافة الموظف بنجاح");
     } catch (err) { const message = err instanceof Error ? err.message : "تعذر حفظ الموظف."; setError(message); toast.error(editingId ? "تعذر تحديث الموظف" : "تعذر إضافة الموظف", message); }
     finally { setSaving(false); }
