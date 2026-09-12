@@ -2,7 +2,6 @@ import base, { HadirRealtime } from "./automation-entry";
 import { handleDeviceRebind } from "./device-rebind-api";
 import { handleDailyStatus } from "./daily-status-canonical";
 import { handleProfessionalAttendanceReport } from "./professional-attendance-report-api";
-import { handleReportArchive } from "./report-archive";
 import { handleCompanyLogoRequest } from "./company-logo";
 import { runAutomaticVip } from "./automatic-vip";
 
@@ -16,8 +15,6 @@ type Env = {
   VAPID_SUBJECT?: string;
   PROFILE_IMAGES?: R2Bucket;
 };
-
-let leaveSchemaReady: Promise<void> | null = null;
 
 function configuredOrigins(env: Env) {
   return [String(env.APP_ORIGIN || ""), String(env.APP_ORIGINS || "")]
@@ -97,42 +94,12 @@ export default {
 
     const url = new URL(request.url);
     const normalizedPath = url.pathname.replace(/\/$/, "");
-    if (normalizedPath.startsWith("/api/reports/archive")) {
-      const actorProbe = new URL(request.url);
-      actorProbe.pathname = "/api/me";
-      actorProbe.search = "";
-      const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
-      const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
-      return handleReportArchive(request, env, actor, origin(request, env));
-    }
 
     if (normalizedPath === "/api/manager/daily-status" || normalizedPath === "/api/reports/attendance" || normalizedPath === "/api/reports/professional-attendance") {
       const cors = dailyCors(request, env);
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
 
       try {
-        if (!leaveSchemaReady) {
-          leaveSchemaReady = env.DB.batch([
-            env.DB.prepare(`CREATE TABLE IF NOT EXISTS leave_requests (
-              id TEXT PRIMARY KEY,
-              employee_id TEXT NOT NULL,
-              type TEXT NOT NULL,
-              start_date TEXT NOT NULL,
-              end_date TEXT NOT NULL,
-              reason TEXT,
-              status TEXT NOT NULL DEFAULT 'pending',
-              reviewer_id TEXT,
-              reviewed_at TEXT,
-              created_at TEXT NOT NULL
-            )`),
-            env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_leave_requests_employee_dates ON leave_requests(employee_id,start_date,end_date)"),
-          ]).then(() => undefined).catch(error => {
-            leaveSchemaReady = null;
-            throw error;
-          });
-        }
-        await leaveSchemaReady;
-
         const actorProbe = new URL(request.url);
         actorProbe.pathname = "/api/me";
         actorProbe.search = "";
@@ -140,9 +107,7 @@ export default {
         const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
         const result = normalizedPath === "/api/manager/daily-status"
           ? await handleDailyStatus(employeeDailyStatusRequest(request, actor), env, actor)
-          : normalizedPath === "/api/reports/professional-attendance"
-            ? await handleProfessionalAttendanceReport(request, env, actor)
-            : await handleProfessionalAttendanceReport(request, env, actor);
+          : await handleProfessionalAttendanceReport(request, env, actor);
         const headers = new Headers(result.headers);
         for (const [key, value] of Object.entries(cors)) headers.set(key, value);
         return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
