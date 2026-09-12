@@ -713,7 +713,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final periodDay = dayStart.add(Duration(days: diff - cycleDay));
     final start = _localTime(periodDay, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
     final end = _localTime(periodDay.add(Duration(days: daysOn)), '${_employee['rotationEndTime'] ?? _employee['workEndTime'] ?? _employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
-    final activeRotation = cycleDay < daysOn || (cycleDay == daysOn && now.isBefore(end));
+    final activeRotation = cycleDay < daysOn;
     if (!activeRotation) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
     final dailyEnabled = _employee['rotationDailyAttendanceEnabled'] == true || '${_employee['rotationDailyAttendanceEnabled'] ?? ''}'.toLowerCase() == 'true' || '${_employee['rotationDailyAttendanceEnabled'] ?? ''}' == '1';
     if (dailyEnabled) {
