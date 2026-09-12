@@ -29,6 +29,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
   Timer? _clockTimer;
   String _name = 'الموظف';
   List<dynamic> _attendance = const [];
+  Map<String, dynamic>? _dailyStatus;
   bool _loading = true;
   String? _error;
 
@@ -37,7 +38,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
     super.initState();
     _load();
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted && _clockedIn) setState(() {});
+      if (mounted) setState(() {});
     });
   }
 
@@ -51,16 +52,20 @@ class _ModernHomePageState extends State<ModernHomePage> {
     try {
       final token = await _session.token();
       final api = HadirApi(token: token);
+      final today = intl.DateFormat('yyyy-MM-dd').format(DateTime.now());
       final results = await Future.wait([
         api.me(),
         api.attendance(limit: 100),
+        api.dailyStatus(date: today),
       ]);
       final me = results[0] as Map<String, dynamic>;
       final user = me['user'];
+      final daily = results[2] as Map<String, dynamic>;
       if (!mounted) return;
       setState(() {
         _name = user is Map ? '${user['name'] ?? 'الموظف'}' : 'الموظف';
         _attendance = results[1] as List<dynamic>;
+        _dailyStatus = _extractDailyStatus(daily);
         _loading = false;
         _error = null;
       });
@@ -79,6 +84,36 @@ class _ModernHomePageState extends State<ModernHomePage> {
     }
   }
 
+  Map<String, dynamic>? _extractDailyStatus(Map<String, dynamic> response) {
+    final employees = response['employees'];
+    if (employees is! List) return null;
+    final row = employees.whereType<Map>().cast<Map>().map(Map<String, dynamic>.from).firstWhere(
+      (item) => item['employeeId'] != null,
+      orElse: () => <String, dynamic>{},
+    );
+    return row.isEmpty ? null : row;
+  }
+
+  String get _canonicalStatus => '${_dailyStatus?['status'] ?? ''}'.trim().toUpperCase();
+
+  String get _statusLabel {
+    switch (_canonicalStatus) {
+      case 'PRESENT': return 'حاضر';
+      case 'LATE': return 'متأخر';
+      case 'ABSENT': return 'غياب';
+      case 'REST': return 'راحة';
+      case 'LEAVE': return 'إجازة';
+      case 'PERMISSION': return 'استئذان';
+      case 'ESCAPED': return 'هروب من العمل';
+      case 'NOT_STARTED': return 'لم يبدأ';
+      case 'INVALID': return 'غير صالح';
+      case 'OPEN': return 'انصراف معلق';
+      default: return _clockedIn ? 'على رأس العمل' : 'خارج الدوام';
+    }
+  }
+
+  bool get _clockedIn => _canonicalStatus == 'OPEN' || _canonicalStatus == 'PRESENT' || _canonicalStatus == 'LATE';
+
   List<Map<String, dynamic>> get _todayRecords {
     final today = DateTime.now();
     final records = _attendance
@@ -86,10 +121,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
         .map((item) => Map<String, dynamic>.from(item))
         .where((item) {
           final value = DateTime.tryParse('${item['timestamp']}')?.toLocal();
-          return value != null &&
-              value.year == today.year &&
-              value.month == today.month &&
-              value.day == today.day;
+          return value != null && value.year == today.year && value.month == today.month && value.day == today.day;
         })
         .toList();
     records.sort((a, b) {
@@ -98,12 +130,6 @@ class _ModernHomePageState extends State<ModernHomePage> {
       return at.compareTo(bt);
     });
     return records;
-  }
-
-  bool get _clockedIn {
-    final records = _todayRecords;
-    if (records.isEmpty) return false;
-    return records.last['type'] == 'check-in';
   }
 
   String get _trackedHours {
@@ -211,13 +237,9 @@ class _ModernHomePageState extends State<ModernHomePage> {
   Widget _dashboardFilter(DateTime now) {
     return Row(
       children: [
-        Expanded(
-          child: _FilterPill(icon: Icons.calendar_today_outlined, label: 'اليوم', value: intl.DateFormat('d MMM', 'ar').format(now)),
-        ),
+        Expanded(child: _FilterPill(icon: Icons.calendar_today_outlined, label: 'اليوم', value: intl.DateFormat('d MMM', 'ar').format(now))),
         const SizedBox(width: 8),
-        Expanded(
-          child: _FilterPill(icon: Icons.person_outline_rounded, label: 'الموظف', value: _name.trim().split(RegExp(r'\s+')).first),
-        ),
+        Expanded(child: _FilterPill(icon: Icons.person_outline_rounded, label: 'الموظف', value: _name.trim().split(RegExp(r'\s+')).first)),
       ],
     );
   }
@@ -230,25 +252,18 @@ class _ModernHomePageState extends State<ModernHomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.access_time_rounded, color: _ink, size: 20),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('ساعة الدوام', style: TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900))),
-              _StatusPill(label: active ? 'على رأس العمل' : 'خارج الدوام', active: active),
-            ],
-          ),
+          Row(children: [
+            const Icon(Icons.access_time_rounded, color: _ink, size: 20),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('ساعة الدوام', style: TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900))),
+            _StatusPill(label: _statusLabel, active: active),
+          ]),
           const SizedBox(height: 15),
           Text(_trackedHours, textAlign: TextAlign.center, style: const TextStyle(color: _ink, fontSize: 32, height: 1, fontWeight: FontWeight.w900, letterSpacing: .3)),
           const SizedBox(height: 8),
           Text(active ? 'الوقت المتتبع اليوم' : 'إجمالي الوقت المتتبع اليوم', textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 10.5, fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
-          if (_lastActivityTime != null)
-            Text(
-              '${active ? 'آخر دخول' : 'آخر حركة'} · ${intl.DateFormat('HH:mm', 'ar').format(_lastActivityTime!)}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: _muted, fontSize: 10),
-            ),
+          if (_lastActivityTime != null) Text('${active ? 'آخر دخول' : 'آخر حركة'} · ${intl.DateFormat('HH:mm', 'ar').format(_lastActivityTime!)}', textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 10)),
           const SizedBox(height: 14),
           Text(active ? 'يمكنك تسجيل الانصراف عند انتهاء دوامك.' : 'استخدم الموقع والجهاز وQR لإكمال عملية التحقق.', textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 11, height: 1.4)),
           const SizedBox(height: 16),
@@ -267,58 +282,53 @@ class _ModernHomePageState extends State<ModernHomePage> {
   }
 
   Widget _trackedHoursCard() {
-    return Row(
-      children: [
-        Expanded(child: _MetricCard(icon: Icons.timer_outlined, title: 'الساعات المتتبعة', value: _loading ? '—' : _trackedHours)),
-        const SizedBox(width: 9),
-        Expanded(child: _MetricCard(icon: Icons.event_available_outlined, title: 'حركات اليوم', value: '${_todayRecords.length}')),
-      ],
-    );
+    return Row(children: [
+      Expanded(child: _MetricCard(icon: Icons.timer_outlined, title: 'الساعات المتتبعة', value: _loading ? '—' : _trackedHours)),
+      const SizedBox(width: 9),
+      Expanded(child: _MetricCard(icon: Icons.event_available_outlined, title: 'حركات اليوم', value: '${_todayRecords.length}')),
+    ]);
   }
 
   Widget _scheduleCard() {
+    final start = _dailyStatus?['scheduleStart']?.toString();
+    final end = _dailyStatus?['scheduleEnd']?.toString();
+    final scheduleText = start != null && end != null ? '${_formatTime(start)} - ${_formatTime(end)}' : 'جدول العمل';
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
-      child: Row(
-        children: [
-          Container(width: 42, height: 42, decoration: BoxDecoration(color: _brandSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.schedule_outlined, color: _brand, size: 21)),
-          const SizedBox(width: 12),
-          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('جدول العمل', style: TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w900)), SizedBox(height: 3), Text('لا توجد بيانات جدول متاحة من الخادم حالياً.', style: TextStyle(color: _muted, fontSize: 10.5))])),
-          const Icon(Icons.chevron_left_rounded, color: _muted),
-        ],
-      ),
+      child: Row(children: [
+        Container(width: 42, height: 42, decoration: BoxDecoration(color: _brandSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.schedule_outlined, color: _brand, size: 21)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('جدول العمل', style: const TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(scheduleText, style: const TextStyle(color: _muted, fontSize: 10.5))])),
+        const Icon(Icons.chevron_left_rounded, color: _muted),
+      ]),
     );
+  }
+
+  String _formatTime(String value) {
+    final parsed = DateTime.tryParse(value)?.toLocal();
+    return parsed == null ? value : intl.DateFormat('HH:mm', 'ar').format(parsed);
   }
 
   Widget _dashboardActions() {
-    return Row(
-      children: [
-        Expanded(child: _ActionCard(icon: Icons.history_rounded, label: 'السجل', onTap: () => context.push('/history'))),
-        const SizedBox(width: 8),
-        Expanded(child: _ActionCard(icon: Icons.description_outlined, label: 'الطلبات', onTap: () => context.push('/requests'))),
-        const SizedBox(width: 8),
-        Expanded(child: _ActionCard(icon: Icons.insights_outlined, label: 'الإحصاءات', onTap: () => context.push('/insights'))),
-        const SizedBox(width: 8),
-        Expanded(child: _ActionCard(icon: Icons.apps_rounded, label: 'الخدمات', onTap: () => context.push('/services'))),
-      ],
-    );
+    return Row(children: [
+      Expanded(child: _ActionCard(icon: Icons.history_rounded, label: 'السجل', onTap: () => context.push('/history'))),
+      const SizedBox(width: 8),
+      Expanded(child: _ActionCard(icon: Icons.description_outlined, label: 'الطلبات', onTap: () => context.push('/requests'))),
+      const SizedBox(width: 8),
+      Expanded(child: _ActionCard(icon: Icons.insights_outlined, label: 'الإحصاءات', onTap: () => context.push('/insights'))),
+      const SizedBox(width: 8),
+      Expanded(child: _ActionCard(icon: Icons.apps_rounded, label: 'الخدمات', onTap: () => context.push('/services'))),
+    ]);
   }
 
-  Widget _sectionHeader(String title, {Widget? action}) {
-    return Row(children: [Expanded(child: Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900))), if (action != null) action]);
-  }
+  Widget _sectionHeader(String title, {Widget? action}) => Row(children: [Expanded(child: Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900))), if (action != null) action]);
 
   Widget _recentActivity() {
     if (_loading) return const Column(children: [_ActivitySkeleton(), SizedBox(height: 8), _ActivitySkeleton()]);
     if (_error != null) return _errorCard();
-    if (_attendance.isEmpty) {
-      return _emptyCard('لا توجد حركات مسجلة بعد.', Icons.event_available_outlined);
-    }
-    final recent = _attendance
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList();
+    if (_attendance.isEmpty) return _emptyCard('لا توجد حركات مسجلة بعد.', Icons.event_available_outlined);
+    final recent = _attendance.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
     recent.sort((a, b) {
       final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
       final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -345,46 +355,38 @@ class _ModernHomePageState extends State<ModernHomePage> {
     );
   }
 
-  Widget _errorCard() {
-    return _emptyCard(_error ?? 'تعذر تحميل البيانات.', Icons.cloud_off_rounded, action: TextButton(onPressed: _load, child: const Text('إعادة')));
-  }
+  Widget _errorCard() => _emptyCard(_error ?? 'تعذر تحميل البيانات.', Icons.cloud_off_rounded, action: TextButton(onPressed: _load, child: const Text('إعادة')));
 
-  Widget _emptyCard(String text, IconData icon, {Widget? action}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)),
-      child: Row(children: [Icon(icon, color: _brand), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(color: _muted, fontSize: 11))), if (action != null) action]),
-    );
-  }
+  Widget _emptyCard(String text, IconData icon, {Widget? action}) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)),
+    child: Row(children: [Icon(icon, color: _brand), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(color: _muted, fontSize: 11))), if (action != null) action]),
+  );
 
-  Widget _securityNote() {
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(color: _brandSoft, borderRadius: BorderRadius.circular(17)),
-      child: const Row(children: [Icon(Icons.verified_user_outlined, color: _brand, size: 20), SizedBox(width: 9), Expanded(child: Text('الحضور في HADIR يعتمد على التحقق من الموقع والجهاز ورمز QR قبل اعتماد الحركة.', style: TextStyle(color: _brandDark, fontSize: 10, height: 1.45, fontWeight: FontWeight.w600)))]),
-    );
-  }
+  Widget _securityNote() => Container(
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(color: _brandSoft, borderRadius: BorderRadius.circular(17)),
+    child: const Row(children: [Icon(Icons.verified_user_outlined, color: _brand, size: 20), SizedBox(width: 9), Expanded(child: Text('الحضور في HADIR يعتمد على التحقق من الموقع والجهاز ورمز QR قبل اعتماد الحركة.', style: TextStyle(color: _brandDark, fontSize: 10, height: 1.45, fontWeight: FontWeight.w600)))]),
+  );
 
-  Widget _bottomNavigation(BuildContext context) {
-    return NavigationBar(
-      height: 70,
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      elevation: 6,
-      selectedIndex: 0,
-      onDestinationSelected: (index) {
-        if (index == 1) context.push('/history');
-        if (index == 2) context.push('/requests');
-        if (index == 3) context.push('/profile');
-      },
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'الرئيسية'),
-        NavigationDestination(icon: Icon(Icons.access_time_outlined), selectedIcon: Icon(Icons.access_time_filled), label: 'السجل'),
-        NavigationDestination(icon: Icon(Icons.description_outlined), selectedIcon: Icon(Icons.description_rounded), label: 'الطلبات'),
-        NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'حسابي'),
-      ],
-    );
-  }
+  Widget _bottomNavigation(BuildContext context) => NavigationBar(
+    height: 70,
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    elevation: 6,
+    selectedIndex: 0,
+    onDestinationSelected: (index) {
+      if (index == 1) context.push('/history');
+      if (index == 2) context.push('/requests');
+      if (index == 3) context.push('/profile');
+    },
+    destinations: const [
+      NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'الرئيسية'),
+      NavigationDestination(icon: Icon(Icons.access_time_outlined), selectedIcon: Icon(Icons.access_time_filled), label: 'السجل'),
+      NavigationDestination(icon: Icon(Icons.description_outlined), selectedIcon: Icon(Icons.description_rounded), label: 'الطلبات'),
+      NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'حسابي'),
+    ],
+  );
 }
 
 class _HeaderButton extends StatelessWidget {
