@@ -1,0 +1,95 @@
+name: One-time production test data reset
+
+on:
+  push:
+    branches: [ops/reset-production-test-data]
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install --package-lock=false
+      - name: Reset production data except employee accounts and credentials
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess
+
+          protected = {
+              'employees',
+              'employee_passkeys',
+              'admin_accounts',
+              'd1_migrations',
+          }
+
+          def run(sql):
+              out = subprocess.check_output([
+                  'npx', 'wrangler', 'd1', 'execute', 'Hadir', '--remote', '--json', '--command', sql
+              ], text=True)
+              data = json.loads(out)
+              rows = []
+              for result in data if isinstance(data, list) else []:
+                  rows.extend(result.get('results') or [])
+              return rows
+
+          tables = [str(row['name']) for row in run(
+              "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+          ) if row.get('name')]
+          targets = [t for t in tables if t not in protected]
+          print('Protected tables:', ', '.join(sorted(protected)))
+          print('Tables to clear:', ', '.join(targets) if targets else '(none)')
+
+          # Keep employee records (including pin_hash and avatar/avatar_key) and passkeys.
+          # Clear all transactional, reporting, session, notification, and test data.
+          # Execute one table at a time so D1 reports accurate row-change counts.
+          for table in targets:
+              if not table.replace('_', 'a').isalnum() or table[0].isdigit():
+                  raise SystemExit(f'Unsafe table name: {table!r}')
+              before = run(f'SELECT COUNT(*) AS c FROM "{table}"')[0].get('c', 0)
+              if int(before or 0) == 0:
+                  print(f'{table}: already empty')
+                  continue
+              run(f'DELETE FROM "{table}"')
+              after = run(f'SELECT COUNT(*) AS c FROM "{table}"')[0].get('c', 0)
+              if int(after or 0) != 0:
+                  raise SystemExit(f'{table}: reset failed; remaining rows={after}')
+              print(f'{table}: deleted {before} rows')
+
+          employee_count = run('SELECT COUNT(*) AS c FROM employees')[0].get('c', 0)
+          passkey_count = run('SELECT COUNT(*) AS c FROM employee_passkeys')[0].get('c', 0)
+          print(f'PRESERVED employees: {employee_count}')
+          print(f'PRESERVED employee_passkeys: {passkey_count}')
+          PY
+      - name: Verify reset invariants
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess
+          def q(sql):
+              out=subprocess.check_output(['npx','wrangler','d1','execute','Hadir','--remote','--json','--command',sql],text=True)
+              data=json.loads(out); rows=[]
+              for result in data if isinstance(data,list) else []: rows.extend(result.get('results') or [])
+              return rows
+          employees=int(q('SELECT COUNT(*) AS c FROM employees')[0]['c'])
+          if employees < 0: raise SystemExit('invalid employee count')
+          operational=['attendance','audit','requests','employee_requests','notifications','violations','leave_requests','tasks','performance_reviews','payroll_entries','anomaly_events','ai_insights','push_subscriptions','escape_events','device_rebind_requests','daily_attendance_status','attendance_reporting_facts','report_archives','auth_sessions','webauthn_challenges']
+          for table in operational:
+              exists=q(f'SELECT COUNT(*) AS c FROM sqlite_master WHERE type="table" AND name="{table}"')[0]['c']
+              if int(exists):
+                  count=q(f'SELECT COUNT(*) AS c FROM "{table}"')[0]['c']
+                  if int(count): raise SystemExit(f'{table} is not empty: {count}')
+          print(f'RESET VERIFIED; employees preserved: {employees}')
+          PY
