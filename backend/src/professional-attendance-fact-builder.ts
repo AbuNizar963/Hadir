@@ -12,10 +12,15 @@ function tzParts(date: Date) { const parts = new Intl.DateTimeFormat("en-CA", { 
 function timezoneOffsetMinutes(day: string) { const noonUtc = new Date(`${day}T12:00:00Z`); const local = tzParts(noonUtc); return Math.round((Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute) - noonUtc.getTime()) / 60000); }
 function localMidnightUtc(day: string) { return new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), 0, 0) - timezoneOffsetMinutes(day) * 60000); }
 function localDayNow() { const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()); const get = (type: string) => parts.find((p) => p.type === type)?.value || ""; return `${get("year")}-${get("month")}-${get("day")}`; }
+function employeeCreatedDay(value: unknown) { const timestamp = Date.parse(String(value || "")); if (!Number.isFinite(timestamp)) return null; return new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(timestamp)); }
 export async function materializeDay(env: Env, day: string, actor: any, employeeId?: string) {
   const request = new Request(`https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}`, { method: "GET" });
   const response = await handleDailyStatus(request, env, actor); if (!response.ok) throw new Error(`تعذر حساب حالة الدوام لليوم ${day}`);
   const payload = await response.json() as any; const employees = Array.isArray(payload.employees) ? payload.employees : []; const filtered = employees.filter((e: any) => !employeeId || String(e.employeeId) === employeeId); if (!filtered.length) return 0;
+  const ids = filtered.map((e: any) => String(e.employeeId || "")).filter(Boolean); const placeholders = ids.map(() => "?").join(",");
+  const createdResult = ids.length ? await env.DB.prepare(`SELECT id,created_at AS createdAt FROM employees WHERE id IN (${placeholders})`).bind(...ids).all<any>() : { results: [] } as any;
+  const createdByEmployee = new Map<string, string | null>((createdResult.results || []).map((row: any) => [String(row.id), employeeCreatedDay(row.createdAt)]));
+  const eligible = filtered.filter((e: any) => { const createdDay = createdByEmployee.get(String(e.employeeId)); return !createdDay || day >= createdDay; }); if (!eligible.length) return 0;
   const start = localMidnightUtc(addDays(day, -7)).toISOString(); const end = localMidnightUtc(addDays(day, 8)).toISOString();
   const eventsResult = employeeId ? await env.DB.prepare("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? AND employee_id=? ORDER BY timestamp ASC").bind(start, end, employeeId).all<any>() : await env.DB.prepare("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(start, end).all<any>();
   const eventsByEmployee = new Map<string, any[]>(); for (const event of eventsResult.results || []) { const id = String(event.employeeId || ""); if (!id) continue; const list = eventsByEmployee.get(id) || []; list.push(event); eventsByEmployee.set(id, list); }
@@ -26,7 +31,7 @@ export async function materializeDay(env: Env, day: string, actor: any, employee
   const auditsByEmployee = new Map<string, any[]>(); for (const auditRow of auditResult.results || []) { const id = String(auditRow.employeeId || ""); if (!id) continue; const list = auditsByEmployee.get(id) || []; list.push(auditRow); auditsByEmployee.set(id, list); }
   const statements: D1PreparedStatement[] = []; const today = localDayNow(); const quality = day === today ? "exact" : "reconstructed"; const qualityReason = day === today ? "محسوب من بيانات اليوم الحالية" : "أعيد بناؤه من السجلات التاريخية المتاحة؛ لا توجد لقطة جدول تاريخية كاملة";
   const dayStartMs = localMidnightUtc(day).getTime(), dayEndMs = localMidnightUtc(addDays(day, 1)).getTime();
-  for (const e of filtered) {
+  for (const e of eligible) {
     const id = String(e.employeeId || ""); if (!id) continue; const isRotation = String(e.scheduleType || "").toUpperCase() === "ROTATION"; const dailyRotationAttendance = isRotation && Boolean(e.rotationDailyAttendanceEnabled); const shiftStartMs = Date.parse(String(e.scheduledStart || "")); const shiftEndMs = Date.parse(String(e.scheduledEnd || ""));
     const events = (eventsByEmployee.get(id) || []).filter((x) => { const ts = Date.parse(String(x.timestamp)); if (!Number.isFinite(ts)) return false; if (isRotation && !dailyRotationAttendance && Number.isFinite(shiftStartMs) && Number.isFinite(shiftEndMs)) return ts >= shiftStartMs && ts <= shiftEndMs; return ts >= dayStartMs && ts < dayEndMs; });
     const ins = events.filter((x) => String(x.type) === "check-in"); const outs = events.filter((x) => String(x.type) === "check-out");
