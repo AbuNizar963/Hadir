@@ -325,7 +325,7 @@ export default function ManagerEmployees() {
     setSaving(true); setError(null);
     try {
       const grace = form.grace.trim() === "" ? 0 : Math.max(0, Number(form.grace) || 0);
-      const earlyCheckoutGrace = form.earlyCheckoutGrace.trim() === "" ? 0 : Math.min(1440, Math.max(0, Number(form.earlyCheckoutGrace) || 0));
+      const earlyCheckoutGrace = form.earlyCheckoutGrace.trim() === "" ? 0 : Math.min(180, Math.max(0, Number(form.earlyCheckoutGrace) || 0));
       const specialties = form.specialties.split(",").map((x) => x.trim()).filter(Boolean);
       const payload: Record<string, unknown> = {
         name, jobNumber, status: form.status, scheduleType: form.scheduleType,
