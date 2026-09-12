@@ -711,6 +711,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       final checkpoint = _localTime(DateTime(now.year, now.month, now.day), dailyTime);
       final rawGrace = _number(_employee['rotationDailyAttendanceGraceMinutes'], 0).clamp(0, 180);
       final graceEnd = checkpoint.add(Duration(minutes: rawGrace));
+      final checkpointInRotation = !checkpoint.isBefore(start) && checkpoint.isBefore(end);
+      if (!checkpointInRotation) return {'isWorkDay': true, 'kind': 'ROTATION_DAILY_INVALID', 'start': null, 'end': null, 'rotationStart': start, 'rotationEnd': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
       return {'isWorkDay': true, 'kind': 'ROTATION_DAILY', 'start': checkpoint, 'end': graceEnd, 'rotationStart': start, 'rotationEnd': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff, 'dailyAttendanceEnabled': true, 'dailyAttendanceTime': dailyTime, 'dailyAttendanceGraceMinutes': rawGrace};
     }
     return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
