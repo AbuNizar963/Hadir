@@ -1,2 +1,2 @@
-HADIR employee management release: canonical-save-v2
-This marker intentionally contains no runtime logic; it ensures the verified main revision is published to the Worker.
+HADIR employee management release: canonical-save-v2.1
+This marker intentionally contains no runtime logic; it ensures the verified main revision is published to the Worker after the checkout-policy schema migration.
