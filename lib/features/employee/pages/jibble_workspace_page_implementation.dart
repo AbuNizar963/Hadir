@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../core/api.dart';
+import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
 
 const _green = Color(0xFF0B6B5A);
@@ -83,7 +84,7 @@ class _JibbleWorkspacePageState extends State<JibbleWorkspacePage> {
 
   Widget _homeTab() {
     final firstName = _name.trim().split(RegExp(r'\s+')).first;
-    final now = DateTime.now();
+    final now = HadirTime.now();
     return RefreshIndicator(
       color: _green,
       onRefresh: _load,
@@ -279,7 +280,7 @@ class _JibbleWorkspacePageState extends State<JibbleWorkspacePage> {
 
   List<dynamic> _todayAttendance(DateTime now) {
     return _attendance.where((item) {
-      final date = DateTime.tryParse('${item is Map ? item['timestamp'] : null}');
+      final date = HadirTime.fromTimestamp(item is Map ? item['timestamp'] : null);
       return date != null &&
           date.year == now.year &&
           date.month == now.month &&
@@ -338,10 +339,10 @@ class _JibbleWorkspacePageState extends State<JibbleWorkspacePage> {
   }
 
   String _workHours() {
-    final now = DateTime.now();
+    final now = HadirTime.now();
     final times = _todayAttendance(now)
         .whereType<Map>()
-        .map((e) => DateTime.tryParse('${e['timestamp']}'))
+        .map((e) => HadirTime.fromTimestamp(e['timestamp']))
         .whereType<DateTime>()
         .toList()
       ..sort();
@@ -622,7 +623,7 @@ class _JibbleWorkspacePageState extends State<JibbleWorkspacePage> {
     if (raw is! Map) return const SizedBox.shrink();
     final item = Map<String, dynamic>.from(raw);
     final checkout = item['type'] == 'check-out';
-    final date = DateTime.tryParse('${item['timestamp']}');
+    final date = HadirTime.fromTimestamp(item['timestamp']);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
