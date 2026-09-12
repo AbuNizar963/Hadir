@@ -16,7 +16,7 @@ function archiveDeleteAllowed(a:any){return !!a&&String(a.role).toLowerCase()===
 export default {
   async fetch(request:Request,env:Env,ctx:ExecutionContext){
     const url=new URL(request.url), path=url.pathname, o=cors(request,env);
-    if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{"access-control-allow-origin":o,"access-control-allow-credentials":"true","access-control-allow-methods":"GET,DELETE,OPTIONS","access-control-allow-headers":"authorization,content-type","cache-control":"no-store"}});
+    if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{"access-control-allow-origin":o,"access-control-allow-credentials":"true","access-control-allow-methods":"GET,POST,PATCH,PUT,DELETE,OPTIONS","access-control-allow-headers":"authorization,content-type,x-device-id,x-requested-with","cache-control":"no-store"}});
     if(path==="/api/reports/archive"&&request.method==="GET"){
       const a=await archiveActor(request,env); if(!archiveAllowed(a))return json({error:"غير مصرح"},403,o);
       const limit=Number(url.searchParams.get("limit")||25); return json({ok:true,readOnly:true,archives:await listReportArchives(env,limit)},200,o);
