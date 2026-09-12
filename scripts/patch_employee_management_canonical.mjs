@@ -17,6 +17,11 @@ const earlyCheckoutValidationAligned = '      const earlyCheckoutGrace = form.ea
 if (source.includes(earlyCheckoutValidation)) source = source.replace(earlyCheckoutValidation, earlyCheckoutValidationAligned, 1);
 if (!source.includes(earlyCheckoutValidationAligned)) throw new Error("Frontend early checkout validation marker missing");
 
+const addRoleMarker = '  const canAdd = canManage || role === "supervisor";';
+const addRoleAligned = '  const canAdd = canManage;';
+if (source.includes(addRoleMarker)) source = source.replace(addRoleMarker, addRoleAligned, 1);
+if (!source.includes(addRoleAligned)) throw new Error("Employee add permission marker missing");
+
 if (!source.includes("let savedEmployee: Employee | null = null;")) source = source.replace("      let savedEmployeeId = editingId;\n", "      let savedEmployeeId = editingId;\n      let savedEmployee: Employee | null = null;\n");
 if (!source.includes("savedEmployee = result.employee || null;")) source = source.replace("          savedEmployeeId = result.employee?.id || editingId;\n", "          savedEmployeeId = result.employee?.id || editingId;\n          savedEmployee = result.employee || null;\n", 1);
 if (!source.includes("const updated = await updateBackendEmployee(savedEmployeeId, payload);")) source = source.replace("          if (savedEmployeeId) await updateBackendEmployee(savedEmployeeId, payload);\n", "          if (savedEmployeeId) {\n            const updated = await updateBackendEmployee(savedEmployeeId, payload);\n            savedEmployee = updated.employee || null;\n          }\n");
