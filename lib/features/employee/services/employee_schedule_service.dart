@@ -96,7 +96,7 @@ class EmployeeScheduleService {
 
       final cycleDay = period.cycleDay;
       final daysOn = _positiveInt(employee['rotationDaysOn'], 4);
-      final workDay = cycleDay == null ? 1 : cycleDay + 1;
+      final workDay = cycleDay ?? 1;
       return EmployeeScheduleState(
         isWorkDay: true,
         kind: 'ROTATION',
