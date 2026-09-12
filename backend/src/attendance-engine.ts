@@ -30,7 +30,7 @@ export async function handleDailyStatus(req:Request,env:Env,actor:any,persist=fa
     const attendanceQuery=await env.DB.prepare("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(from,to).all<any>();
     const requestQuery=await env.DB.prepare("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission')").all<any>();
     const now=new Date(),today=dayKey(now),escapeCutoff=day===today?now:localDateTimeUtc(nextDay,"00:00");
-    const escapeQuery=await env.DB.prepare("SELECT employee_id AS employeeId,status,timestamp FROM escape_events WHERE timestamp<? ORDER BY timestamp DESC").bind(escapeCutoff.toISOString()).all<any>();
+    const escapeQuery=await env.DB.prepare("SELECT employee_id AS employeeId,status,timestamp FROM escape_events WHERE timestamp>=? AND timestamp<? ORDER BY timestamp DESC").bind(localDateTimeUtc(day,"00:00").toISOString(),escapeCutoff.toISOString()).all<any>();
     const latestEscapeByEmployee=new Map<string,any>();
     for(const row of escapeQuery.results||[]){const id=String(row.employeeId||"");if(id&&!latestEscapeByEmployee.has(id))latestEscapeByEmployee.set(id,row);}
     const employees=employeeQuery.results||[], attendance=attendanceQuery.results||[], requests=requestQuery.results||[];
