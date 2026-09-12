@@ -1,0 +1,2 @@
+HADIR employee management release: canonical-save-v2
+This marker intentionally contains no runtime logic; it ensures the verified main revision is published to the Worker.
