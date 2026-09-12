@@ -47,6 +47,22 @@ void main() {
       expect(state.detail, '09:00 → 16:00');
     });
 
+    test('supports an overnight administrative shift', () {
+      final state = service.resolve(
+        {
+          'scheduleType': 'ADMIN',
+          'workDays': [0, 1, 2, 3, 4],
+          'workStartTime': '22:00',
+          'workEndTime': '06:00',
+        },
+        target: HadirTime.date(2026, 9, 13, 23),
+      );
+
+      expect(state.isWorkDay, isTrue);
+      expect(state.kind, 'ADMIN');
+      expect(state.detail, '22:00 → 06:00');
+    });
+
     test('reports web-compatible rest status after the configured end time', () {
       final state = service.resolveStatus(
         {
@@ -123,6 +139,23 @@ void main() {
 
       expect(state.kind, 'NOT_STARTED');
       expect(state.isWorkDay, isFalse);
+    });
+
+    test('keeps the first rotation day pending until the configured start time', () {
+      final before = service.resolveStatus(
+        employee,
+        target: HadirTime.date(2026, 9, 1, 6, 59),
+      );
+      final atStart = service.resolveStatus(
+        employee,
+        target: HadirTime.date(2026, 9, 1, 7),
+      );
+
+      expect(before.kind, 'NOT_STARTED');
+      expect(before.isWorkDay, isFalse);
+      expect(atStart.kind, 'ROTATION');
+      expect(atStart.isWorkDay, isTrue);
+      expect(atStart.detail, 'اليوم 1 من 4 في المناوبة');
     });
 
     test('rejects an invalid rotation start-date format', () {
