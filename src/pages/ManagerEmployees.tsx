@@ -345,6 +345,7 @@ export default function ManagerEmployees() {
         rotationDailyAttendanceEnabled: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled,
         rotationDailyAttendanceTime: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? form.rotationDailyAttendanceTime : null,
         rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceGraceMinutes) || 0)) : 0,
+        earlyCheckoutGraceMinutes: earlyCheckoutGrace,
         locationId: form.locationId || null, specialties,
       };
       if (pin) payload.pin = pin;
