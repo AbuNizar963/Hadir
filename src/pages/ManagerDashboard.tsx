@@ -25,24 +25,10 @@ function statusLabel(row: DailyStatusRow) {
 function isPresent(row: DailyStatusRow) { return row.status === "PRESENT" || row.status === "LATE"; }
 function isRest(row: DailyStatusRow) { return row.status === "REST" || row.status === "NOT_STARTED"; }
 
-function alignCurrentShiftStatus(row: DailyStatusRow, nowMs: number, today: string): DailyStatusRow {
-  if (row.attendanceDay !== today || row.status === "LEAVE" || row.status === "PERMISSION" || row.status === "INVALID") return row;
-  const start = row.scheduledStart ? Date.parse(row.scheduledStart) : NaN;
-  const end = row.scheduledEnd ? Date.parse(row.scheduledEnd) : NaN;
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return row;
-
-  // The dashboard is a live view: a shift that is currently running must not be
-  // displayed as REST/NOT_STARTED merely because the rotation day crossed midnight.
-  if (nowMs >= start && nowMs < end && isRest(row)) {
-    return { ...row, status: "PRESENT" };
-  }
-
-  // Once the scheduled window has ended, do not keep showing the employee as
-  // PRESENT/LATE. They are off-duty until the next scheduled period.
-  if (nowMs >= end && isPresent(row)) {
-    return { ...row, status: "REST" };
-  }
-
+function alignCurrentShiftStatus(row: DailyStatusRow, _nowMs: number, _today: string): DailyStatusRow {
+  // The backend attendance engine is the single source of truth. The dashboard
+  // must render the canonical status exactly as returned by daily-status and
+  // must never reinterpret PRESENT/LATE/ABSENT/REST locally after the response.
   return row;
 }
 
