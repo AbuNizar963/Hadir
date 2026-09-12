@@ -7,18 +7,20 @@ import 'package:intl/intl.dart' as intl;
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/api.dart';
+import '../../../core/hadir_brand.dart';
+import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
 import '../../../services/attendance_service.dart';
 
-const _brand = Color(0xFF0B6B5A);
-const _brandDark = Color(0xFF064B40);
-const _brandSoft = Color(0xFFE8F5F0);
-const _canvas = Color(0xFFF5F8F7);
-const _ink = Color(0xFF142D27);
-const _muted = Color(0xFF72827D);
-const _line = Color(0xFFDCE6E2);
-const _danger = Color(0xFFB33A32);
-const _warning = Color(0xFF9A6A18);
+const _brand = HadirBrand.lightPrimary;
+const _brandDark = Color(0xFF187A57);
+const _brandSoft = Color(0xFFE5F5EE);
+const _canvas = HadirBrand.lightBackground;
+const _ink = HadirBrand.lightText;
+const _muted = HadirBrand.lightMuted;
+const _line = HadirBrand.lightBorder;
+const _danger = HadirBrand.lightDanger;
+const _warning = HadirBrand.lightWarning;
 
 class AttendancePage extends StatefulWidget {
   final String type;
@@ -268,9 +270,9 @@ class _AttendancePageState extends State<AttendancePage>
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
       final seconds = ((expiresAt
-                      .difference(DateTime.now().toUtc())
-                      .inMilliseconds +
-                  999) ~/
+                          .difference(DateTime.now().toUtc())
+                          .inMilliseconds +
+                      999) ~/
               1000)
           .clamp(0, 60)
           .toInt();
@@ -527,7 +529,7 @@ class _AttendancePageState extends State<AttendancePage>
   }
 
   Widget _miniDateBadge() {
-    final now = DateTime.now();
+    final now = HadirTime.now();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
       decoration: BoxDecoration(
