@@ -83,7 +83,10 @@ class EmployeeScheduleService {
         final cycleDay = period.cycleDay;
         final daysOff = _nonNegativeInt(employee['rotationDaysOff'], 4);
         final daysOn = _positiveInt(employee['rotationDaysOn'], 4);
-        final restDay = cycleDay == null ? 1 : cycleDay - daysOn + 1;
+        // resolve() exposes cycleDay as 1-based, while the Web rotation
+        // info uses a zero-based cycleDay. Convert directly to the 1-based
+        // rest-day number expected by the Web status wording.
+        final restDay = cycleDay == null ? 1 : cycleDay - daysOn;
         return EmployeeScheduleState(
           isWorkDay: false,
           kind: 'OFF',
