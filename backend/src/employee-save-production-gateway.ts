@@ -169,7 +169,7 @@ async function saveEmployee(req: Request, env: Env, id: string, a: Actor, o: str
   const policy = await env.DB.prepare("SELECT early_checkout_minutes AS minutes FROM employee_checkout_policies WHERE employee_id=? LIMIT 1").bind(id).first<any>();
   const result = employeeOut(updated, Number(policy?.minutes || 0));
   const damascusDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  await refreshProfessionalAttendanceFact(env, damascusDay, a, id);
+  try { await refreshProfessionalAttendanceFact(env, damascusDay, a, id); } catch (error) { console.error("[employee-save] professional fact refresh deferred", { employeeId: id, error }); }
   if (body.isVip !== undefined || body.autoCheckIn !== undefined || body.autoCheckOut !== undefined) {
     await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), id, result.jobNumber, a.name, "workforce-controls", "success", "تحديث إعدادات الموظف من لوحة الموظفين", now(), req.headers.get("x-device-id") || "OWNER_PANEL", req.headers.get("CF-Connecting-IP") || "unknown").run().catch(() => undefined);
   }
