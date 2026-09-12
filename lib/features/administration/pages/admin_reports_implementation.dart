@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/api.dart';
 import '../../../core/hadir_brand.dart';
+import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
 
 class AdminReportsPage extends StatefulWidget {
@@ -22,8 +23,8 @@ class AdminReportsPage extends StatefulWidget {
 
 class _AdminReportsPageState extends State<AdminReportsPage> {
   HadirApi? _api;
-  DateTime _from = DateTime(DateTime.now().year, DateTime.now().month, 1);
-  DateTime _to = DateTime.now();
+  DateTime _from = DateTime(HadirTime.now().year, HadirTime.now().month, 1);
+  DateTime _to = HadirTime.now();
   String? _employeeId;
   String _statusFilter = 'ALL';
   bool _exceptionsOnly = false;
@@ -110,7 +111,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
       context: context,
       initialDate: from ? _from : _to,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: HadirTime.now().add(const Duration(days: 365)),
       locale: const Locale('ar'),
     );
     if (selected == null) return;
@@ -124,7 +125,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
   }
 
   void _setPeriod(String value) {
-    final today = DateTime.now();
+    final today = HadirTime.now();
     setState(() {
       if (value == 'today') {
         _from = DateTime(today.year, today.month, today.day);
@@ -438,8 +439,8 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
 
   String _clock(dynamic value) {
     if (value == null || '$value'.isEmpty) return '—';
-    final parsed = DateTime.tryParse('$value');
-    return parsed == null ? '$value' : '${parsed.toLocal().hour.toString().padLeft(2, '0')}:${parsed.toLocal().minute.toString().padLeft(2, '0')}';
+    final parsed = HadirTime.fromTimestamp(value);
+    return parsed == null ? '$value' : '${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
   }
 
   Widget _dateButton(String label, DateTime value, bool from) => OutlinedButton.icon(onPressed: () => _pickDate(from), icon: const Icon(Icons.calendar_today_outlined, size: 17), label: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(fontSize: 10)), Text(_date(value), style: const TextStyle(fontWeight: FontWeight.w800))]));
