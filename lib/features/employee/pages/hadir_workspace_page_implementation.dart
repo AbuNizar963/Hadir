@@ -264,8 +264,22 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final now = _damascusNow();
     final dailyMode = schedule['kind'] == 'ROTATION_DAILY';
     final dailyInvalid = schedule['kind'] == 'ROTATION_DAILY_INVALID';
-    final dailyWindowOpen = !dailyMode || (schedule['start'] is DateTime && schedule['end'] is DateTime && !now.isBefore(schedule['start'] as DateTime) && !now.isAfter(schedule['end'] as DateTime));
-    final canIn = schedule['isWorkDay'] == true && !dailyInvalid && dailyWindowOpen && open == null && !today.any((r) => _type(r) == 'check-in') && !hasLeave && !hasPermission && escape == null;
+    final scheduledStart = schedule['start'];
+    final scheduledEnd = schedule['end'];
+    final scheduledWindowOpen = scheduledStart is DateTime &&
+        scheduledEnd is DateTime &&
+        !now.isBefore(scheduledStart) &&
+        now.isBefore(scheduledEnd);
+    final dailyWindowOpen = !dailyMode || scheduledWindowOpen;
+    final scheduleWindowOpen = dailyMode ? dailyWindowOpen : scheduledWindowOpen;
+    final canIn = schedule['isWorkDay'] == true &&
+        !dailyInvalid &&
+        scheduleWindowOpen &&
+        open == null &&
+        !today.any((r) => _type(r) == 'check-in') &&
+        !hasLeave &&
+        !hasPermission &&
+        escape == null;
     final canOut = open != null;
     final checkInSubtitle = schedule['isWorkDay'] != true ? 'أنت في الراحة' : dailyInvalid ? 'إعداد التسجيل اليومي غير صالح' : dailyMode && now.isBefore(schedule['start'] as DateTime) ? 'التسجيل يبدأ ${intl.DateFormat('HH:mm').format(schedule['start'] as DateTime)}' : dailyMode && now.isAfter(schedule['end'] as DateTime) ? 'انتهت مهلة التسجيل' : open != null ? 'الدوام جارٍ' : canIn ? 'مسح رمز QR' : 'غير متاح الآن';
     final checkOutSubtitle = open != null ? 'إنهاء الدوام الآن' : today.any((r) => _type(r) == 'check-out') ? 'تم تسجيل الانصراف' : 'بعد تسجيل الحضور';
@@ -714,6 +728,9 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final start = _localTime(periodDay, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
     final end = _localTime(periodDay.add(Duration(days: daysOn)), '${_employee['rotationEndTime'] ?? _employee['workEndTime'] ?? _employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
     final activeRotation = cycleDay < daysOn;
+    if (activeRotation && now.isBefore(start)) {
+      return {'isWorkDay': false, 'kind': 'NOT_STARTED', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    }
     if (!activeRotation) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
     final dailyEnabled = _employee['rotationDailyAttendanceEnabled'] == true || '${_employee['rotationDailyAttendanceEnabled'] ?? ''}'.toLowerCase() == 'true' || '${_employee['rotationDailyAttendanceEnabled'] ?? ''}' == '1';
     if (dailyEnabled) {
