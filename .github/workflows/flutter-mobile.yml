@@ -24,35 +24,8 @@ on:
       - 'analysis_options.yaml'
       - '.github/workflows/flutter-mobile.yml'
 
-permissions:
-  contents: write
-
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Switch to the PR head branch
-        shell: bash
-        run: |
-          git fetch origin "${{ github.head_ref }}"
-          git checkout -B "${{ github.head_ref }}" "origin/${{ github.head_ref }}"
-      - name: Apply temporary safe UI patch
-        run: python3 .github/scripts/patch_rotation_daily_ui.py
-      - name: Verify patch shape
-        run: |
-          grep -q "ROTATION_DAILY" lib/features/employee/pages/hadir_workspace_page_implementation.dart
-          git diff --check
-      - name: Commit patch when needed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/features/employee/pages/hadir_workspace_page_implementation.dart
-          git diff --cached --quiet || git commit -m "feat(employee): align rotation daily attendance UI with central engine"
-          git push origin HEAD:${{ github.head_ref || github.ref_name }}
-
   android:
-    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -121,7 +94,6 @@ jobs:
           path: android/app/build/outputs/bundle/release/app-release.aab
 
   ios:
-    needs: prepare
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
