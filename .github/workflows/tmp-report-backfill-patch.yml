@@ -1,0 +1,54 @@
+name: Temporary report backfill UI patch
+on:
+  push:
+    branches: [fix/professional-report-explicit-backfill]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch report UI safely
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/pages/ProfessionalAttendanceReports.tsx')
+          s = p.read_text(encoding='utf-8')
+          old = 'import { getProfessionalAttendanceReport, type ProfessionalAttendanceReport } from "@/lib/professionalAttendanceReport";'
+          new = 'import { backfillProfessionalAttendanceReport, getProfessionalAttendanceReport, type ProfessionalAttendanceReport } from "@/lib/professionalAttendanceReport";'
+          if old not in s:
+              raise SystemExit('import anchor not found')
+          s = s.replace(old, new, 1)
+          old = '  const [loading, setLoading] = useState(false);\n  const [error, setError] = useState<string | null>(null);'
+          new = '  const [loading, setLoading] = useState(false);\n  const [backfilling, setBackfilling] = useState(false);\n  const [error, setError] = useState<string | null>(null);'
+          if old not in s:
+              raise SystemExit('state anchor not found')
+          s = s.replace(old, new, 1)
+          old = '  const load = async () => {\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(from) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(to) || from > to) { setError("حدد فترة زمنية صحيحة."); return; }\n    setLoading(true); setError(null);\n    try { setReport(await getProfessionalAttendanceReport(from, to, employeeId || undefined)); }\n    catch (e) { setError(e instanceof Error ? e.message : "تعذر تحميل التقرير"); }\n    finally { setLoading(false); }\n  };'
+          new = '  const load = async () => {\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(from) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(to) || from > to) { setError("حدد فترة زمنية صحيحة."); return; }\n    setLoading(true); setError(null);\n    try { setReport(await getProfessionalAttendanceReport(from, to, employeeId || undefined)); }\n    catch (e) { setError(e instanceof Error ? e.message : "تعذر تحميل التقرير"); }\n    finally { setLoading(false); }\n  };\n\n  const backfill = async () => {\n    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(from) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(to) || from > to) { setError("حدد فترة زمنية صحيحة."); return; }\n    setBackfilling(true); setError(null);\n    try {\n      const result = await backfillProfessionalAttendanceReport(from, to, employeeId || undefined);\n      await load();\n      setError(null);\n      window.alert(`تم تحديث طبقة التقارير بنجاح: ${Number(result.written || 0)} سجل.`);\n    } catch (e) { setError(e instanceof Error ? e.message : "تعذر تحديث طبقة التقارير"); }\n    finally { setBackfilling(false); }\n  };'
+          if old not in s:
+              raise SystemExit('load anchor not found')
+          s = s.replace(old, new, 1)
+          old = '<Button onClick={() => void load()} disabled={loading} className="self-start lg:self-end">{loading ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <CalendarDays className="ml-2 h-4 w-4" />}تحديث التقرير</Button>'
+          new = '<div className="flex flex-wrap gap-2 self-start lg:self-end"><Button onClick={() => void load()} disabled={loading || backfilling}>{loading ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <CalendarDays className="ml-2 h-4 w-4" />}تحديث التقرير</Button><Button variant="outline" onClick={() => void backfill()} disabled={loading || backfilling}>{backfilling ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <Database className="ml-2 h-4 w-4" />}تهيئة بيانات الفترة</Button></div>'
+          if old not in s:
+              raise SystemExit('button anchor not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          print('patched', p)
+      - name: Validate diff
+        run: |
+          git diff --check
+          git diff --stat
+          git diff -- src/pages/ProfessionalAttendanceReports.tsx
+      - name: Commit patch and remove workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/pages/ProfessionalAttendanceReports.tsx .github/workflows/tmp-report-backfill-patch.yml
+          git commit -m 'feat(reports): add explicit report data initialization'
+          git rm .github/workflows/tmp-report-backfill-patch.yml
+          git commit -m 'chore: remove temporary report patch workflow'
+          git push origin HEAD:fix/professional-report-explicit-backfill
