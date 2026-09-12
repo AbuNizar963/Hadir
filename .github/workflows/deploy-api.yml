@@ -22,26 +22,21 @@ jobs:
       PRODUCTION_APP_ORIGIN: https://hadir-9rq.pages.dev
     steps:
       - uses: actions/checkout@v5
-
       - name: Validate Cloudflare credentials
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test "${#CLOUDFLARE_API_TOKEN}" -ge 20
-
       - name: Install backend dependencies
         working-directory: backend
         run: npm install --package-lock=false
-
       - name: Apply session security patch
         working-directory: backend
         run: node scripts/patch-session-security.mjs
-
       - name: Validate Worker bundle
         working-directory: backend
         run: npm run check
-
       - name: Preflight D1 access
         working-directory: backend
         shell: bash
@@ -61,11 +56,9 @@ jobs:
             fi
             exit "$status"
           fi
-
       - name: Apply remote D1 migrations
         working-directory: backend
         run: npx wrangler d1 migrations apply Hadir --remote
-
       - name: Verify canonical reporting schemas
         working-directory: backend
         shell: bash
@@ -73,37 +66,27 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import json, subprocess
-
           def query(sql):
-              raw = subprocess.check_output([
-                  "npx", "wrangler", "d1", "execute", "Hadir", "--remote", "--json", "--command", sql
-              ], text=True)
-              data = json.loads(raw)
-              rows = []
-              for result in data if isinstance(data, list) else []:
-                  rows.extend(result.get("results") or [])
+              raw = subprocess.check_output(["npx","wrangler","d1","execute","Hadir","--remote","--json","--command",sql], text=True)
+              data=json.loads(raw); rows=[]
+              for result in data if isinstance(data,list) else []: rows.extend(result.get("results") or [])
               return rows
-
-          expected = {
-              "daily_attendance_status": ["PRESENT", "LATE", "ABSENT", "REST", "LEAVE", "PERMISSION", "ESCAPED", "NOT_STARTED", "INVALID", "OPEN"],
-              "attendance_reporting_facts": ["PRESENT", "LATE", "ABSENT", "REST", "LEAVE", "PERMISSION", "ESCAPED", "NOT_STARTED", "INVALID", "OPEN"],
-          }
-          for table, statuses in expected.items():
-              rows = query(f'SELECT sql FROM sqlite_master WHERE type = "table" AND name = "{table}";')
-              if not rows:
-                  raise SystemExit(f"ERROR: production table {table} does not exist")
-              sql = str(rows[0].get("sql") or "").upper()
-              missing = [status for status in statuses if status not in sql]
-              if missing:
-                  raise SystemExit(f"ERROR: production {table} CHECK/schema is missing: {missing}")
+          expected={
+              "daily_attendance_status":["PRESENT","LATE","ABSENT","REST","LEAVE","PERMISSION","ESCAPED","NOT_STARTED","INVALID","OPEN"],
+              "attendance_reporting_facts":["PRESENT","LATE","ABSENT","REST","LEAVE","PERMISSION","ESCAPED","NOT_STARTED","INVALID","OPEN"]}
+          for table,statuses in expected.items():
+              rows=query(f'SELECT sql FROM sqlite_master WHERE type = "table" AND name = "{table}";')
+              if not rows: raise SystemExit(f"ERROR: production table {table} does not exist")
+              sql=str(rows[0].get("sql") or "").upper(); missing=[s for s in statuses if s not in sql]
+              if missing: raise SystemExit(f"ERROR: production {table} CHECK/schema is missing: {missing}")
               print(f"{table}: canonical status schema verified.")
-
-          fact_rows = query("SELECT COUNT(*) AS total FROM attendance_reporting_facts;")
-          daily_rows = query("SELECT COUNT(*) AS total FROM daily_attendance_status;")
-          print(f"attendance_reporting_facts rows: {fact_rows[0].get('total', 0) if fact_rows else 0}")
-          print(f"daily_attendance_status rows: {daily_rows[0].get('total', 0) if daily_rows else 0}")
+          fact=query("SELECT COUNT(*) AS total FROM attendance_reporting_facts;"); daily=query("SELECT COUNT(*) AS total FROM daily_attendance_status;")
+          archive=query("SELECT sql FROM sqlite_master WHERE type='table' AND name='report_archives';")
+          if not archive: raise SystemExit("ERROR: production report_archives table does not exist")
+          print(f"attendance_reporting_facts rows: {fact[0].get('total',0) if fact else 0}")
+          print(f"daily_attendance_status rows: {daily[0].get('total',0) if daily else 0}")
+          print("report_archives schema: verified.")
           PY
-
       - name: Verify and repair auth session schema
         working-directory: backend
         shell: bash
@@ -113,79 +96,49 @@ jobs:
           printf '%s\n' "$schema"
           python - "$schema" <<'PY'
           import json, subprocess, sys
-          data = json.loads(sys.argv[1])
-          rows = []
-          for result in data if isinstance(data, list) else []:
-              rows.extend(result.get("results") or [])
-          columns = {str(row.get("name")) for row in rows}
+          data=json.loads(sys.argv[1]); rows=[]
+          for result in data if isinstance(data,list) else []: rows.extend(result.get("results") or [])
+          columns={str(row.get("name")) for row in rows}
           if "revoked_at" not in columns:
               print("auth_sessions.revoked_at is missing; adding the nullable compatibility column.")
-              subprocess.run([
-                  "npx", "wrangler", "d1", "execute", "Hadir", "--remote",
-                  "--command", "ALTER TABLE auth_sessions ADD COLUMN revoked_at TEXT;",
-              ], check=True)
-          else:
-              print("auth_sessions.revoked_at is present.")
+              subprocess.run(["npx","wrangler","d1","execute","Hadir","--remote","--command","ALTER TABLE auth_sessions ADD COLUMN revoked_at TEXT;"],check=True)
+          else: print("auth_sessions.revoked_at is present.")
           PY
           repaired="$(npx wrangler d1 execute Hadir --remote --json --command 'PRAGMA table_info("auth_sessions")')"
           python - "$repaired" <<'PY'
-          import json, sys
-          data = json.loads(sys.argv[1])
-          rows = []
-          for result in data if isinstance(data, list) else []:
-              rows.extend(result.get("results") or [])
-          columns = {str(row.get("name")) for row in rows}
-          if "revoked_at" not in columns:
-              raise SystemExit("ERROR: auth_sessions.revoked_at is still missing after schema repair.")
+          import json,sys
+          data=json.loads(sys.argv[1]); rows=[]
+          for result in data if isinstance(data,list) else []: rows.extend(result.get("results") or [])
+          columns={str(row.get("name")) for row in rows}
+          if "revoked_at" not in columns: raise SystemExit("ERROR: auth_sessions.revoked_at is still missing after schema repair.")
           print("auth_sessions schema is compatible with session security.")
           PY
-
       - name: Prepare Worker secrets
         working-directory: backend
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$JWT_SECRET"
-          test -n "$OWNER_RECOVERY_CODE"
-          test -n "$VAPID_PUBLIC_KEY"
-          test -n "$VAPID_PRIVATE_KEY"
-          test -n "$VAPID_SUBJECT"
+          test -n "$JWT_SECRET"; test -n "$OWNER_RECOVERY_CODE"; test -n "$VAPID_PUBLIC_KEY"; test -n "$VAPID_PRIVATE_KEY"; test -n "$VAPID_SUBJECT"
           umask 077
           python - <<'PY'
-          import json, os
-          values = {
-              "JWT_SECRET": os.environ["JWT_SECRET"],
-              "OWNER_RECOVERY_CODE": os.environ["OWNER_RECOVERY_CODE"],
-              "VAPID_PUBLIC_KEY": os.environ["VAPID_PUBLIC_KEY"],
-              "VAPID_PRIVATE_KEY": os.environ["VAPID_PRIVATE_KEY"],
-              "VAPID_SUBJECT": os.environ["VAPID_SUBJECT"],
-          }
-          with open('.secrets.json', 'w', encoding='utf-8') as f:
-              json.dump(values, f)
+          import json,os
+          values={"JWT_SECRET":os.environ["JWT_SECRET"],"OWNER_RECOVERY_CODE":os.environ["OWNER_RECOVERY_CODE"],"VAPID_PUBLIC_KEY":os.environ["VAPID_PUBLIC_KEY"],"VAPID_PRIVATE_KEY":os.environ["VAPID_PRIVATE_KEY"],"VAPID_SUBJECT":os.environ["VAPID_SUBJECT"]}
+          with open('.secrets.json','w',encoding='utf-8') as f: json.dump(values,f)
           PY
-
       - name: Deploy hadir-api once
         working-directory: backend
         run: npx wrangler deploy --secrets-file .secrets.json
-
       - name: Verify Cloudflare Worker secrets
         working-directory: backend
         shell: bash
         run: |
           set -euo pipefail
-          secrets="$(npx wrangler secret list 2>/dev/null)"
-          printf '%s\n' "$secrets"
-          printf '%s\n' "$secrets" | grep -q 'GEMINI_API_KEY' || {
-            echo 'GEMINI_API_KEY is not configured on the deployed Cloudflare Worker.'
-            echo 'Add GEMINI_API_KEY in Cloudflare Workers & Pages > Settings > Variables and Secrets > Secrets, then redeploy.'
-            exit 1
-          }
-
+          secrets="$(npx wrangler secret list 2>/dev/null)"; printf '%s\n' "$secrets"
+          printf '%s\n' "$secrets" | grep -q 'GEMINI_API_KEY' || { echo 'GEMINI_API_KEY is not configured on the deployed Cloudflare Worker.'; exit 1; }
       - name: Remove temporary secrets file
         if: always()
         working-directory: backend
         run: rm -f .secrets.json
-
       - name: Verify API health
         shell: bash
         run: |
@@ -193,36 +146,47 @@ jobs:
           curl -fsS --retry 5 --retry-delay 3 https://hadir-api.abunizar963.workers.dev/api/health -o /tmp/health.json
           cat /tmp/health.json
           python - /tmp/health.json <<'PY'
-          import json, sys
-          with open(sys.argv[1], encoding='utf-8') as f:
-              data=json.load(f)
-          assert data.get('ok') is True, data
-          assert data.get('d1') is True, data
+          import json,sys
+          with open(sys.argv[1],encoding='utf-8') as f: data=json.load(f)
+          assert data.get('ok') is True,data; assert data.get('d1') is True,data
           PY
-
       - name: Verify production Pages CORS
         shell: bash
         run: |
           set -euo pipefail
-          headers="$(curl -sS --retry 5 --retry-delay 2 -D - -o /dev/null -X OPTIONS \
-            -H "Origin: $PRODUCTION_APP_ORIGIN" \
-            -H 'Access-Control-Request-Method: POST' \
-            -H 'Access-Control-Request-Headers: authorization,content-type' \
-            https://hadir-api.abunizar963.workers.dev/api/auth/login)"
-          printf '%s\n' "$headers"
-          normalized_headers="$(printf '%s\n' "$headers" | tr -d '\r')"
+          headers="$(curl -sS --retry 5 --retry-delay 2 -D - -o /dev/null -X OPTIONS -H "Origin: $PRODUCTION_APP_ORIGIN" -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: authorization,content-type' https://hadir-api.abunizar963.workers.dev/api/auth/login)"
+          printf '%s\n' "$headers"; normalized_headers="$(printf '%s\n' "$headers" | tr -d '\r')"
           printf '%s\n' "$normalized_headers" | grep -Fqi "access-control-allow-origin: $PRODUCTION_APP_ORIGIN"
           printf '%s\n' "$normalized_headers" | grep -Fqi 'access-control-allow-credentials: true'
-
       - name: Verify bootstrap compatibility
         shell: bash
         run: |
           set -euo pipefail
-          code="$(curl -sS -o /tmp/bootstrap.json -w '%{http_code}' https://hadir-api.abunizar963.workers.dev/api/bootstrap)"
-          cat /tmp/bootstrap.json
-          case "$code" in
-            200|401) exit 0 ;;
-            *) echo "Unexpected /api/bootstrap status: $code"; exit 1;;
-          esac
-
+          code="$(curl -sS -o /tmp/bootstrap.json -w '%{http_code}' https://hadir-api.abunizar963.workers.dev/api/bootstrap)"; cat /tmp/bootstrap.json
+          case "$code" in 200|401) exit 0;; *) echo "Unexpected /api/bootstrap status: $code"; exit 1;; esac
+      - name: Verify previous-month archive manifest
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,subprocess
+          from datetime import datetime,timezone,timedelta
+          from zoneinfo import ZoneInfo
+          now=datetime.now(timezone.utc).astimezone(ZoneInfo("Asia/Damascus")); first=now.replace(day=1)
+          if first.month==1: year,month=first.year-1,12
+          else: year,month=first.year,first.month-1
+          period_from=f"{year:04d}-{month:02d}-01"; next_month=datetime(year+(month==12),1 if month==12 else month+1,1); period_to=(next_month-timedelta(days=1)).strftime("%Y-%m-%d")
+          expected_id=f"attendance_period_{period_from}"
+          sql=f"SELECT report_id,period_from,period_to,status,file_key,file_size,file_sha256,locked_at FROM report_archives WHERE report_id='{expected_id}';"
+          raw=subprocess.check_output(["npx","wrangler","d1","execute","Hadir","--remote","--json","--command",sql],text=True)
+          data=json.loads(raw); rows=[]
+          for result in data if isinstance(data,list) else []: rows.extend(result.get("results") or [])
+          if not rows: raise SystemExit(f"ERROR: previous-month archive manifest is missing for {period_from}..{period_to}")
+          row=rows[0]
+          if row.get("status")!="LOCKED": raise SystemExit(f"ERROR: archive manifest exists but is not LOCKED: {row.get('status')}")
+          if row.get("period_from")!=period_from or row.get("period_to")!=period_to: raise SystemExit(f"ERROR: archive period mismatch: {row}")
+          if not row.get("file_key") or not row.get("file_sha256") or not row.get("locked_at"): raise SystemExit(f"ERROR: archive manifest is incomplete: {row}")
+          print(f"previous-month archive manifest verified: {period_from}..{period_to}, status=LOCKED, key={row['file_key']}, size={row['file_size']}")
+          PY
       # Keep the workflow push-triggered so D1 migrations are applied with the API deployment.
