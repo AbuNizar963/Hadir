@@ -1,5 +1,6 @@
 import 'package:geolocator/geolocator.dart';
 import '../../core/api.dart';
+import '../../core/hadir_time.dart';
 import '../../core/session.dart';
 
 class AttendanceService {
@@ -119,7 +120,7 @@ class AttendanceService {
       'locationId': challenge.locationId,
       'challengeId': challenge.challengeId,
     });
-    return AttendanceResult(DateTime.now(), challenge.distance, accuracyMeters: challenge.accuracyMeters);
+    return AttendanceResult(HadirTime.now(), challenge.distance, accuracyMeters: challenge.accuracyMeters);
   }
 
   Future<AttendanceResult> record({required String type, required String qrCode}) async {
