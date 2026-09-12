@@ -68,13 +68,12 @@ elif "function CompanySpecialtySelect" not in s:
     raise SystemExit("CompanySpecialtySelect is missing; refusing unsafe patch")
 
 # The employee PATCH endpoint already persists earlyCheckoutGraceMinutes in the
-# same atomic save path. The old UI then issued a second PUT to a legacy endpoint
-# that is no longer part of the production gateway, which caused the browser to
-# report the generic Worker/network error after a successful employee update.
-# Send the value in the canonical PATCH payload and stop issuing that duplicate PUT.
+# same save path. The old UI then issued a second PUT to a legacy endpoint that is
+# no longer part of the production gateway. Send the value in the canonical PATCH
+# payload and stop issuing that duplicate PUT.
 policy_marker = '        rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceGraceMinutes) || 0)) : 0,\n        locationId: form.locationId || null, specialties,'
 policy_replacement = '        rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceGraceMinutes) || 0)) : 0,\n        earlyCheckoutGraceMinutes: earlyCheckoutGrace,\n        locationId: form.locationId || null, specialties,'
-if policy_marker in s and 'earlyCheckoutGraceMinutes: earlyCheckoutGrace,' not in s:
+if policy_marker in s:
     s = s.replace(policy_marker, policy_replacement, 1)
 call_marker = '        if (savedEmployeeId) await saveCheckoutPolicy(savedEmployeeId, earlyCheckoutGrace);\n'
 if call_marker in s:
