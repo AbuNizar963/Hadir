@@ -50,6 +50,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
         'LEAVE': 'إجازة',
         'PERMISSION': 'استئذان',
         'REST': 'راحة',
+        'ESCAPED': 'هروب من العمل',
         'NOT_STARTED': 'لم يبدأ',
         'INVALID': 'غير صالح',
         'OPEN': 'مناوبة مفتوحة',
@@ -173,7 +174,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
       final status = '${row['status'] ?? ''}';
       if (_statusFilter != 'ALL' && status != _statusFilter) return false;
       if (_exceptionsOnly) {
-        final exception = status == 'LATE' || status == 'ABSENT' || status == 'OPEN' || _num(row, 'lateMinutes') > 0 || _num(row, 'earlyLeaveMinutes') > 0;
+        final exception = status == 'LATE' || status == 'ABSENT' || status == 'ESCAPED' || status == 'OPEN' || _num(row, 'lateMinutes') > 0 || _num(row, 'earlyLeaveMinutes') > 0;
         if (!exception) return false;
       }
       return true;
@@ -370,6 +371,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
                         DropdownMenuItem(value: 'LEAVE', child: Text('إجازة')),
                         DropdownMenuItem(value: 'PERMISSION', child: Text('استئذان')),
                         DropdownMenuItem(value: 'REST', child: Text('راحة')),
+                        DropdownMenuItem(value: 'ESCAPED', child: Text('هروب من العمل')),
                         DropdownMenuItem(value: 'NOT_STARTED', child: Text('لم يبدأ')),
                         DropdownMenuItem(value: 'OPEN', child: Text('مناوبة مفتوحة')),
                         DropdownMenuItem(value: 'INVALID', child: Text('غير صالح')),
