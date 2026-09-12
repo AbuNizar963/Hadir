@@ -1,6 +1,6 @@
 import base from "./attendance-safety-gateway";
 import { HadirRealtime } from "./realtime";
-import { archiveClosedMonth, getReportArchive, listReportArchives } from "./report-archive";
+import { archiveClosedMonth, deleteReportArchive, getReportArchive, listReportArchives } from "./report-archive";
 export { HadirRealtime };
 
 type Env = { DB: D1Database; REPORT_ARCHIVES?: R2Bucket; APP_TIMEZONE?: string; APP_ORIGIN?: string };
@@ -15,16 +15,21 @@ function archiveAllowed(a:any){return !!a&&["owner","manager","supervisor"].incl
 export default {
   async fetch(request:Request,env:Env,ctx:ExecutionContext){
     const url=new URL(request.url), path=url.pathname, o=cors(request,env);
-    if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{"access-control-allow-origin":o,"access-control-allow-credentials":"true","access-control-allow-methods":"GET,OPTIONS","access-control-allow-headers":"authorization,content-type","cache-control":"no-store"}});
+    if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{"access-control-allow-origin":o,"access-control-allow-credentials":"true","access-control-allow-methods":"GET,DELETE,OPTIONS","access-control-allow-headers":"authorization,content-type","cache-control":"no-store"}});
     if(path==="/api/reports/archive"&&request.method==="GET"){
       const a=await archiveActor(request,env); if(!archiveAllowed(a))return json({error:"غير مصرح"},403,o);
       const limit=Number(url.searchParams.get("limit")||25); return json({ok:true,readOnly:true,archives:await listReportArchives(env,limit)},200,o);
     }
     const match=path.match(/^\/api\/reports\/archive\/([^/]+)$/);
-    if(match&&request.method==="GET"){
+    if(match&&(request.method==="GET"||request.method==="DELETE")){
       const a=await archiveActor(request,env); if(!archiveAllowed(a))return json({error:"غير مصرح"},403,o);
+      const id=decodeURIComponent(match[1]);
+      if(request.method==="DELETE"){
+        if(!env.REPORT_ARCHIVES)return json({error:"R2 binding REPORT_ARCHIVES غير موجود"},503,o);
+        try{const result=await deleteReportArchive(env,id);if(!result.ok)return json({error:"الأرشيف غير موجود أو تم حذفه مسبقًا"},404,o);return json({ok:true,deleted:true,reportId:id},200,o);}catch(error){console.error("[report-archive] delete failed",error);return json({error:error instanceof Error?error.message:"تعذر حذف الأرشيف"},500,o);}
+      }
       if(!env.REPORT_ARCHIVES)return json({error:"R2 binding REPORT_ARCHIVES غير موجود"},503,o);
-      const meta=await getReportArchive(env,decodeURIComponent(match[1])); if(!meta)return json({error:"الأرشيف غير موجود"},404,o);
+      const meta=await getReportArchive(env,id); if(!meta)return json({error:"الأرشيف غير موجود"},404,o);
       const object=await env.REPORT_ARCHIVES.get(meta.file_key); if(!object)return json({error:"ملف الأرشيف غير موجود في R2"},404,o);
       return new Response(object.body,{status:200,headers:{"content-type":meta.mime_type,"content-length":String(meta.file_size),"content-disposition":`attachment; filename="${meta.file_name.replace(/[^A-Za-z0-9._-]/g,"_")}"`,"cache-control":"private, max-age=300","access-control-allow-origin":o,"access-control-allow-credentials":"true"}});
     }
