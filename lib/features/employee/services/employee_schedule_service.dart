@@ -56,6 +56,78 @@ class EmployeeScheduleService {
     return type == 'ROTATION' ? _rotation(employee, now) : _admin(employee, now);
   }
 
+  /// Returns the user-facing schedule status with the same status wording
+  /// and end-of-shift handling as the Web schedule layer.
+  EmployeeScheduleState resolveStatus(
+    Map<String, dynamic>? employee, {
+    DateTime? target,
+  }) {
+    if (employee == null) {
+      return const EmployeeScheduleState(
+        isWorkDay: false,
+        kind: 'INVALID',
+        label: 'غير محدد',
+      );
+    }
+
+    final now = target ?? HadirTime.now();
+    final period = resolve(employee, target: now);
+
+    if (period.kind == 'NOT_STARTED' || period.kind == 'INVALID') {
+      return period;
+    }
+
+    final type = '${employee['scheduleType'] ?? 'ADMIN'}'.trim().toUpperCase();
+    if (type == 'ROTATION') {
+      if (period.kind == 'OFF') {
+        final cycleDay = period.cycleDay;
+        final daysOff = _nonNegativeInt(employee['rotationDaysOff'], 4);
+        final daysOn = _positiveInt(employee['rotationDaysOn'], 4);
+        final restDay = cycleDay == null ? 1 : cycleDay - daysOn + 1;
+        return EmployeeScheduleState(
+          isWorkDay: false,
+          kind: 'OFF',
+          label: 'فترة راحة',
+          detail: 'اليوم $restDay من $daysOff في الراحة',
+          cycleDay: cycleDay,
+          cycleTotal: period.cycleTotal,
+        );
+      }
+
+      final cycleDay = period.cycleDay;
+      final daysOn = _positiveInt(employee['rotationDaysOn'], 4);
+      final workDay = cycleDay == null ? 1 : cycleDay + 1;
+      return EmployeeScheduleState(
+        isWorkDay: true,
+        kind: 'ROTATION',
+        label: 'في المناوبة',
+        detail: 'اليوم $workDay من $daysOn في المناوبة',
+        start: period.start,
+        end: period.end,
+        cycleDay: cycleDay,
+        cycleTotal: period.cycleTotal,
+      );
+    }
+
+    if (period.kind == 'OFF') return period;
+    if (period.end != null && !now.isBefore(period.end!)) {
+      return EmployeeScheduleState(
+        isWorkDay: false,
+        kind: 'OFF',
+        label: 'فترة راحة',
+        detail: 'انتهى دوام اليوم',
+        end: period.end,
+      );
+    }
+
+    return const EmployeeScheduleState(
+      isWorkDay: true,
+      kind: 'ADMIN',
+      label: 'في المناوبة',
+      detail: 'يوم عمل (إداري)',
+    );
+  }
+
   EmployeeScheduleState _admin(
     Map<String, dynamic> employee,
     DateTime target,
