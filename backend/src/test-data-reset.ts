@@ -6,27 +6,23 @@ type ResetResult = {
   r2Deleted: number;
 };
 
-const PROTECTED_TABLES = new Set(["admin_accounts", "settings", "locations", "d1_migrations"]);
+// A test-data reset must not change employee identities, credentials,
+// profile images, or the work configuration that was explicitly requested
+// to remain intact. Only transactional/test/runtime data is cleared.
+const PROTECTED_TABLES = new Set([
+  "admin_accounts",
+  "employees",
+  "employee_passkeys",
+  "employee_webauthn_credentials",
+  "employee_checkout_policies",
+  "settings",
+  "locations",
+  "d1_migrations",
+]);
 
 function safeTableName(value: unknown): string | null {
   const name = String(value || "").trim();
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : null;
-}
-
-async function emptyProfileImages(bucket: R2Bucket | undefined): Promise<number> {
-  if (!bucket) return 0;
-  let deleted = 0;
-  let cursor: string | undefined;
-  do {
-    const page = await bucket.list({ limit: 1000, ...(cursor ? { cursor } : {}) });
-    const keys = page.objects.map((object) => object.key);
-    if (keys.length) {
-      await bucket.delete(keys);
-      deleted += keys.length;
-    }
-    cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor);
-  return deleted;
 }
 
 export async function resetTestData(env: Env): Promise<ResetResult> {
@@ -39,11 +35,11 @@ export async function resetTestData(env: Env): Promise<ResetResult> {
     .filter((name): name is string => Boolean(name));
   const preserved = allTables.filter((name) => PROTECTED_TABLES.has(name));
 
-  // Delete every application-data table while keeping the administrative
-  // accounts, system settings, and configured work locations intact.
-  // D1 enforces foreign keys; deferring them lets the complete cleanup happen
-  // atomically even when a newly added module references employees.
-  const targets = allTables.filter((name) => !PROTECTED_TABLES.has(name));
+  // Cloudflare/internal tables (for example _cf_KV) are not application data
+  // and must never be touched by this reset.
+  const targets = allTables.filter(
+    (name) => !PROTECTED_TABLES.has(name) && !name.startsWith("_cf_")
+  );
   const statements = [env.DB.prepare("PRAGMA defer_foreign_keys = ON")];
   for (const table of targets) statements.push(env.DB.prepare(`DELETE FROM "${table}"`));
   statements.push(env.DB.prepare("PRAGMA defer_foreign_keys = OFF"));
@@ -55,6 +51,7 @@ export async function resetTestData(env: Env): Promise<ResetResult> {
     deleted[table] = Number.isFinite(changes) ? changes : 0;
   });
 
-  const r2Deleted = await emptyProfileImages(env.PROFILE_IMAGES);
-  return { deleted, preserved, r2Deleted };
+  // Profile images are intentionally preserved. Employee rows remain intact,
+  // so their existing R2 object keys continue to work after the reset.
+  return { deleted, preserved, r2Deleted: 0 };
 }
