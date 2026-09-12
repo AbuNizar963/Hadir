@@ -16,7 +16,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _employees = [];
-  List<dynamic> _escapes = [];
   String _filter = 'all';
   String _search = '';
 
@@ -51,21 +50,9 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       final daily = await api.dailyStatus(date: _today());
       final rows = _asMapList(daily['employees']);
 
-      List<dynamic> escapes = [];
-      try {
-        final response = await api.dio.get(
-          '/api/escape-events',
-          queryParameters: {'limit': 2000},
-        );
-        escapes = _asList(response.data);
-      } catch (_) {
-        // Escape events are optional; the core daily dashboard remains usable.
-      }
-
       if (!mounted) return;
       setState(() {
         _employees = rows;
-        _escapes = escapes;
         _loading = false;
       });
     } catch (error) {
@@ -91,17 +78,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         .toList();
   }
 
-  List<dynamic> _asList(dynamic value) {
-    if (value is List) return List<dynamic>.from(value);
-    if (value is Map) {
-      for (final key in const ['data', 'items', 'entries', 'events']) {
-        final nested = value[key];
-        if (nested is List) return List<dynamic>.from(nested);
-      }
-    }
-    return [];
-  }
-
   int _count(String status) => _employees
       .where((row) => '${row['status'] ?? ''}'.toUpperCase() == status)
       .length;
@@ -109,33 +85,14 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   int get _present => _count('PRESENT') + _count('LATE');
   int get _absent => _count('ABSENT');
   int get _late => _count('LATE');
-  int get _rest => _employees.where((row) {
-        final status = '${row['status'] ?? ''}'.toUpperCase();
-        return status == 'REST' || status == 'NOT_STARTED';
-      }).length;
+  int get _rest => _count('REST');
   int get _leave => _count('LEAVE');
   int get _permission => _count('PERMISSION');
-  int get _escaped => _latestEscapedIds.length;
-
-  Set<String> get _latestEscapedIds {
-    final latest = <String, String>{};
-    for (final raw in _escapes) {
-      if (raw is! Map) continue;
-      final id = '${raw['employeeId'] ?? ''}';
-      if (id.isEmpty || latest.containsKey(id)) continue;
-      latest[id] = '${raw['status'] ?? ''}'.toLowerCase();
-    }
-    return latest.entries
-        .where((entry) => entry.value == 'escaped')
-        .map((entry) => entry.key)
-        .toSet();
-  }
+  int get _escaped => _count('ESCAPED');
 
   List<Map<String, dynamic>> get _filteredEmployees {
     final query = _search.trim();
-    final escapedIds = _latestEscapedIds;
     return _employees.where((row) {
-      final id = '${row['employeeId'] ?? ''}';
       final name = '${row['employeeName'] ?? ''}';
       final status = '${row['status'] ?? ''}'.toUpperCase();
       if (query.isNotEmpty && !name.contains(query)) return false;
@@ -147,13 +104,13 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         case 'late':
           return status == 'LATE';
         case 'rest':
-          return status == 'REST' || status == 'NOT_STARTED';
+          return status == 'REST';
         case 'leave':
           return status == 'LEAVE';
         case 'permission':
           return status == 'PERMISSION';
         case 'escaped':
-          return escapedIds.contains(id);
+          return status == 'ESCAPED';
         default:
           return true;
       }
@@ -161,8 +118,6 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
   }
 
   String _statusLabel(Map<String, dynamic> row) {
-    final escaped = _latestEscapedIds.contains('${row['employeeId'] ?? ''}');
-    if (escaped) return 'هارب';
     switch ('${row['status'] ?? ''}'.toUpperCase()) {
       case 'PRESENT':
         return 'حاضر';
@@ -171,14 +126,19 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       case 'ABSENT':
         return 'غائب';
       case 'REST':
-      case 'NOT_STARTED':
         return 'مستريح';
+      case 'NOT_STARTED':
+        return 'لم يبدأ';
       case 'LEAVE':
         return 'إجازة';
       case 'PERMISSION':
         return 'إذن';
+      case 'ESCAPED':
+        return 'هارب';
       case 'INVALID':
         return 'جدول غير صالح';
+      case 'OPEN':
+        return 'دوام مفتوح';
       default:
         return 'غير محدد';
     }
