@@ -75,9 +75,16 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       final canonical = results[5];
       if (canonical is Map) {
         final employees = canonical['employees'];
-        if (employees is List && employees.isNotEmpty && employees.first is Map) {
-          final value = employees.first['status'];
-          if (value is String && value.trim().isNotEmpty) canonicalStatus = value.trim().toUpperCase();
+        if (employees is List) {
+          for (final row in employees) {
+            if (row is! Map) continue;
+            if ('${row['employeeId'] ?? row['id'] ?? ''}'.trim() != id) continue;
+            final value = row['status'];
+            if (value is String && value.trim().isNotEmpty) {
+              canonicalStatus = value.trim().toUpperCase();
+            }
+            break;
+          }
         }
       }
       if (!mounted) return;
