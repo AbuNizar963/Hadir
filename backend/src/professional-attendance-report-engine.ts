@@ -54,12 +54,12 @@ function validatePeriod(from: string, to: string) {
 
 async function loadFacts(env: Env, from: string, to: string, employeeId?: string): Promise<FactRow[]> {
   const sourceExpression = `(SELECT CASE
-    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE a.device_id = 'AUTO_VIP' OR a.qr_code = 'AUTO_VIP')
-      AND NOT EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE NOT (a.device_id = 'AUTO_VIP' OR a.qr_code = 'AUTO_VIP' OR a.qr_code = 'AUTO_DIRECT' OR a.device_id LIKE 'ADMIN_DIRECT:%')) THEN 'AUTOMATIC_VIP'
-    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE a.qr_code = 'AUTO_DIRECT' OR a.device_id = 'ADMIN_DIRECT:التلقائي')
-      AND NOT EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE NOT (a.device_id = 'AUTO_VIP' OR a.qr_code = 'AUTO_VIP' OR a.qr_code = 'AUTO_DIRECT' OR a.device_id = 'ADMIN_DIRECT:التلقائي')) THEN 'AUTOMATIC'
-    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE a.device_id = 'AUTO_VIP' OR a.qr_code = 'AUTO_VIP' OR a.qr_code = 'AUTO_DIRECT' OR a.device_id = 'ADMIN_DIRECT:التلقائي') THEN 'MIXED'
-    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE a.device_id = 'ADMIN_DIRECT' OR a.qr_code = 'ADMIN_DIRECT') THEN 'MANUAL_OWNER'
+    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE COALESCE(a.device_id,'') = 'AUTO_VIP' OR COALESCE(a.qr_code,'') = 'AUTO_VIP')
+      AND NOT EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE NOT (COALESCE(a.device_id,'') IN ('AUTO_VIP','ADMIN_DIRECT:التلقائي') OR COALESCE(a.qr_code,'') IN ('AUTO_VIP','AUTO_DIRECT'))) THEN 'AUTOMATIC_VIP'
+    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE COALESCE(a.qr_code,'') = 'AUTO_DIRECT' OR COALESCE(a.device_id,'') = 'ADMIN_DIRECT:التلقائي')
+      AND NOT EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE NOT (COALESCE(a.device_id,'') IN ('AUTO_VIP','ADMIN_DIRECT:التلقائي') OR COALESCE(a.qr_code,'') IN ('AUTO_VIP','AUTO_DIRECT'))) THEN 'AUTOMATIC'
+    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE COALESCE(a.device_id,'') IN ('AUTO_VIP','ADMIN_DIRECT:التلقائي') OR COALESCE(a.qr_code,'') IN ('AUTO_VIP','AUTO_DIRECT')) THEN 'MIXED'
+    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE COALESCE(a.device_id,'') LIKE 'ADMIN_DIRECT:%' OR COALESCE(a.qr_code,'') = 'ADMIN_DIRECT') THEN 'MANUAL_OWNER'
     WHEN json_array_length(f.attendance_event_ids_json) > 0 THEN 'MANUAL_EMPLOYEE'
     ELSE 'UNKNOWN'
   END FROM attendance_reporting_facts f2 WHERE f2.attendance_day = f.attendance_day AND f2.employee_id = f.employee_id)`;
