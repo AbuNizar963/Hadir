@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../core/api.dart';
+import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
 
 class HadirWorkspacePage extends StatefulWidget {
@@ -19,9 +20,9 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Timer? _ticker;
   bool _loading = true;
   String? _error;
-  DateTime _now = DateTime.now();
+  DateTime _now = HadirTime.now();
 
-  DateTime get _damascusDateTime => _now.toUtc().add(const Duration(hours: 3));
+  DateTime get _damascusDateTime => _now;
   String? _sessionToken;
   String? _canonicalStatus;
   Map<String, dynamic> _employee = <String, dynamic>{};
@@ -35,7 +36,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
+      if (mounted) setState(() => _now = HadirTime.now());
     });
     _load();
   }
@@ -408,7 +409,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     String type = 'permission';
     String reason = '';
     final damascusToday = _damascusDateTime;
-    DateTime start = DateTime(damascusToday.year, damascusToday.month, damascusToday.day);
+    DateTime start = HadirTime.date(damascusToday.year, damascusToday.month, damascusToday.day);
     DateTime end = start;
     final controller = TextEditingController();
     var sent = false;
@@ -470,8 +471,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   Widget _dateField(BuildContext context, String label, DateTime value, ValueChanged<DateTime> onChanged) {
     return InkWell(
       onTap: () async {
-        final picked = await showDatePicker(context: context, initialDate: value, firstDate: DateTime(_damascusDateTime.year, _damascusDateTime.month, _damascusDateTime.day), lastDate: DateTime(_damascusDateTime.year + 3), locale: const Locale('ar'));
-        if (picked != null) onChanged(picked);
+        final picked = await showDatePicker(context: context, initialDate: value, firstDate: HadirTime.date(_damascusDateTime.year, _damascusDateTime.month, _damascusDateTime.day), lastDate: HadirTime.date(_damascusDateTime.year + 3, _damascusDateTime.month, _damascusDateTime.day), locale: const Locale('ar'));
+        if (picked != null) onChanged(HadirTime.date(picked.year, picked.month, picked.day));
       },
       borderRadius: BorderRadius.circular(12),
       child: InputDecorator(decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()), child: Text(intl.DateFormat('yyyy-MM-dd').format(value))),
@@ -624,7 +625,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
         start = null;
       }
     }
-    if (start != null) total += _now.difference(start);
+    if (start != null) total += _damascusDateTime.difference(start);
     if (total.isNegative || total.inMinutes <= 0) return '—';
     return '${total.inHours}:${(total.inMinutes % 60).toString().padLeft(2, '0')}';
   }
@@ -676,7 +677,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final workDays = _workDays();
     final weekday = now.weekday % 7;
     if (!workDays.contains(weekday)) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null};
-    final day = DateTime(now.year, now.month, now.day);
+    final day = HadirTime.date(now.year, now.month, now.day);
     final start = _localTime(day, '${_employee['workStartTime'] ?? '09:00'}');
     var end = _localTime(day, '${_employee['workEndTime'] ?? '16:00'}');
     if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
@@ -692,10 +693,10 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final daysOn = _number(_employee['rotationDaysOn'], 4).clamp(1, 31);
     final daysOff = _number(_employee['rotationDaysOff'], 4).clamp(0, 31);
     final cycle = daysOn + daysOff;
-    final first = _localTime(DateTime(parsed.year, parsed.month, parsed.day), '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
+    final first = _localTime(HadirTime.date(parsed.year, parsed.month, parsed.day), '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
     if (now.isBefore(first)) return {'isWorkDay': false, 'kind': 'NOT_STARTED', 'start': first, 'end': null};
-    final dayStart = DateTime(parsed.year, parsed.month, parsed.day);
-    final diff = DateTime(now.year, now.month, now.day).difference(dayStart).inDays;
+    final dayStart = HadirTime.date(parsed.year, parsed.month, parsed.day);
+    final diff = HadirTime.date(now.year, now.month, now.day).difference(dayStart).inDays;
     if (diff < 0) return {'isWorkDay': false, 'kind': 'NOT_STARTED', 'start': first, 'end': null};
     final cycleDay = diff % cycle;
     final periodDay = dayStart.add(Duration(days: diff - cycleDay));
@@ -708,7 +709,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
       final dailyTime = '${_employee['rotationDailyAttendanceTime'] ?? ''}'.trim();
       final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(dailyTime);
       if (match == null) return {'isWorkDay': true, 'kind': 'ROTATION_DAILY_INVALID', 'start': null, 'end': null, 'rotationStart': start, 'rotationEnd': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
-      final checkpoint = _localTime(DateTime(now.year, now.month, now.day), dailyTime);
+      final checkpoint = _localTime(HadirTime.date(now.year, now.month, now.day), dailyTime);
       final rawGrace = _number(_employee['rotationDailyAttendanceGraceMinutes'], 0).clamp(0, 180);
       final graceEnd = checkpoint.add(Duration(minutes: rawGrace));
       final checkpointInRotation = !checkpoint.isBefore(start) && checkpoint.isBefore(end);
@@ -727,16 +728,13 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     return [0, 1, 2, 3, 4];
   }
 
-  DateTime _damascusNow() {
-    final utc = _now.toUtc();
-    return utc.add(const Duration(hours: 3));
-  }
+  DateTime _damascusNow() => _now;
 
   DateTime _localTime(DateTime day, String value) {
     final m = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(value.trim());
     final h = m == null ? 9 : int.parse(m.group(1)!);
     final min = m == null ? 0 : int.parse(m.group(2)!);
-    return DateTime(day.year, day.month, day.day, h.clamp(0, 23), min.clamp(0, 59));
+    return HadirTime.date(day.year, day.month, day.day, h.clamp(0, 23), min.clamp(0, 59));
   }
 
   String _scheduleLabel(Map<String, dynamic> s) {
@@ -782,9 +780,9 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
         final off = _number(_employee['rotationDaysOff'], 4).clamp(0, 31);
         final cycle = on + off;
         if (cycle <= 0) return '';
-        final dayStart = DateTime(parsed.year, parsed.month, parsed.day);
+        final dayStart = HadirTime.date(parsed.year, parsed.month, parsed.day);
         final now = _damascusNow();
-        final diff = DateTime(now.year, now.month, now.day).difference(dayStart).inDays;
+        final diff = HadirTime.date(now.year, now.month, now.day).difference(dayStart).inDays;
         final cycleDay = diff % cycle;
         final next = dayStart.add(Duration(days: diff + (cycle - cycleDay)));
         target = _localTime(next, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
@@ -843,8 +841,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   String _requestType(dynamic row) => '${row is Map ? row['type'] ?? '' : ''}'.toLowerCase();
   String _type(dynamic row) => '${row is Map ? row['type'] ?? '' : ''}'.toLowerCase();
-  DateTime? _stamp(dynamic row) => row is Map ? DateTime.tryParse('${row['timestamp'] ?? row['createdAt'] ?? ''}') : null;
-  String _dateKey(DateTime date) => intl.DateFormat('yyyy-MM-dd').format(date);
+  DateTime? _stamp(dynamic row) => row is Map ? HadirTime.fromTimestamp(row['timestamp'] ?? row['createdAt']) : null;
+  String _dateKey(DateTime date) => HadirTime.dateKey(date);
   String _time(dynamic row) { final d = _stamp(row); return d == null ? '—' : intl.DateFormat('HH:mm').format(d); }
   int _number(dynamic value, int fallback) => int.tryParse('$value') ?? fallback;
   String _minutesLabel(int minutes) => minutes >= 60 ? '${minutes ~/ 60} ساعة و${minutes % 60} دقيقة' : '$minutes دقيقة';
