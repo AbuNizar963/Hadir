@@ -2,7 +2,6 @@ import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CalendarDays, Coffee, ShieldAlert, Clock3, UserCheck, UserX, Users } from "lucide-react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getDailyStatus, type DailyStatusRow } from "@/lib/dailyStatus";
-import { getBackendEscapeEvents } from "@/lib/backend";
 import { todayKey } from "@/lib/utils";
 
 type Filter = "all" | "present" | "absent" | "late" | "rest" | "leave" | "escaped";
@@ -17,7 +16,9 @@ function statusLabel(row: DailyStatusRow) {
     case "NOT_STARTED": return "مستريح";
     case "LEAVE": return "إجازة";
     case "PERMISSION": return "إذن";
+    case "ESCAPED": return "هارب";
     case "INVALID": return "جدول غير صالح";
+    case "OPEN": return "دوام مفتوح";
     default: return "غير محدد";
   }
 }
@@ -34,7 +35,6 @@ function alignCurrentShiftStatus(row: DailyStatusRow, _nowMs: number, _today: st
 
 export default function ManagerDashboard() {
   const [rows, setRows] = useState<DailyStatusRow[]>([]);
-  const [escapeEvents, setEscapeEvents] = useState<Array<{ employeeId: string; status: "escaped" | "returned" }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -57,13 +57,9 @@ export default function ManagerDashboard() {
       inFlight = true;
       queued = false;
       try {
-        const [result, escapes] = await Promise.all([
-          getDailyStatus(today),
-          getBackendEscapeEvents(undefined, 2000),
-        ]);
+        const result = await getDailyStatus(today);
         if (!active) return;
         setRows(Array.isArray(result.employees) ? result.employees : []);
-        setEscapeEvents(Array.isArray(escapes) ? escapes.map((item) => ({ employeeId: String(item.employeeId), status: item.status })) : []);
         setError(null);
         setLoading(false);
       } catch (err) {
@@ -99,13 +95,7 @@ export default function ManagerDashboard() {
   const absentIds = useMemo(() => new Set(currentRows.filter((row) => row.status === "ABSENT").map((row) => row.employeeId)), [currentRows]);
   const restIds = useMemo(() => new Set(currentRows.filter(isRest).map((row) => row.employeeId)), [currentRows]);
   const leaveIds = useMemo(() => new Set(currentRows.filter((row) => row.status === "LEAVE").map((row) => row.employeeId)), [currentRows]);
-  const escapedIds = useMemo(() => {
-    const latest = new Map<string, "escaped" | "returned">();
-    for (const event of escapeEvents) {
-      if (!latest.has(event.employeeId)) latest.set(event.employeeId, event.status);
-    }
-    return new Set([...latest.entries()].filter(([, status]) => status === "escaped").map(([employeeId]) => employeeId));
-  }, [escapeEvents]);
+  const escapedIds = useMemo(() => new Set(currentRows.filter((row) => row.status === "ESCAPED").map((row) => row.employeeId)), [currentRows]);
 
   const filteredRows = useMemo(() => currentRows.filter((row) => {
     const id = row.employeeId;
@@ -148,21 +138,22 @@ export default function ManagerDashboard() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-sm font-bold">حالة الموظفين الحالية</div>
-            <div className="mt-1 text-xs text-muted-foreground">المصدر: D1 · attendance + employees + requests + escape_events · Asia/Damascus</div>
+            <div className="mt-1 text-xs text-muted-foreground">المصدر: محرك الحضور المركزي · daily-status · Asia/Damascus</div>
           </div>
         </div>
         <div className="mb-4 flex flex-wrap gap-2">
           {filters.map(([value, label]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${filter === value ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{label}</button>)}
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث باسم الموظف" className="min-w-[180px] flex-1 rounded-lg border bg-secondary/50 px-3 py-1.5 text-sm" />
         </div>
-        {loading ? <div className="py-8 text-center text-sm text-muted-foreground">جاري مزامنة الحالة الحالية من D1…</div> : filteredRows.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">لا توجد نتائج مطابقة.</div> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{filteredRows.map((row) => <EmployeeRow key={row.employeeId} row={row} escaped={escapedIds.has(row.employeeId)} />)}</div>}
+        {loading ? <div className="py-8 text-center text-sm text-muted-foreground">جاري مزامنة الحالة الحالية من D1…</div> : filteredRows.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">لا توجد نتائج مطابقة.</div> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{filteredRows.map((row) => <EmployeeRow key={row.employeeId} row={row} />)}</div>}
       </section>
     </ManagerLayout>
   );
 }
 
-const EmployeeRow = memo(function EmployeeRow({ row, escaped }: { row: DailyStatusRow; escaped: boolean }) {
-  const status = escaped ? "هارب" : statusLabel(row);
+const EmployeeRow = memo(function EmployeeRow({ row }: { row: DailyStatusRow }) {
+  const escaped = row.status === "ESCAPED";
+  const status = statusLabel(row);
   const present = !escaped && isPresent(row);
   const rest = !escaped && isRest(row);
   const leave = !escaped && row.status === "LEAVE";
