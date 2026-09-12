@@ -270,7 +270,7 @@ export default function ManagerEmployees() {
   const toggleDay = (day: number) => setForm((v) => ({ ...v, workDays: v.workDays.includes(day) ? v.workDays.filter((x) => x !== day) : [...v.workDays, day].sort() }));
   const canManage = role === "owner" || role === "manager";
   const isOwner = role === "owner";
-  const canAdd = canManage || role === "supervisor";
+  const canAdd = canManage;
   const escapeStatusFor = (employeeId: string): "escaped" | "returned" | "none" => { const latest = escapeEvents.find((x) => x.employeeId === employeeId); return latest?.status || "none"; };
 
   const changeEscape = async (e: Employee, status: "escaped" | "returned") => {
