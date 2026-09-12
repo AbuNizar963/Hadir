@@ -92,10 +92,6 @@ async function actor(req: Request, env: Env): Promise<Actor | null> {
   } catch { return null; }
 }
 
-async function ensurePolicyTable(env: Env) {
-  await env.DB.prepare("CREATE TABLE IF NOT EXISTS employee_checkout_policies(employee_id TEXT PRIMARY KEY,early_checkout_minutes INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL)").run();
-}
-
 function employeeOut(row: any, policyMinutes = 0) {
   let specialties: string[] = [];
   let workDays: number[] = [];
@@ -153,18 +149,25 @@ async function saveEmployee(req: Request, env: Env, id: string, a: Actor, o: str
   if (body.autoCheckIn !== undefined) { sets.push("auto_check_in=?"); values.push(body.autoCheckIn ? 1 : 0); }
   if (body.autoCheckOut !== undefined) { sets.push("auto_check_out=?"); values.push(body.autoCheckOut ? 1 : 0); }
 
-  await ensurePolicyTable(env);
+  let policyMinutes: number | undefined;
   if (body.earlyCheckoutGraceMinutes !== undefined) {
     const n = Number(body.earlyCheckoutGraceMinutes);
     if (!Number.isInteger(n) || n < 0 || n > 180) return json({ error: "مهلة الانصراف المبكر يجب أن تكون بين 0 و180 دقيقة" }, 400, o);
-    await env.DB.prepare("INSERT INTO employee_checkout_policies(employee_id,early_checkout_minutes,updated_at) VALUES(?,?,?) ON CONFLICT(employee_id) DO UPDATE SET early_checkout_minutes=excluded.early_checkout_minutes,updated_at=excluded.updated_at").bind(id, n, now()).run();
+    policyMinutes = n;
   }
-  if (!sets.length && body.earlyCheckoutGraceMinutes === undefined) return json({ ok: true, employee: employeeOut(current) }, 200, o);
+  if (!sets.length && policyMinutes === undefined) return json({ ok: true, employee: employeeOut(current) }, 200, o);
 
-  if (sets.length) {
-    try { await env.DB.prepare(`UPDATE employees SET ${sets.join(",")} WHERE id=?`).bind(...values, id).run(); }
-    catch (error) { return json({ error: "تعذر تحديث بيانات الموظف", detail: error instanceof Error ? error.message : String(error) }, 409, o); }
+  try {
+    const statements: D1PreparedStatement[] = [];
+    if (sets.length) statements.push(env.DB.prepare(`UPDATE employees SET ${sets.join(",")} WHERE id=?`).bind(...values, id));
+    if (policyMinutes !== undefined) {
+      statements.push(env.DB.prepare("INSERT INTO employee_checkout_policies(employee_id,early_checkout_minutes,updated_at) VALUES(?,?,?) ON CONFLICT(employee_id) DO UPDATE SET early_checkout_minutes=excluded.early_checkout_minutes,updated_at=excluded.updated_at").bind(id, policyMinutes, now()));
+    }
+    await env.DB.batch(statements);
+  } catch (error) {
+    return json({ error: "تعذر تحديث بيانات الموظف", detail: error instanceof Error ? error.message : String(error) }, 409, o);
   }
+
   const updated = await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();
   const policy = await env.DB.prepare("SELECT early_checkout_minutes AS minutes FROM employee_checkout_policies WHERE employee_id=? LIMIT 1").bind(id).first<any>();
   const result = employeeOut(updated, Number(policy?.minutes || 0));
