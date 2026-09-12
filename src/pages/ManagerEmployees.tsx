@@ -358,7 +358,6 @@ export default function ManagerEmployees() {
           savedEmployeeId = created.employee?.id || null;
           if (savedEmployeeId) await updateBackendEmployee(savedEmployeeId, payload);
         }
-        if (savedEmployeeId) await saveCheckoutPolicy(savedEmployeeId, earlyCheckoutGrace);
       } else if (editingId) {
         const current = employees.find((e) => e.id === editingId);
         if (!current) throw new Error("الموظف غير موجود.");
