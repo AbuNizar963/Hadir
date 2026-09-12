@@ -32,6 +32,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Switch to the PR head branch
+        shell: bash
+        run: |
+          git fetch origin "${{ github.head_ref }}"
+          git checkout -B "${{ github.head_ref }}" "origin/${{ github.head_ref }}"
       - name: Apply temporary safe UI patch
         run: python3 .github/scripts/patch_rotation_daily_ui.py
       - name: Verify patch shape
