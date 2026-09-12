@@ -53,7 +53,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
         'ESCAPED': 'هروب من العمل',
         'NOT_STARTED': 'لم يبدأ',
         'INVALID': 'غير صالح',
-        'OPEN': 'مناوبة مفتوحة',
+        'OPEN': 'انصراف معلق',
       }[value] ?? value;
 
   @override
@@ -373,7 +373,7 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
                         DropdownMenuItem(value: 'REST', child: Text('راحة')),
                         DropdownMenuItem(value: 'ESCAPED', child: Text('هروب من العمل')),
                         DropdownMenuItem(value: 'NOT_STARTED', child: Text('لم يبدأ')),
-                        DropdownMenuItem(value: 'OPEN', child: Text('مناوبة مفتوحة')),
+                        DropdownMenuItem(value: 'OPEN', child: Text('انصراف معلق')),
                         DropdownMenuItem(value: 'INVALID', child: Text('غير صالح')),
                       ],
                       onChanged: (value) => setState(() => _statusFilter = value ?? 'ALL'),
