@@ -77,7 +77,8 @@ void main() {
       expect(state.isWorkDay, isFalse);
       expect(state.kind, 'OFF');
       expect(state.label, 'فترة راحة');
-      expect(state.detail, 'انتهى دوام اليوم');
+      expect(state.detail, 'انتهى دوام اليوم · العمل القادم 2026-09-14 08:30');
+      expect(state.start, HadirTime.date(2026, 9, 14, 8, 30));
     });
 
     test('reports web-compatible active status during configured hours', () {
@@ -156,6 +157,37 @@ void main() {
       expect(atStart.kind, 'ROTATION');
       expect(atStart.isWorkDay, isTrue);
       expect(atStart.detail, 'اليوم 1 من 4 في المناوبة');
+    });
+
+    test('keeps every later rotation work cycle pending until its start time', () {
+      final before = service.resolveStatus(
+        employee,
+        target: HadirTime.date(2026, 9, 9, 6, 59),
+      );
+      final atStart = service.resolveStatus(
+        employee,
+        target: HadirTime.date(2026, 9, 9, 7),
+      );
+
+      expect(before.kind, 'NOT_STARTED');
+      expect(before.isWorkDay, isFalse);
+      expect(before.cycleDay, 1);
+      expect(before.start, HadirTime.date(2026, 9, 9, 7));
+      expect(atStart.kind, 'ROTATION');
+      expect(atStart.isWorkDay, isTrue);
+      expect(atStart.cycleDay, 1);
+    });
+
+    test('uses the canonical invalid schedule label in status output', () {
+      final state = service.resolveStatus(
+        {...employee, 'rotationStartDate': '01-09-2026'},
+        target: HadirTime.date(2026, 9, 2, 10),
+      );
+
+      expect(state.kind, 'INVALID');
+      expect(state.isWorkDay, isFalse);
+      expect(state.label, 'جدول غير صالح');
+      expect(state.detail, 'حدد تاريخ أول مناوبة.');
     });
 
     test('rejects an invalid rotation start-date format', () {
