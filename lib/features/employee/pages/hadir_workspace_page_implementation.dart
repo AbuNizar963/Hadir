@@ -253,9 +253,13 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final escape = _activeEscape();
     final hasLeave = approved.any((r) => _requestType(r) == 'leave');
     final hasPermission = approved.any((r) => _requestType(r) == 'permission');
-    final canIn = schedule['isWorkDay'] == true && open == null && !today.any((r) => _type(r) == 'check-in') && !hasLeave && !hasPermission && escape == null;
+    final now = _damascusNow();
+    final dailyMode = schedule['kind'] == 'ROTATION_DAILY';
+    final dailyInvalid = schedule['kind'] == 'ROTATION_DAILY_INVALID';
+    final dailyWindowOpen = !dailyMode || (schedule['start'] is DateTime && schedule['end'] is DateTime && !now.isBefore(schedule['start'] as DateTime) && !now.isAfter(schedule['end'] as DateTime));
+    final canIn = schedule['isWorkDay'] == true && !dailyInvalid && dailyWindowOpen && open == null && !today.any((r) => _type(r) == 'check-in') && !hasLeave && !hasPermission && escape == null;
     final canOut = open != null;
-    final checkInSubtitle = schedule['isWorkDay'] != true ? 'أنت في الراحة' : open != null ? 'الدوام جارٍ' : canIn ? 'مسح رمز QR' : 'غير متاح الآن';
+    final checkInSubtitle = schedule['isWorkDay'] != true ? 'أنت في الراحة' : dailyInvalid ? 'إعداد التسجيل اليومي غير صالح' : dailyMode && now.isBefore(schedule['start'] as DateTime) ? 'التسجيل يبدأ ${intl.DateFormat('HH:mm').format(schedule['start'] as DateTime)}' : dailyMode && now.isAfter(schedule['end'] as DateTime) ? 'انتهت مهلة التسجيل' : open != null ? 'الدوام جارٍ' : canIn ? 'مسح رمز QR' : 'غير متاح الآن';
     final checkOutSubtitle = open != null ? 'إنهاء الدوام الآن' : today.any((r) => _type(r) == 'check-out') ? 'تم تسجيل الانصراف' : 'بعد تسجيل الحضور';
     return Row(
       children: [
@@ -660,6 +664,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     'إذن' => 'لديك إذن معتمد لهذا اليوم.',
     'حاضر' => 'أنت مسجل حضور الآن.',
     'متأخر' => 'تم تسجيل حضورك بعد بداية الفترة.',
+    'تسجيل يومي غير صالح' => 'وقت التسجيل اليومي غير صالح. راجع إعدادات الموظف.',
     'راحة' => 'اليوم ليس ضمن أيام العمل.',
     _ => 'لم يحن وقت بداية المناوبة بعد.',
   };
@@ -695,14 +700,20 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     final cycleDay = diff % cycle;
     final periodDay = dayStart.add(Duration(days: diff - cycleDay));
     final start = _localTime(periodDay, '${_employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
-    final end = _localTime(periodDay.add(Duration(days: daysOn)), '${_employee['rotationEndTime'] ?? _employee['workEndTime'] ?? _employee['workStartTime'] ?? '09:00'}');
-    if (cycleDay < daysOn) {
-      return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    final end = _localTime(periodDay.add(Duration(days: daysOn)), '${_employee['rotationEndTime'] ?? _employee['workEndTime'] ?? _employee['rotationStartTime'] ?? _employee['workStartTime'] ?? '09:00'}');
+    final activeRotation = cycleDay < daysOn || (cycleDay == daysOn && now.isBefore(end));
+    if (!activeRotation) return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    final dailyEnabled = _employee['rotationDailyAttendanceEnabled'] == true || '${_employee['rotationDailyAttendanceEnabled'] ?? ''}'.toLowerCase() == 'true' || '${_employee['rotationDailyAttendanceEnabled'] ?? ''}' == '1';
+    if (dailyEnabled) {
+      final dailyTime = '${_employee['rotationDailyAttendanceTime'] ?? ''}'.trim();
+      final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(dailyTime);
+      if (match == null) return {'isWorkDay': true, 'kind': 'ROTATION_DAILY_INVALID', 'start': null, 'end': null, 'rotationStart': start, 'rotationEnd': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+      final checkpoint = _localTime(DateTime(now.year, now.month, now.day), dailyTime);
+      final rawGrace = _number(_employee['rotationDailyAttendanceGraceMinutes'], 0).clamp(0, 180);
+      final graceEnd = checkpoint.add(Duration(minutes: rawGrace));
+      return {'isWorkDay': true, 'kind': 'ROTATION_DAILY', 'start': checkpoint, 'end': graceEnd, 'rotationStart': start, 'rotationEnd': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff, 'dailyAttendanceEnabled': true, 'dailyAttendanceTime': dailyTime, 'dailyAttendanceGraceMinutes': rawGrace};
     }
-    if (cycleDay == daysOn && now.isBefore(end)) {
-      return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
-    }
-    return {'isWorkDay': false, 'kind': 'OFF', 'start': null, 'end': null, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
+    return {'isWorkDay': true, 'kind': 'ROTATION', 'start': start, 'end': end, 'cycleDay': cycleDay, 'daysOn': daysOn, 'daysOff': daysOff};
   }
 
   List<int> _workDays() {
@@ -728,6 +739,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   String _scheduleLabel(Map<String, dynamic> s) {
     if (s['kind'] == 'ADMIN') return 'دوام إداري';
+    if (s['kind'] == 'ROTATION_DAILY') return 'مناوبة تناوبية · تسجيل يومي';
+    if (s['kind'] == 'ROTATION_DAILY_INVALID') return 'تسجيل يومي غير صالح';
     if (s['kind'] == 'ROTATION') return 'مناوبة تناوبية';
     if (s['kind'] == 'NOT_STARTED') return 'لم تبدأ المناوبة';
     return 'فترة راحة';
@@ -736,7 +749,10 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
   String _periodLabel(Map<String, dynamic> s) {
     final start = s['start'];
     final end = s['end'];
-    if (start is DateTime && end is DateTime) return '${intl.DateFormat('HH:mm').format(start)} → ${intl.DateFormat('HH:mm').format(end)}';
+    if (start is DateTime && end is DateTime) {
+      final suffix = s['kind'] == 'ROTATION_DAILY' ? ' (نافذة التسجيل)' : '';
+      return '${intl.DateFormat('HH:mm').format(start)} → ${intl.DateFormat('HH:mm').format(end)}$suffix';
+    }
     if (s['kind'] == 'NOT_STARTED' && start is DateTime) return 'تبدأ ${intl.DateFormat('HH:mm').format(start)}';
     return '—';
   }
@@ -753,6 +769,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     DateTime? target;
     String label = '';
     if (s['kind'] == 'NOT_STARTED' && start is DateTime) { target = start; label = 'بداية أول مناوبة'; }
+    else if (s['kind'] == 'ROTATION_DAILY' && start is DateTime && _damascusNow().isBefore(start)) { target = start; label = 'يبدأ التسجيل اليومي خلال'; }
+    else if (s['kind'] == 'ROTATION_DAILY' && end is DateTime && end.isAfter(_damascusNow())) { target = end; label = 'تنتهي مهلة التسجيل خلال'; }
     else if (s['isWorkDay'] == true && end is DateTime && end.isAfter(_damascusNow())) { target = end; label = 'تنتهي المناوبة خلال'; }
     else if (s['kind'] == 'OFF') {
       final raw = '${_employee['rotationStartDate'] ?? ''}'.split('T').first;
