@@ -69,7 +69,7 @@ export type ProfessionalAttendanceReport = {
     exceptions: Array<{ attendanceDay: string; employeeId: string; employeeName: string; jobNumber: string | null; code: string; status: ProfessionalAttendanceStatus; attendanceSource: ProfessionalAttendanceRow["attendanceSource"]; minutes: number; attendanceEventIds: string[]; requestIds: string[]; auditIds: string[] }>;
   };
   rows: ProfessionalAttendanceRow[];
-  dataQuality: { byStatus: Record<string, number>; complete: boolean };
+  dataQuality: { byStatus: Partial<Record<ProfessionalAttendanceStatus, number>>; complete: boolean };
   integrity: { sourceOfTruth: string; rawSource: string; noRawAttendanceMutation: boolean; periodScoped: boolean; maxDays: number; drillDownAvailable: boolean; sourceEventIdsIncluded: boolean; requestIdsIncluded: boolean; auditIdsIncluded: boolean; attendanceSourceDerivedFromRawEvents: boolean };
 };
 
@@ -138,7 +138,11 @@ export async function getProfessionalAttendanceReport(from: string, to: string, 
   });
   const data = await response.json().catch(() => null) as ProfessionalAttendanceReport | { error?: string } | null;
   if (!response.ok) throw new Error(String(data && "error" in data ? data.error : `HTTP ${response.status}`));
-  return data as ProfessionalAttendanceReport;
+  if (!data || "error" in data || !Array.isArray(data.rows)) throw new Error("استجابة التقرير غير صالحة");
+  const byStatus: Partial<Record<ProfessionalAttendanceStatus, number>> = {};
+  for (const row of data.rows) byStatus[row.status] = (byStatus[row.status] || 0) + 1;
+  data.dataQuality = { ...data.dataQuality, byStatus };
+  return data;
 }
 
 export async function getProfessionalAttendanceDrilldown(attendanceDay: string, employeeId: string) {
@@ -150,5 +154,6 @@ export async function getProfessionalAttendanceDrilldown(attendanceDay: string, 
   });
   const data = await response.json().catch(() => null) as ProfessionalAttendanceDrilldown | { error?: string } | null;
   if (!response.ok) throw new Error(String(data && "error" in data ? data.error : `HTTP ${response.status}`));
-  return data as ProfessionalAttendanceDrilldown;
+  if (!data || "error" in data) throw new Error("استجابة تفصيل التقرير غير صالحة");
+  return data;
 }
