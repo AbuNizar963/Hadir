@@ -3,6 +3,7 @@ import 'package:intl/intl.dart' as intl;
 
 import '../../../core/api.dart';
 import '../../../core/hadir_brand.dart';
+import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
 
 class JibbleHistoryPage extends StatefulWidget {
@@ -29,9 +30,6 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
     if (mounted) setState(() { _loading = true; _error = null; });
     try {
       final api = HadirApi(token: await _session.token());
-      // The employee attendance endpoint returns only the current shift for
-      // limits <= 500. The history screen needs the full available period,
-      // matching the reference web client which requests 1000+ records.
       final records = await api.attendance(limit: 2000);
       if (!mounted) return;
       setState(() {
@@ -49,9 +47,9 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
   }
 
   List<dynamic> get _visibleRecords {
-    final now = DateTime.now();
+    final now = HadirTime.now();
     final records = _records.where((raw) {
-      final date = _date(raw)?.toLocal();
+      final date = HadirTime.fromTimestamp(_date(raw));
       if (date == null || date.year != now.year || date.month != now.month) return false;
       return _viewMode == 1 || date.day == now.day;
     }).toList();
@@ -168,13 +166,13 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
   }
 
   Widget _summary() {
-    final now = DateTime.now();
+    final now = HadirTime.now();
     final month = _records.where((raw) {
-      final date = _date(raw)?.toLocal();
+      final date = HadirTime.fromTimestamp(_date(raw));
       return date != null && date.year == now.year && date.month == now.month;
     }).length;
     final today = _records.where((raw) {
-      final date = _date(raw)?.toLocal();
+      final date = HadirTime.fromTimestamp(_date(raw));
       return date != null && date.year == now.year && date.month == now.month && date.day == now.day;
     }).length;
     final scheme = Theme.of(context).colorScheme;
@@ -224,7 +222,7 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
   Widget _recordTile(dynamic raw) {
     final item = Map<String, dynamic>.from(raw as Map);
     final checkout = item['type'] == 'check-out' || item['type'] == 'out';
-    final date = _date(item)?.toLocal();
+    final date = HadirTime.fromTimestamp(_date(item));
     final distance = double.tryParse('${item['distanceMeters']}');
     final scheme = Theme.of(context).colorScheme;
     return Container(
@@ -260,61 +258,19 @@ class _JibbleHistoryPageState extends State<JibbleHistoryPage> {
   }
 
   DateTime? _date(dynamic raw) {
-    if (raw is! Map) return null;
-    return DateTime.tryParse('${raw['timestamp'] ?? raw['time']}');
-  }
-
-  Widget _message(String text, IconData icon) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .75)),
-      ),
-      child: Column(children: [
-        Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(16)),
-          child: Icon(icon, color: scheme.primary),
-        ),
-        const SizedBox(height: 12),
-        Text(text, textAlign: TextAlign.center, style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w700, height: 1.45)),
-      ]),
-    );
+    if (raw is Map) return DateTime.tryParse('${raw['timestamp']}');
+    return null;
   }
 }
 
 class _SummarySkeleton extends StatelessWidget {
   const _SummarySkeleton();
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 126,
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: .45),
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(height: 180, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(24)));
 }
 
 class _RowSkeleton extends StatelessWidget {
   const _RowSkeleton();
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 72,
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: .45),
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .7)),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(height: 74, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(18)));
 }
