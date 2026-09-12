@@ -538,7 +538,7 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
 
   Widget _avatar(BuildContext context, String? url, String name, {double size = 56, bool light = false}) {
     final scheme = Theme.of(context).colorScheme;
-    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900)))));
+    final child = url == null ? Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: light ? scheme.primary : scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))) : ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(url, headers: _sessionTokenCached() == null ? null : {'Authorization': 'Bearer ${_sessionTokenCached()}'}, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Text(name.trim().isEmpty ? 'م' : name.trim().characters.first, style: TextStyle(color: scheme.primary, fontSize: size * .34, fontWeight: FontWeight.w900))))) ;
     return Container(width: size, height: size, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(14), border: Border.all(color: scheme.primary.withValues(alpha: .28))), child: child);
   }
 
@@ -642,6 +642,8 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
         'PERMISSION' => 'إذن',
         'ESCAPED' => 'هارب',
         'NOT_STARTED' => 'لم تبدأ المناوبة',
+        'OPEN' => 'انصراف معلق',
+        'INVALID' => 'جدول غير صالح',
         _ => 'غائب',
       };
     }
@@ -665,7 +667,9 @@ class _HadirWorkspacePageState extends State<HadirWorkspacePage> {
     'إذن' => 'لديك إذن معتمد لهذا اليوم.',
     'حاضر' => 'أنت مسجل حضور الآن.',
     'متأخر' => 'تم تسجيل حضورك بعد بداية الفترة.',
+    'انصراف معلق' => 'تم تسجيل الحضور ولم يُسجل الانصراف بعد.',
     'تسجيل يومي غير صالح' => 'وقت التسجيل اليومي غير صالح. راجع إعدادات الموظف.',
+    'جدول غير صالح' => 'تعذر تحديد جدول الدوام المعتمد.',
     'راحة' => 'اليوم ليس ضمن أيام العمل.',
     _ => 'لم يحن وقت بداية المناوبة بعد.',
   };
