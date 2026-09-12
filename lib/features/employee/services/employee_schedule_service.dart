@@ -73,8 +73,14 @@ class EmployeeScheduleService {
     final now = target ?? HadirTime.now();
     final period = resolve(employee, target: now);
 
-    if (period.kind == 'NOT_STARTED' || period.kind == 'INVALID') {
-      return period;
+    if (period.kind == 'NOT_STARTED') return period;
+    if (period.kind == 'INVALID') {
+      return EmployeeScheduleState(
+        isWorkDay: false,
+        kind: 'INVALID',
+        label: 'جدول غير صالح',
+        detail: period.detail,
+      );
     }
 
     final type = '${employee['scheduleType'] ?? 'ADMIN'}'.trim().toUpperCase();
@@ -114,12 +120,16 @@ class EmployeeScheduleService {
 
     if (period.kind == 'OFF') return period;
     if (period.end != null && !now.isBefore(period.end!)) {
+      final nextStart = _nextAdminWorkStart(employee, now);
       return EmployeeScheduleState(
         isWorkDay: false,
         kind: 'OFF',
         label: 'فترة راحة',
-        detail: 'انتهى دوام اليوم',
+        detail: nextStart == null
+            ? 'انتهى دوام اليوم'
+            : 'انتهى دوام اليوم · العمل القادم ${_formatDateTime(nextStart)}',
         end: period.end,
+        start: nextStart,
       );
     }
 
@@ -219,16 +229,32 @@ class EmployeeScheduleService {
       startDate.add(Duration(days: cycleIndex * cycleTotal)),
       time,
     );
+    final periodEnd = periodStart.add(Duration(days: daysOn));
+
+    // A later rotation cycle starts at its configured start time, not at
+    // midnight. Keep the same pending state used for the first cycle.
+    if (cycleDay < daysOn && target.isBefore(periodStart)) {
+      return EmployeeScheduleState(
+        isWorkDay: false,
+        kind: 'NOT_STARTED',
+        label: 'لم تبدأ المناوبة بعد',
+        detail:
+            'تبدأ المناوبة القادمة في ${_formatDateTime(periodStart)}',
+        start: periodStart,
+        end: periodEnd,
+        cycleDay: cycleDay + 1,
+        cycleTotal: cycleTotal,
+      );
+    }
 
     if (cycleDay < daysOn) {
-      final end = periodStart.add(Duration(days: daysOn));
       return EmployeeScheduleState(
         isWorkDay: true,
         kind: 'ROTATION',
         label: 'مناوبة تناوبية',
-        detail: 'من ${_formatDateTime(periodStart)} → ${_formatDateTime(end)}',
+        detail: 'من ${_formatDateTime(periodStart)} → ${_formatDateTime(periodEnd)}',
         start: periodStart,
-        end: end,
+        end: periodEnd,
         cycleDay: cycleDay + 1,
         cycleTotal: cycleTotal,
       );
@@ -243,6 +269,24 @@ class EmployeeScheduleService {
       cycleDay: cycleDay + 1,
       cycleTotal: cycleTotal,
     );
+  }
+
+  DateTime? _nextAdminWorkStart(
+    Map<String, dynamic> employee,
+    DateTime target,
+  ) {
+    final workDays = _workDays(employee['workDays'] ?? employee['workDaysJson']);
+    if (workDays.isEmpty) return null;
+
+    final startTime = '${employee['workStartTime'] ?? '09:00'}';
+    final today = _dateOnly(HadirTime.dateKey(target));
+    for (var offset = 0; offset <= 7; offset++) {
+      final candidateDay = today.add(Duration(days: offset));
+      if (!workDays.contains(candidateDay.weekday % 7)) continue;
+      final candidate = _localDateTime(candidateDay, startTime);
+      if (candidate.isAfter(target)) return candidate;
+    }
+    return null;
   }
 
   List<int> _workDays(dynamic raw) {
