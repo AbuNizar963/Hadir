@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../core/api.dart';
+import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
 
 const _green = Color(0xFF0B6B5A);
@@ -55,10 +56,9 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
 
   List<Map<String, dynamic>> _recordsIn(DateTime from, DateTime to) {
     return _records.where((record) {
-      final value = DateTime.tryParse('${record['timestamp']}');
+      final value = HadirTime.fromTimestamp(record['timestamp']);
       if (value == null) return false;
-      final local = value.toLocal();
-      return !local.isBefore(from) && local.isBefore(to);
+      return !value.isBefore(from) && value.isBefore(to);
     }).toList()
       ..sort((a, b) {
         final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -71,7 +71,7 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
     var total = Duration.zero;
     DateTime? checkIn;
     for (final record in records) {
-      final time = DateTime.tryParse('${record['timestamp']}')?.toLocal();
+      final time = HadirTime.fromTimestamp(record['timestamp']);
       if (time == null) continue;
       if (record['type'] == 'check-in') {
         checkIn = time;
@@ -81,7 +81,7 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
       }
     }
     if (checkIn != null) {
-      final now = DateTime.now();
+      final now = HadirTime.now();
       if (now.isAfter(checkIn)) total += now.difference(checkIn);
     }
     return total;
@@ -90,7 +90,7 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
   String _hours(Duration duration) => duration == Duration.zero ? '0س' : '${duration.inHours}س ${duration.inMinutes.remainder(60)}د';
 
   int _daysWithActivity(List<Map<String, dynamic>> records) => records
-      .map((r) => DateTime.tryParse('${r['timestamp']}')?.toLocal())
+      .map((r) => HadirTime.fromTimestamp(r['timestamp']))
       .whereType<DateTime>()
       .map((d) => '${d.year}-${d.month}-${d.day}')
       .toSet()
@@ -101,7 +101,7 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
   bool _hasOpenShift(List<Map<String, dynamic>> records) {
     DateTime? checkIn;
     for (final record in records) {
-      final time = DateTime.tryParse('${record['timestamp']}')?.toLocal();
+      final time = HadirTime.fromTimestamp(record['timestamp']);
       if (time == null) continue;
       if (record['type'] == 'check-in') {
         checkIn = time;
@@ -115,9 +115,9 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
   List<_DaySummary> _dailySummaries(List<Map<String, dynamic>> records) {
     final grouped = <DateTime, List<Map<String, dynamic>>>{};
     for (final record in records) {
-      final time = DateTime.tryParse('${record['timestamp']}')?.toLocal();
+      final time = HadirTime.fromTimestamp(record['timestamp']);
       if (time == null) continue;
-      final day = DateTime(time.year, time.month, time.day);
+      final day = HadirTime.date(time.year, time.month, time.day);
       grouped.putIfAbsent(day, () => <Map<String, dynamic>>[]).add(record);
     }
     final result = grouped.entries.map((entry) {
@@ -140,11 +140,11 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month);
-    final nextMonth = DateTime(now.year, now.month + 1);
+    final now = HadirTime.now();
+    final monthStart = HadirTime.date(now.year, now.month);
+    final nextMonth = HadirTime.date(now.year, now.month + 1);
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final week = _recordsIn(DateTime(weekStart.year, weekStart.month, weekStart.day), DateTime(now.year, now.month, now.day + 1));
+    final week = _recordsIn(HadirTime.date(weekStart.year, weekStart.month, weekStart.day), HadirTime.date(now.year, now.month, now.day + 1));
     final month = _recordsIn(monthStart, nextMonth);
     final monthDuration = _durationFor(month);
     final activeDays = _daysWithActivity(month);
@@ -223,7 +223,7 @@ class _AttendanceInsightsPageState extends State<AttendanceInsightsPage> {
   Widget _lastActivity(List<Map<String, dynamic>> month) {
     if (month.isEmpty) return const _MessageCard('لا توجد حركات مسجلة لهذا الشهر.', Icons.event_available_rounded);
     final latest = month.last;
-    final time = DateTime.tryParse('${latest['timestamp']}')?.toLocal();
+    final time = HadirTime.fromTimestamp(latest['timestamp']);
     final checkout = latest['type'] == 'check-out';
     return Container(
       padding: const EdgeInsets.all(15),
