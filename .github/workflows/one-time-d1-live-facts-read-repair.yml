@@ -1,0 +1,117 @@
+# One-time canonical repair; removed after Actions verification.
+name: One-time D1 live facts read repair
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-time-d1-live-facts-read-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reduce employee-scoped D1 reads
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          function replaceOnce(source, pattern, replacement, label) {
+            const next = source.replace(pattern, replacement);
+            if (next === source) throw new Error(`${label} anchor not found`);
+            return next;
+          }
+
+          const attendancePath = 'backend/src/attendance-engine.ts';
+          let attendance = fs.readFileSync(attendancePath, 'utf8');
+
+          attendance = replaceOnce(
+            attendance,
+            '    nextDay = addDays(day, 1);\n  try {',
+            '    nextDay = addDays(day, 1),\n    requestedEmployeeId = String(url.searchParams.get("employeeId") || "").trim();\n  try {',
+            'daily-status employee selector',
+          );
+
+          attendance = replaceOnce(
+            attendance,
+            'FROM employees e WHERE (e.status=\'active\' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?)) AND (? != \'staff\' OR e.id=?) ORDER BY e.name',
+            'FROM employees e WHERE (e.status=\'active\' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?)) AND (? != \'staff\' OR e.id=?) AND (? = \'\' OR e.id=?) ORDER BY e.name',
+            'daily-status employee filter',
+          );
+
+          attendance = replaceOnce(
+            attendance,
+            'String(actor.id),\n      )\n      .all<EmployeeRow>();',
+            'String(actor.id),\n        requestedEmployeeId,\n        requestedEmployeeId,\n      )\n      .all<EmployeeRow>();',
+            'daily-status employee bindings',
+          );
+
+          attendance = replaceOnce(
+            attendance,
+            '"SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NOT NULL AND start_date <= ? AND COALESCE(end_date,start_date) >= ? UNION ALL SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NULL AND substr(created_at,1,10)=?"',
+            '"SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NOT NULL AND start_date <= ? AND COALESCE(end_date,start_date) >= ? AND (? = \'\' OR employee_id=?) UNION ALL SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NULL AND substr(created_at,1,10)=? AND (? = \'\' OR employee_id=?)"',
+            'daily-status request filter',
+          );
+
+          attendance = replaceOnce(
+            attendance,
+            '.bind(day, day, day)\n      .all<any>();',
+            '.bind(day, day, requestedEmployeeId, requestedEmployeeId, day, requestedEmployeeId, requestedEmployeeId)\n      .all<any>();',
+            'daily-status request bindings',
+          );
+
+          attendance = replaceOnce(
+            attendance,
+            '"SELECT event.employee_id AS employeeId,event.status,event.timestamp FROM escape_events event INNER JOIN (SELECT employee_id,MAX(timestamp) AS latestTimestamp FROM escape_events WHERE timestamp<? GROUP BY employee_id) latest ON latest.employee_id=event.employee_id AND latest.latestTimestamp=event.timestamp ORDER BY event.timestamp DESC"',
+            '"SELECT event.employee_id AS employeeId,event.status,event.timestamp FROM escape_events event INNER JOIN (SELECT employee_id,MAX(timestamp) AS latestTimestamp FROM escape_events WHERE timestamp<? GROUP BY employee_id) latest ON latest.employee_id=event.employee_id AND latest.latestTimestamp=event.timestamp WHERE (? = \'\' OR event.employee_id=?) ORDER BY event.timestamp DESC"',
+            'daily-status escape filter',
+          );
+
+          attendance = replaceOnce(
+            attendance,
+            '.bind(escapeCutoff.toISOString())\n      .all<any>();',
+            '.bind(escapeCutoff.toISOString(), requestedEmployeeId, requestedEmployeeId)\n      .all<any>();',
+            'daily-status escape bindings',
+          );
+
+          attendance = replaceOnce(
+            attendance,
+            '"SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",\n    )\n      .bind(historicalFrom, historicalTo)',
+            '"SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? AND (? = \'\' OR employee_id=?) ORDER BY timestamp ASC",\n    )\n      .bind(historicalFrom, historicalTo, requestedEmployeeId, requestedEmployeeId)',
+            'daily-status historical attendance filter',
+          );
+
+          fs.writeFileSync(attendancePath, attendance);
+
+          const reportPath = 'backend/src/professional-attendance-report-engine.ts';
+          let report = fs.readFileSync(reportPath, 'utf8');
+
+          report = replaceOnce(
+            report,
+            '    const response = await handleDailyStatus(\n      new Request(`https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}`),',
+            '    const response = await handleDailyStatus(\n      new Request(`https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}${employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : ""}`),',
+            'live facts daily-status employee selector',
+          );
+
+          report = replaceOnce(
+            report,
+            '    const attendanceRows = await env.DB.prepare(\n      "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",\n    ).bind(new Date(dayAnchor - 86400000).toISOString(), new Date(dayAnchor + 172800000).toISOString()).all<any>();',
+            '    const attendanceQuery = employeeId\n      ? env.DB.prepare(\n          "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC",\n        ).bind(employeeId, new Date(dayAnchor - 86400000).toISOString(), new Date(dayAnchor + 86400000).toISOString())\n      : env.DB.prepare(\n          "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",\n        ).bind(new Date(dayAnchor - 86400000).toISOString(), new Date(dayAnchor + 172800000).toISOString());\n    const attendanceRows = await attendanceQuery.all<any>();',
+            'live facts attendance scope',
+          );
+
+          fs.writeFileSync(reportPath, report);
+          NODE
+          npx --yes prettier@3.6.2 --write backend/src/attendance-engine.ts backend/src/professional-attendance-report-engine.ts
+          git diff --check
+          git config user.name "HADIR Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/attendance-engine.ts backend/src/professional-attendance-report-engine.ts
+          if git diff --cached --quiet; then echo "No changes needed"; exit 0; fi
+          git commit -m "perf: reduce D1 reads for employee live facts"
+          git push
