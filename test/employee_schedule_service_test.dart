@@ -63,6 +63,25 @@ void main() {
       expect(state.detail, '22:00 → 06:00');
     });
 
+    test('reports not-started status before the configured start time', () {
+      final state = service.resolveStatus(
+        {
+          'scheduleType': 'ADMIN',
+          'workDays': [0, 1, 2, 3, 4],
+          'workStartTime': '08:30',
+          'workEndTime': '16:00',
+        },
+        target: HadirTime.date(2026, 9, 13, 8, 29),
+      );
+
+      expect(state.isWorkDay, isFalse);
+      expect(state.kind, 'NOT_STARTED');
+      expect(state.label, 'لم تبدأ المناوبة بعد');
+      expect(state.detail, 'تبدأ المناوبة الساعة 08:30');
+      expect(state.start, HadirTime.date(2026, 9, 13, 8, 30));
+      expect(state.end, HadirTime.date(2026, 9, 13, 16));
+    });
+
     test('reports web-compatible rest status after the configured end time', () {
       final state = service.resolveStatus(
         {
