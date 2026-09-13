@@ -27,30 +27,120 @@ Future<bool> _isTokenValid(String token) async {
   }
 }
 
+/// Resolves the navigation target after authentication state is restored.
+///
+/// Keeping this decision separate from token validation makes the session
+/// restore behavior deterministic and testable without coupling tests to
+/// secure storage or the live API.
+String? resolveAuthenticatedRedirect({
+  required String location,
+  String? employeeToken,
+  String? adminToken,
+}) {
+  const publicLocations = {
+    '/',
+    '/login',
+    '/employee-login',
+    '/admin-login',
+    '/manager/login',
+  };
+
+  final hasEmployeeToken = employeeToken != null && employeeToken.isNotEmpty;
+  final hasAdminToken = adminToken != null && adminToken.isNotEmpty;
+
+  if (!hasEmployeeToken && !hasAdminToken && !publicLocations.contains(location)) {
+    return '/';
+  }
+
+  // A restored admin session should never land on a login/public entry page.
+  if (hasAdminToken && publicLocations.contains(location)) return '/admin';
+
+  // A restored employee session should resume the employee workspace instead
+  // of showing the landing/login screen again.
+  if (hasEmployeeToken && publicLocations.contains(location)) return '/home';
+
+  const adminPaths = {
+    '/admin',
+    '/admin/roles',
+    '/admin/manage',
+    '/admin/operations',
+    '/admin/reports',
+    '/admin/reports/archive',
+    '/admin/audit',
+    '/admin/settings',
+    '/manager',
+    '/manager/employees',
+    '/manager/workforce',
+    '/manager/requests',
+    '/manager/audit',
+    '/manager/reports',
+    '/manager/report-archive',
+    '/manager/settings',
+    '/manager/employees/transfer',
+  };
+  if (!hasAdminToken && adminPaths.contains(location)) return '/admin-login';
+
+  const employeePaths = {
+    '/home',
+    '/employee',
+    '/center',
+    '/employee/center',
+    '/employee/premium',
+    '/attendance',
+    '/history',
+    '/employee/history',
+    '/insights',
+    '/requests',
+    '/notifications',
+    '/employee/notifications',
+    '/profile',
+    '/employee/profile',
+    '/services',
+    '/weather',
+    '/prayer',
+    '/ai',
+  };
+  final isEmployeeScan = location.startsWith('/employee/scan/');
+  if (!hasEmployeeToken && (employeePaths.contains(location) || isEmployeeScan)) return '/login';
+
+  return null;
+}
+
 GoRouter buildAppRouter() => GoRouter(
   initialLocation: '/',
   redirect: (_, state) async {
     final employeeToken = await _session.token();
     final adminToken = await _session.adminToken();
+
+    // Clear the in-memory validation cache when its corresponding persisted
+    // session disappears. This prevents a later reuse of the same token value
+    // from bypassing validation after logout/login.
+    if (employeeToken == null || employeeToken.isEmpty) _validatedEmployeeToken = null;
+    if (adminToken == null || adminToken.isEmpty) _validatedAdminToken = null;
+
     final location = state.matchedLocation;
-    const publicLocations = {'/', '/login', '/employee-login', '/admin-login', '/manager/login'};
 
     if (employeeToken != null && employeeToken.isNotEmpty && employeeToken != _validatedEmployeeToken) {
       final valid = await _isTokenValid(employeeToken);
       if (!valid) {
         _validatedEmployeeToken = null;
         await _session.clear();
-        if (!publicLocations.contains(location)) return '/';
+        if (!resolveAuthenticatedRedirect(location: location).isNullOrEmpty) {
+          return resolveAuthenticatedRedirect(location: location);
+        }
       } else {
         _validatedEmployeeToken = employeeToken;
       }
     }
+
     if (adminToken != null && adminToken.isNotEmpty && adminToken != _validatedAdminToken) {
       final valid = await _isTokenValid(adminToken);
       if (!valid) {
         _validatedAdminToken = null;
         await _session.clearAdmin();
-        if (!publicLocations.contains(location)) return '/';
+        if (!resolveAuthenticatedRedirect(location: location).isNullOrEmpty) {
+          return resolveAuthenticatedRedirect(location: location);
+        }
       } else {
         _validatedAdminToken = adminToken;
       }
@@ -58,29 +148,11 @@ GoRouter buildAppRouter() => GoRouter(
 
     final currentEmployeeToken = await _session.token();
     final currentAdminToken = await _session.adminToken();
-
-    if (currentEmployeeToken == null && currentAdminToken == null && !publicLocations.contains(location)) return '/';
-    if (currentAdminToken != null && (location == '/admin-login' || location == '/manager/login')) return '/admin';
-    if (currentEmployeeToken != null && location == '/employee-login') return '/home';
-
-    const adminPaths = {
-      '/admin', '/admin/roles', '/admin/manage', '/admin/operations',
-      '/admin/reports', '/admin/reports/archive', '/admin/audit', '/admin/settings',
-      '/manager', '/manager/employees', '/manager/workforce', '/manager/requests',
-      '/manager/audit', '/manager/reports', '/manager/report-archive', '/manager/settings',
-      '/manager/employees/transfer',
-    };
-    if (currentAdminToken == null && adminPaths.contains(location)) return '/admin-login';
-
-    const employeePaths = {
-      '/home', '/employee', '/center', '/employee/center', '/employee/premium',
-      '/attendance', '/history', '/employee/history', '/insights', '/requests',
-      '/notifications', '/employee/notifications', '/profile', '/employee/profile',
-      '/services', '/weather', '/prayer', '/ai',
-    };
-    final isEmployeeScan = location.startsWith('/employee/scan/');
-    if (currentEmployeeToken == null && (employeePaths.contains(location) || isEmployeeScan)) return '/login';
-    return null;
+    return resolveAuthenticatedRedirect(
+      location: location,
+      employeeToken: currentEmployeeToken,
+      adminToken: currentAdminToken,
+    );
   },
   errorBuilder: (_, __) => const _NotFoundPage(),
   routes: [
