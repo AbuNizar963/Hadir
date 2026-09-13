@@ -151,8 +151,14 @@ if (!source.includes("const sharePdf = async")) {
       const dayNumber = String(dateOf(reportDate).getDate());
       const monthNumber = String(dateOf(reportDate).getMonth() + 1);
       const yearNumber = String(dateOf(reportDate).getFullYear());
-      const displayDate = `${dayNumber}/${monthNumber}/${yearNumber}`;
-      const filename = `${companyName} - سجل الحضور والغياب - ليوم ${reportDay} - تاريخ ${displayDate}.pdf`;
+      const displayDate = dayNumber + "/" + monthNumber + "/" + yearNumber;
+      const filename =
+        companyName +
+        " - سجل الحضور والغياب - ليوم " +
+        reportDay +
+        " - تاريخ " +
+        displayDate +
+        ".pdf";
       const blob = await generateProfessionalReportPdf(
         documentHtml,
         printCss,
