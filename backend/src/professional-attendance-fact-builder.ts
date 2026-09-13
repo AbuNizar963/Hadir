@@ -75,8 +75,6 @@ async function materializeDay(env: Env, day: string, actor: any, employeeId?: st
     eventsByEmployee.set(id, list);
   }
 
-  // Read all approved/confirmed requests for the day once. The overlap rule mirrors
-  // daily-status requestActive(), including open-ended requests via created_at.
   const requestResult = employeeId
     ? await env.DB.prepare("SELECT id,employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE employee_id=? AND status IN ('approved','confirmed')").bind(employeeId).all<any>()
     : await env.DB.prepare("SELECT id,employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed')").all<any>();
@@ -92,7 +90,6 @@ async function materializeDay(env: Env, day: string, actor: any, employeeId?: st
     requestsByEmployee.set(id, list);
   }
 
-  // Audit is also read once per day instead of once per employee/day.
   const auditResult = employeeId
     ? await env.DB.prepare("SELECT id,employee_id AS employeeId,timestamp FROM audit WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(employeeId, start, end).all<any>()
     : await env.DB.prepare("SELECT id,employee_id AS employeeId,timestamp FROM audit WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(start, end).all<any>();
@@ -146,6 +143,16 @@ async function materializeDay(env: Env, day: string, actor: any, employeeId?: st
   }
   if (statements.length) await env.DB.batch(statements);
   return statements.length;
+}
+
+export async function refreshProfessionalAttendanceFact(env: Env, day: string, actor: any, employeeId: string) {
+  if (!DAY_RE.test(day) || !String(employeeId || "").trim()) return 0;
+  try {
+    return await materializeDay(env, day, actor, employeeId);
+  } catch (error) {
+    console.error("professional attendance fact refresh failed", { day, employeeId, error });
+    return 0;
+  }
 }
 
 export async function ensureProfessionalAttendanceFacts(env: Env, from: string, to: string, actor: any, employeeId?: string) {
