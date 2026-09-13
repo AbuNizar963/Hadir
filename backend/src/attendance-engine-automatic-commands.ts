@@ -1,10 +1,9 @@
 import { dateKey, getAttendanceShift, getAttendanceShiftForDay } from "./attendance-period";
 import { refreshProfessionalAttendanceFact } from "./professional-attendance-fact-builder";
 import { refreshCanonicalStatus } from "./attendance-engine-commands";
+import { submitAttendanceThroughCentralEngine } from "./attendance-engine-central";
 
 type Env = { DB: D1Database; APP_TIMEZONE?: string };
-
-const id = () => crypto.randomUUID();
 
 export function dateKeyLocal(date: Date, tz: string) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
@@ -16,21 +15,18 @@ export function operationalShift(employee: any, current: Date, tz: string) {
   return getAttendanceShift(employee, current, tz);
 }
 
-async function locationFor(db: D1Database, employee: any) {
-  const row = await db.prepare("SELECT id,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id=? LIMIT 1").bind(employee.locationId || "main").first<any>();
-  return row || (await db.prepare("SELECT id,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name LIMIT 1").first<any>());
-}
-
-export async function insertAutomaticAttendance(db: D1Database, employee: any, type: "check-in" | "check-out", timestamp: string, actorName: string, reason: string) {
-  const loc = await locationFor(db, employee);
-  if (!loc) return null;
-  const deviceId = `ADMIN_DIRECT:${actorName}`;
-  const attendanceId = id();
-  await db.prepare("INSERT INTO attendance(id,employee_id,job_number,employee_name,type,timestamp,lat,lng,distance_meters,device_id,ip,qr_code,location_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
-    .bind(attendanceId, employee.id, employee.jobNumber, employee.name, type, timestamp, Number(loc.lat), Number(loc.lng), 0, deviceId, "system", "AUTO_DIRECT", loc.id).run();
-  await db.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip,lat,lng,distance_meters) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
-    .bind(id(), employee.id, employee.jobNumber, actorName, type, "success", reason, timestamp, deviceId, "system", Number(loc.lat), Number(loc.lng), 0).run().catch(() => undefined);
-  return { id: attendanceId, employeeId: employee.id, employeeName: employee.name, type, timestamp, locationId: loc.id };
+/**
+ * Compatibility name kept for existing callers. It no longer writes to D1
+ * directly; every automatic/VIP attendance write goes through the canonical
+ * attendance engine.
+ */
+export async function insertAutomaticAttendance(env: Env, employee: any, type: "check-in" | "check-out", _timestamp: string, _actorName: string, reason: string) {
+  const deviceId = `CENTRAL_AUTO:${employee.id}`;
+  const result = await submitAttendanceThroughCentralEngine(env, String(employee.id), type, deviceId, reason);
+  if (result.error || !result.response) return null;
+  const payload = await result.response.json().catch(() => ({})) as any;
+  if (!result.response.ok || !payload?.ok) return null;
+  return payload.record || null;
 }
 
 export async function runAutomaticAttendance(env: Env) {
@@ -58,7 +54,7 @@ export async function runAutomaticAttendance(env: Env) {
     let hasShiftIn = shiftRows.some((r: any) => r.type === "check-in");
     const hasShiftOut = shiftRows.some((r: any) => r.type === "check-out");
     if ((e.autoCheckIn || e.isVip) && current >= shift.start && !hasShiftIn) {
-      const r = await insertAutomaticAttendance(env.DB, e, "check-in", shift.start.toISOString(), "التلقائي", "تحضير تلقائي حسب بداية المناوبة للموظف VIP/التلقائي");
+      const r = await insertAutomaticAttendance(env, e, "check-in", shift.start.toISOString(), "التلقائي", "تحضير تلقائي حسب بداية المناوبة للموظف VIP/التلقائي");
       if (r) {
         shiftRows.push({ type: r.type, timestamp: r.timestamp });
         hasShiftIn = true;
@@ -68,7 +64,7 @@ export async function runAutomaticAttendance(env: Env) {
     }
     const latestShiftIn = [...shiftRows].filter((r) => r.type === "check-in" && Date.parse(String(r.timestamp)) <= shift.end.getTime()).sort((a, b) => Date.parse(String(b.timestamp)) - Date.parse(String(a.timestamp)))[0];
     if ((e.autoCheckOut || e.isVip) && !hasShiftOut && latestShiftIn && current >= shift.end) {
-      const r = await insertAutomaticAttendance(env.DB, e, "check-out", shift.end.toISOString(), "التلقائي", "انصراف تلقائي حسب نهاية المناوبة للموظف VIP/التلقائي");
+      const r = await insertAutomaticAttendance(env, e, "check-out", shift.end.toISOString(), "التلقائي", "انصراف تلقائي حسب نهاية المناوبة للموظف VIP/التلقائي");
       if (r) {
         results.push(r);
         await refreshProfessionalAttendanceFact(env, currentDay, { id: e.id, role: "staff" }, e.id);
