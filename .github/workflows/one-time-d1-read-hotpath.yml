@@ -1,3 +1,4 @@
+# One-time canonical repair; removed after the source migration is verified.
 name: One-time D1 read hot-path repair
 
 on:
