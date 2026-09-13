@@ -111,6 +111,7 @@ GoRouter buildAppRouter() => GoRouter(
   redirect: (_, state) async {
     final employeeToken = await _session.token();
     final adminToken = await _session.adminToken();
+    final location = state.matchedLocation;
 
     // Clear the in-memory validation cache when its corresponding persisted
     // session disappears. This prevents a later reuse of the same token value
@@ -118,19 +119,14 @@ GoRouter buildAppRouter() => GoRouter(
     if (employeeToken == null || employeeToken.isEmpty) _validatedEmployeeToken = null;
     if (adminToken == null || adminToken.isEmpty) _validatedAdminToken = null;
 
-    final location = state.matchedLocation;
-
     if (employeeToken != null && employeeToken.isNotEmpty && employeeToken != _validatedEmployeeToken) {
       final valid = await _isTokenValid(employeeToken);
       if (!valid) {
         _validatedEmployeeToken = null;
         await _session.clear();
-        if (!resolveAuthenticatedRedirect(location: location).isNullOrEmpty) {
-          return resolveAuthenticatedRedirect(location: location);
-        }
-      } else {
-        _validatedEmployeeToken = employeeToken;
+        return resolveAuthenticatedRedirect(location: location);
       }
+      _validatedEmployeeToken = employeeToken;
     }
 
     if (adminToken != null && adminToken.isNotEmpty && adminToken != _validatedAdminToken) {
@@ -138,12 +134,9 @@ GoRouter buildAppRouter() => GoRouter(
       if (!valid) {
         _validatedAdminToken = null;
         await _session.clearAdmin();
-        if (!resolveAuthenticatedRedirect(location: location).isNullOrEmpty) {
-          return resolveAuthenticatedRedirect(location: location);
-        }
-      } else {
-        _validatedAdminToken = adminToken;
+        return resolveAuthenticatedRedirect(location: location);
       }
+      _validatedAdminToken = adminToken;
     }
 
     final currentEmployeeToken = await _session.token();
