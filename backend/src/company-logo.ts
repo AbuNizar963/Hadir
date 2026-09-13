@@ -36,10 +36,16 @@ function logoUrl(request: Request, version?: string): string {
 }
 
 function requestToken(req: Request): string {
+  const authorization = req.headers.get("authorization");
+  const bearer = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (bearer) return bearer;
+
   const cookie = req.headers.get("cookie") || "";
-  const item = cookie.split(";").map((v) => v.trim()).find((v) => v.startsWith(`${SESSION_COOKIE}=`));
-  if (item) return decodeURIComponent(item.slice(SESSION_COOKIE.length + 1));
-  return (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  const item = cookie
+    .split(";")
+    .map((v) => v.trim())
+    .find((v) => v.startsWith(`${SESSION_COOKIE}=`));
+  return item ? decodeURIComponent(item.slice(SESSION_COOKIE.length + 1)) : "";
 }
 
 async function authenticatedActor(req: Request, env: Env): Promise<Actor | null> {
@@ -49,10 +55,21 @@ async function authenticatedActor(req: Request, env: Env): Promise<Actor | null>
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
     let binary = "";
     for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
-    const tokenHash = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-    const session = await env.DB.prepare("SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1").bind(tokenHash).first<{ userId: string; userType: string }>();
+    const tokenHash = btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+    const session = await env.DB
+      .prepare(
+        "SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1",
+      )
+      .bind(tokenHash)
+      .first<{ userId: string; userType: string }>();
     if (!session || session.userType !== "admin") return null;
-    const row = await env.DB.prepare("SELECT id,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1").bind(session.userId).first<{ id: string; role: Role; active: number }>();
+    const row = await env.DB
+      .prepare("SELECT id,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1")
+      .bind(session.userId)
+      .first<{ id: string; role: Role; active: number }>();
     return row ? { id: String(row.id), role: row.role } : null;
   } catch {
     return null;
@@ -67,7 +84,16 @@ export async function handleCompanyLogoRequest(
 ): Promise<Response | null> {
   const url = new URL(req.url);
   if (url.pathname.replace(/\/$/, "") !== "/api/company/logo") return null;
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "content-type, authorization, x-device-id", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" } });
+  if (req.method === "OPTIONS")
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "access-control-allow-origin": origin,
+        "access-control-allow-credentials": "true",
+        "access-control-allow-headers": "content-type, authorization, x-device-id",
+        "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+      },
+    });
   if (!env.PROFILE_IMAGES) return json({ error: "R2 binding PROFILE_IMAGES غير موجود" }, 503, origin);
 
   if (req.method === "GET") {
@@ -75,26 +101,35 @@ export async function handleCompanyLogoRequest(
     // because a legacy/stale D1 value can otherwise resurrect the old image.
     const object = await env.PROFILE_IMAGES.get(CURRENT_LOGO_KEY);
     if (object) {
-      const headers = new Headers({ "access-control-allow-origin": origin, "access-control-allow-credentials": "true", "cache-control": "no-store" });
+      const headers = new Headers({
+        "access-control-allow-origin": origin,
+        "access-control-allow-credentials": "true",
+        "cache-control": "no-store",
+      });
       object.writeHttpMetadata(headers);
       headers.set("content-type", LOGO_CONTENT_TYPE);
       headers.set("etag", object.httpEtag);
       return new Response(object.body, { status: 200, headers });
     }
-    return new Response(null, { status: 404, headers: { "access-control-allow-origin": origin, "cache-control": "no-store" } });
+    return new Response(null, {
+      status: 404,
+      headers: { "access-control-allow-origin": origin, "cache-control": "no-store" },
+    });
   }
 
-  const resolvedActor = actor || await authenticatedActor(req, env);
+  const resolvedActor = actor || (await authenticatedActor(req, env));
   if (!canManage(resolvedActor)) return json({ error: "غير مصرح" }, 403, origin);
 
   if (req.method === "POST") {
     const contentType = (req.headers.get("content-type") || "").split(";", 1)[0].toLowerCase();
-    if (contentType !== "multipart/form-data") return json({ error: "يجب إرسال الشعار بصيغة multipart/form-data" }, 415, origin);
+    if (contentType !== "multipart/form-data")
+      return json({ error: "يجب إرسال الشعار بصيغة multipart/form-data" }, 415, origin);
     const form = await req.formData().catch(() => null);
     const file = form?.get("file");
     if (!(file instanceof File)) return json({ error: "ملف الشعار مطلوب" }, 400, origin);
     if (file.type !== LOGO_CONTENT_TYPE) return json({ error: "يجب أن يكون الشعار بصيغة WebP" }, 415, origin);
-    if (file.size <= 0 || file.size > MAX_LOGO_BYTES) return json({ error: "حجم الشعار يجب أن يكون أقل من 100 كيلوبايت" }, 413, origin);
+    if (file.size <= 0 || file.size > MAX_LOGO_BYTES)
+      return json({ error: "حجم الشعار يجب أن يكون أقل من 100 كيلوبايت" }, 413, origin);
 
     // One durable canonical R2 object is used for the current company logo.
     // This prevents a D1 write-limit from orphaning the image after upload.
@@ -118,17 +153,46 @@ export async function handleCompanyLogoRequest(
 
     try {
       await env.DB.batch([
-        env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_KEY_SETTING, key),
-        env.DB.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(LOGO_URL_SETTING, versionedPublicUrl),
+        env.DB
+          .prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+          .bind(LOGO_KEY_SETTING, key),
+        env.DB
+          .prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+          .bind(LOGO_URL_SETTING, versionedPublicUrl),
       ]);
     } catch (error) {
       // R2 is already the authoritative store and the object was verified.
       // Never delete it because D1 may be temporarily read-only after its limit.
       console.error("company logo settings update failed; preserving R2 object", key, error);
-      return json({ ok: true, r2Saved: true, settingsUpdated: false, url: versionedPublicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE, warning: "تم حفظ ملف الشعار نفسه في R2، لكن تعذر تحديث إعدادات D1 مؤقتًا" }, 200, origin);
+      return json(
+        {
+          ok: true,
+          r2Saved: true,
+          settingsUpdated: false,
+          url: versionedPublicUrl,
+          key,
+          size: file.size,
+          contentType: LOGO_CONTENT_TYPE,
+          warning: "تم حفظ ملف الشعار نفسه في R2، لكن تعذر تحديث إعدادات D1 مؤقتًا",
+        },
+        200,
+        origin,
+      );
     }
 
-    return json({ ok: true, r2Saved: true, settingsUpdated: true, url: versionedPublicUrl, key, size: file.size, contentType: LOGO_CONTENT_TYPE }, 200, origin);
+    return json(
+      {
+        ok: true,
+        r2Saved: true,
+        settingsUpdated: true,
+        url: versionedPublicUrl,
+        key,
+        size: file.size,
+        contentType: LOGO_CONTENT_TYPE,
+      },
+      200,
+      origin,
+    );
   }
 
   if (req.method === "DELETE") {
