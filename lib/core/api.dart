@@ -123,7 +123,16 @@ class HadirApi {
     if (report is! Map) throw StateError('استجابة مركز التقرير غير صالحة.');
     return Map<String, dynamic>.from(report);
   }
-  Future<Map<String, dynamic>> professionalAttendanceDrilldown({required String attendanceDay, required String employeeId}) async => _asMap((await dio.get('/api/reports/professional-attendance', queryParameters: {'from': attendanceDay, 'to': attendanceDay, 'employeeId': employeeId, 'drilldown': '1'})).data);
+  Future<Map<String, dynamic>> professionalAttendanceDrilldown({required String attendanceDay, required String employeeId}) async {
+    final response = await dio.get('/api/manager/attendance-center', queryParameters: {
+      'date': attendanceDay,
+      'from': attendanceDay,
+      'to': attendanceDay,
+      'employeeId': employeeId,
+      'drilldown': '1',
+    });
+    return _asMap(response.data);
+  }
   Future<List<dynamic>> archivedReports({int limit = 25}) async { final data = _asMap((await dio.get('/api/reports/archive', queryParameters: {'limit': limit.clamp(1, 100)})).data); return _asList(data['reports']); }
   Future<List<int>> downloadArchivedReport(String reportId) async => List<int>.from((await dio.get<List<int>>('/api/reports/archive/${Uri.encodeComponent(reportId)}', options: Options(responseType: ResponseType.bytes))).data ?? const <int>[]);
   Future<void> deleteArchivedReport(String reportId) async { await dio.delete('/api/reports/archive/${Uri.encodeComponent(reportId)}'); }
