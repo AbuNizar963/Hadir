@@ -1,3 +1,5 @@
+import { handleDailyStatus } from "./attendance-engine";
+
 type Env = { DB: D1Database };
 
 type FactRow = {
@@ -43,6 +45,7 @@ const jsonArray = (value: string | null | undefined): string[] => {
 
 const dateNumber = (day: string) => Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10))) / 86400000;
 const daysBetween = (from: string, to: string) => Math.round(dateNumber(to) - dateNumber(from)) + 1;
+const damascusDay = (date = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus" }).format(date);
 
 function validatePeriod(from: string, to: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new Error("الفترة الزمنية غير صالحة");
@@ -103,10 +106,104 @@ function toPublicRow(row: FactRow) {
   };
 }
 
-export async function buildProfessionalAttendanceReport(env: Env, from: string, to: string, employeeId?: string) {
+async function loadLiveTodayFacts(env: Env, day: string, employeeId: string | undefined, actor: any): Promise<FactRow[]> {
+  if (day !== damascusDay() || !actor) return [];
+  try {
+    const response = await handleDailyStatus(
+      new Request(`https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}`),
+      env,
+      actor,
+      false,
+    );
+    if (!response.ok) return [];
+    const payload = await response.json() as any;
+    const liveEmployees = (Array.isArray(payload.employees) ? payload.employees : [])
+      .filter((row: any) => !employeeId || String(row.employeeId) === employeeId);
+    if (!liveEmployees.length) return [];
+
+    const start = `${day}T00:00:00.000Z`;
+    const attendanceRows = await env.DB.prepare(
+      "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
+    ).bind(start, `${day}T23:59:59.999Z`).all<any>();
+    const eventsByEmployee = new Map<string, any[]>();
+    for (const event of attendanceRows.results || []) {
+      const id = String(event.employeeId || "");
+      if (!id) continue;
+      const list = eventsByEmployee.get(id) || [];
+      list.push(event);
+      eventsByEmployee.set(id, list);
+    }
+
+    const classifySource = (events: any[]) => {
+      const sources = new Set<string>();
+      for (const event of events) {
+        const deviceId = String(event.deviceId || "");
+        const qrCode = String(event.qrCode || "");
+        if (deviceId === "AUTO_VIP" || qrCode === "AUTO_VIP") sources.add("AUTOMATIC_VIP");
+        else if (qrCode === "AUTO_DIRECT" || deviceId === "ADMIN_DIRECT:التلقائي") sources.add("AUTOMATIC");
+        else if (deviceId.startsWith("ADMIN_DIRECT:") || deviceId === "ADMIN_DIRECT" || qrCode === "ADMIN_DIRECT") sources.add("MANUAL_OWNER");
+        else sources.add("MANUAL_EMPLOYEE");
+      }
+      if (!sources.size) return "UNKNOWN";
+      if (sources.size === 1) return Array.from(sources)[0];
+      return "MIXED";
+    };
+
+    return liveEmployees.map((row: any): FactRow => {
+      const events = eventsByEmployee.get(String(row.employeeId)) || [];
+      const checkInAt = row.checkInAt || null;
+      const checkOutAt = row.checkOutAt || null;
+      const expectedStart = row.scheduledStart || null;
+      const expectedEnd = row.scheduledEnd || null;
+      const expectedMinutes = expectedStart && expectedEnd ? Math.max(0, Math.round((Date.parse(expectedEnd) - Date.parse(expectedStart)) / 60000)) : 0;
+      const workedMinutes = checkInAt && checkOutAt ? Math.max(0, Math.round((Date.parse(checkOutAt) - Date.parse(checkInAt)) / 60000)) : null;
+      const lateMinutes = row.status === "LATE" && checkInAt && expectedStart ? Math.max(0, Math.round((Date.parse(checkInAt) - Date.parse(expectedStart)) / 60000)) : 0;
+      const earlyLeaveMinutes = checkOutAt && expectedEnd ? Math.max(0, Math.round((Date.parse(expectedEnd) - Date.parse(checkOutAt)) / 60000)) : 0;
+      const overtimeMinutes = checkOutAt && expectedEnd ? Math.max(0, Math.round((Date.parse(checkOutAt) - Date.parse(expectedEnd)) / 60000)) : 0;
+      const exceptionCode = row.status === "ABSENT" ? "ABSENT_NO_APPROVED_REASON" : row.status === "OPEN" ? "MISSING_CHECKOUT" : lateMinutes ? "LATE_ARRIVAL" : earlyLeaveMinutes ? "EARLY_LEAVE" : overtimeMinutes ? "OVERTIME" : null;
+      return {
+        attendanceDay: day,
+        employeeId: String(row.employeeId),
+        jobNumber: String(row.jobNumber || ""),
+        employeeName: String(row.employeeName || ""),
+        locationId: null,
+        status: String(row.status || "INVALID"),
+        scheduleType: String(row.scheduleType || "ADMIN"),
+        scheduledStart: expectedStart,
+        scheduledEnd: expectedEnd,
+        expectedMinutes,
+        checkInAt,
+        checkOutAt,
+        workedMinutes,
+        lateMinutes,
+        earlyLeaveMinutes,
+        overtimeMinutes,
+        open: row.status === "OPEN" ? 1 : 0,
+        exceptionCode,
+        attendanceEventIdsJson: JSON.stringify(events.map((event) => String(event.id))),
+        requestIdsJson: "[]",
+        auditIdsJson: "[]",
+        attendanceSource: classifySource(events),
+        calculationSource: "attendance-engine-live",
+        calculationVersion: "daily-status-v1",
+        historicalDataQuality: "exact",
+        timezone: "Asia/Damascus",
+        computedAt: String(payload.computedAt || new Date().toISOString()),
+      };
+    });
+  } catch (error) {
+    console.error("professional attendance live read failed", { day, error });
+    return [];
+  }
+}
+
+export async function buildProfessionalAttendanceReport(env: Env, from: string, to: string, employeeId?: string, actor?: any) {
   const dayCount = validatePeriod(from, to);
   const sourceRows = await loadFacts(env, from, to, employeeId);
-  const rows = sourceRows.filter((row) => VALID_STATUSES.has(row.status)).map(toPublicRow);
+  const liveRows = to >= damascusDay() ? await loadLiveTodayFacts(env, damascusDay(), employeeId, actor) : [];
+  const rows = [...sourceRows.filter((row) => row.attendanceDay !== damascusDay()), ...liveRows]
+    .filter((row) => VALID_STATUSES.has(row.status))
+    .map(toPublicRow);
   const employees = new Map<string, { employeeId: string; employeeName: string; jobNumber: string | null; days: number; present: number; late: number; absent: number; leave: number; permission: number; rest: number; escaped: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>();
   const daily = new Map<string, any>();
   const exceptionCounts: Record<string, number> = {};
