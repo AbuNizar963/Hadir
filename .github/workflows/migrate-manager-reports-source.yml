@@ -28,9 +28,6 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Materialize ManagerReports source changes
         run: node scripts/patch-manager-reports-live.mjs
 
