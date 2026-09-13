@@ -14,10 +14,18 @@ final _session = HadirSession();
 String? _validatedEmployeeToken;
 String? _validatedAdminToken;
 
-Future<bool> _isTokenValid(String token) async {
+Future<bool> _isTokenValid(String token, {required String role}) async {
   try {
-    await HadirApi(token: token).me();
-    return true;
+    final data = await HadirApi(token: token).me();
+    final user = data['user'] is Map
+        ? Map<String, dynamic>.from(data['user'] as Map)
+        : data;
+    final actualRole = user['role']?.toString();
+
+    if (role == 'admin') {
+      return const {'owner', 'manager', 'supervisor'}.contains(actualRole);
+    }
+    return actualRole == 'staff';
   } on DioException catch (error) {
     final status = error.response?.statusCode;
     if (status == 401 || status == 403) return false;
@@ -83,9 +91,6 @@ String? resolveAuthenticatedRedirect({
     '/profile',
     '/employee/profile',
     '/services',
-    '/weather',
-    '/prayer',
-    '/ai',
   };
   final isEmployeeScan = location.startsWith('/employee/scan/');
   if (!hasEmployeeToken && (employeePaths.contains(location) || isEmployeeScan)) {
@@ -114,11 +119,14 @@ GoRouter buildAppRouter() => GoRouter(
     if (employeeToken != null &&
         employeeToken.isNotEmpty &&
         employeeToken != _validatedEmployeeToken) {
-      final valid = await _isTokenValid(employeeToken);
+      final valid = await _isTokenValid(employeeToken, role: 'employee');
       if (!valid) {
         _validatedEmployeeToken = null;
-        await _session.clear();
-        return resolveAuthenticatedRedirect(location: location);
+        await _session.clearEmployee();
+        return resolveAuthenticatedRedirect(
+          location: location,
+          adminToken: await _session.adminToken(),
+        );
       }
       _validatedEmployeeToken = employeeToken;
     }
@@ -126,11 +134,14 @@ GoRouter buildAppRouter() => GoRouter(
     if (adminToken != null &&
         adminToken.isNotEmpty &&
         adminToken != _validatedAdminToken) {
-      final valid = await _isTokenValid(adminToken);
+      final valid = await _isTokenValid(adminToken, role: 'admin');
       if (!valid) {
         _validatedAdminToken = null;
         await _session.clearAdmin();
-        return resolveAuthenticatedRedirect(location: location);
+        return resolveAuthenticatedRedirect(
+          location: location,
+          employeeToken: await _session.token(),
+        );
       }
       _validatedAdminToken = adminToken;
     }
@@ -144,7 +155,7 @@ GoRouter buildAppRouter() => GoRouter(
   errorBuilder: (_, __) => const _NotFoundPage(),
   routes: [
     GoRoute(path: '/', builder: (_, __) => const LandingPage()),
-    GoRoute(path: '/login', builder: (_, __) => const LoginEntryPage()),
+    GoRoute(path: '/login', builder: (_, __) => const EmployeeLoginPage()),
     GoRoute(path: '/employee-login', builder: (_, __) => const EmployeeLoginPage()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
     GoRoute(path: '/manager/login', builder: (_, __) => const AdminLoginPage()),
@@ -170,7 +181,7 @@ GoRouter buildAppRouter() => GoRouter(
     GoRoute(path: '/employee', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
-    GoRoute(path: '/employee/premium', builder: (_, __) => const SwipeBackPage(child: EmployeePremiumPage())),
+    GoRoute(path: '/employee/premium', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
@@ -182,9 +193,9 @@ GoRouter buildAppRouter() => GoRouter(
     GoRoute(path: '/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
     GoRoute(path: '/employee/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
     GoRoute(path: '/services', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
-    GoRoute(path: '/weather', builder: (_, __) => const SwipeBackPage(child: ServicesPage(initialTab: 0))),
-    GoRoute(path: '/prayer', builder: (_, __) => const SwipeBackPage(child: ServicesPage(initialTab: 1))),
-    GoRoute(path: '/ai', builder: (_, __) => const SwipeBackPage(child: AIAssistantPage())),
+    GoRoute(path: '/weather', builder: (_, __) => const ServicesPage(initialTab: 0)),
+    GoRoute(path: '/prayer', builder: (_, __) => const ServicesPage(initialTab: 1)),
+    GoRoute(path: '/ai', builder: (_, __) => const AIAssistantPage()),
   ],
 );
 
@@ -262,9 +273,6 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
         path == '/profile' ||
         path == '/employee/profile' ||
         path == '/services' ||
-        path == '/weather' ||
-        path == '/prayer' ||
-        path == '/ai' ||
         path.startsWith('/employee/scan/');
     final content = isAdminArea
         ? AdminMobileShell(child: widget.child)
@@ -347,72 +355,6 @@ class LoginEntryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF4F7F6),
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Container(
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .94),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: const Color(0xFFDCE6E2)),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x0D142D27),
-                        blurRadius: 24,
-                        offset: Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          IconButton.filledTonal(
-                            onPressed: () => context.go('/'),
-                            icon: const Icon(Icons.arrow_forward_rounded),
-                          ),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              'اختيار مساحة الدخول',
-                              style: TextStyle(
-                                color: Color(0xFF142D27),
-                                fontSize: 21,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      FilledButton.icon(
-                        onPressed: () => context.go('/employee-login'),
-                        icon: const Icon(Icons.person_rounded),
-                        label: const Text('مساحة الموظف'),
-                      ),
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        onPressed: () => context.go('/manager/login'),
-                        icon: const Icon(Icons.admin_panel_settings_rounded),
-                        label: const Text('مساحة الإدارة'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    return const EmployeeLoginPage();
   }
 }
