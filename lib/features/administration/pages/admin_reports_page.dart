@@ -1,4 +1,9 @@
-/// Administration reports page public entry point.
+/// Stable administration reports entry point.
 library;
 
-export 'admin_global_reports_page.dart';
+import 'admin_global_reports_page.dart';
+
+/// Backward-compatible route name used by the administration router.
+class AdminReportsPage extends AdminGlobalReportsPage {
+  const AdminReportsPage({super.key});
+}
