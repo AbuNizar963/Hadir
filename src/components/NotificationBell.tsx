@@ -48,51 +48,26 @@ async function backendNotifications(): Promise<AppNotification[]> {
     }
 
     const rows = (await response.json()) as any[];
-    const deletedResponse = await fetch(
-      `${API_URL}/api/notifications/deleted`,
-      {
-        headers: notificationAuthHeaders(),
-        credentials: "include",
-        cache: "no-store",
-      },
-    ).catch(() => null);
-
-    const deletedRows =
-      deletedResponse && deletedResponse.ok
-        ? ((await deletedResponse.json()) as any[])
-        : [];
-    const deleted = new Set(
-      (Array.isArray(deletedRows) ? deletedRows : []).map((notification) =>
-        String(notification.notificationId),
-      ),
-    );
-
     return Array.isArray(rows)
-      ? rows
-          .map(
-            (notification): AppNotification => ({
-              id: String(notification.id),
-              userId: String(
-                notification.recipientId ?? notification.userId ?? "",
-              ),
-              title: String(notification.title || "إشعار"),
-              body: String(
-                notification.message ?? notification.body ?? "",
-              ),
-              type: (
-                notification.severity === "danger"
-                  ? "error"
-                  : notification.severity === "warning"
-                    ? "warning"
-                    : notification.severity === "success"
-                      ? "success"
-                      : notification.type ?? "info"
-              ) as AppNotification["type"],
-              read: Boolean(notification.readAt),
-              createdAt: String(notification.createdAt),
-            }),
-          )
-          .filter((notification) => !deleted.has(notification.id))
+      ? rows.map(
+          (notification): AppNotification => ({
+            id: String(notification.id),
+            userId: String(
+              notification.recipientId ?? notification.userId ?? "",
+            ),
+            title: String(notification.title || "إشعار"),
+            body: String(notification.message ?? notification.body ?? ""),
+            type: (notification.severity === "danger"
+              ? "error"
+              : notification.severity === "warning"
+                ? "warning"
+                : notification.severity === "success"
+                  ? "success"
+                  : (notification.type ?? "info")) as AppNotification["type"],
+            read: Boolean(notification.readAt),
+            createdAt: String(notification.createdAt),
+          }),
+        )
       : [];
   } catch {
     return [];
@@ -124,17 +99,10 @@ export default function NotificationBell({ userId }: Props) {
   const navigate = useNavigate();
 
   const refresh = useMemo(
-    () =>
-      async () => {
-        const remote = await backendNotifications();
-        setItems(
-          remote.length
-            ? remote
-            : userId
-              ? getNotifications(userId)
-              : [],
-        );
-      },
+    () => async () => {
+      const remote = await backendNotifications();
+      setItems(remote.length ? remote : userId ? getNotifications(userId) : []);
+    },
     [userId],
   );
 
@@ -203,10 +171,7 @@ export default function NotificationBell({ userId }: Props) {
     }
 
     const handleOutsideClick = (event: MouseEvent) => {
-      if (
-        wrapRef.current &&
-        !wrapRef.current.contains(event.target as Node)
-      ) {
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
