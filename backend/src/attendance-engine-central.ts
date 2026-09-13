@@ -25,9 +25,10 @@ export async function handleAttendanceThroughCentralEngine(
   env: Env,
   actor: any,
   origin: string,
-  trustedTimestamp?: string,
 ) {
-  return executeCentralAttendance(req, env, actor, origin, trustedTimestamp, false);
+  // Public HTTP attendance never receives a trusted timestamp. Trusted event
+  // times are available only to internal application flows below.
+  return executeCentralAttendance(req, env, actor, origin, undefined, false);
 }
 
 /**
