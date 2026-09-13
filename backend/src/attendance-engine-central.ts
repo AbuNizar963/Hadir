@@ -33,8 +33,8 @@ export async function submitAttendanceThroughCentralEngine(
   timestamp?: string,
 ) {
   const employee = await env.DB.prepare(
-    "SELECT id,location_id AS locationId FROM employees WHERE id=? AND status='active' LIMIT 1'")
-    .bind(employeeId).first<any>();
+    "SELECT id,location_id AS locationId FROM employees WHERE id=? AND status='active' LIMIT 1"
+  ).bind(employeeId).first<any>();
   if (!employee) return { response: null, error: "الموظف غير موجود أو موقوف" };
 
   const location = await env.DB.prepare(
