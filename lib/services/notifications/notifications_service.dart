@@ -60,7 +60,9 @@ class NotificationsService {
 
   Future<void> delete(String id) async {
     final token = await _token();
-    if (token != null && token.isNotEmpty) { try { await HadirApi(token: token).deleteNotification(id:id); } catch (_) {} }
+    if (token != null && token.isNotEmpty) {
+      await HadirApi(token: token).deleteNotification(id: id);
+    }
     final rows = await _local();
     await storage.write(key: _key, value: jsonEncode(rows.where((e) => e.id != id).map((e) => e.toJson()).toList()));
   }
