@@ -72,7 +72,7 @@ class HadirApi {
   Future<Map<String, dynamic>> employeeDeviceStatus() async => _asMap((await dio.get('/api/device/status')).data);
   Future<List<dynamic>> locations() async => _asList((await dio.get('/api/locations')).data);
   Future<List<dynamic>> attendance({int limit = 500}) async => _asList((await dio.get('/api/attendance', queryParameters: {'limit': limit.clamp(1, 2000)})).data);
-  Future<List<dynamic>> audit({int limit = 500}) async => _asList((await dio.get('/api/audit', queryParameters: {'limit': limit.clamp(1, 500)})).data);
+  Future<List<dynamic>> audit({int limit = 500}) async => _asList((await dio.get('/api/audit', queryParameters: {'limit': limit.clamp(1, 2000)})).data);
   Future<List<dynamic>> escapeEvents({String? employeeId, int limit = 20}) async => _asList((await dio.get('/api/escape-events', queryParameters: {'limit': limit.clamp(1, 500), if (employeeId != null && employeeId.isNotEmpty) 'employeeId': employeeId})).data);
   Future<Map<String, dynamic>> createChallenge({required String type, required double lat, required double lng, required String qrCode, required String deviceId}) async => _asMap((await dio.post('/api/attendance/challenge', data: {'type': type, 'lat': lat, 'lng': lng, 'qrCode': qrCode, 'deviceId': deviceId})).data);
   Future<Map<String, dynamic>> createAttendance(Map<String, dynamic> record) async => _asMap((await dio.post('/api/attendance', data: record)).data);
