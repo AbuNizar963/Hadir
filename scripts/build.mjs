@@ -33,9 +33,10 @@ run("node", ["scripts/patch-manager-report-share-filename-safe.mjs"]);
 
 const managerReportsSource = readFileSync(new URL("../src/pages/ManagerReports.tsx", import.meta.url), "utf8");
 const canonicalHistoricalReports = managerReportsSource.includes("const [dailyStatusByDate, setDailyStatusByDate]")
-  || managerReportsSource.includes("dailyStatusByDate?.get(k)?.get(employee.id)");
+  || managerReportsSource.includes("dailyStatusByDate?.get(k)?.get(employee.id)")
+  || (managerReportsSource.includes("const dailyStatusMap = useMemo") && managerReportsSource.includes("getDailyStatus"));
 if (canonicalHistoricalReports) {
-  console.log("ManagerReports historical patch: canonical per-date status source is already present; legacy patch skipped safely.");
+  console.log("ManagerReports historical patch: current per-day status model is already canonical; legacy patch skipped safely.");
 } else {
   run("node", ["scripts/patch-manager-reports-historical-v2.mjs"]);
 }
@@ -86,7 +87,7 @@ if (sourceHeaderScan.status !== 0 || !sourceHeaderScan.stdout?.trim()) {
   throw new Error("Production build validation failed: canonical daily report branding was not found in source or dist.");
 }
 const shareMarkers = ["navigator.share", "html2canvas", "sharingPdf"];
-const shareScan = spawnSync("grep", ["-RIlE", shareMarkers.join("|"), "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+const shareScan = spawnSync("grep", ["-RIlE", shareMarkers.join("|"), "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 if (shareScan.status !== 0 || !shareScan.stdout?.trim()) {
   throw new Error("Production build validation failed: direct daily PDF sharing action was not found in dist.");
 }
