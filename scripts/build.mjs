@@ -62,7 +62,6 @@ if (canonicalManagerDashboard) {
 
 run("node", ["scripts/patch-manager-menu-autoclose-on-scroll.mjs"]);
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
-run("node", ["scripts/patch-employee-home-shift-info.mjs"]);
 run("node", ["scripts/patch-qibla-page.mjs"]);
 run("node", ["scripts/patch-employee-center-loading.mjs"]);
 run("node", ["scripts/patch-manager-topbar-geometry.mjs"]);
