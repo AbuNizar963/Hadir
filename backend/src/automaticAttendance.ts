@@ -1,4 +1,4 @@
-import { dateKeyLocal, insertAutomaticAttendance, operationalShift } from "./attendance-engine-automatic-commands";
+import { insertAutomaticAttendance, operationalShift } from "./attendance-engine-automatic-commands";
 
 export { runAutomaticAttendance } from "./attendance-engine-automatic-commands";
 
@@ -88,7 +88,9 @@ export async function directAttendance(
     .bind(
       employeeId,
       shift.start.toISOString(),
-      new Date(Math.min(shift.end.getTime() + 60_000, current.getTime())).toISOString(),
+      new Date(
+        Math.min(shift.end.getTime() + 60_000, current.getTime()),
+      ).toISOString(),
     )
     .all<any>();
 
