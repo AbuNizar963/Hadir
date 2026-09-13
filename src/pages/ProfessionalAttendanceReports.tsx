@@ -7,7 +7,7 @@ import { getBackendEmployees } from "@/lib/backend";
 import { backfillProfessionalAttendanceReport, getProfessionalAttendanceReport, type ProfessionalAttendanceReport } from "@/lib/professionalAttendanceReport";
 import { downloadProfessionalAttendanceReport } from "@/lib/professionalReportExport";
 import { downloadCSV } from "@/lib/csv";
-import { BarChart3, CalendarDays, Clock3, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users } from "lucide-react";
+import { BarChart3, CalendarDays, Clock3, Database, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import type { Employee } from "@/types";
 
