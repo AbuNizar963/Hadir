@@ -17,23 +17,30 @@ jobs:
 
       - name: Apply repository patches
         run: |
+          set -euo pipefail
           python3 scripts/apply_company_specialties.py
           python3 scripts/apply_job_number_update.py
           node scripts/patch_employee_management_canonical.mjs
 
       - name: Migrate session security into source
-        if: ${{ hashFiles('backend/scripts/patch-session-security.mjs') != '' }}
         working-directory: backend
         run: |
           set -euo pipefail
+          if [ ! -f scripts/patch-session-security.mjs ]; then
+            echo 'Session security helper is already removed; source migration is complete.'
+            exit 0
+          fi
           npm install --package-lock=false
           node scripts/patch-session-security.mjs
           npx --yes prettier --write src/index.ts src/entry.ts src/ai-entry.ts src/employee-save-production-gateway.ts src/workforce.ts ../.github/workflows/deploy-api.yml
 
       - name: Remove obsolete session patching
-        if: ${{ hashFiles('backend/scripts/patch-session-security.mjs') != '' }}
         run: |
           set -euo pipefail
+          if [ ! -f backend/scripts/patch-session-security.mjs ]; then
+            echo 'Session security helper is already removed; nothing to clean up.'
+            exit 0
+          fi
           python3 - <<'PY'
           from pathlib import Path
 
@@ -48,13 +55,10 @@ jobs:
           workflow.write_text(text.replace(block, ''), encoding='utf-8')
 
           helper = Path('backend/scripts/patch-session-security.mjs')
-          if not helper.exists():
-              raise SystemExit('Expected session security patch helper was not found; refusing to continue.')
           helper.unlink()
           PY
 
       - name: Verify session security migration
-        if: ${{ hashFiles('backend/scripts/patch-session-security.mjs') == '' }}
         run: |
           set -euo pipefail
           test ! -e backend/scripts/patch-session-security.mjs
@@ -67,6 +71,7 @@ jobs:
           grep -q 'SESSION_TOUCH_INTERVAL_SECONDS' backend/src/index.ts
           grep -q 'revoked_at' backend/src/index.ts
           grep -q 'julianday(last_seen_at)' backend/src/index.ts
+          echo 'Session security is present in canonical source and runtime patching is removed.'
 
       - name: Commit patch
         run: |
