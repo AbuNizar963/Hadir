@@ -16,85 +16,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch and format canonical sources
+      - name: Narrow daily-status attendance window
         run: |
           node <<'NODE'
           const fs = require('fs');
+          const path = 'backend/src/attendance-engine.ts';
+          let source = fs.readFileSync(path, 'utf8');
 
-          function replaceOnce(source, pattern, replacement, label) {
-            const next = source.replace(pattern, replacement);
-            if (next === source) throw new Error(`${label} anchor not found`);
-            return next;
-          }
+          const windowPattern = /from = localDateTimeUtc\(addDays\(day, -8\), "00:00"\)\.toISOString\(\),\s+to = localDateTimeUtc\(addDays\(day, 9\), "00:00"\)\.toISOString\(\);/;
+          const windowReplacement = 'to = localDateTimeUtc(addDays(day, 2), "00:00").toISOString();';
+          const narrowed = source.replace(windowPattern, windowReplacement);
+          if (narrowed === source) throw new Error('daily-status broad window anchor not found');
+          source = narrowed;
 
-          const attendancePath = 'backend/src/attendance-engine.ts';
-          let attendance = fs.readFileSync(attendancePath, 'utf8');
+          const rotationPattern = /const historicalFrom = localDateTimeUtc\(\s+addDays\(day, -Math\.max\(7, maxRotationOn - 1\),\)\s+,\s+"00:00",\s+\)\.toISOString\(\);/;
+          const rotationReplacement = 'const historicalFrom = localDateTimeUtc(\n      addDays(day, -Math.max(1, maxRotationOn - 1)),\n      "00:00",\n    ).toISOString();';
+          const narrowedRotation = source.replace(rotationPattern, rotationReplacement);
+          if (narrowedRotation === source) throw new Error('daily-status rotation history anchor not found');
+          source = narrowedRotation;
 
-          attendance = replaceOnce(
-            attendance,
-            /FROM employees e WHERE e\.status='active' OR EXISTS \(SELECT 1 FROM attendance a WHERE a\.employee_id=e\.id AND a\.timestamp>=\? AND a\.timestamp<\?\) ORDER BY e\.name/,
-            "FROM employees e WHERE (e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?)) AND (? != 'staff' OR e.id=?) ORDER BY e.name",
-            'daily-status employee query',
-          );
-
-          attendance = replaceOnce(
-            attendance,
-            /\s*const attendanceQuery = await env\.DB\.prepare\("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=\? AND timestamp<\? ORDER BY timestamp ASC"\)\.bind\(from, to\)\.all<any>\(\);/,
-            '',
-            'daily-status redundant attendance query',
-          );
-
-          attendance = replaceOnce(
-            attendance,
-            /const requestQuery = await env\.DB\.prepare\("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN \('approved','confirmed'\) AND type IN \('leave','permission'\)"\)\.all<any>\(\);/,
-            'const requestQuery = await env.DB.prepare("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NOT NULL AND start_date <= ? AND COALESCE(end_date,start_date) >= ? UNION ALL SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NULL AND substr(created_at,1,10)=?").bind(day, day, day).all<any>();',
-            'daily-status request query',
-          );
-
-          attendance = replaceOnce(
-            attendance,
-            /\.bind\(localDateTimeUtc\(day, "00:00"\)\.toISOString\(\), localDateTimeUtc\(nextDay, "00:00"\)\.toISOString\(\)\)\.all<EmployeeRow>\(\);/,
-            '.bind(localDateTimeUtc(day, "00:00").toISOString(), localDateTimeUtc(nextDay, "00:00").toISOString(), String(actor.role), String(actor.id)).all<EmployeeRow>();',
-            'daily-status employee bindings',
-          );
-
-          attendance = replaceOnce(
-            attendance,
-            /\s*const employees = employeeQuery\.results \|\| \[\], attendance = attendanceQuery\.results \|\| \[\], requests = requestQuery\.results \|\| \[\];\s*const scopedEmployees = String\(actor\.role\) === "staff" \? employees\.filter\(employee => String\(employee\.id\) === String\(actor\.id\)\) : employees;\s*const byEmployee = new Map<string, any\[\]>\(\);\s*for \(const row of attendance\) \{\s*const id = String\(row\.employeeId \|\| ""\);\s*if \(id\) \{\s*const list = byEmployee\.get\(id\) \|\| \[\];\s*list\.push\(row\);\s*byEmployee\.set\(id, list\);\s*\}\s*\}\s*/,
-            '\n        const employees = employeeQuery.results || [], requests = requestQuery.results || [];\n        const scopedEmployees = employees;\n',
-            'daily-status collection block',
-          );
-
-          attendance = replaceOnce(
-            attendance,
-            /const rows = byEmployee\.get\(id\) \|\| \[\];/,
-            'const rows = historicalByEmployee.get(id) || [];',
-            'daily-status employee rows map',
-          );
-
-          fs.writeFileSync(attendancePath, attendance);
-
-          const requestsPath = 'backend/src/requests.ts';
-          let requests = fs.readFileSync(requestsPath, 'utf8');
-          requests = replaceOnce(
-            requests,
-            /async function ensureRequestSchema\(db:D1Database\)\{.*?\}\n/,
-            '',
-            'request schema hot-path block',
-          );
-          requests = replaceOnce(
-            requests,
-            /export async function handleRequests\(req:Request,env:Env,actor:Actor\|null,origin:string\)\{await ensureRequestSchema\(env\.DB\);const url=/,
-            'export async function handleRequests(req:Request,env:Env,actor:Actor|null,origin:string){const url=',
-            'request schema hot-path call',
-          );
-          fs.writeFileSync(requestsPath, requests);
+          fs.writeFileSync(path, source);
           NODE
-          npx --yes prettier@3.6.2 --write backend/src/attendance-engine.ts backend/src/requests.ts
+          npx --yes prettier@3.6.2 --write backend/src/attendance-engine.ts
           git diff --check
           git config user.name "HADIR Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/src/attendance-engine.ts backend/src/requests.ts
+          git add backend/src/attendance-engine.ts
           if git diff --cached --quiet; then echo "No changes needed"; exit 0; fi
-          git commit -m "perf: reduce D1 daily status read amplification"
+          git commit -m "perf: narrow daily status attendance window"
           git push
