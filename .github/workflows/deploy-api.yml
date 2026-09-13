@@ -44,7 +44,7 @@ jobs:
               backend/src/employee-save-production-gateway.ts \
               backend/src/workforce.ts \
               .github/workflows/deploy-api.yml
-            python3 -c 'from pathlib import Path; p=Path(".github/workflows/deploy-api.yml"); t=p.read_text(encoding="utf-8"); s=t.find("      - name: Migrate session security into canonical source\\n"); e=t.find("      - name: Validate Worker bundle\\n", s); assert s >= 0 and e > s, "temporary migration step not found"; p.write_text(t[:s] + t[e:], encoding="utf-8")'
+            python3 -c 'import re; from pathlib import Path; p=Path(".github/workflows/deploy-api.yml"); t=p.read_text(encoding="utf-8"); pattern=r"^ {6}- name: Migrate session security into canonical source\\n.*?(?=^ {6}- name: Validate Worker bundle\\n)"; new,n=re.subn(pattern,"",t,flags=re.M|re.S); assert n==1, f"temporary migration step not found: {n}"; p.write_text(new,encoding="utf-8")'
             rm backend/scripts/patch-session-security.mjs
           fi
           if grep -R --line-number --fixed-strings 'patch-session-security.mjs' .github/workflows backend/src backend/package.json; then
