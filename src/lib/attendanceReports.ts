@@ -7,6 +7,7 @@ export type AttendanceReportRow = {
   jobNumber: string | null;
   locationId: string | null;
   status: string;
+  attendanceSource: string;
   scheduleType: string;
   scheduledStart: string | null;
   scheduledEnd: string | null;
@@ -47,6 +48,7 @@ export type AttendanceReport = {
     leave: number;
     permission: number;
     rest: number;
+    escaped: number;
     notStarted: number;
     invalid: number;
     open: number;
@@ -68,6 +70,7 @@ export type AttendanceReport = {
       leave: number;
       permission: number;
       rest: number;
+      escaped: number;
       open: number;
       workedMinutes: number;
       expectedMinutes: number;
@@ -86,6 +89,7 @@ export type AttendanceReport = {
       leave: number;
       permission: number;
       rest: number;
+      escaped: number;
       open: number;
       workedMinutes: number;
       expectedMinutes: number;
@@ -100,12 +104,14 @@ export type AttendanceReport = {
       jobNumber: string | null;
       code: string;
       status: string;
+      attendanceSource: string;
       minutes: number;
       attendanceEventIds: string[];
       requestIds: string[];
       auditIds: string[];
     }>;
     exceptionCounts: Record<string, number>;
+    attendanceSourceCounts: Record<string, number>;
   };
   rows: AttendanceReportRow[];
   dataQuality: {
@@ -122,6 +128,7 @@ export type AttendanceReport = {
     sourceEventIdsIncluded: boolean;
     requestIdsIncluded: boolean;
     auditIdsIncluded: boolean;
+    attendanceSourceDerivedFromRawEvents?: boolean;
   };
 };
 
@@ -134,12 +141,12 @@ const apiUrl = String(import.meta.env.VITE_API_URL || "https://hadir-api.abuniza
 
 export async function getAttendanceReport(from: string, to: string, employeeId?: string): Promise<AttendanceReport> {
   if (!backendEnabled) throw new Error("نظام التقارير الخلفي غير مفعّل.");
-  const params = new URLSearchParams({ from, to });
+  const params = new URLSearchParams({ date: to, from, to });
   if (employeeId) params.set("employeeId", employeeId);
   const headers = new Headers({ "content-type": "application/json" });
   const authToken = token();
   if (authToken) headers.set("authorization", `Bearer ${authToken}`);
-  const response = await fetch(`${apiUrl}/api/reports/professional-attendance?${params.toString()}`, {
+  const response = await fetch(`${apiUrl}/api/manager/attendance-center?${params.toString()}`, {
     method: "GET",
     headers,
     credentials: "include",
@@ -147,5 +154,6 @@ export async function getAttendanceReport(from: string, to: string, employeeId?:
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : `فشل تحميل التقرير (${response.status})`);
-  return data as AttendanceReport;
+  if (!data?.report || !Array.isArray(data.report.rows)) throw new Error("استجابة مركز التقرير غير صالحة");
+  return data.report as AttendanceReport;
 }
