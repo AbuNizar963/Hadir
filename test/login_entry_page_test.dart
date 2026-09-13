@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:hadir/features/authentication/authentication.dart';
 import 'package:hadir/modern_router.dart';
 
 void main() {
-  testWidgets('login entry exposes employee and admin spaces', (tester) async {
+  testWidgets('login entry now opens the employee login directly', (tester) async {
     final router = GoRouter(
       initialLocation: '/login',
       routes: [
@@ -13,35 +14,18 @@ void main() {
           path: '/login',
           builder: (_, __) => const LoginEntryPage(),
         ),
-        GoRoute(
-          path: '/employee-login',
-          builder: (_, __) => const Scaffold(body: Text('employee')),
-        ),
-        GoRoute(
-          path: '/manager/login',
-          builder: (_, __) => const Scaffold(body: Text('admin')),
-        ),
       ],
     );
 
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
 
-    expect(find.text('مساحة الموظف'), findsOneWidget);
-    expect(find.text('مساحة الإدارة'), findsOneWidget);
-
-    await tester.tap(find.text('مساحة الموظف'));
-    await tester.pumpAndSettle();
-    expect(find.text('employee'), findsOneWidget);
-
-    router.go('/login');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('مساحة الإدارة'));
-    await tester.pumpAndSettle();
-    expect(find.text('admin'), findsOneWidget);
+    expect(find.byType(EmployeeLoginPage), findsOneWidget);
+    expect(find.text('مساحة الموظف'), findsNothing);
+    expect(find.text('مساحة الإدارة'), findsNothing);
   });
 
-  test('restored employee session resumes the employee workspace', () {
+  test('authenticated root redirects to the employee workspace', () {
     expect(
       resolveAuthenticatedRedirect(
         location: '/',
@@ -49,29 +33,32 @@ void main() {
       ),
       '/home',
     );
-    expect(
-      resolveAuthenticatedRedirect(
-        location: '/employee-login',
-        employeeToken: 'employee-token',
-      ),
-      '/home',
-    );
   });
 
-  test('restored admin session resumes the admin workspace', () {
+  test('authenticated root redirects to the admin workspace', () {
     expect(
       resolveAuthenticatedRedirect(
         location: '/',
         adminToken: 'admin-token',
       ),
       '/admin',
+    );
+  });
+
+  test('authentication entry routes remain public', () {
+    expect(
+      resolveAuthenticatedRedirect(
+        location: '/employee-login',
+        employeeToken: 'employee-token',
+      ),
+      isNull,
     );
     expect(
       resolveAuthenticatedRedirect(
         location: '/manager/login',
         adminToken: 'admin-token',
       ),
-      '/admin',
+      isNull,
     );
   });
 
