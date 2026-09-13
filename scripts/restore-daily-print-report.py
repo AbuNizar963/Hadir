@@ -85,7 +85,7 @@ def restore_source() -> None:
         source = source.replace(daily_call, daily_filtered_call, 1)
 
         section_pattern = re.compile(
-            r'      <section\n        className="service-report[^\n]*"\n        dir="rtl"\n      >'
+            r'<section\s+className="service-report[^\"]*"[^>]*>'
         )
         section = section_pattern.search(source)
         if not section:
