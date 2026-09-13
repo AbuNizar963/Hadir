@@ -17,68 +17,16 @@ jobs:
 
       - name: Apply repository patches
         run: |
-          set -euo pipefail
           python3 scripts/apply_company_specialties.py
           python3 scripts/apply_job_number_update.py
           node scripts/patch_employee_management_canonical.mjs
-
-      - name: Migrate session security into source
-        working-directory: backend
-        run: |
-          set -euo pipefail
-          if [ ! -f scripts/patch-session-security.mjs ]; then
-            echo 'Session security helper is already removed; source migration is complete.'
-            exit 0
-          fi
-          npm install --package-lock=false
-          node scripts/patch-session-security.mjs
-          npx --yes prettier --write src/index.ts src/entry.ts src/ai-entry.ts src/employee-save-production-gateway.ts src/workforce.ts ../.github/workflows/deploy-api.yml
-
-      - name: Remove obsolete session patching
-        run: |
-          set -euo pipefail
-          if [ ! -f backend/scripts/patch-session-security.mjs ]; then
-            echo 'Session security helper is already removed; nothing to clean up.'
-            exit 0
-          fi
-          python3 - <<'PY'
-          from pathlib import Path
-
-          workflow = Path('.github/workflows/deploy-api.yml')
-          text = workflow.read_text(encoding='utf-8')
-          block = '''      - name: Apply session security patch
-        working-directory: backend
-        run: node scripts/patch-session-security.mjs
-'''
-          if block not in text:
-              raise SystemExit('Expected session security patch step was not found; refusing to modify deploy workflow.')
-          workflow.write_text(text.replace(block, ''), encoding='utf-8')
-
-          helper = Path('backend/scripts/patch-session-security.mjs')
-          helper.unlink()
-          PY
-
-      - name: Verify session security migration
-        run: |
-          set -euo pipefail
-          test ! -e backend/scripts/patch-session-security.mjs
-          if grep -R --line-number --fixed-strings 'patch-session-security.mjs' .github/workflows backend/src backend/package.json; then
-            echo 'ERROR: obsolete session patch helper is still referenced.'
-            exit 1
-          fi
-          grep -q 'SESSION_IDLE_TIMEOUT_MS' backend/src/index.ts
-          grep -q 'SESSION_MAX_AGE_MS' backend/src/index.ts
-          grep -q 'SESSION_TOUCH_INTERVAL_SECONDS' backend/src/index.ts
-          grep -q 'revoked_at' backend/src/index.ts
-          grep -q 'julianday(last_seen_at)' backend/src/index.ts
-          echo 'Session security is present in canonical source and runtime patching is removed.'
 
       - name: Commit patch
         run: |
           set -euo pipefail
           git config user.name "HADIR Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/types/index.ts src/components/settings/CompanySpecialtiesPanel.tsx src/pages/ManagerSettings.tsx src/pages/ManagerEmployees.tsx src/pages/ManagerReports.tsx backend/src/recovery.ts backend/src/index.ts backend/src/entry.ts backend/src/ai-entry.ts backend/src/employee-save-production-gateway.ts backend/src/workforce.ts backend/src/device-rebind-api.ts backend/src/requests.ts backend/scripts/patch-session-security.mjs .github/workflows/deploy-api.yml scripts/apply_job_number_update.py
+          git add src/types/index.ts src/components/settings/CompanySpecialtiesPanel.tsx src/pages/ManagerSettings.tsx src/pages/ManagerEmployees.tsx src/pages/ManagerReports.tsx backend/src/recovery.ts backend/src/index.ts backend/src/entry.ts backend/src/ai-entry.ts backend/src/employee-save-production-gateway.ts backend/src/workforce.ts backend/src/device-rebind-api.ts backend/src/requests.ts scripts/apply_job_number_update.py
           if git diff --cached --quiet; then echo "No changes needed"; exit 0; fi
-          git commit -m "chore: migrate session security into source"
+          git commit -m "chore: apply canonical repository patches"
           git push
