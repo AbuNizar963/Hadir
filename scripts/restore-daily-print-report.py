@@ -1,3 +1,5 @@
+# One-time migration helper: restores the previously configured daily print data
+# into the canonical ManagerReports source before the helper is removed.
 from pathlib import Path
 import re
 
