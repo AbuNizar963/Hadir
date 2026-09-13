@@ -1,17 +1,30 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const file = "src/pages/ManagerReports.tsx";
+
 if (!existsSync(file)) {
   throw new Error("ManagerReports Damascus date patch: source file not found.");
 }
 
 let source = readFileSync(file, "utf8");
-if (source.includes("function damascusTodayKey()")) {
-  console.log("ManagerReports Damascus date patch: already applied.");
+
+const canonicalDateState =
+  source.includes("function damascusTodayKey()") &&
+  source.includes("const damascusToday = damascusTodayKey();") &&
+  source.includes('[date, setDate] = useState(damascusToday)') &&
+  source.includes('[month, setMonth] = useState(damascusToday.slice(0, 7))') &&
+  source.includes('[year, setYear] = useState(damascusToday.slice(0, 4))');
+
+if (canonicalDateState) {
+  console.log(
+    "ManagerReports Damascus date patch: canonical Damascus date state already present; no changes required.",
+  );
   process.exit(0);
 }
 
-const todayPattern = /function todayLocal\(\)\s*\{\s*const d = new Date\(\);\s*return new Date\(d\.getFullYear\(\), d\.getMonth\(\), d\.getDate\(\), 12\);\s*\}/m;
+const todayPattern =
+  /function todayLocal\(\)\s*\{\s*const d = new Date\(\);\s*return new Date\(d\.getFullYear\(\), d\.getMonth\(\), d\.getDate\(\), 12\);\s*\}/m;
+
 if (!todayPattern.test(source)) {
   throw new Error(
     "ManagerReports Damascus date patch: todayLocal anchor not found; refusing unsafe replacement.",
@@ -23,7 +36,9 @@ source = source.replace(
   'function damascusTodayKey() {\n  return new Intl.DateTimeFormat("en-CA", {\n    timeZone: "Asia/Damascus",\n    year: "numeric",\n    month: "2-digit",\n    day: "2-digit",\n  }).format(new Date());\n}\nfunction todayLocal() {\n  return dateOf(damascusTodayKey());\n}',
 );
 
-const statePattern = /const \[mode, setMode\] = useState<Mode>\(\s*"monthly"\s*\),\s*\[date, setDate\] = useState\(\s*new Date\(\)\.toISOString\(\)\.slice\(0, 10\)\s*\),\s*\[month, setMonth\] = useState\(\s*new Date\(\)\.toISOString\(\)\.slice\(0, 7\)\s*\),\s*\[year, setYear\] = useState\(\s*String\(new Date\(\)\.getFullYear\(\)\)\s*\);/m;
+const statePattern =
+  /const \[mode, setMode\][\s\S]*?\[year, setYear\] = useState\(String\(new Date\(\)\.getFullYear\(\)\)\);/m;
+
 if (!statePattern.test(source)) {
   throw new Error(
     "ManagerReports Damascus date patch: period state anchor not found; refusing unsafe replacement.",
