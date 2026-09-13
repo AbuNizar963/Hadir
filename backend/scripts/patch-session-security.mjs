@@ -33,7 +33,7 @@ if (indexSource.includes(guardOld)) {
 }
 
 const writeOld = 'UPDATE auth_sessions SET last_seen_at=? WHERE token_hash=?';
-const writeNew = 'UPDATE auth_sessions SET last_seen_at=? WHERE token_hash=? AND revoked_at IS NULL AND (last_seen_at IS NULL OR last_seen_at <= datetime(\'now\', \'-15 minutes\'))';
+const writeNew = 'UPDATE auth_sessions SET last_seen_at=? WHERE token_hash=? AND revoked_at IS NULL AND (last_seen_at IS NULL OR julianday(last_seen_at) <= julianday(\'now\', \'-15 minutes\'))';
 indexSource = indexSource.replaceAll(writeOld, writeNew);
 
 const bearerFirst = 'req.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||getCookie(req,SESSION_COOKIE)';
