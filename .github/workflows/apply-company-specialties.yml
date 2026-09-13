@@ -20,12 +20,18 @@ jobs:
           python3 scripts/apply_company_specialties.py
           python3 scripts/apply_job_number_update.py
 
+      - name: Apply one-time live report read repair
+        run: |
+          node scripts/repair-live-report-read-window-once.mjs
+          npx --yes prettier@3.6.2 --write backend/src/professional-attendance-report-engine.ts
+          git diff --check
+
       - name: Commit patch
         run: |
           set -euo pipefail
           git config user.name "HADIR Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/types/index.ts src/components/settings/CompanySpecialtiesPanel.tsx src/pages/ManagerSettings.tsx src/pages/ManagerEmployees.tsx src/pages/ManagerReports.tsx public/report-print.css backend/src/recovery.ts backend/src/index.ts backend/src/entry.ts backend/src/ai-entry.ts backend/src/employee-save-production-gateway.ts backend/src/workforce.ts backend/src/device-rebind-api.ts backend/src/requests.ts scripts/apply_job_number_update.py
+          git add src/types/index.ts src/components/settings/CompanySpecialtiesPanel.tsx src/pages/ManagerSettings.tsx src/pages/ManagerEmployees.tsx src/pages/ManagerReports.tsx public/report-print.css backend/src/recovery.ts backend/src/index.ts backend/src/entry.ts backend/src/ai-entry.ts backend/src/employee-save-production-gateway.ts backend/src/workforce.ts backend/src/device-rebind-api.ts backend/src/requests.ts backend/src/professional-attendance-report-engine.ts scripts/apply_job_number_update.py
           if git diff --cached --quiet; then echo "No changes needed"; exit 0; fi
-          git commit -m "chore: apply canonical repository patches"
+          git commit -m "perf: narrow live report D1 read window"
           git push
