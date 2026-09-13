@@ -2,6 +2,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/api.dart';
 import '../../core/hadir_time.dart';
 import '../../core/session.dart';
+import '../../features/employee/services/employee_schedule_service.dart';
 
 class AttendanceService {
   final HadirApi api;
@@ -59,9 +60,65 @@ class AttendanceService {
     return Geolocator.distanceBetween(lat1, lon1, lat2, lon2);
   }
 
+  /// Keeps direct attendance routes subject to the same schedule window as
+  /// the employee workspace. Check-out remains allowed for an already-open
+  /// session even after the scheduled end time.
+  static bool checkInWindowOpen(
+    Map<String, dynamic>? employee, {
+    DateTime? target,
+  }) {
+    final now = target ?? HadirTime.now();
+    final schedule = const EmployeeScheduleService().resolve(employee, target: now);
+    if (!schedule.isWorkDay || schedule.kind == 'INVALID' || schedule.kind == 'NOT_STARTED') {
+      return false;
+    }
+    final start = schedule.start;
+    final end = schedule.end;
+    return start != null && end != null && !now.isBefore(start) && now.isBefore(end);
+  }
+
+  static String checkInWindowError(
+    Map<String, dynamic>? employee, {
+    DateTime? target,
+  }) {
+    final now = target ?? HadirTime.now();
+    final schedule = const EmployeeScheduleService().resolve(employee, target: now);
+    if (schedule.kind == 'INVALID') {
+      return schedule.detail ?? 'جدول الدوام غير صالح.';
+    }
+    if (schedule.kind == 'NOT_STARTED') {
+      return schedule.detail ?? 'لم تبدأ المناوبة بعد.';
+    }
+    if (!schedule.isWorkDay) {
+      return 'لا يمكن تسجيل الحضور أثناء فترة الراحة.';
+    }
+    if (schedule.start != null && now.isBefore(schedule.start!)) {
+      return 'لم يبدأ وقت تسجيل الحضور بعد. يبدأ ${_formatTime(schedule.start!)}.';
+    }
+    if (schedule.end != null && !now.isBefore(schedule.end!)) {
+      return 'انتهى وقت تسجيل الحضور لهذه الفترة.';
+    }
+    return 'تسجيل الحضور غير متاح حاليًا.';
+  }
+
+  static String _formatTime(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
   Future<AttendanceChallenge> prepareChallenge({required String type, required String qrCode}) async {
     final code = qrCode.trim();
     if (code.isEmpty) throw Exception('امسح رمز QR أو أدخله يدويًا.');
+
+    final normalizedType = type.trim().toLowerCase();
+    Map<String, dynamic>? employee;
+    if (normalizedType == 'check-in') {
+      final profile = await api.employeeProfile();
+      final raw = profile['employee'] is Map ? profile['employee'] : profile;
+      employee = raw is Map ? Map<String, dynamic>.from(raw) : null;
+      if (!checkInWindowOpen(employee)) {
+        throw Exception(checkInWindowError(employee));
+      }
+    }
+
     final place = await workplace();
     final lat = double.tryParse('${place['lat']}');
     final lng = double.tryParse('${place['lng']}');
