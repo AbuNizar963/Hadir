@@ -171,6 +171,17 @@ class EmployeeScheduleService {
         ? rawEnd
         : rawEnd.add(const Duration(days: 1));
 
+    if (target.isBefore(start)) {
+      return EmployeeScheduleState(
+        isWorkDay: false,
+        kind: 'NOT_STARTED',
+        label: 'لم تبدأ المناوبة بعد',
+        detail: 'تبدأ المناوبة الساعة ${_formatTime(start)}',
+        start: start,
+        end: end,
+      );
+    }
+
     return EmployeeScheduleState(
       isWorkDay: true,
       kind: 'ADMIN',
