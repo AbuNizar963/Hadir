@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 1
 
       - name: Install formatter dependency
-        run: npm ci --ignore-scripts
+        run: npm install --no-save --ignore-scripts --no-package-lock typescript@5.5.3
 
       - name: Repair canonical escape-state logic
         run: |
@@ -31,8 +31,7 @@ jobs:
           const attendancePath = 'backend/src/attendance-engine.ts';
 
           function replaceOnce(source, pattern, replacement, label) {
-            const match = source.match(pattern);
-            if (!match) throw new Error(`Safety check failed: ${label} anchor not found`);
+            if (!pattern.test(source)) throw new Error(`Safety check failed: ${label} anchor not found`);
             return source.replace(pattern, replacement);
           }
 
@@ -40,6 +39,8 @@ jobs:
             const source = fs.readFileSync(path, 'utf8');
             const kind = path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
             const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, kind);
+            const diagnostics = ts.getPreEmitDiagnostics(file);
+            if (diagnostics.length) throw new Error(`TypeScript parse failed for ${path}`);
             const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
             fs.writeFileSync(path, printer.printFile(file));
           }
