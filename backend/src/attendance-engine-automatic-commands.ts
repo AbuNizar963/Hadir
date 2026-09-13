@@ -20,9 +20,9 @@ export function operationalShift(employee: any, current: Date, tz: string) {
  * directly; every automatic/VIP attendance write goes through the canonical
  * attendance engine.
  */
-export async function insertAutomaticAttendance(env: Env, employee: any, type: "check-in" | "check-out", _timestamp: string, _actorName: string, reason: string) {
+export async function insertAutomaticAttendance(env: Env, employee: any, type: "check-in" | "check-out", timestamp: string, _actorName: string, reason: string) {
   const deviceId = `CENTRAL_AUTO:${employee.id}`;
-  const result = await submitAttendanceThroughCentralEngine(env, String(employee.id), type, deviceId, reason);
+  const result = await submitAttendanceThroughCentralEngine(env, String(employee.id), type, deviceId, reason, timestamp);
   if (result.error || !result.response) return null;
   const payload = await result.response.json().catch(() => ({})) as any;
   if (!result.response.ok || !payload?.ok) return null;
