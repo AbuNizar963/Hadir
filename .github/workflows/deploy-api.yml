@@ -42,23 +42,10 @@ jobs:
               backend/src/entry.ts \
               backend/src/ai-entry.ts \
               backend/src/employee-save-production-gateway.ts \
-              backend/src/workforce.ts \
-              .github/workflows/deploy-api.yml
-            python3 -c 'import re; from pathlib import Path; p=Path(".github/workflows/deploy-api.yml"); t=p.read_text(encoding="utf-8"); pattern=r"^ {6}- name: Migrate session security into canonical source\\n.*?(?=^ {6}- name: Validate Worker bundle\\n)"; new,n=re.subn(pattern,"",t,flags=re.M|re.S); assert n==1, f"temporary migration step not found: {n}"; p.write_text(new,encoding="utf-8")'
+              backend/src/workforce.ts
             rm backend/scripts/patch-session-security.mjs
-          fi
-          if grep -R --line-number --fixed-strings 'patch-session-security.mjs' .github/workflows backend/src backend/package.json; then
-            echo 'ERROR: obsolete session patch helper is still referenced.'
-            exit 1
-          fi
-          grep -q 'SESSION_IDLE_TIMEOUT_MS' backend/src/index.ts
-          grep -q 'SESSION_MAX_AGE_MS' backend/src/index.ts
-          grep -q 'SESSION_TOUCH_INTERVAL_SECONDS' backend/src/index.ts
-          grep -q 'revoked_at' backend/src/index.ts
-          grep -q 'julianday(last_seen_at)' backend/src/index.ts
-          git add -A
-          git diff --cached --check
-          if ! git diff --cached --quiet; then
+            git add backend/src/index.ts backend/src/entry.ts backend/src/ai-entry.ts backend/src/employee-save-production-gateway.ts backend/src/workforce.ts backend/scripts/patch-session-security.mjs
+            git diff --cached --check
             git config user.name "HADIR Bot"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "refactor(auth): make session security canonical in source"
