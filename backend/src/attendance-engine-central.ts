@@ -1,6 +1,6 @@
 import { handleEmployeeAttendance as executeCanonicalAttendance } from "./attendance-engine-commands";
 
-type Env = { DB: D1Database; APP_TIMEZONE?: string };
+type Env = { DB: D1Database };
 
 /**
  * Single application-level gateway for attendance mutations.
@@ -9,6 +9,17 @@ type Env = { DB: D1Database; APP_TIMEZONE?: string };
  * attendance all enter this module. Only the canonical attendance engine is
  * allowed to persist the attendance row.
  */
+function executeCentralAttendance(
+  req: Request,
+  env: Env,
+  actor: any,
+  origin: string,
+  trustedTimestamp?: string,
+  internal = false,
+) {
+  return executeCanonicalAttendance(req, env, actor, origin, trustedTimestamp, internal);
+}
+
 export async function handleAttendanceThroughCentralEngine(
   req: Request,
   env: Env,
@@ -16,15 +27,13 @@ export async function handleAttendanceThroughCentralEngine(
   origin: string,
   trustedTimestamp?: string,
 ) {
-  return executeCanonicalAttendance(req, env, actor, origin, trustedTimestamp, false);
+  return executeCentralAttendance(req, env, actor, origin, trustedTimestamp, false);
 }
 
 /**
  * Internal write helper used by automatic/VIP and administrative flows.
- * The final boolean is intentionally not exposed through HTTP; it is supplied
- * only by this module after a server-side caller has explicitly entered the
- * central engine. This lets trusted automation keep working without turning
- * a client-controlled header into a privilege flag.
+ * The internal trust boundary is private to this module; callers cannot
+ * supply the internal flag through an HTTP request or client-controlled data.
  */
 export async function submitAttendanceThroughCentralEngine(
   env: Env,
@@ -62,7 +71,7 @@ export async function submitAttendanceThroughCentralEngine(
     }),
   });
 
-  const response = await executeCanonicalAttendance(
+  const response = await executeCentralAttendance(
     request,
     env,
     { id: employeeId, role: "staff", name: "المحرك المركزي" },
