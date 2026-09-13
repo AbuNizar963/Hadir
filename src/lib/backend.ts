@@ -79,3 +79,5 @@ export async function deleteBackendEmployee(id: string) { return requestWithRetr
 export async function getBackendEscapeEvents(employeeId?: string, limit = 500) { const query = new URLSearchParams({ limit: String(Math.min(limit, 2000)) }); if (employeeId) query.set("employeeId", employeeId); return request<EscapeEvent[]>(`/api/escape-events?${query.toString()}`, {}, "admin"); }
 export async function createBackendEscapeEvent(input: { employeeId: string; status: "escaped" | "returned"; reason?: string; lat?: number; lng?: number }) { return requestWithRetry<{ ok: boolean; event: EscapeEvent }>("/api/escape-events", { method: "POST", body: JSON.stringify(input) }, 3, "admin"); }
 export async function backendHealth() { return request<{ ok: boolean; database?: string; ownerInitialized?: boolean }>("/api/health"); }
+export type { AdminAccount };
+export async function resetBackendTestData() { return requestWithRetry<{ ok: boolean; deleted: Record<string, number | string>; preserved: string[]; message: string }>("/api/workforce/reset", { method: "POST", body: JSON.stringify({ confirmation: "تأكيد" }) }, 3, "admin"); }
