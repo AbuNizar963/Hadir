@@ -1,6 +1,7 @@
-type ChallengeEnv = { DB: D1Database };
+type ChallengeEnv = { DB: D1Database; APP_TIMEZONE?: string };
 
 const CHALLENGE_TTL_MS = 60_000;
+const CHECKOUT_GRACE_MS = 4 * 60 * 60 * 1000;
 const EARTH_RADIUS_METERS = 6_371_000;
 
 function json(data: unknown, status = 200, origin = "*") {
@@ -52,6 +53,43 @@ async function employeeLocation(db: D1Database, employeeId: string) {
   return { id: String(selected.id), lat, lng, radiusMeters: radius };
 }
 
+async function timezone(db: D1Database, configured?: string) {
+  let tz = String(configured || "Asia/Damascus").trim() || "Asia/Damascus";
+  const row = await db.prepare("SELECT value FROM settings WHERE key='timezone' LIMIT 1").first<any>().catch(() => null);
+  try {
+    const parsed = JSON.parse(String(row?.value || ""));
+    if (typeof parsed === "string" && parsed.trim()) tz = parsed.trim();
+  } catch {
+    if (String(row?.value || "").trim()) tz = String(row.value).trim();
+  }
+  return tz;
+}
+
+async function checkoutWindow(db: D1Database, employeeId: string, now: Date, tz: string) {
+  const row = await db.prepare("SELECT id,job_number AS jobNumber,name,status,location_id AS locationId,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson FROM employees WHERE id=? AND status='active' LIMIT 1").bind(employeeId).first<any>();
+  if (!row) return { allowed: false, error: "الموظف غير موجود أو موقوف" };
+
+  const lastIn = await db.prepare("SELECT timestamp FROM attendance WHERE employee_id=? AND type='check-in' ORDER BY timestamp DESC LIMIT 1").bind(employeeId).first<any>();
+  if (!lastIn?.timestamp) return { allowed: false, error: "لا يمكن تسجيل الانصراف قبل تسجيل الحضور" };
+
+  const checkInAt = new Date(String(lastIn.timestamp));
+  if (!Number.isFinite(checkInAt.getTime())) return { allowed: false, error: "تعذر تحديد بداية جلسة الدوام الحالية" };
+
+  const { getAttendanceShift } = await import("./attendance-period");
+  const shift = getAttendanceShift(row, checkInAt, tz);
+  if (!shift.isWorkDay) return { allowed: false, error: "لا توجد مناوبة صالحة لجلسة الحضور الحالية" };
+
+  const latestOut = await db.prepare("SELECT timestamp FROM attendance WHERE employee_id=? AND type='check-out' AND timestamp>? ORDER BY timestamp DESC LIMIT 1").bind(employeeId, checkInAt.toISOString()).first<any>();
+  if (latestOut?.timestamp) return { allowed: false, error: "تم تسجيل الانصراف بالفعل" };
+
+  const graceEnd = new Date(shift.end.getTime() + CHECKOUT_GRACE_MS);
+  if (now.getTime() > graceEnd.getTime()) {
+    return { allowed: false, error: "انتهت مهلة تسجيل الانصراف لهذه المناوبة (4 ساعات بعد نهايتها)." };
+  }
+
+  return { allowed: true, shiftEnd: shift.end.toISOString(), graceEnd: graceEnd.toISOString() };
+}
+
 export async function createAttendanceChallenge(req: Request, env: ChallengeEnv, actor: any, deviceId: string, origin: string) {
   if (!actor || String(actor.role).toLowerCase() !== "staff") return json({ ok: false, error: "الموظف فقط يستطيع إنشاء تحقق الحضور" }, 403, origin);
   const body = await req.json().catch(() => null) as any;
@@ -71,6 +109,12 @@ export async function createAttendanceChallenge(req: Request, env: ChallengeEnv,
   if (!location) return json({ ok: false, error: "لا يوجد موقع عمل صالح محفوظ في D1" }, 409, origin);
   const distance = distanceMeters(lat, lng, location.lat, location.lng);
   if (distance > location.radiusMeters) return json({ ok: false, error: `أنت خارج نطاق موقع العمل. المسافة ${distance} م، والنطاق ${location.radiusMeters} م.` }, 403, origin);
+
+  if (type === "check-out") {
+    const tz = await timezone(env.DB, env.APP_TIMEZONE);
+    const window = await checkoutWindow(env.DB, String(actor.id), new Date(), tz);
+    if (!window.allowed) return json({ ok: false, error: window.error }, 403, origin);
+  }
 
   const now = new Date();
   const expiresAt = new Date(now.getTime() + CHALLENGE_TTL_MS);
@@ -98,6 +142,12 @@ export async function claimAttendanceChallenge(db: D1Database, actor: any, devic
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false, status: 400, error: "إحداثيات GPS غير صالحة." };
   const drift = distanceMeters(lat, lng, Number(row.lat), Number(row.lng));
   if (drift > 100) return { ok: false, status: 403, error: "تغير الموقع بشكل كبير منذ بدء التحقق. أعد المحاولة." };
+
+  if (String(row.type) === "check-out") {
+    const tz = await timezone(db);
+    const window = await checkoutWindow(db, String(actor.id), new Date(), tz);
+    if (!window.allowed) return { ok: false, status: 403, error: window.error };
+  }
 
   const claimedAt = new Date().toISOString();
   const result = await db.prepare("UPDATE attendance_challenges SET used_at=? WHERE id=? AND used_at IS NULL AND expires_at>? ").bind(claimedAt, challengeId, claimedAt).run();
