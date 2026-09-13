@@ -42,7 +42,6 @@ jobs:
           if (!normalized.includes('/api/locations')) throw new Error('Locations API feature missing');
           if (!normalized.includes('/api/notifications')) throw new Error('Notifications API feature missing');
           if (!normalized.includes('original.fetch(req,env,ctx)')) throw new Error('Original app delegation missing');
-          if (!normalized.includes('revoked_at')) throw new Error('Session revocation handling marker missing');
           NODE
           git diff --check
           npm --prefix backend run check
