@@ -1,0 +1,77 @@
+name: Repair automation entry
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Repair automation entry
+        env:
+          TARGET: backend/src/automation-entry.ts
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = process.env.TARGET;
+          let source = fs.readFileSync(path, 'utf8');
+
+          const replacements = [
+            [
+              'const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||"").trim();',
+              'const token=(request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||readCookie(request,SESSION_COOKIE)||"").trim();'
+            ]
+          ];
+
+          let changed = false;
+          for (const [before, after] of replacements) {
+            const count = source.split(before).length - 1;
+            if (count === 0) throw new Error(`Expected source pattern not found: ${before}`);
+            source = source.split(before).join(after);
+            changed = true;
+          }
+
+          if (!source.includes('revoked_at IS NULL')) {
+            throw new Error('Session revocation guard is missing from automation-entry.ts');
+          }
+          if (!source.includes('request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||readCookie(request,SESSION_COOKIE)')) {
+            throw new Error('Bearer-first token precedence was not applied');
+          }
+
+          if (!changed) throw new Error('No guarded source change was produced');
+          fs.writeFileSync(path, source.endsWith('\n') ? source : source + '\n');
+          NODE
+
+      - name: Format source professionally
+        run: npx --yes prettier@3.6.2 --write backend/src/automation-entry.ts
+
+      - name: Validate source and diff
+        run: |
+          test -s backend/src/automation-entry.ts
+          grep -q 'revoked_at IS NULL' backend/src/automation-entry.ts
+          grep -q 'request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"") || readCookie(request, SESSION_COOKIE)' backend/src/automation-entry.ts
+          git diff --check
+          npm --prefix backend run check
+
+      - name: Commit repaired source and remove temporary workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/repair-automation-entry.yml
+          git add backend/src/automation-entry.ts
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m 'fix(auth): normalize automation entry authentication'
+          git push
