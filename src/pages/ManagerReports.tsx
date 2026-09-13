@@ -1,10 +1,6 @@
-import {
-  useEffect,
-  useMemo,
-  useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
-import { getEmployees,
-  getSettings } from "@/lib/storage";
+import { getEmployees, getSettings } from "@/lib/storage";
 import {
   getBackendAudit,
   getBackendEmployees,
@@ -769,8 +765,8 @@ export default function ManagerReports() {
     () =>
       mode === "daily"
         ? serviceRows(
-            summaries.filter((s) =>
-              getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay,
+            summaries.filter(
+              (s) => getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay,
             ),
             dates,
             index,
@@ -1119,61 +1115,61 @@ export default function ManagerReports() {
           dir="rtl"
         >
           <div className="print:hidden">
-          <div className="p-5 md:p-7 border-b-2 border-black/70 text-center">
-            <div className="flex flex-col items-center gap-2">
-              {settings.brandLogo && (
-                <img
-                  src={settings.brandLogo}
-                  alt="شعار الشركة"
-                  className="h-14 w-auto max-w-[180px] object-contain"
-                />
-              )}
-              <h1 className="text-xl md:text-2xl font-black">
-                {settings.brandName || "خدمة الدوام اليومية"}
-              </h1>
-              <div className="text-sm font-bold">
-                خدمة الدوام اليومية · {formatDate(date)}
+            <div className="p-5 md:p-7 border-b-2 border-black/70 text-center">
+              <div className="flex flex-col items-center gap-2">
+                {settings.brandLogo && (
+                  <img
+                    src={settings.brandLogo}
+                    alt="شعار الشركة"
+                    className="h-14 w-auto max-w-[180px] object-contain"
+                  />
+                )}
+                <h1 className="text-xl md:text-2xl font-black">
+                  {settings.brandName || "خدمة الدوام اليومية"}
+                </h1>
+                <div className="text-sm font-bold">
+                  خدمة الدوام اليومية · {formatDate(date)}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-4 p-5">
-            {groupColumns.map((column, columnIndex) => (
-              <div key={columnIndex} className="space-y-4">
-                {column.map((group) => (
-                  <div key={group.name} className="border-2 border-black/70">
-                    <div className="px-3 py-2 border-b-2 border-black/70 font-black text-center">
-                      {group.name}
-                    </div>
-                    <div className="divide-y divide-black/20">
-                      {group.rows.map((row) => (
-                        <div
-                          key={row.employee.id}
-                          className="p-3 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 items-center"
-                        >
-                          <div className="min-w-0">
-                            <div className="font-black truncate">
-                              {row.employee.name}
-                            </div>
-                            <div className="text-xs opacity-70">
-                              {row.employee.jobNumber}
-                            </div>
-                          </div>
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-black ${cls[row.status]}`}
+            <div className="grid md:grid-cols-2 gap-4 p-5">
+              {groupColumns.map((column, columnIndex) => (
+                <div key={columnIndex} className="space-y-4">
+                  {column.map((group) => (
+                    <div key={group.name} className="border-2 border-black/70">
+                      <div className="px-3 py-2 border-b-2 border-black/70 font-black text-center">
+                        {group.name}
+                      </div>
+                      <div className="divide-y divide-black/20">
+                        {group.rows.map((row) => (
+                          <div
+                            key={row.employee.id}
+                            className="p-3 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 items-center"
                           >
-                            {labels[row.status]}
-                          </span>
-                          <div className="text-xs font-bold text-left whitespace-nowrap">
-                            {row.checkIn} → {row.checkOut}
+                            <div className="min-w-0">
+                              <div className="font-black truncate">
+                                {row.employee.name}
+                              </div>
+                              <div className="text-xs opacity-70">
+                                {row.employee.jobNumber}
+                              </div>
+                            </div>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-black ${cls[row.status]}`}
+                            >
+                              {labels[row.status]}
+                            </span>
+                            <div className="text-xs font-bold text-left whitespace-nowrap">
+                              {row.checkIn} → {row.checkOut}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
           <div className="daily-print-report" dir="rtl">
             <header className="daily-print-header">
@@ -1188,11 +1184,10 @@ export default function ManagerReports() {
                 {settings.brandName || "HADIR"}
               </div>
               <div className="daily-print-title">
-                سجل الحضور والانصراف ليوم {days[dateOf(date).getDay()]} {String(
-                  dateOf(date).getDate(),
-                ).padStart(2, "0")}/{String(
-                  dateOf(date).getMonth() + 1,
-                ).padStart(2, "0")}/{dateOf(date).getFullYear()}
+                سجل الحضور والانصراف ليوم {days[dateOf(date).getDay()]}{" "}
+                {String(dateOf(date).getDate()).padStart(2, "0")}/
+                {String(dateOf(date).getMonth() + 1).padStart(2, "0")}/
+                {dateOf(date).getFullYear()}
               </div>
             </header>
             <table className="daily-print-table">
@@ -1221,7 +1216,9 @@ export default function ManagerReports() {
                   <tr key={row.employee.id}>
                     <td className="daily-print-center">{i + 1}</td>
                     <td>{specialtyOf(row.employee)}</td>
-                    <td className="daily-print-name-cell">{row.employee.name}</td>
+                    <td className="daily-print-name-cell">
+                      {row.employee.name}
+                    </td>
                     <td className="daily-print-center">
                       <span className={`daily-print-status ${row.status}`}>
                         {labels[row.status]}
