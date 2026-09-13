@@ -23,7 +23,7 @@ source = source.replace(
   'function damascusTodayKey() {\n  return new Intl.DateTimeFormat("en-CA", {\n    timeZone: "Asia/Damascus",\n    year: "numeric",\n    month: "2-digit",\n    day: "2-digit",\n  }).format(new Date());\n}\nfunction todayLocal() {\n  return dateOf(damascusTodayKey());\n}',
 );
 
-const statePattern = /const \[mode, setMode\] = useState<Mode>\("monthly"\),\s*\[date, setDate\] = useState\([^\)]*\),\s*\[month, setMonth\] = useState\([^\)]*\),\s*\[year, setYear\] = useState\([^\)]*\);/m;
+const statePattern = /const \[mode, setMode\] = useState<Mode>\(\s*"monthly"\s*\),\s*\[date, setDate\] = useState\(\s*new Date\(\)\.toISOString\(\)\.slice\(0, 10\)\s*\),\s*\[month, setMonth\] = useState\(\s*new Date\(\)\.toISOString\(\)\.slice\(0, 7\)\s*\),\s*\[year, setYear\] = useState\(\s*String\(new Date\(\)\.getFullYear\(\)\)\s*\);/m;
 if (!statePattern.test(source)) {
   throw new Error(
     "ManagerReports Damascus date patch: period state anchor not found; refusing unsafe replacement.",
