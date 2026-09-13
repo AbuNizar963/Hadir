@@ -28,29 +28,23 @@ jobs:
           const path = process.env.TARGET;
           let source = fs.readFileSync(path, 'utf8');
 
-          const replacements = [
-            [
-              'const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||"").trim();',
-              'const token=(request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||readCookie(request,SESSION_COOKIE)||"").trim();'
-            ]
-          ];
+          const before = 'const token=(readCookie(request,SESSION_COOKIE)||request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||"").trim();';
+          const after = 'const token=(request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||readCookie(request,SESSION_COOKIE)||"").trim();';
+          const count = source.split(before).length - 1;
 
-          let changed = false;
-          for (const [before, after] of replacements) {
-            const count = source.split(before).length - 1;
-            if (count === 0) throw new Error(`Expected source pattern not found: ${before}`);
-            source = source.split(before).join(after);
-            changed = true;
+          if (count !== 2) {
+            throw new Error(`Expected exactly 2 legacy token expressions, found ${count}`);
           }
+
+          source = source.split(before).join(after);
 
           if (!source.includes('revoked_at IS NULL')) {
             throw new Error('Session revocation guard is missing from automation-entry.ts');
           }
-          if (!source.includes('request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||readCookie(request,SESSION_COOKIE)')) {
+          if (!source.includes(after)) {
             throw new Error('Bearer-first token precedence was not applied');
           }
 
-          if (!changed) throw new Error('No guarded source change was produced');
           fs.writeFileSync(path, source.endsWith('\n') ? source : source + '\n');
           NODE
 
@@ -61,11 +55,29 @@ jobs:
         run: |
           set -euo pipefail
           test -s backend/src/automation-entry.ts
-          grep -q 'revoked_at IS NULL' backend/src/automation-entry.ts
-          grep -Eq 'request\.headers\.get\("authorization"\).*replace\(/\^Bearer\\\\s\+\/i, ""\).*readCookie\(request, SESSION_COOKIE\)' backend/src/automation-entry.ts
-          test "$(awk 'NF{count++} END{print count+0}' backend/src/automation-entry.ts)" -gt 20
+          node <<'NODE'
+          const fs = require('fs');
+          const source = fs.readFileSync('backend/src/automation-entry.ts', 'utf8');
+          const lines = source.split(/\r?\n/);
+          const nonEmptyLines = lines.filter((line) => line.trim().length > 0).length;
+          const bearerFirst = /request\.headers\.get\("authorization"\)\?\.replace\(\/\^Bearer\\\\s\+\/i, ""\)\s*\|\|\s*readCookie\(request, SESSION_COOKIE\)/;
+
+          if (!source.includes('revoked_at IS NULL')) {
+            throw new Error('Session revocation guard is missing');
+          }
+          if (!bearerFirst.test(source)) {
+            throw new Error('Bearer-first authentication expression is missing after formatting');
+          }
+          if (nonEmptyLines <= 20) {
+            throw new Error(`automation-entry.ts appears truncated or compressed: ${nonEmptyLines} non-empty lines`);
+          }
+          if (source.includes('readCookie(request, SESSION_COOKIE) || request.headers.get("authorization")')) {
+            throw new Error('Cookie-first authentication precedence remains');
+          }
+          NODE
           git diff --check
           npm --prefix backend run check
+          git diff --check
 
       - name: Commit repaired source and remove temporary workflow
         run: |
@@ -76,5 +88,6 @@ jobs:
           git add backend/src/automation-entry.ts
           git diff --cached --check
           git diff --cached --stat
+          git diff --cached -- backend/src/automation-entry.ts
           git commit -m 'fix(auth): normalize automation entry authentication'
           git push
