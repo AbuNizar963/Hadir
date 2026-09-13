@@ -1,5 +1,6 @@
 import fs from "node:fs";
 
+// One-time migration helper. Removed after canonical source verification.
 function replaceOnce(path, pattern, replacement, label) {
   const source = fs.readFileSync(path, "utf8");
   const next = source.replace(pattern, replacement);
