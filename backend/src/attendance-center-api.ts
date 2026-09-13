@@ -1,5 +1,6 @@
 import { handleDailyStatus } from "./attendance-engine";
 import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
+import { filterFutureCurrentDayRows } from "./professional-attendance-report-view";
 
 type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string };
 
@@ -146,12 +147,12 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
       return json(payload, dailyStatus.status, origin);
     }
 
-    const report = await buildProfessionalAttendanceReport(env, from, to, employeeId, actor);
+    const report = filterFutureCurrentDayRows(await buildProfessionalAttendanceReport(env, from, to, employeeId, actor));
     const live = await dailyStatus.json();
 
     return json({
       ok: true,
-      centerVersion: "1.1",
+      centerVersion: "1.2",
       timezone: "Asia/Damascus",
       date,
       from,
