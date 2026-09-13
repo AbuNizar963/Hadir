@@ -121,6 +121,23 @@ export type ProfessionalAttendanceDrilldown = {
   };
 };
 
+type AttendanceCenterResponse = {
+  ok: boolean;
+  centerVersion: string;
+  timezone: string;
+  date: string;
+  from: string;
+  to: string;
+  attendance: Record<string, unknown>;
+  report: ProfessionalAttendanceReport;
+  integrity: {
+    readOnly: boolean;
+    noRawAttendanceMutation: boolean;
+    attendanceSource: string;
+    historicalReportSource: string;
+  };
+};
+
 const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
 
 const adminHeaders = () => {
@@ -129,20 +146,21 @@ const adminHeaders = () => {
 };
 
 export async function getProfessionalAttendanceReport(from: string, to: string, employeeId?: string) {
-  const query = new URLSearchParams({ from, to });
+  const query = new URLSearchParams({ date: to, from, to });
   if (employeeId) query.set("employeeId", employeeId);
-  const response = await fetch(`${API_URL}/api/reports/professional-attendance?${query.toString()}`, {
+  const response = await fetch(`${API_URL}/api/manager/attendance-center?${query.toString()}`, {
     headers: adminHeaders(),
     credentials: "include",
     cache: "no-store",
   });
-  const data = await response.json().catch(() => null) as ProfessionalAttendanceReport | { error?: string } | null;
+  const data = await response.json().catch(() => null) as AttendanceCenterResponse | { error?: string } | null;
   if (!response.ok) throw new Error(String(data && "error" in data ? data.error : `HTTP ${response.status}`));
-  if (!data || "error" in data || !Array.isArray(data.rows)) throw new Error("استجابة التقرير غير صالحة");
+  if (!data || "error" in data || !data.report || !Array.isArray(data.report.rows)) throw new Error("استجابة مركز التقرير غير صالحة");
+  const report = data.report;
   const byStatus: Partial<Record<ProfessionalAttendanceStatus, number>> = {};
-  for (const row of data.rows) byStatus[row.status] = (byStatus[row.status] || 0) + 1;
-  data.dataQuality = { ...data.dataQuality, byStatus };
-  return data;
+  for (const row of report.rows) byStatus[row.status] = (byStatus[row.status] || 0) + 1;
+  report.dataQuality = { ...report.dataQuality, byStatus };
+  return report;
 }
 
 export async function getProfessionalAttendanceDrilldown(attendanceDay: string, employeeId: string) {
