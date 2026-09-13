@@ -16,13 +16,15 @@ export async function handleAttendanceThroughCentralEngine(
   origin: string,
   trustedTimestamp?: string,
 ) {
-  return executeCanonicalAttendance(req, env, actor, origin, trustedTimestamp);
+  return executeCanonicalAttendance(req, env, actor, origin, trustedTimestamp, false);
 }
 
 /**
  * Internal write helper used by automatic/VIP and administrative flows.
- * It creates an internal attendance request and sends it through the same
- * central application gateway used by normal employee requests.
+ * The final boolean is intentionally not exposed through HTTP; it is supplied
+ * only by this module after a server-side caller has explicitly entered the
+ * central engine. This lets trusted automation keep working without turning
+ * a client-controlled header into a privilege flag.
  */
 export async function submitAttendanceThroughCentralEngine(
   env: Env,
@@ -60,12 +62,13 @@ export async function submitAttendanceThroughCentralEngine(
     }),
   });
 
-  const response = await handleAttendanceThroughCentralEngine(
+  const response = await executeCanonicalAttendance(
     request,
     env,
     { id: employeeId, role: "staff", name: "المحرك المركزي" },
     "*",
     timestamp,
+    true,
   );
   return { response, error: null };
 }
