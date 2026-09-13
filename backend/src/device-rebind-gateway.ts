@@ -46,7 +46,7 @@ function dailyCors(request: Request, env: Env) {
     "access-control-allow-origin": allowOrigin,
     "access-control-allow-credentials": "true",
     "access-control-allow-headers": "authorization, content-type",
-    "access-control-allow-methods": "GET, OPTIONS",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
     "vary": "Origin",
     "cache-control": "no-store",
   };

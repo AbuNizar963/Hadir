@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getSettings, getEmployees } from "@/lib/storage";
 import { getBackendEmployees } from "@/lib/backend";
-import { getProfessionalAttendanceReport, type ProfessionalAttendanceReport } from "@/lib/professionalAttendanceReport";
+import { backfillProfessionalAttendanceReport, getProfessionalAttendanceReport, type ProfessionalAttendanceReport } from "@/lib/professionalAttendanceReport";
 import { downloadProfessionalAttendanceReport } from "@/lib/professionalReportExport";
 import { downloadCSV } from "@/lib/csv";
 import { BarChart3, CalendarDays, Clock3, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users } from "lucide-react";
@@ -30,6 +30,7 @@ export default function ProfessionalAttendanceReports() {
   const [employees, setEmployees] = useState<Employee[]>(getEmployees());
   const [report, setReport] = useState<ProfessionalAttendanceReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"overview" | "daily" | "employees" | "exceptions">("overview");
   const settings = getSettings();
@@ -40,6 +41,18 @@ export default function ProfessionalAttendanceReports() {
     try { setReport(await getProfessionalAttendanceReport(from, to, employeeId || undefined)); }
     catch (e) { setError(e instanceof Error ? e.message : "تعذر تحميل التقرير"); }
     finally { setLoading(false); }
+  };
+
+  const backfill = async () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) { setError("حدد فترة زمنية صحيحة."); return; }
+    setBackfilling(true); setError(null);
+    try {
+      const result = await backfillProfessionalAttendanceReport(from, to, employeeId || undefined);
+      await load();
+      setError(null);
+      window.alert(`تم تحديث طبقة التقارير بنجاح: ${Number(result.written || 0)} سجل.`);
+    } catch (e) { setError(e instanceof Error ? e.message : "تعذر تحديث طبقة التقارير"); }
+    finally { setBackfilling(false); }
   };
 
   useEffect(() => { let alive = true; getBackendEmployees().then((rows) => { if (alive && Array.isArray(rows)) setEmployees(rows); }).catch(() => undefined); return () => { alive = false; }; }, []);
@@ -75,7 +88,7 @@ export default function ProfessionalAttendanceReports() {
 
   return <ManagerLayout title="التقارير" subtitle="نظام التقارير العالمي · الحضور والموارد البشرية" actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportExcel} disabled={!report}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel</Button><Button variant="outline" onClick={exportCsv} disabled={!report}><Download className="ml-2 h-4 w-4" />CSV</Button><Button onClick={printReport} disabled={!report}><FileText className="ml-2 h-4 w-4" />PDF / طباعة</Button></div>}>
     <div dir="rtl" className="space-y-5 pb-10 print:bg-white">
-      <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5"><CardContent className="p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="flex items-center gap-2 text-xs font-bold text-primary"><BarChart3 className="h-4 w-4" />HADIR · Global Workforce Reporting</div><h1 className="mt-2 text-2xl font-black">لوحة الحضور التنفيذية</h1><p className="mt-1 text-sm text-muted-foreground">بيانات يومية موثقة، مؤشرات تشغيلية، واستثناءات قابلة للتتبع.</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><label className="text-xs font-bold">من<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm" /></label><label className="text-xs font-bold">إلى<input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm" /></label><label className="text-xs font-bold">الموظف<select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="mt-1 block h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">كل الموظفين</option>{employees.map((e) => <option key={e.id} value={e.id}>{e.name} · {e.jobNumber}</option>)}</select></label></div><Button onClick={() => void load()} disabled={loading} className="self-start lg:self-end">{loading ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <CalendarDays className="ml-2 h-4 w-4" />}تحديث التقرير</Button></div></CardContent></Card>
+      <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5"><CardContent className="p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="flex items-center gap-2 text-xs font-bold text-primary"><BarChart3 className="h-4 w-4" />HADIR · Global Workforce Reporting</div><h1 className="mt-2 text-2xl font-black">لوحة الحضور التنفيذية</h1><p className="mt-1 text-sm text-muted-foreground">بيانات يومية موثقة، مؤشرات تشغيلية، واستثناءات قابلة للتتبع.</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><label className="text-xs font-bold">من<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm" /></label><label className="text-xs font-bold">إلى<input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm" /></label><label className="text-xs font-bold">الموظف<select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="mt-1 block h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">كل الموظفين</option>{employees.map((e) => <option key={e.id} value={e.id}>{e.name} · {e.jobNumber}</option>)}</select></label></div><div className="flex flex-wrap gap-2 self-start lg:self-end"><Button onClick={() => void load()} disabled={loading || backfilling}>{loading ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <CalendarDays className="ml-2 h-4 w-4" />}تحديث التقرير</Button><Button variant="outline" onClick={() => void backfill()} disabled={loading || backfilling}>{backfilling ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <Database className="ml-2 h-4 w-4" />}تهيئة بيانات الفترة</Button></div></div></CardContent></Card>
 
       {error && <Card className="border-destructive/30"><CardContent className="flex items-center gap-3 p-4 text-sm"><TriangleAlert className="h-5 w-5 text-destructive" /><span>{error}</span></CardContent></Card>}
       {loading && !report ? <Card><CardContent className="p-10 text-center text-muted-foreground">جاري بناء التقرير من طبقة البيانات الرسمية…</CardContent></Card> : report && <>
