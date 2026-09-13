@@ -3,12 +3,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 const file = new URL("../src/pages/ProfessionalAttendanceReports.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 
-const iconImport = 'import { BarChart3, CalendarDays, Clock3, Database, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users } from "lucide-react";';
-const legacyIconImport = 'import { BarChart3, CalendarDays, Clock3, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users } from "lucide-react";';
-const shareIconImport = 'import { BarChart3, CalendarDays, Clock3, Database, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users, Share2 } from "lucide-react";';
-if (source.includes(iconImport)) source = source.replace(iconImport, shareIconImport);
-else if (source.includes(legacyIconImport)) source = source.replace(legacyIconImport, shareIconImport);
-else if (!source.includes("Share2")) throw new Error("Professional report share patch: icon import anchor not found.");
+const iconImportMatch = source.match(/import \{([^}]+)\} from ["']lucide-react["'];/);
+if (!iconImportMatch) throw new Error("Professional report share patch: lucide-react import not found.");
+const iconNames = iconImportMatch[1].split(",").map((name) => name.trim()).filter(Boolean);
+if (!iconNames.includes("Share2")) {
+  iconNames.push("Share2");
+  const nextImport = `import { ${iconNames.join(", ")} } from \"lucide-react\";`;
+  source = source.replace(iconImportMatch[0], nextImport);
+}
 
 const pdfImport = 'import { generateProfessionalReportPdf, pdfBlobToFile } from "@/lib/professionalPdf";';
 if (!source.includes(pdfImport)) {
