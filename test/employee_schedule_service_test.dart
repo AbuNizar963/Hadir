@@ -219,6 +219,17 @@ void main() {
       expect(state.isWorkDay, isFalse);
     });
 
+    test('rejects a calendar-invalid rotation start date', () {
+      final state = service.resolve(
+        {...employee, 'rotationStartDate': '2026-02-30'},
+        target: HadirTime.date(2026, 9, 2, 10),
+      );
+
+      expect(state.kind, 'INVALID');
+      expect(state.isWorkDay, isFalse);
+      expect(state.label, 'تاريخ بداية المناوبة غير صالح');
+    });
+
     test('reports the active rotation day using web status wording', () {
       final state = service.resolveStatus(
         employee,
