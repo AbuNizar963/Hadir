@@ -23,17 +23,15 @@ jobs:
           const path = 'backend/src/attendance-engine.ts';
           let source = fs.readFileSync(path, 'utf8');
 
-          const windowPattern = /from = localDateTimeUtc\(addDays\(day, -8\), "00:00"\)\.toISOString\(\),\s+to = localDateTimeUtc\(addDays\(day, 9\), "00:00"\)\.toISOString\(\);/;
-          const windowReplacement = 'to = localDateTimeUtc(addDays(day, 2), "00:00").toISOString();';
-          const narrowed = source.replace(windowPattern, windowReplacement);
-          if (narrowed === source) throw new Error('daily-status broad window anchor not found');
-          source = narrowed;
+          const oldWindow = 'from = localDateTimeUtc(addDays(day, -8), "00:00").toISOString(),\n    to = localDateTimeUtc(addDays(day, 9), "00:00").toISOString();';
+          const newWindow = 'to = localDateTimeUtc(addDays(day, 2), "00:00").toISOString();';
+          if (!source.includes(oldWindow)) throw new Error('daily-status broad window anchor not found');
+          source = source.replace(oldWindow, newWindow);
 
-          const rotationPattern = /const historicalFrom = localDateTimeUtc\(\s+addDays\(day, -Math\.max\(7, maxRotationOn - 1\),\)\s+,\s+"00:00",\s+\)\.toISOString\(\);/;
-          const rotationReplacement = 'const historicalFrom = localDateTimeUtc(\n      addDays(day, -Math.max(1, maxRotationOn - 1)),\n      "00:00",\n    ).toISOString();';
-          const narrowedRotation = source.replace(rotationPattern, rotationReplacement);
-          if (narrowedRotation === source) throw new Error('daily-status rotation history anchor not found');
-          source = narrowedRotation;
+          const oldRotationWindow = 'addDays(day, -Math.max(7, maxRotationOn - 1)),';
+          const newRotationWindow = 'addDays(day, -Math.max(1, maxRotationOn - 1)),';
+          if (!source.includes(oldRotationWindow)) throw new Error('daily-status rotation history anchor not found');
+          source = source.replace(oldRotationWindow, newRotationWindow);
 
           fs.writeFileSync(path, source);
           NODE
