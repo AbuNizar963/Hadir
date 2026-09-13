@@ -164,8 +164,8 @@ export async function getProfessionalAttendanceReport(from: string, to: string, 
 }
 
 export async function getProfessionalAttendanceDrilldown(attendanceDay: string, employeeId: string) {
-  const query = new URLSearchParams({ from: attendanceDay, to: attendanceDay, employeeId, drilldown: "1" });
-  const response = await fetch(`${API_URL}/api/reports/professional-attendance?${query.toString()}`, {
+  const query = new URLSearchParams({ date: attendanceDay, from: attendanceDay, to: attendanceDay, employeeId, drilldown: "1" });
+  const response = await fetch(`${API_URL}/api/manager/attendance-center?${query.toString()}`, {
     headers: adminHeaders(),
     credentials: "include",
     cache: "no-store",
