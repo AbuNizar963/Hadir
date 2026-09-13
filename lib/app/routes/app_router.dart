@@ -69,6 +69,7 @@ String? resolveAuthenticatedRedirect({
     '/admin/audit',
     '/admin/settings',
     '/manager',
+    '/manager-home',
     '/manager/employees',
     '/manager/workforce',
     '/manager/requests',
