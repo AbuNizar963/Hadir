@@ -121,7 +121,7 @@ async function saveEmployee(req: Request, env: Env, id: string, a: Actor, o: str
   }
   if (body.pin !== undefined || body.password !== undefined) {
     const password = String(body.pin ?? body.password ?? "");
-    if (password.length < 4) return json({ error: "رمز PIN يجب أن يكون 4 محارف على الأقل" }, 400, o);
+    if (password.length < 4) return json({ error: "رمز PIN يجب أن يكون 4 أحرف على الأقل" }, 400, o);
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
     const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" }, key, 256);
