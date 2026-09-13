@@ -1,6 +1,7 @@
 import base, { HadirRealtime } from "./automation-entry";
 import { handleDeviceRebind } from "./device-rebind-api";
 import { handleDailyStatus } from "./daily-status-canonical";
+import { handleAttendanceCenter } from "./attendance-center-api";
 import { handleProfessionalAttendanceReport } from "./professional-attendance-report-api";
 import { handleCompanyLogoRequest } from "./company-logo";
 import { runAutomaticVip } from "./automatic-vip";
@@ -94,6 +95,25 @@ export default {
 
     const url = new URL(request.url);
     const normalizedPath = url.pathname.replace(/\/$/, "");
+
+    if (normalizedPath === "/api/manager/attendance-center") {
+      const cors = dailyCors(request, env);
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+      try {
+        const actorProbe = new URL(request.url);
+        actorProbe.pathname = "/api/me";
+        actorProbe.search = "";
+        const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
+        const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
+        const result = await handleAttendanceCenter(request, env, actor);
+        const headers = new Headers(result.headers);
+        for (const [key, value] of Object.entries(cors)) headers.set(key, value);
+        return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
+      } catch (error) {
+        console.error("/api/manager/attendance-center failed", error);
+        return dailyError("تعذر قراءة مركز الحضور والتقارير.", request, env);
+      }
+    }
 
     if (normalizedPath === "/api/manager/daily-status" || normalizedPath === "/api/reports/attendance" || normalizedPath === "/api/reports/professional-attendance") {
       const cors = dailyCors(request, env);
