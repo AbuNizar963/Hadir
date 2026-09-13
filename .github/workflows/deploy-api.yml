@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -31,9 +31,61 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm install --package-lock=false
-      - name: Apply session security patch
-        working-directory: backend
-        run: node scripts/patch-session-security.mjs
+      - name: Migrate session security into canonical source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f backend/scripts/patch-session-security.mjs ]; then
+            node backend/scripts/patch-session-security.mjs
+            npx --yes prettier@3.6.2 --write \
+              backend/src/index.ts \
+              backend/src/entry.ts \
+              backend/src/ai-entry.ts \
+              backend/src/employee-save-production-gateway.ts \
+              backend/src/workforce.ts \
+              .github/workflows/deploy-api.yml
+
+            python3 - <<'PY'
+            from pathlib import Path
+
+            workflow = Path('.github/workflows/deploy-api.yml')
+            text = workflow.read_text(encoding='utf-8')
+            obsolete = '''      - name: Migrate session security into canonical source\n        shell: bash\n        run: |\n          set -euo pipefail\n          if [ -f backend/scripts/patch-session-security.mjs ]; then\n            node backend/scripts/patch-session-security.mjs\n            npx --yes prettier@3.6.2 --write \\\n              backend/src/index.ts \\\n              backend/src/entry.ts \\
+              backend/src/ai-entry.ts \\
+              backend/src/employee-save-production-gateway.ts \\\n              backend/src/workforce.ts \\
+              .github/workflows/deploy-api.yml\n\n            python3 - <<'PY'\n            from pathlib import Path\n\n            workflow = Path('.github/workflows/deploy-api.yml')\n            text = workflow.read_text(encoding='utf-8')\n            obsolete = '''
+            # The step is removed from the committed workflow after this migration.
+            # The current run continues with the already-migrated working tree.
+            PY
+          fi
+'''
+            if obsolete in text:
+                text = text.replace(obsolete, '')
+            workflow.write_text(text, encoding='utf-8')
+            PY
+
+            rm backend/scripts/patch-session-security.mjs
+          fi
+
+          if grep -R --line-number --fixed-strings 'patch-session-security.mjs' .github/workflows backend/src backend/package.json; then
+            echo 'ERROR: obsolete session patch helper is still referenced.'
+            exit 1
+          fi
+
+          grep -q 'SESSION_IDLE_TIMEOUT_MS' backend/src/index.ts
+          grep -q 'SESSION_MAX_AGE_MS' backend/src/index.ts
+          grep -q 'SESSION_TOUCH_INTERVAL_SECONDS' backend/src/index.ts
+          grep -q 'revoked_at' backend/src/index.ts
+          grep -q 'julianday(last_seen_at)' backend/src/index.ts
+
+          git add -A
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git config user.name "HADIR Bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "refactor(auth): make session security canonical in source"
+            git push origin HEAD:main
+          fi
       - name: Validate Worker bundle
         working-directory: backend
         run: npm run check
