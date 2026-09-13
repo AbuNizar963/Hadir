@@ -1,5 +1,6 @@
 import fs from "node:fs";
 
+// One-time migration helper. Removed after canonical source verification.
 const path = "backend/src/professional-attendance-report-engine.ts";
 const source = fs.readFileSync(path, "utf8");
 const pattern = /    const dayAnchor = Date\.parse\(`\$\{day\}T00:00:00Z`\);\n    const attendanceQuery = employeeId\n      \? env\.DB\.prepare\([\s\S]*?\n    const attendanceRows = await attendanceQuery\.all<any>\(\);/;
