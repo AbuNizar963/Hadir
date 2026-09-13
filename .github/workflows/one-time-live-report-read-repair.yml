@@ -1,0 +1,50 @@
+# One-time canonical repair; removed after source and Actions verification.
+name: One-time live report read repair
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-time-live-report-read-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Narrow live report attendance read
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'backend/src/professional-attendance-report-engine.ts';
+          let source = fs.readFileSync(path, 'utf8');
+
+          const oldBlock = `    const dayAnchor = Date.parse(\`${'${day}'}T00:00:00Z\`);
+    const attendanceRows = await env.DB.prepare(
+      "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
+    ).bind(new Date(dayAnchor - 86400000).toISOString(), new Date(dayAnchor + 172800000).toISOString()).all<any>();`;
+          const newBlock = `    const dayStart = new Date(\`${'${day}'}T00:00:00+03:00\`);
+    const dayEnd = new Date(dayStart.getTime() + 86400000);
+    const attendanceSql = employeeId
+      ? "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<?"
+      : "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<?";
+    const attendanceRows = employeeId
+      ? await env.DB.prepare(attendanceSql).bind(employeeId, dayStart.toISOString(), dayEnd.toISOString()).all<any>()
+      : await env.DB.prepare(attendanceSql).bind(dayStart.toISOString(), dayEnd.toISOString()).all<any>();`;
+          if (!source.includes(oldBlock)) throw new Error('live report broad attendance query anchor not found');
+          source = source.replace(oldBlock, newBlock);
+
+          fs.writeFileSync(path, source);
+          NODE
+          npx --yes prettier@3.6.2 --write backend/src/professional-attendance-report-engine.ts
+          git diff --check
+          git config user.name "HADIR Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/professional-attendance-report-engine.ts
+          if git diff --cached --quiet; then echo "No changes needed"; exit 0; fi
+          git commit -m "perf: narrow live attendance report reads"
+          git push
