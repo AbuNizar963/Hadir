@@ -47,6 +47,13 @@ jobs:
         working-directory: backend
         run: npx wrangler deploy --dry-run
 
+      - name: Verify removed dependency
+        run: |
+          if grep -R "patch-session-security" .github/workflows backend --exclude-dir=node_modules; then
+            echo "patch-session-security dependency still exists"
+            exit 1
+          fi
+
       - name: Commit migrated source
         run: |
           git config user.name "github-actions[bot]"
