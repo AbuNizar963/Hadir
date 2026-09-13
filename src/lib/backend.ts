@@ -47,7 +47,19 @@ export async function deleteBackendAdmin(id: string) { return requestWithRetry<{
 export async function resetBackendEmployeeDevice(id: string) { return requestWithRetry<{ ok: boolean }>(`/api/employees/${encodeURIComponent(id)}/device`, { method: "DELETE" }, 3, "admin"); }
 export async function getBackendAttendance(limit = 500) { const role = activeRole(); if (role === "admin") { const audit = await request<any[]>(`/api/audit?limit=${Math.min(limit, 2000)}`, {}, "admin"); return audit.filter((row) => row.result === "success" && (row.action === "check-in" || row.action === "check-out") && row.employeeId).map((row) => ({ id: String(row.id), employeeId: String(row.employeeId), jobNumber: String(row.jobNumber || ""), employeeName: String(row.actorName || ""), type: row.action as "check-in" | "check-out", timestamp: String(row.timestamp), lat: Number(row.lat || 0), lng: Number(row.lng || 0), distanceMeters: Number(row.distanceMeters || 0), deviceId: String(row.deviceId || ""), ip: String(row.ip || ""), qrCode: "", locationId: undefined })) as AttendanceRecord[]; } return request<AttendanceRecord[]>(`/api/attendance?limit=${Math.min(limit, 2000)}`, {}, role); }
 export async function createAttendanceChallenge(input: { type: "check-in" | "check-out"; lat: number; lng: number; qrCode: string; deviceId?: string }) { return requestWithRetry<{ ok: boolean; challengeId: string; expiresAt: string }>("/api/attendance/challenge", { method: "POST", body: JSON.stringify(input) }, 3, "employee"); }
-export async function createBackendAttendance(record: Omit<AttendanceRecord, "id" | "ip"> & { challengeId?: string }) { return requestWithRetry<{ ok: boolean }>("/api/attendance", { method: "POST", body: JSON.stringify(record) }, 3, "employee"); }
+export async function createBackendAttendance(record: Omit<AttendanceRecord, "id" | "ip"> & { challengeId?: string }) {
+  const submit = (payload: typeof record) => requestWithRetry<{ ok: boolean; record?: AttendanceRecord }>("/api/attendance", { method: "POST", body: JSON.stringify(payload) }, 3, "employee");
+  try {
+    return await submit(record);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error || "");
+    const requiresChallenge = /تحقق\s*الحضور\s*(مطلوب|ضروري)|attendance\s*verification\s*(required|needed)/i.test(reason);
+    if (!requiresChallenge) throw error;
+    const challenge = await createAttendanceChallenge({ type: record.type, lat: record.lat, lng: record.lng, qrCode: record.qrCode, deviceId: record.deviceId });
+    if (!challenge?.ok || !challenge.challengeId) throw new Error("تعذر إنشاء تحقق الحضور. أعد المحاولة.");
+    return await submit({ ...record, challengeId: challenge.challengeId });
+  }
+}
 export async function getBackendRequests(role?: RoleHint) { return request<EmployeeRequest[]>("/api/requests", {}, role || activeRole()); }
 export async function createBackendRequest(input: Omit<EmployeeRequest, "id" | "status" | "createdAt">) { return requestWithRetry<{ ok: boolean }>("/api/requests", { method: "POST", body: JSON.stringify(input) }, 3, "employee"); }
 export async function updateBackendRequest(id: string, status: "approved" | "rejected") { return requestWithRetry<{ ok: boolean }>(`/api/requests/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status }) }, 3, "admin"); }
@@ -67,5 +79,3 @@ export async function deleteBackendEmployee(id: string) { return requestWithRetr
 export async function getBackendEscapeEvents(employeeId?: string, limit = 500) { const query = new URLSearchParams({ limit: String(Math.min(limit, 2000)) }); if (employeeId) query.set("employeeId", employeeId); return request<EscapeEvent[]>(`/api/escape-events?${query.toString()}`, {}, "admin"); }
 export async function createBackendEscapeEvent(input: { employeeId: string; status: "escaped" | "returned"; reason?: string; lat?: number; lng?: number }) { return requestWithRetry<{ ok: boolean; event: EscapeEvent }>("/api/escape-events", { method: "POST", body: JSON.stringify(input) }, 3, "admin"); }
 export async function backendHealth() { return request<{ ok: boolean; database?: string; ownerInitialized?: boolean }>("/api/health"); }
-export type { AdminAccount };
-export async function resetBackendTestData() { return requestWithRetry<{ ok: boolean; deleted: Record<string, number | string>; preserved: string[]; message: string }>("/api/workforce/reset", { method: "POST", body: JSON.stringify({ confirmation: "تأكيد" }) }, 3, "admin"); }
