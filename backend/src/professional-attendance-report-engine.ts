@@ -121,12 +121,13 @@ async function loadLiveTodayFacts(env: Env, day: string, employeeId: string | un
       .filter((row: any) => !employeeId || String(row.employeeId) === employeeId);
     if (!liveEmployees.length) return [];
 
-    const start = `${day}T00:00:00.000Z`;
+    const dayAnchor = Date.parse(`${day}T00:00:00Z`);
     const attendanceRows = await env.DB.prepare(
       "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
-    ).bind(start, `${day}T23:59:59.999Z`).all<any>();
+    ).bind(new Date(dayAnchor - 86400000).toISOString(), new Date(dayAnchor + 172800000).toISOString()).all<any>();
     const eventsByEmployee = new Map<string, any[]>();
     for (const event of attendanceRows.results || []) {
+      if (damascusDay(new Date(String(event.timestamp))) !== day) continue;
       const id = String(event.employeeId || "");
       if (!id) continue;
       const list = eventsByEmployee.get(id) || [];
@@ -200,8 +201,9 @@ async function loadLiveTodayFacts(env: Env, day: string, employeeId: string | un
 export async function buildProfessionalAttendanceReport(env: Env, from: string, to: string, employeeId?: string, actor?: any) {
   const dayCount = validatePeriod(from, to);
   const sourceRows = await loadFacts(env, from, to, employeeId);
-  const liveRows = to >= damascusDay() ? await loadLiveTodayFacts(env, damascusDay(), employeeId, actor) : [];
-  const rows = [...sourceRows.filter((row) => row.attendanceDay !== damascusDay()), ...liveRows]
+  const currentDay = damascusDay();
+  const liveRows = from <= currentDay && currentDay <= to ? await loadLiveTodayFacts(env, currentDay, employeeId, actor) : [];
+  const rows = [...sourceRows.filter((row) => row.attendanceDay !== currentDay), ...liveRows]
     .filter((row) => VALID_STATUSES.has(row.status))
     .map(toPublicRow);
   const employees = new Map<string, { employeeId: string; employeeName: string; jobNumber: string | null; days: number; present: number; late: number; absent: number; leave: number; permission: number; rest: number; escaped: number; open: number; workedMinutes: number; expectedMinutes: number; lateMinutes: number; earlyLeaveMinutes: number; overtimeMinutes: number }>();
