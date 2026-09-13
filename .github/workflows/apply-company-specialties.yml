@@ -21,6 +21,7 @@ jobs:
           python3 scripts/apply_job_number_update.py
           node scripts/patch_employee_management_canonical.mjs
           python3 scripts/restore-daily-print-report.py
+          npx --yes prettier@3.6.2 --write src/pages/ManagerReports.tsx public/report-print.css
 
       - name: Commit patch
         run: |
