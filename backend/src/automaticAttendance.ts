@@ -1,6 +1,6 @@
 import { refreshProfessionalAttendanceFact } from "./professional-attendance-fact-builder";
 import { refreshCanonicalStatus } from "./attendance-engine-commands";
-import { dateKeyLocal, insertAutomaticAttendance, operationalShift, runAutomaticAttendance } from "./attendance-engine-automatic-commands";
+import { dateKeyLocal, insertAutomaticAttendance, operationalShift } from "./attendance-engine-automatic-commands";
 
 export { runAutomaticAttendance } from "./attendance-engine-automatic-commands";
 
@@ -61,5 +61,3 @@ export async function workforceControls(req:Request,env:Env,actor:Admin|null,ori
   await env.DB.prepare(`UPDATE employees SET ${fields.join(",")} WHERE id=?`).bind(...values).run();
   return json({ok:true,employeeId},200,origin);
 }
-
-void runAutomaticAttendance;
