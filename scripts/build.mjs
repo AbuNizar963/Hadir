@@ -21,7 +21,6 @@ if (!existsSync(vitePackage)) {
 
 run("node", ["scripts/repair-manager-report-patch.mjs"]);
 run("node", ["scripts/patch-manager-reports-final.mjs"]);
-run("node", ["scripts/patch-manager-reports-final2.mjs"]);
 run("node", ["scripts/patch-manager-reports-live.mjs"]);
 run("node", ["scripts/patch-manager-report-header-preflight.mjs"]);
 run("node", ["scripts/patch-manager-report-header.mjs"]);
