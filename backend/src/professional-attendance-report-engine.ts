@@ -158,21 +158,15 @@ async function loadLiveTodayFacts(
     );
     if (!liveEmployees.length) return [];
 
-    const dayAnchor = Date.parse(`${day}T00:00:00Z`);
+    const dayStart = new Date(`${day}T00:00:00+03:00`);
+    const dayEnd = new Date(dayStart.getTime() + 86400000);
     const attendanceQuery = employeeId
       ? env.DB.prepare(
           "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
-        ).bind(
-          employeeId,
-          new Date(dayAnchor - 86400000).toISOString(),
-          new Date(dayAnchor + 86400000).toISOString(),
-        )
+        ).bind(employeeId, dayStart.toISOString(), dayEnd.toISOString())
       : env.DB.prepare(
           "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
-        ).bind(
-          new Date(dayAnchor - 86400000).toISOString(),
-          new Date(dayAnchor + 172800000).toISOString(),
-        );
+        ).bind(dayStart.toISOString(), dayEnd.toISOString());
     const attendanceRows = await attendanceQuery.all<any>();
     const eventsByEmployee = new Map<string, any[]>();
     for (const event of attendanceRows.results || []) {
