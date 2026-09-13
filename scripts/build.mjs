@@ -27,7 +27,6 @@ run("node", ["scripts/patch-global-attendance-escaped-label.mjs"]);
 run("node", ["scripts/patch-report-archive-delete.mjs"]);
 run("node", ["scripts/patch-manager-report-share.mjs"]);
 run("node", ["scripts/patch-professional-report-share.mjs"]);
-run("node", ["scripts/patch-manager-report-filename.mjs"]);
 run("node", ["scripts/patch-company-logo-refresh.mjs"]);
 run("node", ["scripts/patch-company-logo-settings-preview.mjs"]);
 run("node", ["scripts/patch-manager-report-share-filename-safe.mjs"]);
