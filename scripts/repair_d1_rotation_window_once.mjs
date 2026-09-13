@@ -1,5 +1,6 @@
 import fs from "node:fs";
 
+// Temporary one-time repair; removed immediately after canonical source verification.
 const path = "backend/src/attendance-engine.ts";
 let source = fs.readFileSync(path, "utf8");
 
