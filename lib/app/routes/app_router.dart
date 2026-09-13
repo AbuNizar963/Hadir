@@ -48,10 +48,6 @@ String? resolveAuthenticatedRedirect({
   final hasEmployeeToken = employeeToken != null && employeeToken.isNotEmpty;
   final hasAdminToken = adminToken != null && adminToken.isNotEmpty;
 
-  if (!hasEmployeeToken && !hasAdminToken && !publicLocations.contains(location)) {
-    return '/';
-  }
-
   // A restored admin session should never land on a login/public entry page.
   if (hasAdminToken && publicLocations.contains(location)) return '/admin';
 
@@ -103,6 +99,10 @@ String? resolveAuthenticatedRedirect({
   };
   final isEmployeeScan = location.startsWith('/employee/scan/');
   if (!hasEmployeeToken && (employeePaths.contains(location) || isEmployeeScan)) return '/login';
+
+  if (!hasEmployeeToken && !hasAdminToken && !publicLocations.contains(location)) {
+    return '/';
+  }
 
   return null;
 }
