@@ -1,13 +1,10 @@
-import { dateKey, getAttendanceShift, getAttendanceShiftForDay } from "./attendance-period";
+import { addDays, dateKey, getAttendanceShift, getAttendanceShiftForDay } from "./attendance-period";
 
 type Env = { DB: D1Database; APP_TIMEZONE?: string; };
 const TZ = "Asia/Damascus";
-const DAY_MS = 86_400_000;
 const SAFETY_AFTER_SHIFT_MS = 6 * 60 * 60 * 1000;
 const id = () => crypto.randomUUID();
 const nowIso = () => new Date().toISOString();
-const dayNumber = (day: string) => Date.UTC(Number(day.slice(0,4)), Number(day.slice(5,7))-1, Number(day.slice(8,10))) / DAY_MS;
-const addDays = (day: string, n: number) => new Date((dayNumber(day) + n) * DAY_MS).toISOString().slice(0,10);
 function asMs(value: unknown) { const n = Date.parse(String(value || "")); return Number.isFinite(n) ? n : null; }
 function shiftForException(employee: any, now: Date, tz: string) {
   if (String(employee.scheduleType || "ADMIN").toUpperCase() !== "ROTATION") return getAttendanceShift(employee, now, tz);
@@ -32,7 +29,7 @@ export async function runAttendanceExceptionEngine(env: Env) {
   for (const employee of (employees.results || []) as any[]) {
     const shift = shiftForException(employee, now, tz);
     if (!shift.isWorkDay || shift.end.getTime() <= shift.start.getTime() || nowMs < shift.start.getTime()) continue;
-    const startIso = shift.start.toISOString(), safetyCutoff = new Date(shift.end.getTime() + SAFETY_AFTER_SHIFT_MS);
+    const startIso = shift.start.toISOString(), endIso = shift.end.toISOString(), safetyCutoff = new Date(shift.end.getTime() + SAFETY_AFTER_SHIFT_MS);
     const events = await env.DB.prepare("SELECT type,timestamp FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<=? ORDER BY timestamp ASC").bind(employee.id, startIso, new Date(Math.min(nowMs, safetyCutoff.getTime())).toISOString()).all<any>();
     const rows = (events.results || []) as any[], checkIns = rows.filter(row => String(row.type) === "check-in"), checkOuts = rows.filter(row => String(row.type) === "check-out");
     const firstIn = checkIns[0] ? asMs(checkIns[0].timestamp) : null, lastOut = checkOuts.length ? asMs(checkOuts[checkOuts.length - 1].timestamp) : null;
@@ -44,7 +41,7 @@ export async function runAttendanceExceptionEngine(env: Env) {
     const day = dateKey(shift.start, tz), existing = await env.DB.prepare("SELECT id FROM attendance_exceptions WHERE employee_id=? AND shift_start=? AND exception_code=? LIMIT 1").bind(employee.id, startIso, code).first<any>();
     if (existing) continue;
     const createdAt = nowIso();
-    await env.DB.prepare(`INSERT INTO attendance_exceptions (id,employee_id,attendance_day,shift_start,shift_end,schedule_type,exception_code,state,first_event_at,last_event_at,raw_worked_minutes,payroll_approved_minutes,safety_cutoff_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id(), employee.id, day, startIso, shift.end.toISOString(), String(employee.scheduleType || "ADMIN").toUpperCase(), code, "PENDING_REGULARIZATION", firstIn ? new Date(firstIn).toISOString() : null, lastOut ? new Date(lastOut).toISOString() : null, rawMinutes, 0, cutoff.toISOString(), createdAt, createdAt).run();
+    await env.DB.prepare(`INSERT INTO attendance_exceptions (id,employee_id,attendance_day,shift_start,shift_end,schedule_type,exception_code,state,first_event_at,last_event_at,raw_worked_minutes,payroll_approved_minutes,safety_cutoff_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id(), employee.id, day, startIso, endIso, String(employee.scheduleType || "ADMIN").toUpperCase(), code, "PENDING_REGULARIZATION", firstIn ? new Date(firstIn).toISOString() : null, lastOut ? new Date(lastOut).toISOString() : null, rawMinutes, 0, cutoff.toISOString(), createdAt, createdAt).run();
     await notifyManagers(env.DB, String(employee.name || ""), String(employee.jobNumber || ""), code); created++;
   }
   return { ok: true, created, checkedEmployees: (employees.results || []).length, computedAt: nowIso() };
