@@ -1,4 +1,5 @@
 import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
+import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
 
 type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string };
 
@@ -103,11 +104,7 @@ async function buildProfessionalAttendanceDrilldown(env: Env, attendanceDay: str
       computedAt: fact.computed_at,
       scheduleSnapshot,
     },
-    sources: {
-      attendance,
-      requests,
-      audit,
-    },
+    sources: { attendance, requests, audit },
     trace: {
       attendanceEventIds,
       requestIds,
@@ -142,11 +139,14 @@ export async function handleProfessionalAttendanceReport(req: Request, env: Env,
       return json(detail, 200, origin);
     }
 
-    // The report contract is strictly read-only: GET may SELECT existing facts
-    // and source rows, but it never materializes, backfills, INSERTs, UPDATEs,
-    // DELETEs, or creates database objects.
-    const report = await buildProfessionalAttendanceReport(env, from, to, employeeId);
-    return json(report, 200, origin);
+    let report = await buildProfessionalAttendanceReport(env, from, to, employeeId);
+    let materialized = 0;
+    if (report.rows.length === 0) {
+      materialized = await ensureProfessionalAttendanceFacts(env, from, to, actor, employeeId);
+      if (materialized > 0) report = await buildProfessionalAttendanceReport(env, from, to, employeeId);
+    }
+
+    return json({ ...report, materializedOnDemand: materialized > 0, materializedRecords: materialized }, 200, origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : "تعذر بناء التقرير";
     console.error("professional attendance report failed", error);
