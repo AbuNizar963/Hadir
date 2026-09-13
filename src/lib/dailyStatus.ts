@@ -84,6 +84,7 @@ function normalizeActiveAttendance(
   };
 }
 
+// Escape is a current employee state, so the latest event takes precedence over the daily snapshot.
 async function getCurrentEscapedEmployeeIds(): Promise<Set<string>> {
   try {
     const events = (await getBackendEscapeEvents(undefined, 2000)) as EscapeState[];
