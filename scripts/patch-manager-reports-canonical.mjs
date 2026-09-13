@@ -28,7 +28,7 @@ const replacementFunctions = `function calculateDetails(employee: Employee, date
     const lm = cin && scheduledStart ? Math.max(0, Math.round((cin.getTime() - scheduledStart.getTime()) / 60000) - grace) : 0;
     const wd = cin && cout ? Math.max(0, minutesBetween(cin.toISOString(), cout.toISOString())) : 0;
     const em = cout && scheduledEnd ? Math.max(0, Math.round((scheduledEnd.getTime() - cout.getTime()) / 60000)) : 0;
-    const status: Status = serverStatus || "absent";
+    const status: Status = serverStatus === "open" ? "present" : serverStatus || "absent";
     const detailText = [status === "off" ? "لا يوجد دوام" : status === "not_started" ? "لم يبدأ الدوام" : "الحالة المعتمدة من الخادم", requestText(requests, employee.id, k)].filter(Boolean).join(" · ");
     detail.push({ date: k, day: days[d.getDay()], status, checkIn: cin ? formatTime(cin.toISOString()) : "—", checkOut: cout ? formatTime(cout.toISOString()) : "—", worked: wd, late: lm, early: em, detail: detailText });
   }
@@ -54,7 +54,7 @@ function calculateSummary(employee: Employee, dates: Date[], _index: Map<string,
     lateMinutes += lm;
     earlyMinutes += em;
     worked += wd;
-    if (serverStatus === "open") open++;
+    if (serverStatus === "open") present++;
     else if (serverStatus === "late") late++;
     else if (serverStatus === "present") present++;
     else if (em) early++;
@@ -78,4 +78,4 @@ if (!source.includes("dailyStatusByDate?.get(k)?.get(employee.id)")) throw new E
 if (source.includes('import { getEmployeeWorkPeriod } from "@/lib/schedule";')) throw new Error("ManagerReports canonical patch: local schedule import remains.");
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerReports canonical patch: applied safely; report status now comes from daily_attendance_status.");
+console.log("ManagerReports canonical patch: active attendance is reported as PRESENT while the underlying open checkout state remains intact.");
