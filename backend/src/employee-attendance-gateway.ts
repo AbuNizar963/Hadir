@@ -1,21 +1,17 @@
-import { submitAttendanceThroughCentralEngine } from "./attendance-engine-central";
-import { handleEmployeeAttendance as executeCanonicalAttendance } from "./attendance-engine-commands";
+import { handleAttendanceThroughCentralEngine, submitAttendanceThroughCentralEngine } from "./attendance-engine-central";
 
 type Env = { DB: D1Database };
 
 /**
  * Public attendance gateway.
  *
- * Every HTTP attendance request enters this module first. The actual D1 write
- * remains exclusively inside the canonical attendance engine, while the
- * central gateway is the only application-level route into that engine.
+ * Every HTTP attendance request enters the central attendance engine before
+ * reaching the canonical D1 writer. This keeps the route stable for existing
+ * callers while preventing a second application-level attendance path.
  */
 export async function handleEmployeeAttendance(req: Request, env: Env, actor: any, origin: string) {
-  return executeCanonicalAttendance(req, env, actor, origin);
+  return handleAttendanceThroughCentralEngine(req, env, actor, origin);
 }
 
-/**
- * Internal callers (automatic/VIP and administrative flows) use the same
- * central gateway without constructing an HTTP session.
- */
+/** Internal compatibility export for automatic/VIP and administrative flows. */
 export { submitAttendanceThroughCentralEngine };
