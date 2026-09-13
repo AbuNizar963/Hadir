@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   deploy:
@@ -31,26 +31,6 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm install --package-lock=false
-      - name: Migrate session security into canonical source
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -f backend/scripts/patch-session-security.mjs ]; then
-            node backend/scripts/patch-session-security.mjs
-            npx --yes prettier@3.6.2 --write \
-              backend/src/index.ts \
-              backend/src/entry.ts \
-              backend/src/ai-entry.ts \
-              backend/src/employee-save-production-gateway.ts \
-              backend/src/workforce.ts
-            rm backend/scripts/patch-session-security.mjs
-            git add backend/src/index.ts backend/src/entry.ts backend/src/ai-entry.ts backend/src/employee-save-production-gateway.ts backend/src/workforce.ts backend/scripts/patch-session-security.mjs
-            git diff --cached --check
-            git config user.name "HADIR Bot"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "refactor(auth): make session security canonical in source"
-            git push origin HEAD:main
-          fi
       - name: Validate Worker bundle
         working-directory: backend
         run: npm run check
