@@ -233,7 +233,7 @@ function filterFutureCurrentDayRows(report: any) {
         minutes: row.lateMinutes || row.earlyLeaveMinutes || row.overtimeMinutes || 0,
         attendanceEventIds: row.attendanceEventIds,
         requestIds: row.requestIds,
-        auditIds: [],
+        auditIds: row.auditIds,
       })),
     },
     rows: visibleRows,
