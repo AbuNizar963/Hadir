@@ -46,7 +46,7 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
       return;
     }
     if (!isValidEmployeePassword(password)) {
-      setState(() => _error = 'رمز الدخول يجب أن يتكون من 4 محارف أو أكثر، باستخدام الأحرف الإنجليزية والأرقام.');
+      setState(() => _error = 'رمز الدخول يجب أن يتكون من 4 أحرف أو أكثر، باستخدام الأحرف الإنجليزية والأرقام.');
       return;
     }
     setState(() { _busy = true; _error = null; });
@@ -149,8 +149,8 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                             onSubmitted: (_) => _login(),
                             decoration: InputDecoration(
                               labelText: 'رمز الدخول',
-                              hintText: '4 محارف أو أكثر',
-                              suffixText: '4+ محارف',
+                              hintText: '4 أحرف أو أكثر',
+                              suffixText: '4+ أحرف',
                               suffixIcon: IconButton(
                                 onPressed: _busy ? null : () => setState(() => _hidden = !_hidden),
                                 icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
