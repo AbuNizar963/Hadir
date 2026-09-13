@@ -1,0 +1,67 @@
+name: Repair employee premium formatting
+
+on:
+  push:
+    branches: [Apps]
+    paths:
+      - '.github/workflows/repair-format-employee-premium.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Apps
+        uses: actions/checkout@v4
+        with:
+          ref: Apps
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Format source professionally
+        run: dart format lib/features/employee/pages/employee_premium_page_implementation.dart
+
+      - name: Verify Flutter source
+        run: |
+          dart format --set-exit-if-changed lib/features/employee/pages/employee_premium_page_implementation.dart
+          flutter analyze
+          flutter test
+
+      - name: Build Android debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+          test -f app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Commit formatted source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/features/employee/pages/employee_premium_page_implementation.dart
+          if ! git diff --cached --quiet; then
+            git commit -m "style(flutter): format employee premium source"
+            git push origin HEAD:Apps
+          fi
+
+      - name: Remove temporary repair workflow
+        if: always()
+        run: |
+          git rm -f .github/workflows/repair-format-employee-premium.yml || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: remove temporary repair workflow"
+            git push origin HEAD:Apps
+          fi
