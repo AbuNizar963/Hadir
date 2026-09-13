@@ -1,0 +1,85 @@
+name: Repair escape-state source
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install formatter dependency
+        run: npm ci --ignore-scripts
+
+      - name: Repair canonical escape-state logic
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import ts from 'typescript';
+
+          const managerPath = 'src/pages/ManagerEmployees.tsx';
+          const attendancePath = 'backend/src/attendance-engine.ts';
+
+          function replaceOnce(source, pattern, replacement, label) {
+            const match = source.match(pattern);
+            if (!match) throw new Error(`Safety check failed: ${label} anchor not found`);
+            return source.replace(pattern, replacement);
+          }
+
+          function formatTypeScript(path) {
+            const source = fs.readFileSync(path, 'utf8');
+            const kind = path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+            const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, kind);
+            const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
+            fs.writeFileSync(path, printer.printFile(file));
+          }
+
+          let manager = fs.readFileSync(managerPath, 'utf8');
+          manager = replaceOnce(
+            manager,
+            /  const stats = \{\s*total: employees\.length,\s*active: employees\.filter\(\(e\) => e\.status === "active"\)\.length,\s*suspended: employees\.filter\(\(e\) => e\.status !== "active"\)\.length,\s*devices: employees\.filter\(\(e\) => !!e\.deviceId\)\.length,\s*vip: employees\.filter\(\(e\) => e\.status === "active" && e\.isVip\)\.length,\s*escaped: employees\.filter\(\(e\) => escapeStatusFor\(e\.id\) === "escaped"\)\.length,\s*\};/,
+            `  const escapedIds = new Set(\n    employees\n      .filter((e) => escapeStatusFor(e.id) === "escaped")\n      .map((e) => e.id),\n  );\n\n  const stats = {\n    total: employees.length,\n    active: employees.filter((e) => e.status === "active" && !escapedIds.has(e.id)).length,\n    suspended: employees.filter((e) => e.status !== "active").length,\n    devices: employees.filter((e) => !!e.deviceId).length,\n    vip: employees.filter((e) => e.status === "active" && !escapedIds.has(e.id) && e.isVip).length,\n    escaped: escapedIds.size,\n  };`,
+            'ManagerEmployees stats',
+          );
+          fs.writeFileSync(managerPath, manager);
+
+          let attendance = fs.readFileSync(attendancePath, 'utf8');
+          attendance = replaceOnce(
+            attendance,
+            /const escapeQuery=await env\.DB\.prepare\("SELECT employee_id AS employeeId,status,timestamp FROM escape_events WHERE timestamp>=\? AND timestamp<\? ORDER BY timestamp DESC"\)\.bind\(localDateTimeUtc\(day,"00:00"\)\.toISOString\(\),escapeCutoff\.toISOString\(\)\)\.all<any>\(\);/,
+            `const escapeQuery = await env.DB.prepare(\n  "SELECT event.employee_id AS employeeId,event.status,event.timestamp FROM escape_events event INNER JOIN (SELECT employee_id,MAX(timestamp) AS latestTimestamp FROM escape_events WHERE timestamp<? GROUP BY employee_id) latest ON latest.employee_id=event.employee_id AND latest.latestTimestamp=event.timestamp ORDER BY event.timestamp DESC",\n).bind(escapeCutoff.toISOString()).all<any>();`,
+            'attendance-engine escape state query',
+          );
+          fs.writeFileSync(attendancePath, attendance);
+
+          formatTypeScript(managerPath);
+          formatTypeScript(attendancePath);
+          NODE
+
+      - name: Verify repair markers and syntax anchors
+        run: |
+          grep -q 'active: employees.filter((e) => e.status === "active" && !escapedIds.has(e.id)).length' src/pages/ManagerEmployees.tsx
+          grep -q 'const escapedIds = new Set' src/pages/ManagerEmployees.tsx
+          grep -q 'latestTimestamp' backend/src/attendance-engine.ts
+
+      - name: Commit canonical source repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ManagerEmployees.tsx backend/src/attendance-engine.ts
+          if git diff --cached --quiet; then
+            echo "No source changes required."
+            exit 0
+          fi
+          git commit -m "fix: separate escaped employees from active workforce"
+          git push
