@@ -199,10 +199,10 @@ class EmployeeScheduleService {
     final rawStart = '${employee['rotationStartDate'] ?? ''}'.trim();
     final startDay = rawStart.length >= 10 ? rawStart.substring(0, 10) : rawStart;
 
-    // Keep this validation equivalent to the Web schedule parser: format only.
-    // Date normalization is intentionally delegated to the same local-date
-    // construction path used by the rest of the native time helpers.
-    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(startDay)) {
+    // Keep this validation equivalent to the Web schedule parser: format and
+    // calendar validity must both be checked before constructing the date.
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(startDay) ||
+        !_isValidDate(startDay)) {
       return const EmployeeScheduleState(
         isWorkDay: false,
         kind: 'INVALID',
@@ -326,6 +326,12 @@ class EmployeeScheduleService {
   DateTime _dateOnly(String value) {
     final parts = value.split('-').map(int.parse).toList();
     return HadirTime.date(parts[0], parts[1], parts[2]);
+  }
+
+  bool _isValidDate(String value) {
+    final parts = value.split('-').map(int.parse).toList();
+    final date = HadirTime.date(parts[0], parts[1], parts[2]);
+    return HadirTime.dateKey(date) == value;
   }
 
   DateTime _localDateTime(DateTime date, String value) {
