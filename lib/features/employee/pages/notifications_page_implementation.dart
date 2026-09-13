@@ -48,6 +48,30 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+  Future<void> _delete(HadirNotification n) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف الإشعار'),
+        content: const Text('هل تريد حذف هذا الإشعار؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('حذف')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await service.delete(n.id);
+      if (mounted) {
+        setState(() => rows.removeWhere((item) => item.id == n.id));
+        _snack('تم حذف الإشعار.');
+      }
+    } catch (e) {
+      _snack(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
   Future<void> _allRead() async {
     try {
       await service.markAllRead();
@@ -139,7 +163,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
               const SizedBox(height: 6),
               Text(n.body, style: const TextStyle(height: 1.45)),
               const SizedBox(height: 8),
-              Text(_date(n.createdAt), style: Theme.of(context).textTheme.bodySmall),
+              Row(children: [
+                Expanded(child: Text(_date(n.createdAt), style: Theme.of(context).textTheme.bodySmall)),
+                IconButton(onPressed: () => _delete(n), icon: const Icon(LucideIcons.trash2, size: 19), tooltip: 'حذف الإشعار', visualDensity: VisualDensity.compact),
+              ]),
             ])),
           ]),
         ),
