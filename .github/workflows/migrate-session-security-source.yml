@@ -42,6 +42,7 @@ jobs:
           path.write_text(text.replace(block, ''), encoding='utf-8')
           PY
           rm backend/scripts/patch-session-security.mjs
+          rm .github/workflows/migrate-session-security-source.yml
 
       - name: Validate migrated source
         working-directory: backend
@@ -58,7 +59,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/src/index.ts backend/src/entry.ts backend/src/ai-entry.ts backend/src/employee-save-production-gateway.ts backend/src/workforce.ts .github/workflows/deploy-api.yml backend/scripts/patch-session-security.mjs .github/workflows/migrate-session-security-source.yml
+          git add -A
           git diff --cached --check
           git diff --cached --stat
           git commit -m "refactor(auth): make session security canonical in source"
