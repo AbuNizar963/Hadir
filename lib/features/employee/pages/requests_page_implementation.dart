@@ -129,6 +129,7 @@ class _RequestsPageState extends State<RequestsPage> {
                               _filterChip('all', 'الكل'),
                               _filterChip('pending', 'قيد المراجعة'),
                               _filterChip('approved', 'مقبول'),
+                              _filterChip('confirmed', 'مؤكد'),
                               _filterChip('rejected', 'مرفوض'),
                               _filterChip('cancelled', 'ملغى'),
                             ],
