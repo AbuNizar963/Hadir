@@ -138,7 +138,7 @@ export async function handleProfessionalAttendanceReport(req: Request, env: Env,
       return json(detail, 200, origin);
     }
 
-    const report = await buildProfessionalAttendanceReport(env, from, to, employeeId);
+    const report = await buildProfessionalAttendanceReport(env, from, to, employeeId, actor);
     return json(report, 200, origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : "تعذر بناء التقرير";
