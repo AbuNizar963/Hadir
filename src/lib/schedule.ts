@@ -63,6 +63,7 @@ export function getEmployeeWorkPeriod(employee: Employee | null | undefined, tar
   if (info.phase === "OFF") return { isWorkDay: false, kind: "OFF", start: null, end: null, label: "راحة تناوبية", detail: `اليوم ${normalizeDigits(String(info.cycleDay - info.daysOn + 1))} من ${normalizeDigits(String(info.daysOff))} في الراحة` };
   const periodStart = info.periodStart;
   const end = new Date(periodStart.getTime() + info.daysOn * DAY_MS);
+  if (target.getTime() < periodStart.getTime()) return { isWorkDay: false, kind: "NOT_STARTED", start: periodStart, end, label: "لم تبدأ المناوبة بعد", detail: `تبدأ المناوبة الساعة ${formatTime(periodStart)}` };
   return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "مناوبة تناوبية", detail: `من ${formatDateTime(periodStart)} → ${formatDateTime(end)}` };
 }
 
