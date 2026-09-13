@@ -1,0 +1,53 @@
+name: Format Apps source once
+
+on:
+  push:
+    branches: [work/apps-web-parity]
+    paths:
+      - 'lib/features/employee/pages/employee_premium_page_implementation.dart'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: work/apps-web-parity
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Format employee premium source
+        run: dart format lib/features/employee/pages/employee_premium_page_implementation.dart
+
+      - name: Commit formatted source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/features/employee/pages/employee_premium_page_implementation.dart
+          if git diff --cached --quiet; then
+            echo "Source is already formatted."
+            exit 0
+          fi
+          git commit -m "style(flutter): format employee premium source"
+          git push origin HEAD:work/apps-web-parity
+
+      - name: Remove temporary formatter
+        if: always()
+        run: |
+          git rm -f .github/workflows/format-apps-source-once.yml || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: remove temporary source formatter"
+            git push origin HEAD:work/apps-web-parity
+          fi
