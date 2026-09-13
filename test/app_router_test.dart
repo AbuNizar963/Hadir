@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:hadir/app/routes/app_router.dart';
 
@@ -65,13 +66,14 @@ void main() {
         isNull,
       );
     });
+  });
 
-    test('premium route is represented by the center redirect in the router', () {
-      final router = buildAppRouter();
-      final premiumRoute = router.configuration.routes
-          .whereType<dynamic>()
-          .firstWhere((route) => route.path == '/employee/premium');
-      expect(premiumRoute.path, '/employee/premium');
-    });
+  test('routes premium to the employee center', () {
+    final router = buildAppRouter();
+    final premiumRoute = router.configuration.routes
+        .whereType<GoRoute>()
+        .firstWhere((route) => route.path == '/employee/premium');
+
+    expect(premiumRoute.redirect, isNotNull);
   });
 }
