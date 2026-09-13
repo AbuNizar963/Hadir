@@ -2,6 +2,8 @@ name: migrate-attendance-app
 on:
   push:
     branches: [refactor/attendance-app-engine]
+  pull_request:
+    branches: [main]
 permissions:
   contents: write
 jobs:
