@@ -1,11 +1,28 @@
-import { handleEmployeeAttendance } from "./attendance-engine-commands";
+import { handleEmployeeAttendance as executeCanonicalAttendance } from "./attendance-engine-commands";
 
 type Env = { DB: D1Database; APP_TIMEZONE?: string };
 
 /**
- * The single write gateway for every attendance action.
- * Manual staff attendance, VIP/automatic attendance and administrative
- * attendance must all enter the canonical attendance engine through here.
+ * Single application-level gateway for attendance mutations.
+ *
+ * HTTP employee attendance, VIP/automatic attendance and administrative
+ * attendance all enter this module. Only the canonical attendance engine is
+ * allowed to persist the attendance row.
+ */
+export async function handleAttendanceThroughCentralEngine(
+  req: Request,
+  env: Env,
+  actor: any,
+  origin: string,
+  trustedTimestamp?: string,
+) {
+  return executeCanonicalAttendance(req, env, actor, origin, trustedTimestamp);
+}
+
+/**
+ * Internal write helper used by automatic/VIP and administrative flows.
+ * It creates an internal attendance request and sends it through the same
+ * central application gateway used by normal employee requests.
  */
 export async function submitAttendanceThroughCentralEngine(
   env: Env,
@@ -16,8 +33,8 @@ export async function submitAttendanceThroughCentralEngine(
   timestamp?: string,
 ) {
   const employee = await env.DB.prepare(
-    "SELECT id,location_id AS locationId FROM employees WHERE id=? AND status='active' LIMIT 1"
-  ).bind(employeeId).first<any>();
+    "SELECT id,location_id AS locationId FROM employees WHERE id=? AND status='active' LIMIT 1'")
+    .bind(employeeId).first<any>();
   if (!employee) return { response: null, error: "الموظف غير موجود أو موقوف" };
 
   const location = await env.DB.prepare(
@@ -43,7 +60,7 @@ export async function submitAttendanceThroughCentralEngine(
     }),
   });
 
-  const response = await handleEmployeeAttendance(
+  const response = await handleAttendanceThroughCentralEngine(
     request,
     env,
     { id: employeeId, role: "staff", name: "المحرك المركزي" },
