@@ -1,5 +1,4 @@
 import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
-import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
 
 type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string };
 
@@ -126,7 +125,6 @@ export async function handleProfessionalAttendanceReport(req: Request, env: Env,
       return json(detail, 200, origin);
     }
 
-    await ensureProfessionalAttendanceFacts(env, from, to, actor, employeeId);
     const report = await buildProfessionalAttendanceReport(env, from, to, employeeId);
     return json(report, 200, origin);
   } catch (error) {
