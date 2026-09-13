@@ -14,6 +14,7 @@ import {
   formatDurationMinutes,
   formatTime,
   minutesBetween,
+  todayKey,
 } from "@/lib/utils";
 import {
   FileSpreadsheet,
@@ -468,6 +469,15 @@ function specialtyOf(e: Employee) {
     "غير محدد"
   );
 }
+function isShiftEndedForDailyReport(date: Date, end: Date | null) {
+  const reportDay = key(date);
+  const currentDay = todayKey();
+
+  if (reportDay < currentDay) return true;
+  if (reportDay > currentDay) return false;
+  return !!end && Date.now() >= end.getTime();
+}
+
 function serviceRows(
   summaries: Summary[],
   dates: Date[],
@@ -477,21 +487,57 @@ function serviceRows(
   dailyStatus?: Map<string, DailyStatusRow>,
 ) {
   return summaries.map((s) => {
+    const reportDates = datesForEmployee(s.employee, dates);
     const d = calculateDetails(
       s.employee,
-      datesForEmployee(s.employee, dates),
+      reportDates,
       index,
       settings,
       requests,
       dailyStatus,
     )[0];
+
+    if (!d) {
+      return {
+        employee: s.employee,
+        specialty: specialtyOf(s.employee),
+        status: "absent" as Status,
+        checkIn: "—",
+        checkOut: "—",
+        note: "",
+      };
+    }
+
+    if (d.status !== "open" || d.checkIn === "—") {
+      return {
+        employee: s.employee,
+        specialty: specialtyOf(s.employee),
+        status: d.status,
+        checkIn: d.checkIn,
+        checkOut: d.checkOut,
+        note: d.detail,
+      };
+    }
+
+    const reportDate = reportDates[0];
+    const workPeriod = reportDate
+      ? getEmployeeWorkPeriod(s.employee, reportDate)
+      : null;
+    const ended =
+      !!reportDate &&
+      isShiftEndedForDailyReport(reportDate, workPeriod?.end ?? null);
+    const status: Status = d.late > 0 ? "late" : "present";
+    const note = ended
+      ? [d.detail, "انصراف ناقص"].filter(Boolean).join(" · ")
+      : d.detail;
+
     return {
       employee: s.employee,
       specialty: specialtyOf(s.employee),
-      status: d.status,
+      status,
       checkIn: d.checkIn,
       checkOut: d.checkOut,
-      note: d.detail,
+      note,
     };
   });
 }
