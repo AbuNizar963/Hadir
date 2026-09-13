@@ -32,24 +32,68 @@ String? resolveAuthenticatedRedirect({
   String? employeeToken,
   String? adminToken,
 }) {
-  const publicLocations = {'/', '/login', '/employee-login', '/admin-login', '/manager/login'};
+  const publicLocations = {
+    '/',
+    '/login',
+    '/employee-login',
+    '/admin-login',
+    '/manager/login',
+  };
   final hasEmployeeToken = employeeToken != null && employeeToken.isNotEmpty;
   final hasAdminToken = adminToken != null && adminToken.isNotEmpty;
+
   if (hasAdminToken && publicLocations.contains(location)) return '/admin';
   if (hasEmployeeToken && publicLocations.contains(location)) return '/home';
 
   const adminPaths = {
-    '/admin', '/admin/roles', '/admin/manage', '/admin/operations', '/admin/reports', '/admin/reports/archive', '/admin/audit', '/admin/settings',
-    '/manager', '/manager-home', '/manager/employees', '/manager/workforce', '/manager/requests', '/manager/audit', '/manager/reports', '/manager/report-archive', '/manager/settings', '/manager/employees/transfer',
+    '/admin',
+    '/admin/roles',
+    '/admin/manage',
+    '/admin/operations',
+    '/admin/reports',
+    '/admin/reports/archive',
+    '/admin/audit',
+    '/admin/settings',
+    '/manager',
+    '/manager-home',
+    '/manager/employees',
+    '/manager/workforce',
+    '/manager/requests',
+    '/manager/audit',
+    '/manager/reports',
+    '/manager/report-archive',
+    '/manager/settings',
+    '/manager/employees/transfer',
   };
   if (!hasAdminToken && adminPaths.contains(location)) return '/admin-login';
 
   const employeePaths = {
-    '/home', '/employee', '/center', '/employee/center', '/employee/premium', '/attendance', '/history', '/employee/history', '/insights', '/requests', '/notifications', '/employee/notifications', '/profile', '/employee/profile', '/services', '/weather', '/prayer', '/ai',
+    '/home',
+    '/employee',
+    '/center',
+    '/employee/center',
+    '/employee/premium',
+    '/attendance',
+    '/history',
+    '/employee/history',
+    '/insights',
+    '/requests',
+    '/notifications',
+    '/employee/notifications',
+    '/profile',
+    '/employee/profile',
+    '/services',
+    '/weather',
+    '/prayer',
+    '/ai',
   };
   final isEmployeeScan = location.startsWith('/employee/scan/');
-  if (!hasEmployeeToken && (employeePaths.contains(location) || isEmployeeScan)) return '/login';
-  if (!hasEmployeeToken && !hasAdminToken && !publicLocations.contains(location)) return '/';
+  if (!hasEmployeeToken && (employeePaths.contains(location) || isEmployeeScan)) {
+    return '/login';
+  }
+  if (!hasEmployeeToken && !hasAdminToken && !publicLocations.contains(location)) {
+    return '/';
+  }
   return null;
 }
 
@@ -59,10 +103,17 @@ GoRouter buildAppRouter() => GoRouter(
     final employeeToken = await _session.token();
     final adminToken = await _session.adminToken();
     final location = state.matchedLocation;
-    if (employeeToken == null || employeeToken.isEmpty) _validatedEmployeeToken = null;
-    if (adminToken == null || adminToken.isEmpty) _validatedAdminToken = null;
 
-    if (employeeToken != null && employeeToken.isNotEmpty && employeeToken != _validatedEmployeeToken) {
+    if (employeeToken == null || employeeToken.isEmpty) {
+      _validatedEmployeeToken = null;
+    }
+    if (adminToken == null || adminToken.isEmpty) {
+      _validatedAdminToken = null;
+    }
+
+    if (employeeToken != null &&
+        employeeToken.isNotEmpty &&
+        employeeToken != _validatedEmployeeToken) {
       final valid = await _isTokenValid(employeeToken);
       if (!valid) {
         _validatedEmployeeToken = null;
@@ -71,7 +122,10 @@ GoRouter buildAppRouter() => GoRouter(
       }
       _validatedEmployeeToken = employeeToken;
     }
-    if (adminToken != null && adminToken.isNotEmpty && adminToken != _validatedAdminToken) {
+
+    if (adminToken != null &&
+        adminToken.isNotEmpty &&
+        adminToken != _validatedAdminToken) {
       final valid = await _isTokenValid(adminToken);
       if (!valid) {
         _validatedAdminToken = null;
@@ -80,7 +134,12 @@ GoRouter buildAppRouter() => GoRouter(
       }
       _validatedAdminToken = adminToken;
     }
-    return resolveAuthenticatedRedirect(location: location, employeeToken: await _session.token(), adminToken: await _session.adminToken());
+
+    return resolveAuthenticatedRedirect(
+      location: location,
+      employeeToken: await _session.token(),
+      adminToken: await _session.adminToken(),
+    );
   },
   errorBuilder: (_, __) => const _NotFoundPage(),
   routes: [
@@ -132,6 +191,7 @@ GoRouter buildAppRouter() => GoRouter(
 class SwipeBackPage extends StatefulWidget {
   const SwipeBackPage({super.key, required this.child});
   final Widget child;
+
   @override
   State<SwipeBackPage> createState() => _SwipeBackPageState();
 }
@@ -147,42 +207,212 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
     if (!context.canPop()) return;
     final width = MediaQuery.sizeOf(context).width;
     final x = details.globalPosition.dx;
-    if (x <= _edgeWidth) { _tracking = true; _fromLeft = true; _dragDistance = 0; }
-    else if (x >= width - _edgeWidth) { _tracking = true; _fromLeft = false; _dragDistance = 0; }
+    if (x <= _edgeWidth) {
+      _tracking = true;
+      _fromLeft = true;
+      _dragDistance = 0;
+    } else if (x >= width - _edgeWidth) {
+      _tracking = true;
+      _fromLeft = false;
+      _dragDistance = 0;
+    }
   }
+
   void _update(DragUpdateDetails details) {
     if (!_tracking) return;
     final delta = details.primaryDelta ?? 0;
     _dragDistance += _fromLeft ? delta : -delta;
     if (_dragDistance < 0) _dragDistance = 0;
   }
+
   void _end(DragEndDetails details) {
     if (!_tracking) return;
     final velocity = details.primaryVelocity ?? 0;
     final effectiveVelocity = _fromLeft ? velocity : -velocity;
     final shouldPop = _dragDistance >= _triggerDistance || effectiveVelocity > 700;
-    _tracking = false; _dragDistance = 0;
+    _tracking = false;
+    _dragDistance = 0;
     if (shouldPop && mounted && context.canPop()) context.pop();
   }
-  void _cancel() { _tracking = false; _dragDistance = 0; }
+
+  void _cancel() {
+    _tracking = false;
+    _dragDistance = 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
-    final isAdminArea = path == '/admin' || path.startsWith('/admin/') || path == '/manager' || path.startsWith('/manager/');
-    final isEmployeeArea = path == '/home' || path == '/employee' || path == '/center' || path == '/employee/center' || path == '/employee/premium' || path == '/attendance' || path == '/history' || path == '/employee/history' || path == '/insights' || path == '/requests' || path == '/notifications' || path == '/employee/notifications' || path == '/profile' || path == '/employee/profile' || path == '/services' || path == '/weather' || path == '/prayer' || path == '/ai' || path.startsWith('/employee/scan/');
-    final content = isAdminArea ? AdminMobileShell(child: widget.child) : isEmployeeArea ? EmployeeMobileShell(child: widget.child) : widget.child;
-    return GestureDetector(behavior: HitTestBehavior.translucent, onHorizontalDragStart: _start, onHorizontalDragUpdate: _update, onHorizontalDragEnd: _end, onHorizontalDragCancel: _cancel, child: content);
+    final isAdminArea = path == '/admin' ||
+        path.startsWith('/admin/') ||
+        path == '/manager' ||
+        path.startsWith('/manager/');
+    final isEmployeeArea = path == '/home' ||
+        path == '/employee' ||
+        path == '/center' ||
+        path == '/employee/center' ||
+        path == '/employee/premium' ||
+        path == '/attendance' ||
+        path == '/history' ||
+        path == '/employee/history' ||
+        path == '/insights' ||
+        path == '/requests' ||
+        path == '/notifications' ||
+        path == '/employee/notifications' ||
+        path == '/profile' ||
+        path == '/employee/profile' ||
+        path == '/services' ||
+        path == '/weather' ||
+        path == '/prayer' ||
+        path == '/ai' ||
+        path.startsWith('/employee/scan/');
+    final content = isAdminArea
+        ? AdminMobileShell(child: widget.child)
+        : isEmployeeArea
+            ? EmployeeMobileShell(child: widget.child)
+            : widget.child;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: _start,
+      onHorizontalDragUpdate: _update,
+      onHorizontalDragEnd: _end,
+      onHorizontalDragCancel: _cancel,
+      child: content,
+    );
   }
 }
 
 class _NotFoundPage extends StatelessWidget {
   const _NotFoundPage();
+
   @override
-  Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(backgroundColor: const Color(0xFFF4F7F6), body: SafeArea(child: Center(child: Padding(padding: const EdgeInsets.all(20), child: Container(constraints: const BoxConstraints(maxWidth: 420), padding: const EdgeInsets.all(30), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFDCE6E2)), boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 24, offset: Offset(0, 10))]), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.error_outline_rounded, color: Color(0xFF0B6B5A), size: 40), const SizedBox(height: 12), const Text('الصفحة غير موجودة', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF142D27), fontSize: 27, fontWeight: FontWeight.w900)), const SizedBox(height: 18), FilledButton.icon(onPressed: () => context.go('/'), icon: const Icon(Icons.home_rounded), label: const Text('العودة للرئيسية'))])))));
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF4F7F6),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 420),
+                padding: const EdgeInsets.all(30),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFDCE6E2)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0D142D27),
+                      blurRadius: 24,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline_rounded, color: Color(0xFF0B6B5A), size: 40),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'الصفحة غير موجودة',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF142D27),
+                        fontSize: 27,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: () => context.go('/'),
+                      icon: const Icon(Icons.home_rounded),
+                      label: const Text('العودة للرئيسية'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class LoginEntryPage extends StatelessWidget {
   const LoginEntryPage({super.key});
+
   @override
-  Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(backgroundColor: const Color(0xFFF4F7F6), body: SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(20), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 520), child: Container(padding: const EdgeInsets.all(22), decoration: BoxDecoration(color: Colors.white.withValues(alpha: .94), borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFDCE6E2)), boxShadow: const [BoxShadow(color: Color(0x0D142D27), blurRadius: 24, offset: Offset(0, 10))]), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Row(children: [IconButton.filledTonal(onPressed: () => context.go('/'), icon: const Icon(Icons.arrow_forward_rounded)), const SizedBox(width: 10), const Expanded(child: Text('اختيار مساحة الدخول', style: TextStyle(color: Color(0xFF142D27), fontSize: 21, fontWeight: FontWeight.w900)))]), const SizedBox(height: 18), FilledButton.icon(onPressed: () => context.go('/employee-login'), icon: const Icon(Icons.person_rounded), label: const Text('مساحة الموظف')), const SizedBox(height: 10), OutlinedButton.icon(onPressed: () => context.go('/manager/login'), icon: const Icon(Icons.admin_panel_settings_rounded), label: const Text('مساحة الإدارة'))]))))));
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF4F7F6),
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .94),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFFDCE6E2)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0D142D27),
+                        blurRadius: 24,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          IconButton.filledTonal(
+                            onPressed: () => context.go('/'),
+                            icon: const Icon(Icons.arrow_forward_rounded),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'اختيار مساحة الدخول',
+                              style: TextStyle(
+                                color: Color(0xFF142D27),
+                                fontSize: 21,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      FilledButton.icon(
+                        onPressed: () => context.go('/employee-login'),
+                        icon: const Icon(Icons.person_rounded),
+                        label: const Text('مساحة الموظف'),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: () => context.go('/manager/login'),
+                        icon: const Icon(Icons.admin_panel_settings_rounded),
+                        label: const Text('مساحة الإدارة'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
