@@ -59,14 +59,17 @@ jobs:
 
       - name: Validate source and diff
         run: |
+          set -euo pipefail
           test -s backend/src/automation-entry.ts
           grep -q 'revoked_at IS NULL' backend/src/automation-entry.ts
-          grep -q 'request.headers.get("authorization")?.replace(/^Bearer\\s+/i,"") || readCookie(request, SESSION_COOKIE)' backend/src/automation-entry.ts
+          grep -Eq 'request\.headers\.get\("authorization"\).*replace\(/\^Bearer\\\\s\+\/i, ""\).*readCookie\(request, SESSION_COOKIE\)' backend/src/automation-entry.ts
+          test "$(awk 'NF{count++} END{print count+0}' backend/src/automation-entry.ts)" -gt 20
           git diff --check
           npm --prefix backend run check
 
       - name: Commit repaired source and remove temporary workflow
         run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm .github/workflows/repair-automation-entry.yml
