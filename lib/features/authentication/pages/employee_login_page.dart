@@ -6,6 +6,13 @@ import '../../../core/api.dart';
 import '../../../core/hadir_brand.dart';
 import '../../../core/session.dart';
 
+const int employeePasswordMinLength = 4;
+final RegExp employeePasswordPattern = RegExp(r'^[A-Za-z0-9]+$');
+
+bool isValidEmployeePassword(String password) =>
+    password.length >= employeePasswordMinLength &&
+    employeePasswordPattern.hasMatch(password);
+
 class EmployeeLoginPage extends StatefulWidget {
   const EmployeeLoginPage({super.key});
 
@@ -38,8 +45,8 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
       setState(() => _error = 'أدخل رقم الموظف ورمز الدخول.');
       return;
     }
-    if (!RegExp(r'^\d{6}$').hasMatch(password)) {
-      setState(() => _error = 'رمز دخول الموظف يجب أن يتكون من 6 أرقام بالضبط.');
+    if (!isValidEmployeePassword(password)) {
+      setState(() => _error = 'رمز الدخول يجب أن يتكون من 4 محارف أو أكثر، باستخدام الأحرف الإنجليزية والأرقام.');
       return;
     }
     setState(() { _busy = true; _error = null; });
@@ -134,17 +141,16 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                             focusNode: _passFocus,
                             enabled: !_busy,
                             obscureText: _hidden,
-                            keyboardType: TextInputType.number,
+                            keyboardType: TextInputType.visiblePassword,
                             textInputAction: TextInputAction.done,
                             inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(6),
+                              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
                             ],
                             onSubmitted: (_) => _login(),
                             decoration: InputDecoration(
                               labelText: 'رمز الدخول',
-                              hintText: 'أدخل 6 أرقام',
-                              suffixText: '6 أرقام',
+                              hintText: '4 محارف أو أكثر',
+                              suffixText: '4+ محارف',
                               suffixIcon: IconButton(
                                 onPressed: _busy ? null : () => setState(() => _hidden = !_hidden),
                                 icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
