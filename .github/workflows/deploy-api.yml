@@ -35,8 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          migrate_session_source() {
+          if [ -f backend/scripts/patch-session-security.mjs ]; then
             node backend/scripts/patch-session-security.mjs
             npx --yes prettier@3.6.2 --write \
               backend/src/index.ts \
@@ -45,39 +44,18 @@ jobs:
               backend/src/employee-save-production-gateway.ts \
               backend/src/workforce.ts \
               .github/workflows/deploy-api.yml
-
-            python3 - <<'PY'
-from pathlib import Path
-
-workflow = Path('.github/workflows/deploy-api.yml')
-text = workflow.read_text(encoding='utf-8')
-start_marker = '      - name: Migrate session security into canonical source\n'
-end_marker = '      - name: Validate Worker bundle\n'
-start = text.find(start_marker)
-end = text.find(end_marker, start + len(start_marker))
-if start < 0 or end < 0:
-    raise SystemExit('Could not locate the temporary migration step in deploy-api.yml')
-workflow.write_text(text[:start] + text[end:], encoding='utf-8')
-PY
-
+            python3 -c 'from pathlib import Path; p=Path(".github/workflows/deploy-api.yml"); t=p.read_text(encoding="utf-8"); s=t.find("      - name: Migrate session security into canonical source\\n"); e=t.find("      - name: Validate Worker bundle\\n", s); assert s >= 0 and e > s, "temporary migration step not found"; p.write_text(t[:s] + t[e:], encoding="utf-8")'
             rm backend/scripts/patch-session-security.mjs
-          }
-
-          if [ -f backend/scripts/patch-session-security.mjs ]; then
-            migrate_session_source
           fi
-
           if grep -R --line-number --fixed-strings 'patch-session-security.mjs' .github/workflows backend/src backend/package.json; then
             echo 'ERROR: obsolete session patch helper is still referenced.'
             exit 1
           fi
-
           grep -q 'SESSION_IDLE_TIMEOUT_MS' backend/src/index.ts
           grep -q 'SESSION_MAX_AGE_MS' backend/src/index.ts
           grep -q 'SESSION_TOUCH_INTERVAL_SECONDS' backend/src/index.ts
           grep -q 'revoked_at' backend/src/index.ts
           grep -q 'julianday(last_seen_at)' backend/src/index.ts
-
           git add -A
           git diff --cached --check
           if ! git diff --cached --quiet; then
@@ -241,4 +219,3 @@ PY
           if not row.get("file_key") or not row.get("file_sha256") or not row.get("locked_at"): raise SystemExit(f"ERROR: archive manifest is incomplete: {row}")
           print(f"previous-month archive manifest verified: {period_from}..{period_to}, status=LOCKED, key={row['file_key']}, size={row['file_size']}")
           PY
-      # Keep the workflow push-triggered so D1 migrations are applied with the API deployment.
