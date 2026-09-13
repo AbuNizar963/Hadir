@@ -1,0 +1,41 @@
+name: Repair attendance app helpers
+on:
+  push:
+    branches: [refactor/attendance-app-engine]
+    paths:
+      - '.github/workflows/repair-attendance-app.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore helpers removed from app.ts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('backend/src/app.ts')
+          text = p.read_text()
+          marker = 'function avatarKey(employeeId: string) { return `employees/${employeeId}/avatar.webp`; }\n'
+          assert marker in text, 'avatarKey marker not found'
+          assert 'function coordinate(value: unknown)' not in text, 'coordinate already present; refusing duplicate repair'
+          assert 'async function earlyCheckoutMinutes(db: D1Database' not in text, 'earlyCheckoutMinutes already present; refusing duplicate repair'
+          helpers = '''function coordinate(value: unknown) { const n = Number(value); return Number.isFinite(n) ? Number(n.toFixed(7)) : NaN; }\nasync function earlyCheckoutMinutes(db: D1Database, employeeId: string) { const row = await db.prepare("SELECT early_checkout_minutes AS earlyCheckoutMinutes FROM employee_checkout_policies WHERE employee_id=? LIMIT 1").bind(employeeId).first<any>(); const value = Number(row?.earlyCheckoutMinutes); return Number.isFinite(value) && value > 0 ? Math.min(Math.floor(value), 1440) : 0; }\n'''
+          p.write_text(text.replace(marker, marker + helpers, 1))
+          PY
+          grep -q 'function coordinate(value: unknown)' backend/src/app.ts
+          grep -q 'async function earlyCheckoutMinutes(db: D1Database' backend/src/app.ts
+          grep -q 'if(path==="/api/attendance")return handleEmployeeAttendance(req,env,actor,origin);' backend/src/app.ts
+      - name: Commit repair and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/repair-attendance-app.yml
+          git add backend/src/app.ts
+          git commit -m 'fix(attendance): restore shared app helpers after engine extraction'
+          git push
