@@ -39,6 +39,17 @@ indexSource = indexSource.replaceAll(writeOld, writeNew);
 const bearerFirst = 'req.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")||getCookie(req,SESSION_COOKIE)';
 const cookieFirst = 'getCookie(req,SESSION_COOKIE)||req.headers.get("authorization")?.replace(/^Bearer\\s+/i,"")';
 indexSource = indexSource.replaceAll(cookieFirst, bearerFirst);
+
+const schemaOld = "CREATE TABLE IF NOT EXISTS auth_sessions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,user_type TEXT NOT NULL CHECK(user_type IN ('admin','employee')),role TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,last_seen_at TEXT NOT NULL)";
+const schemaNew = "CREATE TABLE IF NOT EXISTS auth_sessions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,user_type TEXT NOT NULL CHECK(user_type IN ('admin','employee')),role TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,last_seen_at TEXT NOT NULL,revoked_at TEXT)";
+if (indexSource.includes(schemaOld)) indexSource = indexSource.replace(schemaOld, schemaNew);
+else if (!indexSource.includes(schemaNew)) throw new Error("Session security patch: auth_sessions schema anchor not found");
+
+const logoutOld = 'if(path==="/api/auth/logout"&&req.method==="POST"){const token=getCookie(req,SESSION_COOKIE)||req.headers.get("authorization")?.replace(/^Bearer\\s+/i,"");if(token){await env.DB.prepare("DELETE FROM auth_sessions WHERE token_hash=?").bind(await hashSessionToken(token)).run().catch(()=>undefined);}return new Response';
+const logoutNew = 'if(path==="/api/auth/logout"&&req.method==="POST"){const token=getCookie(req,SESSION_COOKIE)||req.headers.get("authorization")?.replace(/^Bearer\\s+/i,"");if(token){await env.DB.prepare("UPDATE auth_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL").bind(now(),await hashSessionToken(token)).run().catch(()=>undefined);}return new Response';
+if (indexSource.includes(logoutOld)) indexSource = indexSource.replace(logoutOld, logoutNew);
+else if (!indexSource.includes('UPDATE auth_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL')) throw new Error("Session security patch: logout anchor not found");
+
 writeFileSync(indexPath, indexSource, "utf8");
 
 const entryPath = new URL("../src/entry.ts", import.meta.url);
@@ -81,4 +92,4 @@ if (workforceSource.includes(workforceHandlerOld)) workforceSource = workforceSo
 else if (!workforceSource.includes('workforcePushEnv=env;')) throw new Error("Workforce push patch: handler anchor not found");
 writeFileSync(workforcePath, workforceSource, "utf8");
 
-console.log("Session + workforce notification patch applied: secure session lifetime, bearer-token precedence, reduced D1 session write amplification, and Web Push delivery for workforce events.");
+console.log("Session + workforce notification patch applied: secure session lifetime, bearer-token precedence, reduced D1 session write amplification, session revocation, canonical auth_sessions schema, and Web Push delivery for workforce events.");
