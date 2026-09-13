@@ -1,10 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
-import { getEmployees, getSettings } from "@/lib/storage";
+import { getEmployees,
+  getSettings } from "@/lib/storage";
 import {
   getBackendAudit,
   getBackendEmployees,
   getBackendRequests,
+  getBackendSettings,
 } from "@/lib/backend";
 import { getDailyStatus, type DailyStatusRow } from "@/lib/dailyStatus";
 import { getEmployeeWorkPeriod } from "@/lib/schedule";
@@ -507,7 +512,38 @@ export default function ManagerReports() {
     [loading, setLoading] = useState(true),
     [error, setError] = useState<string | null>(null),
     [expanded, setExpanded] = useState<string | null>(null);
-  const settings = getSettings();
+  const [reportSettings, setReportSettings] = useState(() => getSettings());
+  const settings = reportSettings;
+  useEffect(() => {
+    let alive = true;
+    const loadReportSettings = async () => {
+      try {
+        const remote = await getBackendSettings();
+        if (!alive || !remote) return;
+        setReportSettings((current) => ({
+          ...current,
+          ...remote,
+          adminAccounts: Array.isArray(remote.adminAccounts)
+            ? remote.adminAccounts
+            : current.adminAccounts,
+        }));
+      } catch (error) {
+        console.warn("تعذر تحميل إعدادات التقرير من D1:", error);
+      }
+    };
+    void loadReportSettings();
+    const onSettingsChanged = () => {
+      setReportSettings(getSettings());
+      void loadReportSettings();
+    };
+    window.addEventListener("hadir:cloud-data-changed", onSettingsChanged);
+    window.addEventListener("hadir:d1-view-changed", onSettingsChanged);
+    return () => {
+      alive = false;
+      window.removeEventListener("hadir:cloud-data-changed", onSettingsChanged);
+      window.removeEventListener("hadir:d1-view-changed", onSettingsChanged);
+    };
+  }, []);
   const refreshDailyReportSnapshot = async () => {
     setLoading(true);
     setError(null);
@@ -733,7 +769,9 @@ export default function ManagerReports() {
     () =>
       mode === "daily"
         ? serviceRows(
-            summaries,
+            summaries.filter((s) =>
+              getEmployeeWorkPeriod(s.employee, dateOf(date)).isWorkDay,
+            ),
             dates,
             index,
             settings,
@@ -1080,6 +1118,7 @@ export default function ManagerReports() {
           className="service-report bg-white text-black rounded-none border shadow-sm print:border-0 print:shadow-none"
           dir="rtl"
         >
+          <div className="print:hidden">
           <div className="p-5 md:p-7 border-b-2 border-black/70 text-center">
             <div className="flex flex-col items-center gap-2">
               {settings.brandLogo && (
@@ -1134,6 +1173,67 @@ export default function ManagerReports() {
                 ))}
               </div>
             ))}
+          </div>
+          </div>
+          <div className="daily-print-report" dir="rtl">
+            <header className="daily-print-header">
+              {settings.brandLogo && (
+                <img
+                  src={settings.brandLogo}
+                  alt="شعار الشركة"
+                  className="daily-print-logo"
+                />
+              )}
+              <div className="daily-print-company">
+                {settings.brandName || "HADIR"}
+              </div>
+              <div className="daily-print-title">
+                سجل الحضور والانصراف ليوم {days[dateOf(date).getDay()]} {String(
+                  dateOf(date).getDate(),
+                ).padStart(2, "0")}/{String(
+                  dateOf(date).getMonth() + 1,
+                ).padStart(2, "0")}/{dateOf(date).getFullYear()}
+              </div>
+            </header>
+            <table className="daily-print-table">
+              <colgroup>
+                <col className="daily-print-no" />
+                <col className="daily-print-specialty" />
+                <col className="daily-print-name" />
+                <col className="daily-print-status" />
+                <col className="daily-print-time" />
+                <col className="daily-print-time" />
+                <col className="daily-print-note" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>ت</th>
+                  <th>الاختصاص</th>
+                  <th>اسم الموظف</th>
+                  <th>الحالة</th>
+                  <th>الحضور</th>
+                  <th>الانصراف</th>
+                  <th>ملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyServiceRows.map((row, i) => (
+                  <tr key={row.employee.id}>
+                    <td className="daily-print-center">{i + 1}</td>
+                    <td>{specialtyOf(row.employee)}</td>
+                    <td className="daily-print-name-cell">{row.employee.name}</td>
+                    <td className="daily-print-center">
+                      <span className={`daily-print-status ${row.status}`}>
+                        {labels[row.status]}
+                      </span>
+                    </td>
+                    <td className="daily-print-center">{row.checkIn}</td>
+                    <td className="daily-print-center">{row.checkOut}</td>
+                    <td>{row.note || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
       ) : (

@@ -34,6 +34,118 @@
     print-color-adjust: exact !important;
   }
 
+  .daily-print-report {
+    display: none !important;
+    direction: rtl !important;
+    width: 100% !important;
+    font-family: Cairo, Arial, sans-serif !important;
+    color: #111827 !important;
+    background: #fff !important;
+  }
+
+  .daily-print-header {
+    display: block !important;
+    text-align: center !important;
+    margin: 0 0 7mm !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .daily-print-logo {
+    display: block !important;
+    width: 31mm !important;
+    height: 31mm !important;
+    object-fit: contain !important;
+    margin: 0 auto 2mm !important;
+  }
+
+  .daily-print-company {
+    font-size: 20px !important;
+    line-height: 1.35 !important;
+    font-weight: 900 !important;
+    margin-bottom: 1.5mm !important;
+  }
+
+  .daily-print-title {
+    font-size: 15px !important;
+    line-height: 1.4 !important;
+    font-weight: 800 !important;
+  }
+
+  .daily-print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    direction: rtl !important;
+    font-size: 10.5pt !important;
+    border: 0.45mm solid #111827 !important;
+  }
+
+  .daily-print-table th,
+  .daily-print-table td {
+    border: 0.25mm solid #475569 !important;
+    padding: 1.6mm 1.4mm !important;
+    line-height: 1.3 !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+
+  .daily-print-table th {
+    font-weight: 900 !important;
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
+  }
+
+  .daily-print-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .daily-print-no {
+    width: 9mm !important;
+  }
+
+  .daily-print-specialty {
+    width: 29mm !important;
+  }
+
+  .daily-print-name {
+    width: 42mm !important;
+  }
+
+  .daily-print-status {
+    width: 24mm !important;
+  }
+
+  .daily-print-time {
+    width: 24mm !important;
+  }
+
+  .daily-print-note {
+    width: auto !important;
+  }
+
+  .daily-print-name-cell {
+    font-weight: 800 !important;
+  }
+
+  .daily-print-center {
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+
+  .daily-print-status {
+    display: inline-block !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+  }
+
+  .service-report > .daily-print-report {
+    display: block !important;
+  }
+
   .service-report {
     display: block !important;
     position: static !important;
