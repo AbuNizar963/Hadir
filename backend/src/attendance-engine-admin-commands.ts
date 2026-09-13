@@ -1,9 +1,7 @@
 import { getAttendanceShift } from "./attendance-period";
-import { refreshCanonicalStatus } from "./attendance-engine-commands";
-import { refreshProfessionalAttendanceFact } from "./professional-attendance-fact-builder";
+import { submitAttendanceThroughCentralEngine } from "./attendance-engine-central";
 
 type Env = { DB: D1Database; APP_TIMEZONE?: string };
-
 type Actor = { id?: string; name?: string; role?: string };
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
@@ -27,23 +25,15 @@ export async function handleAdministrativeAttendancePreparation(request: Request
   const shift = getAttendanceShift(employee, now, env.APP_TIMEZONE || "Asia/Damascus");
   if (!shift.isWorkDay || now.getTime() < shift.start.getTime() || now.getTime() > shift.end.getTime() + 60000) return json({ error: "لا توجد مناوبة فعالة لهذا الموظف الآن" }, 409);
 
-  const rows = await env.DB.prepare("SELECT id,type,timestamp FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<=? ORDER BY timestamp DESC LIMIT 200").bind(employee.id, shift.start.toISOString(), new Date(Math.min(shift.end.getTime() + 60000, now.getTime() + 5000)).toISOString()).all<any>();
-  const valid = (rows.results || []).filter((row: any) => {
-    const timestamp = Date.parse(String(row.timestamp || ""));
-    return Number.isFinite(timestamp) && timestamp >= shift.start.getTime() && timestamp <= now.getTime() + 5000;
-  });
-  if (valid.some((row: any) => String(row.type) === "check-in")) return json({ error: "الموظف مسجل حضور بالفعل في هذه المناوبة" }, 409);
-
-  const id = crypto.randomUUID();
-  const timestamp = now.toISOString();
-  const deviceId = `ADMIN_DIRECT:${role === "manager" ? "المدير" : "المالك"}`;
-  await env.DB.prepare("INSERT INTO attendance(id,employee_id,job_number,employee_name,type,timestamp,lat,lng,distance_meters,device_id,ip,qr_code,location_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, employee.id, employee.jobNumber, employee.name, "check-in", timestamp, null, null, null, deviceId, "system", "DIRECT_ADMIN", null).run();
-  await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip,lat,lng,distance_meters) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), employee.id, employee.jobNumber, actor.name || (role === "manager" ? "المدير" : "المالك"), "check-in", "success", "تحضير مباشر من الإدارة", timestamp, deviceId, "system", null, null, null).run().catch(() => undefined);
-
-  const staffActor = { ...actor, id: employee.id, role: "staff" };
-  await refreshCanonicalStatus(env, staffActor, now);
-  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
-  await refreshProfessionalAttendanceFact(env, day, staffActor, employee.id);
-
-  return json({ ok: true, record: { id, employeeId: employee.id, jobNumber: employee.jobNumber, employeeName: employee.name, type: "check-in", timestamp, deviceId, ip: "system", qrCode: "DIRECT_ADMIN", locationId: null } }, 201);
+  const result = await submitAttendanceThroughCentralEngine(
+    env,
+    employeeId,
+    "check-in",
+    `CENTRAL_ADMIN:${role}`,
+    "تحضير مباشر من الإدارة"
+  );
+  if (result.error) return json({ error: result.error }, 409);
+  if (!result.response) return json({ error: "تعذر الوصول إلى محرك الحضور المركزي" }, 500);
+  const payload = await result.response.json().catch(() => ({}));
+  return json(payload, result.response.status);
 }

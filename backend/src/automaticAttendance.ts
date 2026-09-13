@@ -30,8 +30,8 @@ export async function directAttendance(req:Request,env:Env,actor:Admin|null,orig
   if(type==="check-in"&&periodRows.some((r:any)=>r.type==="check-in"))return json({error:"الموظف مسجل حضور بالفعل لهذه المناوبة"},409,origin);
   if(type==="check-out"&&last?.type!=="check-in")return json({error:"لا يمكن تسجيل الانصراف قبل تسجيل الحضور لهذه المناوبة"},409,origin);
   if(type==="check-out"&&current.getTime()<shift.end.getTime())return json({error:"لم ينتهِ وقت دوام الموظف بعد"},403,origin);
-  const record=await insertAutomaticAttendance(env.DB,employee,type,current.toISOString(),actor?.name||(String(actor.role).toLowerCase()==="manager"?"المدير":"المالك"),type==="check-in"?"تحضير مباشر لمهمة/مأمورية":"انصراف مباشر لمهمة/مأمورية");
-  if(!record)return json({error:"لا يوجد موقع عمل محفوظ"},409,origin);
+  const record=await insertAutomaticAttendance(env,employee,type,current.toISOString(),actor?.name||(String(actor.role).toLowerCase()==="manager"?"المدير":"المالك"),type==="check-in"?"تحضير مباشر لمهمة/مأمورية":"انصراف مباشر لمهمة/مأمورية");
+  if(!record)return json({error:"تعذر تسجيل الحضور عبر المحرك المركزي"},409,origin);
   await refreshCanonicalStatus(env,{id:employee.id,role:"staff"},current);
   await refreshProfessionalAttendanceFact(env,dateKeyLocal(current,tz),{id:employee.id,role:"staff"},employee.id);
   return json({ok:true,record},201,origin);
