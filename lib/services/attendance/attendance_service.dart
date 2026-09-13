@@ -104,13 +104,14 @@ class AttendanceService {
   static String _formatTime(DateTime value) =>
       '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
+  static bool _isCheckIn(String type) => type.trim().toLowerCase().replaceAll('_', '-') == 'check-in';
+
   Future<AttendanceChallenge> prepareChallenge({required String type, required String qrCode}) async {
     final code = qrCode.trim();
     if (code.isEmpty) throw Exception('امسح رمز QR أو أدخله يدويًا.');
 
-    final normalizedType = type.trim().toLowerCase();
     Map<String, dynamic>? employee;
-    if (normalizedType == 'check-in') {
+    if (_isCheckIn(type)) {
       final profile = await api.employeeProfile();
       final raw = profile['employee'] is Map ? profile['employee'] : profile;
       employee = raw is Map ? Map<String, dynamic>.from(raw) : null;
@@ -163,6 +164,11 @@ class AttendanceService {
     }
     final profile = await api.employeeProfile();
     final employee = Map<String, dynamic>.from(profile['employee'] is Map ? profile['employee'] : profile);
+    // Revalidate immediately before the mutation so a challenge prepared near
+    // shift end cannot be used to bypass the same schedule rule later.
+    if (_isCheckIn(type) && !checkInWindowOpen(employee)) {
+      throw Exception(checkInWindowError(employee));
+    }
     await api.createAttendance({
       'employeeId': employee['id'],
       'jobNumber': employee['jobNumber'] ?? employee['job_number'],
