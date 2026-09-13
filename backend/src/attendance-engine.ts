@@ -317,8 +317,7 @@ export async function handleDailyStatus(
     day = /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
       ? requestedDay
       : dayKey(new Date()),
-    nextDay = addDays(day, 1),
-    to = localDateTimeUtc(addDays(day, 2), "00:00").toISOString();
+    nextDay = addDays(day, 1);
   try {
     const employeeQuery = await env.DB.prepare(
       "SELECT e.id,e.name,e.job_number AS jobNumber,e.status,e.schedule_type AS scheduleType,e.work_start_time AS workStartTime,e.work_end_time AS workEndTime,e.work_days_json AS workDaysJson,e.rotation_start_date AS rotationStartDate,e.rotation_days_on AS rotationDaysOn,e.rotation_days_off AS rotationDaysOff,e.rotation_daily_attendance_enabled AS rotationDailyAttendanceEnabled,e.rotation_daily_attendance_time AS rotationDailyAttendanceTime,e.rotation_daily_attendance_grace_minutes AS rotationDailyAttendanceGraceMinutes,e.grace_period_minutes AS gracePeriodMinutes,e.is_vip AS isVip,e.auto_check_in AS autoCheckIn,e.auto_check_out AS autoCheckOut FROM employees e WHERE (e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?)) AND (? != 'staff' OR e.id=?) ORDER BY e.name",
@@ -390,10 +389,14 @@ export async function handleDailyStatus(
       addDays(day, -Math.max(1, maxRotationOn - 1)),
       "00:00",
     ).toISOString();
+    const historicalTo = localDateTimeUtc(
+      addDays(day, Math.max(2, maxRotationOn + 1)),
+      "00:00",
+    ).toISOString();
     const historical = await env.DB.prepare(
       "SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
     )
-      .bind(historicalFrom, to)
+      .bind(historicalFrom, historicalTo)
       .all<any>();
     const historicalByEmployee = new Map<string, any[]>();
     for (const row of historical.results || []) {
