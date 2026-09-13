@@ -334,7 +334,7 @@ export async function handleDailyStatus(
       )
       .all<EmployeeRow>();
     const requestQuery = await env.DB.prepare(
-      "SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND start_date IS NOT NULL AND start_date <= ? AND COALESCE(end_date,start_date) >= ? AND employee_id=COALESCE(NULLIF(?, ''), employee_id) UNION ALL SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND start_date IS NULL AND substr(created_at,1,10)=? AND (? = '' OR employee_id=?)",
+      "SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND start_date IS NOT NULL AND start_date <= ? AND COALESCE(end_date,start_date) >= ? AND employee_id=COALESCE(NULLIF(?, ''), employee_id) UNION ALL SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND start_date IS NULL AND substr(created_at,1,10)=? AND employee_id=COALESCE(NULLIF(?, ''), employee_id)",
     )
       .bind(day, day, requestedEmployeeId, day, requestedEmployeeId)
       .all<any>();
