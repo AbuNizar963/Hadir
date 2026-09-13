@@ -3,6 +3,7 @@ import { HadirRealtime } from "./realtime";
 import { bindEmployeeDevice, clearEmployeeDevice, deviceStatus, registrationOptions, verifyRegistration } from "./deviceSecurity";
 import { handleWorkforce } from "./workforce";
 import { handleEmployeeAttendance } from "./employee-attendance-gateway";
+import { handleAdministrativeAttendancePreparation } from "./attendance-engine-admin-commands";
 
 type Env = { REALTIME: DurableObjectNamespace; DB: D1Database; JWT_SECRET?: string; APP_ORIGIN?: string; OWNER_RECOVERY_CODE?: string; PROFILE_IMAGES?: R2Bucket; WEBAUTHN_RP_ID?: string; WEBAUTHN_ORIGIN?: string };
 const SESSION_COOKIE = "hadir_session";
@@ -73,21 +74,11 @@ export default { async fetch(request:Request,env:Env,ctx:ExecutionContext):Promi
 
     if(url.pathname==="/api/manager/attendance"&&request.method==="POST"){
       const admin=await actorForAdministrativeAction(request,env);
-      if(!admin||String(admin.role).toLowerCase()!=="owner") return new Response(JSON.stringify({error:"المالك فقط يستطيع التحضير المباشر"}),{status:403,headers:{...cors(origin),"content-type":"application/json"}});
-      const b=await request.json().catch(()=>({})) as any;
-      const employeeId=String(b.employeeId||"").trim(); const type=String(b.type||"check-in");
-      if(!employeeId||type!=="check-in") return new Response(JSON.stringify({error:"بيانات التحضير المباشر غير صحيحة"}),{status:400,headers:{...cors(origin),"content-type":"application/json"}});
-      const employee=await env.DB.prepare("SELECT id,job_number AS jobNumber,name,status,location_id AS locationId FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
-      if(!employee||employee.status!=="active") return new Response(JSON.stringify({error:"الموظف غير موجود أو موقوف"}),{status:404,headers:{...cors(origin),"content-type":"application/json"}});
-      const last=await env.DB.prepare("SELECT type FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1").bind(employeeId).first<any>();
-      if(last?.type==="check-in") return new Response(JSON.stringify({error:"الموظف مسجل حضور بالفعل"}),{status:409,headers:{...cors(origin),"content-type":"application/json"}});
-      const location=(await env.DB.prepare("SELECT id,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id=? LIMIT 1").bind(employee.locationId||"main").first<any>()) || (await env.DB.prepare("SELECT id,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name LIMIT 1").first<any>());
-      if(!location) return new Response(JSON.stringify({error:"لا يوجد موقع عمل محفوظ"}),{status:409,headers:{...cors(origin),"content-type":"application/json"}});
-      const id=crypto.randomUUID(); const timestamp=new Date().toISOString(); const deviceId=`admin-direct:${admin.id}`; const ip=request.headers.get("CF-Connecting-IP")||"unknown";
-      await env.DB.prepare("INSERT INTO attendance(id,employee_id,job_number,employee_name,type,timestamp,lat,lng,distance_meters,device_id,ip,qr_code,location_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,employee.id,employee.jobNumber,employee.name,"check-in",timestamp,Number(location.lat),Number(location.lng),0,deviceId,ip,"ADMIN_DIRECT",location.id).run();
-      await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip,lat,lng,distance_meters) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),employee.id,employee.jobNumber,admin.name,"check-in","success","تحضير مباشر بواسطة الإدارة لمهمة/مأمورية",timestamp,deviceId,ip,Number(location.lat),Number(location.lng),0).run().catch(()=>undefined);
-      await broadcast(env,{type:"cloud-data-changed",timestamp,path:"/api/attendance",method:"POST"});
-      return new Response(JSON.stringify({ok:true,record:{id,employeeId:employee.id,jobNumber:employee.jobNumber,employeeName:employee.name,type:"check-in",timestamp,lat:Number(location.lat),lng:Number(location.lng),distanceMeters:0,deviceId,ip,qrCode:"ADMIN_DIRECT",locationId:location.id}}),{status:201,headers:{...cors(origin),"content-type":"application/json"}});
+      const attendanceResponse=await handleAdministrativeAttendancePreparation(prepared.request,env,admin);
+      if(attendanceResponse.status!==404){
+        if(attendanceResponse.ok)ctx.waitUntil(broadcast(env,{type:"cloud-data-changed",timestamp:new Date().toISOString(),path:"/api/attendance",method:"POST"}));
+        return addDeviceCookie(attendanceResponse,prepared.deviceId,prepared.setCookie,origin);
+      }
     }
 
     const deviceReset=url.pathname.match(/^\/api\/employees\/([^/]+)\/device$/);
