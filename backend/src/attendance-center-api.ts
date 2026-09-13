@@ -28,7 +28,7 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS(origin) });
   if (req.method !== "GET") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
-  if (!actor || !["owner", "manager", "supervisor", "staff"].includes(String(actor.role))) return json({ error: "غير مصرح" }, 403, origin);
+  if (!actor || !["owner", "manager", "supervisor"].includes(String(actor.role))) return json({ error: "غير مصرح" }, 403, origin);
 
   const date = dayFromRequest(url);
   const from = fromRequest(url);
