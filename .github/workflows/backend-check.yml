@@ -2,7 +2,7 @@ name: Hadir Backend Check
 
 on:
   push:
-    branches: [android-native]
+    branches: [main, Apps, android-native]
     paths:
       - "backend/**"
       - ".github/workflows/backend-check.yml"
