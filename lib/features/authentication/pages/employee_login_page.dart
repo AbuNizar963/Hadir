@@ -149,8 +149,7 @@ class _EmployeeLoginPageState extends State<EmployeeLoginPage> {
                             onSubmitted: (_) => _login(),
                             decoration: InputDecoration(
                               labelText: 'رمز الدخول',
-                              hintText: '4 أحرف أو أكثر',
-                              suffixText: '4+ أحرف',
+                              hintText: 'ادخل كلمة المرور',
                               suffixIcon: IconButton(
                                 onPressed: _busy ? null : () => setState(() => _hidden = !_hidden),
                                 icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
