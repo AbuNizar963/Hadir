@@ -184,16 +184,20 @@ if (!source.includes("const sharePdf = async")) {
 }
 
 const shareButton = `<Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf} data-hadir-share="true"><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري إنشاء PDF…" : readyPdf ? "مشاركة PDF الآن" : "تجهيز PDF للمشاركة"}</Button>`;
-const csvButton = `<Button variant="outline" onClick={exportCsv} disabled={!summaries.length}><FileText className="ml-2 h-4 w-4" />CSV</Button>`;
-const dailyCsvReplacement = `{mode === "daily" ? ${shareButton} : ${csvButton}}`;
+const csvButtonPattern = /<Button\s+variant="outline"\s+onClick=\{exportCsv\}\s+disabled=\{!summaries\.length\}\s*>\s*<FileText\s+className="ml-2 h-4 w-4"\s*\/?>\s*CSV\s*<\/Button>/s;
+const dailyCsvReplacement = `{mode === "daily" ? ${shareButton} : $&}`;
 
-if (!source.includes(dailyCsvReplacement)) {
-  if (!source.includes(csvButton)) {
+if (!source.includes('data-hadir-share="true"')) {
+  const csvButtonMatch = source.match(csvButtonPattern);
+  if (!csvButtonMatch) {
     throw new Error(
-      "ManagerReports share patch: exact CSV JSX anchor not found; refusing unsafe replacement.",
+      "ManagerReports share patch: CSV export button anchor not found; refusing unsafe replacement.",
     );
   }
-  source = source.replace(csvButton, dailyCsvReplacement);
+  source = source.replace(
+    csvButtonMatch[0],
+    `{mode === "daily" ? ${shareButton} : ${csvButtonMatch[0]}}`,
+  );
 }
 
 const hasRenderedShareControl =
