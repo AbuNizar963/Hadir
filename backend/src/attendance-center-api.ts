@@ -40,10 +40,13 @@ async function buildAttendanceCenterDrilldown(env: Env, attendanceDay: string, e
   const row = report.rows.find((candidate) => candidate.employeeId === employeeId && candidate.attendanceDay === attendanceDay);
   if (!row) return null;
 
-  const [fact, attendance, requests, audit] = await Promise.all([
-    env.DB.prepare("SELECT schedule_snapshot_json FROM attendance_reporting_facts WHERE attendance_day = ? AND employee_id = ? LIMIT 1")
+  const factPromise = row.calculationSource === "attendance-engine-live"
+    ? Promise.resolve(null)
+    : env.DB.prepare("SELECT schedule_snapshot_json FROM attendance_reporting_facts WHERE attendance_day = ? AND employee_id = ? LIMIT 1")
       .bind(attendanceDay, employeeId)
-      .first<Record<string, unknown>>(),
+      .first<Record<string, unknown>>();
+  const [fact, attendance, requests, audit] = await Promise.all([
+    factPromise,
     fetchByIds(env.DB, "attendance", parseIds(row.attendanceEventIds)),
     fetchByIds(env.DB, "requests", parseIds(row.requestIds)),
     fetchByIds(env.DB, "audit", parseIds(row.auditIds)),
