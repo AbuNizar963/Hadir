@@ -84,5 +84,9 @@ void main() {
       resolveAuthenticatedRedirect(location: '/manager/reports'),
       '/admin-login',
     );
+    expect(
+      resolveAuthenticatedRedirect(location: '/manager-home'),
+      '/admin-login',
+    );
   });
 }
