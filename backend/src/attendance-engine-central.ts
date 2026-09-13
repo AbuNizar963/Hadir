@@ -1,6 +1,6 @@
 import { handleEmployeeAttendance as executeCanonicalAttendance } from "./attendance-engine-commands";
 
-type Env = { DB: D1Database; APP_TIMEZONE?: string };
+type Env = { DB: D1Database };
 
 /**
  * Single application-level gateway for attendance mutations.
@@ -9,20 +9,32 @@ type Env = { DB: D1Database; APP_TIMEZONE?: string };
  * attendance all enter this module. Only the canonical attendance engine is
  * allowed to persist the attendance row.
  */
-export async function handleAttendanceThroughCentralEngine(
+function executeCentralAttendance(
   req: Request,
   env: Env,
   actor: any,
   origin: string,
   trustedTimestamp?: string,
+  internal = false,
 ) {
-  return executeCanonicalAttendance(req, env, actor, origin, trustedTimestamp);
+  return executeCanonicalAttendance(req, env, actor, origin, trustedTimestamp, internal);
+}
+
+export async function handleAttendanceThroughCentralEngine(
+  req: Request,
+  env: Env,
+  actor: any,
+  origin: string,
+) {
+  // Public HTTP attendance never receives a trusted timestamp. Trusted event
+  // times are available only to internal application flows below.
+  return executeCentralAttendance(req, env, actor, origin, undefined, false);
 }
 
 /**
  * Internal write helper used by automatic/VIP and administrative flows.
- * It creates an internal attendance request and sends it through the same
- * central application gateway used by normal employee requests.
+ * The internal trust boundary is private to this module; callers cannot
+ * supply the internal flag through an HTTP request or client-controlled data.
  */
 export async function submitAttendanceThroughCentralEngine(
   env: Env,
@@ -60,12 +72,13 @@ export async function submitAttendanceThroughCentralEngine(
     }),
   });
 
-  const response = await handleAttendanceThroughCentralEngine(
+  const response = await executeCentralAttendance(
     request,
     env,
     { id: employeeId, role: "staff", name: "المحرك المركزي" },
     "*",
     timestamp,
+    true,
   );
   return { response, error: null };
 }
