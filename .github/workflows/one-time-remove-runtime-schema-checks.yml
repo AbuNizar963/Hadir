@@ -1,0 +1,65 @@
+# One-time canonical repair. Removed after Actions verification.
+name: One-time remove runtime D1 schema checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-time-remove-runtime-schema-checks.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove runtime D1 schema DDL
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          function replaceOnce(path, pattern, replacement, label) {
+            const source = fs.readFileSync(path, 'utf8');
+            const next = source.replace(pattern, replacement);
+            if (next === source) throw new Error(`${label} anchor not found`);
+            fs.writeFileSync(path, next);
+          }
+
+          replaceOnce(
+            'backend/src/app.ts',
+            /async function ensureWorkflowSchema\(db: D1Database\) \{[\s\S]*?\n\}\n/,
+            '',
+            'app runtime schema function',
+          );
+          replaceOnce(
+            'backend/src/app.ts',
+            /    await ensureWorkflowSchema\(env\.DB\);\n/,
+            '',
+            'app runtime schema call',
+          );
+
+          replaceOnce(
+            'backend/src/workforce.ts',
+            /async function ensureWorkforceSchema\(db: D1Database\) \{[\s\S]*?\n\}\n/,
+            '',
+            'workforce runtime schema function',
+          );
+          replaceOnce(
+            'backend/src/workforce.ts',
+            /  await ensureWorkforceSchema\(env\.DB\);\n/,
+            '',
+            'workforce runtime schema call',
+          );
+          NODE
+
+          npx --yes prettier@3.6.2 --write backend/src/app.ts backend/src/workforce.ts
+          git diff --check
+          git config user.name "HADIR Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/app.ts backend/src/workforce.ts
+          if git diff --cached --quiet; then echo "No changes needed"; exit 0; fi
+          git commit -m "perf: remove runtime D1 schema checks"
+          git push
