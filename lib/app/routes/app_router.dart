@@ -40,18 +40,29 @@ String? resolveAuthenticatedRedirect({
   String? employeeToken,
   String? adminToken,
 }) {
-  const publicLocations = {
-    '/',
+  const authEntryLocations = {
     '/login',
     '/employee-login',
     '/admin-login',
     '/manager/login',
   };
+  const publicLocations = {
+    '/',
+    '/weather',
+    '/prayer',
+    '/ai',
+    ...authEntryLocations,
+  };
   final hasEmployeeToken = employeeToken != null && employeeToken.isNotEmpty;
   final hasAdminToken = adminToken != null && adminToken.isNotEmpty;
 
-  if (hasAdminToken && publicLocations.contains(location)) return '/admin';
-  if (hasEmployeeToken && publicLocations.contains(location)) return '/home';
+  if (location == '/') {
+    if (hasAdminToken) return '/admin';
+    if (hasEmployeeToken) return '/home';
+    return null;
+  }
+
+  if (publicLocations.contains(location)) return null;
 
   const adminPaths = {
     '/admin',
@@ -96,9 +107,7 @@ String? resolveAuthenticatedRedirect({
   if (!hasEmployeeToken && (employeePaths.contains(location) || isEmployeeScan)) {
     return '/login';
   }
-  if (!hasEmployeeToken && !hasAdminToken && !publicLocations.contains(location)) {
-    return '/';
-  }
+
   return null;
 }
 
@@ -181,7 +190,7 @@ GoRouter buildAppRouter() => GoRouter(
     GoRoute(path: '/employee', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
     GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
     GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
-    GoRoute(path: '/employee/premium', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
+    GoRoute(path: '/employee/premium', redirect: (_, __) => '/employee/center'),
     GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in'))),
     GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
@@ -354,7 +363,5 @@ class LoginEntryPage extends StatelessWidget {
   const LoginEntryPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const EmployeeLoginPage();
-  }
+  Widget build(BuildContext context) => const EmployeeLoginPage();
 }
