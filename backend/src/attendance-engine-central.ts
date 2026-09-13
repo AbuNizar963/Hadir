@@ -12,7 +12,8 @@ export async function submitAttendanceThroughCentralEngine(
   employeeId: string,
   type: "check-in" | "check-out",
   deviceId: string,
-  reason = ""
+  reason = "",
+  timestamp?: string,
 ) {
   const employee = await env.DB.prepare(
     "SELECT id,location_id AS locationId FROM employees WHERE id=? AND status='active' LIMIT 1"
@@ -38,6 +39,7 @@ export async function submitAttendanceThroughCentralEngine(
       lng: Number(location.lng),
       qrCode: "CENTRAL_ENGINE",
       deviceId,
+      ...(timestamp ? { timestamp } : {}),
     }),
   });
 
@@ -45,7 +47,8 @@ export async function submitAttendanceThroughCentralEngine(
     request,
     env,
     { id: employeeId, role: "staff", name: "المحرك المركزي" },
-    "*"
+    "*",
+    timestamp,
   );
   return { response, error: null };
 }
