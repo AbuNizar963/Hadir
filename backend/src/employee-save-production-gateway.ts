@@ -13,55 +13,80 @@ type Env = {
   BROWSER?: BrowserRun;
 };
 
-type Actor = { id: string; name: string; role: "owner" | "manager" | "supervisor" | "staff" };
+type Actor = {
+  id: string;
+  name: string;
+  role: "owner" | "manager" | "supervisor" | "staff";
+};
 
 const SESSION_COOKIE = "hadir_session";
 const now = () => new Date().toISOString();
-const json = (data: unknown, status = 200, origin = "*") => new Response(JSON.stringify(data), {
-  status,
-  headers: {
-    "content-type": "application/json; charset=utf-8",
-    "access-control-allow-origin": origin,
-    "access-control-allow-credentials": "true",
-    "access-control-allow-headers": "content-type, authorization, x-device-id, x-requested-with",
-    "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
-    "access-control-max-age": "86400",
-    "vary": "Origin",
-    "cache-control": "no-store",
-  },
-});
+const json = (data: unknown, status = 200, origin = "*") =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "access-control-allow-origin": origin,
+      "access-control-allow-credentials": "true",
+      "access-control-allow-headers":
+        "content-type, authorization, x-device-id, x-requested-with",
+      "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
+      "access-control-max-age": "86400",
+      vary: "Origin",
+      "cache-control": "no-store",
+    },
+  });
 
 function configuredOrigins(env: Env) {
-  return String(env.APP_ORIGIN || env.APP_ORIGINS || "").split(",").map(v => v.trim().replace(/\/$/, "")).filter(Boolean);
+  return String(env.APP_ORIGIN || env.APP_ORIGINS || "")
+    .split(",")
+    .map((v) => v.trim().replace(/\/$/, ""))
+    .filter(Boolean);
 }
 
 function isAllowedOrigin(req: Request, env: Env) {
-  const incoming = String(req.headers.get("origin") || "").trim().replace(/\/$/, "");
+  const incoming = String(req.headers.get("origin") || "")
+    .trim()
+    .replace(/\/$/, "");
   if (!incoming) return true;
   const configured = configuredOrigins(env);
   if (configured.includes(incoming)) return true;
-  return !configured.length && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(incoming);
+  return (
+    !configured.length &&
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(incoming)
+  );
 }
 
 function origin(req: Request, env: Env) {
-  const incoming = String(req.headers.get("origin") || "").trim().replace(/\/$/, "");
+  const incoming = String(req.headers.get("origin") || "")
+    .trim()
+    .replace(/\/$/, "");
   const configured = configuredOrigins(env);
   if (incoming && configured.includes(incoming)) return incoming;
-  if (!configured.length && incoming && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(incoming)) return incoming;
+  if (
+    !configured.length &&
+    incoming &&
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(incoming)
+  )
+    return incoming;
   return configured[0] || "*";
 }
 
 function preflight(req: Request, env: Env, o: string) {
-  const requestedHeaders = String(req.headers.get("access-control-request-headers") || "").trim();
+  const requestedHeaders = String(
+    req.headers.get("access-control-request-headers") || "",
+  ).trim();
   return new Response(null, {
     status: 204,
     headers: {
       "access-control-allow-origin": o,
       "access-control-allow-credentials": "true",
-      "access-control-allow-headers": requestedHeaders || "content-type, authorization, x-device-id, x-requested-with",
+      "access-control-allow-headers":
+        requestedHeaders ||
+        "content-type, authorization, x-device-id, x-requested-with",
       "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
       "access-control-max-age": "86400",
-      "vary": "Origin, Access-Control-Request-Headers, Access-Control-Request-Method",
+      vary: "Origin, Access-Control-Request-Headers, Access-Control-Request-Method",
       "cache-control": "no-store",
     },
   });
@@ -69,15 +94,31 @@ function preflight(req: Request, env: Env, o: string) {
 
 function token(req: Request) {
   const cookie = req.headers.get("cookie") || "";
-  const item = cookie.split(";").map(v => v.trim()).find(v => v.startsWith(`${SESSION_COOKIE}=`));
-  return item ? decodeURIComponent(item.slice(SESSION_COOKIE.length + 1)) : (req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() || "");
+  const item = cookie
+    .split(";")
+    .map((v) => v.trim())
+    .find((v) => v.startsWith(`${SESSION_COOKIE}=`));
+  return (
+    req.headers
+      .get("authorization")
+      ?.replace(/^Bearer\s+/i, "")
+      .trim() ||
+    (item ? decodeURIComponent(item.slice(SESSION_COOKIE.length + 1)) : "")
+  );
 }
 
 async function sha256(value: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
   let binary = "";
-  for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  for (const byte of new Uint8Array(digest))
+    binary += String.fromCharCode(byte);
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 async function actor(req: Request, env: Env): Promise<Actor | null> {
@@ -85,96 +126,309 @@ async function actor(req: Request, env: Env): Promise<Actor | null> {
   if (!raw) return null;
   try {
     const hash = await sha256(raw);
-    const session = await env.DB.prepare("SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1").bind(hash).first<any>();
+    const session = await env.DB.prepare(
+      "SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1",
+    )
+      .bind(hash)
+      .first<any>();
     if (!session || session.userType !== "admin") return null;
-    const row = await env.DB.prepare("SELECT id,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1").bind(session.userId).first<any>();
-    return row ? { id: String(row.id), name: String(row.name || ""), role: row.role } : null;
-  } catch { return null; }
+    const row = await env.DB.prepare(
+      "SELECT id,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1",
+    )
+      .bind(session.userId)
+      .first<any>();
+    return row
+      ? { id: String(row.id), name: String(row.name || ""), role: row.role }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function employeeOut(row: any, policyMinutes = 0) {
   let specialties: string[] = [];
   let workDays: number[] = [];
-  try { specialties = JSON.parse(String(row.specialties_json || "[]")); } catch {}
-  try { workDays = JSON.parse(String(row.work_days_json || "[]")); } catch {}
+  try {
+    specialties = JSON.parse(String(row.specialties_json || "[]"));
+  } catch {}
+  try {
+    workDays = JSON.parse(String(row.work_days_json || "[]"));
+  } catch {}
   return {
-    id: String(row.id), jobNumber: String(row.job_number || ""), name: String(row.name || ""), pinHash: "", status: row.status,
-    deviceId: row.device_id, deviceLabel: row.device_label, createdAt: row.created_at, scheduleType: row.schedule_type,
-    rotationStartDate: row.rotation_start_date, avatar: row.avatar || null, workStartTime: row.work_start_time, workEndTime: row.work_end_time,
-    rotationDailyAttendanceEnabled: Boolean(row.rotation_daily_attendance_enabled), rotationDailyAttendanceTime: row.rotation_daily_attendance_time || null,
-    rotationDailyAttendanceGraceMinutes: Number(row.rotation_daily_attendance_grace_minutes ?? 0), gracePeriodMinutes: Number(row.grace_period_minutes ?? 0), earlyCheckoutGraceMinutes: policyMinutes,
-    role: row.role, locationId: row.location_id, rotationDaysOn: row.rotation_days_on, rotationDaysOff: row.rotation_days_off,
-    specialties, workDays, isVip: Boolean(row.is_vip), autoCheckIn: Boolean(row.auto_check_in), autoCheckOut: Boolean(row.auto_check_out),
+    id: String(row.id),
+    jobNumber: String(row.job_number || ""),
+    name: String(row.name || ""),
+    pinHash: "",
+    status: row.status,
+    deviceId: row.device_id,
+    deviceLabel: row.device_label,
+    createdAt: row.created_at,
+    scheduleType: row.schedule_type,
+    rotationStartDate: row.rotation_start_date,
+    avatar: row.avatar || null,
+    workStartTime: row.work_start_time,
+    workEndTime: row.work_end_time,
+    rotationDailyAttendanceEnabled: Boolean(
+      row.rotation_daily_attendance_enabled,
+    ),
+    rotationDailyAttendanceTime: row.rotation_daily_attendance_time || null,
+    rotationDailyAttendanceGraceMinutes: Number(
+      row.rotation_daily_attendance_grace_minutes ?? 0,
+    ),
+    gracePeriodMinutes: Number(row.grace_period_minutes ?? 0),
+    earlyCheckoutGraceMinutes: policyMinutes,
+    role: row.role,
+    locationId: row.location_id,
+    rotationDaysOn: row.rotation_days_on,
+    rotationDaysOff: row.rotation_days_off,
+    specialties,
+    workDays,
+    isVip: Boolean(row.is_vip),
+    autoCheckIn: Boolean(row.auto_check_in),
+    autoCheckOut: Boolean(row.auto_check_out),
   };
 }
 
-async function saveEmployee(req: Request, env: Env, id: string, a: Actor, o: string) {
-  if (!["owner", "manager"].includes(a.role)) return json({ error: "لا تملك صلاحية الكتابة" }, 403, o);
-  const body = await req.json().catch(() => ({})) as Record<string, any>;
-  const current = await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();
+async function saveEmployee(
+  req: Request,
+  env: Env,
+  id: string,
+  a: Actor,
+  o: string,
+) {
+  if (!["owner", "manager"].includes(a.role))
+    return json({ error: "لا تملك صلاحية الكتابة" }, 403, o);
+  const body = (await req.json().catch(() => ({}))) as Record<string, any>;
+  const current = await env.DB.prepare(
+    "SELECT * FROM employees WHERE id=? LIMIT 1",
+  )
+    .bind(id)
+    .first<any>();
   if (!current) return json({ error: "الموظف غير موجود" }, 404, o);
 
   const sets: string[] = [];
   const values: any[] = [];
   const textMap: Record<string, string> = {
-    name: "name", status: "status", scheduleType: "schedule_type", rotationStartDate: "rotation_start_date",
-    workStartTime: "work_start_time", workEndTime: "work_end_time", role: "role", locationId: "location_id",
+    name: "name",
+    status: "status",
+    scheduleType: "schedule_type",
+    rotationStartDate: "rotation_start_date",
+    workStartTime: "work_start_time",
+    workEndTime: "work_end_time",
+    role: "role",
+    locationId: "location_id",
   };
-  for (const [key, column] of Object.entries(textMap)) if (body[key] !== undefined) { sets.push(`${column}=?`); values.push(body[key] === "" ? null : body[key]); }
-  if (body.gracePeriodMinutes !== undefined) { const n = Number(body.gracePeriodMinutes); if (!Number.isInteger(n) || n < 0 || n > 180) return json({ error: "مهلة التأخر يجب أن تكون بين 0 و180 دقيقة" }, 400, o); sets.push("grace_period_minutes=?"); values.push(n); }
-  if (body.rotationDaysOn !== undefined) { const n = Number(body.rotationDaysOn); if (!Number.isInteger(n) || n < 1 || n > 31) return json({ error: "أيام المناوبة غير صحيحة" }, 400, o); sets.push("rotation_days_on=?"); values.push(n); }
-  if (body.rotationDaysOff !== undefined) { const n = Number(body.rotationDaysOff); if (!Number.isInteger(n) || n < 0 || n > 31) return json({ error: "أيام الراحة غير صحيحة" }, 400, o); sets.push("rotation_days_off=?"); values.push(n); }
-  if (body.rotationDailyAttendanceEnabled !== undefined) { sets.push("rotation_daily_attendance_enabled=?"); values.push(body.rotationDailyAttendanceEnabled ? 1 : 0); }
-  if (body.rotationDailyAttendanceTime !== undefined) { const value = body.rotationDailyAttendanceTime == null || body.rotationDailyAttendanceTime === "" ? null : String(body.rotationDailyAttendanceTime); if (value && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return json({ error: "وقت التسجيل اليومي غير صالح" }, 400, o); sets.push("rotation_daily_attendance_time=?"); values.push(value); }
-  if (body.rotationDailyAttendanceGraceMinutes !== undefined) { const n = Number(body.rotationDailyAttendanceGraceMinutes); if (!Number.isInteger(n) || n < 0 || n > 180) return json({ error: "مهلة التسجيل اليومي يجب أن تكون بين 0 و180 دقيقة" }, 400, o); sets.push("rotation_daily_attendance_grace_minutes=?"); values.push(n); }
-  if (body.specialties !== undefined) { sets.push("specialties_json=?"); values.push(JSON.stringify(Array.isArray(body.specialties) ? body.specialties : [])); }
-  if (body.workDays !== undefined) { sets.push("work_days_json=?"); values.push(JSON.stringify(Array.isArray(body.workDays) ? body.workDays : [])); }
+  for (const [key, column] of Object.entries(textMap))
+    if (body[key] !== undefined) {
+      sets.push(`${column}=?`);
+      values.push(body[key] === "" ? null : body[key]);
+    }
+  if (body.gracePeriodMinutes !== undefined) {
+    const n = Number(body.gracePeriodMinutes);
+    if (!Number.isInteger(n) || n < 0 || n > 180)
+      return json(
+        { error: "مهلة التأخر يجب أن تكون بين 0 و180 دقيقة" },
+        400,
+        o,
+      );
+    sets.push("grace_period_minutes=?");
+    values.push(n);
+  }
+  if (body.rotationDaysOn !== undefined) {
+    const n = Number(body.rotationDaysOn);
+    if (!Number.isInteger(n) || n < 1 || n > 31)
+      return json({ error: "أيام المناوبة غير صحيحة" }, 400, o);
+    sets.push("rotation_days_on=?");
+    values.push(n);
+  }
+  if (body.rotationDaysOff !== undefined) {
+    const n = Number(body.rotationDaysOff);
+    if (!Number.isInteger(n) || n < 0 || n > 31)
+      return json({ error: "أيام الراحة غير صحيحة" }, 400, o);
+    sets.push("rotation_days_off=?");
+    values.push(n);
+  }
+  if (body.rotationDailyAttendanceEnabled !== undefined) {
+    sets.push("rotation_daily_attendance_enabled=?");
+    values.push(body.rotationDailyAttendanceEnabled ? 1 : 0);
+  }
+  if (body.rotationDailyAttendanceTime !== undefined) {
+    const value =
+      body.rotationDailyAttendanceTime == null ||
+      body.rotationDailyAttendanceTime === ""
+        ? null
+        : String(body.rotationDailyAttendanceTime);
+    if (value && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value))
+      return json({ error: "وقت التسجيل اليومي غير صالح" }, 400, o);
+    sets.push("rotation_daily_attendance_time=?");
+    values.push(value);
+  }
+  if (body.rotationDailyAttendanceGraceMinutes !== undefined) {
+    const n = Number(body.rotationDailyAttendanceGraceMinutes);
+    if (!Number.isInteger(n) || n < 0 || n > 180)
+      return json(
+        { error: "مهلة التسجيل اليومي يجب أن تكون بين 0 و180 دقيقة" },
+        400,
+        o,
+      );
+    sets.push("rotation_daily_attendance_grace_minutes=?");
+    values.push(n);
+  }
+  if (body.specialties !== undefined) {
+    sets.push("specialties_json=?");
+    values.push(
+      JSON.stringify(Array.isArray(body.specialties) ? body.specialties : []),
+    );
+  }
+  if (body.workDays !== undefined) {
+    sets.push("work_days_json=?");
+    values.push(
+      JSON.stringify(Array.isArray(body.workDays) ? body.workDays : []),
+    );
+  }
   if (body.jobNumber !== undefined) {
     const job = String(body.jobNumber || "").trim();
-    if (!job) return json({ error: "الرقم الوظيفي لا يمكن أن يكون فارغًا" }, 400, o);
-    const duplicate = await env.DB.prepare("SELECT id FROM employees WHERE job_number=? AND id<>? LIMIT 1").bind(job, id).first<any>();
-    if (duplicate) return json({ error: "الرقم الوظيفي مستخدم من موظف آخر" }, 409, o);
-    sets.push("job_number=?"); values.push(job);
+    if (!job)
+      return json({ error: "الرقم الوظيفي لا يمكن أن يكون فارغًا" }, 400, o);
+    const duplicate = await env.DB.prepare(
+      "SELECT id FROM employees WHERE job_number=? AND id<>? LIMIT 1",
+    )
+      .bind(job, id)
+      .first<any>();
+    if (duplicate)
+      return json({ error: "الرقم الوظيفي مستخدم من موظف آخر" }, 409, o);
+    sets.push("job_number=?");
+    values.push(job);
   }
   if (body.pin !== undefined || body.password !== undefined) {
     const password = String(body.pin ?? body.password ?? "");
-    if (password.length < 4) return json({ error: "رمز PIN يجب أن يكون 4 محارف على الأقل" }, 400, o);
+    if (password.length < 4)
+      return json({ error: "رمز PIN يجب أن يكون 4 محارف على الأقل" }, 400, o);
     const salt = crypto.getRandomValues(new Uint8Array(16));
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-    const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" }, key, 256);
-    const b64 = (data: ArrayBuffer | Uint8Array) => { let s = ""; for (const b of new Uint8Array(data)) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, ""); };
-    sets.push("pin_hash=?"); values.push(`pbkdf2$100000$${b64(salt)}$${b64(bits)}`);
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(password),
+      "PBKDF2",
+      false,
+      ["deriveBits"],
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+      key,
+      256,
+    );
+    const b64 = (data: ArrayBuffer | Uint8Array) => {
+      let s = "";
+      for (const b of new Uint8Array(data)) s += String.fromCharCode(b);
+      return btoa(s)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+    };
+    sets.push("pin_hash=?");
+    values.push(`pbkdf2$100000$${b64(salt)}$${b64(bits)}`);
   }
-  if (body.isVip !== undefined) { sets.push("is_vip=?"); values.push(body.isVip ? 1 : 0); }
-  if (body.autoCheckIn !== undefined) { sets.push("auto_check_in=?"); values.push(body.autoCheckIn ? 1 : 0); }
-  if (body.autoCheckOut !== undefined) { sets.push("auto_check_out=?"); values.push(body.autoCheckOut ? 1 : 0); }
+  if (body.isVip !== undefined) {
+    sets.push("is_vip=?");
+    values.push(body.isVip ? 1 : 0);
+  }
+  if (body.autoCheckIn !== undefined) {
+    sets.push("auto_check_in=?");
+    values.push(body.autoCheckIn ? 1 : 0);
+  }
+  if (body.autoCheckOut !== undefined) {
+    sets.push("auto_check_out=?");
+    values.push(body.autoCheckOut ? 1 : 0);
+  }
 
   let policyMinutes: number | undefined;
   if (body.earlyCheckoutGraceMinutes !== undefined) {
     const n = Number(body.earlyCheckoutGraceMinutes);
-    if (!Number.isInteger(n) || n < 0 || n > 180) return json({ error: "مهلة الانصراف المبكر يجب أن تكون بين 0 و180 دقيقة" }, 400, o);
+    if (!Number.isInteger(n) || n < 0 || n > 180)
+      return json(
+        { error: "مهلة الانصراف المبكر يجب أن تكون بين 0 و180 دقيقة" },
+        400,
+        o,
+      );
     policyMinutes = n;
   }
-  if (!sets.length && policyMinutes === undefined) return json({ ok: true, employee: employeeOut(current) }, 200, o);
+  if (!sets.length && policyMinutes === undefined)
+    return json({ ok: true, employee: employeeOut(current) }, 200, o);
 
   try {
     const statements: D1PreparedStatement[] = [];
-    if (sets.length) statements.push(env.DB.prepare(`UPDATE employees SET ${sets.join(",")} WHERE id=?`).bind(...values, id));
+    if (sets.length)
+      statements.push(
+        env.DB.prepare(
+          `UPDATE employees SET ${sets.join(",")} WHERE id=?`,
+        ).bind(...values, id),
+      );
     if (policyMinutes !== undefined) {
-      statements.push(env.DB.prepare("INSERT INTO employee_checkout_policies(employee_id,early_checkout_minutes,updated_at) VALUES(?,?,?) ON CONFLICT(employee_id) DO UPDATE SET early_checkout_minutes=excluded.early_checkout_minutes,updated_at=excluded.updated_at").bind(id, policyMinutes, now()));
+      statements.push(
+        env.DB.prepare(
+          "INSERT INTO employee_checkout_policies(employee_id,early_checkout_minutes,updated_at) VALUES(?,?,?) ON CONFLICT(employee_id) DO UPDATE SET early_checkout_minutes=excluded.early_checkout_minutes,updated_at=excluded.updated_at",
+        ).bind(id, policyMinutes, now()),
+      );
     }
     await env.DB.batch(statements);
   } catch (error) {
-    return json({ error: "تعذر تحديث بيانات الموظف", detail: error instanceof Error ? error.message : String(error) }, 409, o);
+    return json(
+      {
+        error: "تعذر تحديث بيانات الموظف",
+        detail: error instanceof Error ? error.message : String(error),
+      },
+      409,
+      o,
+    );
   }
 
-  const updated = await env.DB.prepare("SELECT * FROM employees WHERE id=? LIMIT 1").bind(id).first<any>();
-  const policy = await env.DB.prepare("SELECT early_checkout_minutes AS minutes FROM employee_checkout_policies WHERE employee_id=? LIMIT 1").bind(id).first<any>();
+  const updated = await env.DB.prepare(
+    "SELECT * FROM employees WHERE id=? LIMIT 1",
+  )
+    .bind(id)
+    .first<any>();
+  const policy = await env.DB.prepare(
+    "SELECT early_checkout_minutes AS minutes FROM employee_checkout_policies WHERE employee_id=? LIMIT 1",
+  )
+    .bind(id)
+    .first<any>();
   const result = employeeOut(updated, Number(policy?.minutes || 0));
-  const damascusDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  try { await refreshProfessionalAttendanceFact(env, damascusDay, a, id); } catch (error) { console.error("[employee-save] professional fact refresh deferred", { employeeId: id, error }); }
-  if (body.isVip !== undefined || body.autoCheckIn !== undefined || body.autoCheckOut !== undefined) {
-    await env.DB.prepare("INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), id, result.jobNumber, a.name, "workforce-controls", "success", "تحديث إعدادات الموظف من لوحة الموظفين", now(), req.headers.get("x-device-id") || "OWNER_PANEL", req.headers.get("CF-Connecting-IP") || "unknown").run().catch(() => undefined);
+  const damascusDay = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Damascus",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  try {
+    await refreshProfessionalAttendanceFact(env, damascusDay, a, id);
+  } catch (error) {
+    console.error("[employee-save] professional fact refresh deferred", {
+      employeeId: id,
+      error,
+    });
+  }
+  if (
+    body.isVip !== undefined ||
+    body.autoCheckIn !== undefined ||
+    body.autoCheckOut !== undefined
+  ) {
+    await env.DB.prepare(
+      "INSERT INTO audit(id,employee_id,job_number,actor_name,action,result,reason,timestamp,device_id,ip) VALUES(?,?,?,?,?,?,?,?,?,?)",
+    )
+      .bind(
+        crypto.randomUUID(),
+        id,
+        result.jobNumber,
+        a.name,
+        "workforce-controls",
+        "success",
+        "تحديث إعدادات الموظف من لوحة الموظفين",
+        now(),
+        req.headers.get("x-device-id") || "OWNER_PANEL",
+        req.headers.get("CF-Connecting-IP") || "unknown",
+      )
+      .run()
+      .catch(() => undefined);
   }
   return json({ ok: true, employee: result }, 200, o);
 }
@@ -184,7 +438,8 @@ export { HadirRealtime };
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     const o = origin(req, env);
-    if (!isAllowedOrigin(req, env)) return json({ error: "مصدر الطلب غير مسموح به." }, 403, o);
+    if (!isAllowedOrigin(req, env))
+      return json({ error: "مصدر الطلب غير مسموح به." }, 403, o);
     if (req.method === "OPTIONS") return preflight(req, env, o);
     const url = new URL(req.url);
     if (url.pathname.replace(/\/$/, "") === "/api/reports/daily/pdf") {
@@ -199,8 +454,18 @@ export default {
       try {
         return await saveEmployee(req, env, decodeURIComponent(match[1]), a, o);
       } catch (error) {
-        console.error("employee save failed", { employeeId: decodeURIComponent(match[1]), error });
-        return json({ error: "تعذر حفظ بيانات الموظف", detail: error instanceof Error ? error.message : String(error) }, 500, o);
+        console.error("employee save failed", {
+          employeeId: decodeURIComponent(match[1]),
+          error,
+        });
+        return json(
+          {
+            error: "تعذر حفظ بيانات الموظف",
+            detail: error instanceof Error ? error.message : String(error),
+          },
+          500,
+          o,
+        );
       }
     }
     return base.fetch(req, env, ctx);
