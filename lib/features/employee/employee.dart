@@ -11,6 +11,7 @@ export 'pages/jibble_workspace_page_implementation.dart';
 export 'pages/modern_home_page_implementation.dart';
 export 'pages/attendance_page_implementation.dart';
 export 'pages/attendance_insights_page_implementation.dart';
+export 'pages/employee_premium_page_implementation.dart';
 export 'pages/requests_page_implementation.dart';
 export 'pages/notifications_page_implementation.dart';
 export 'pages/profile_page_implementation.dart';
