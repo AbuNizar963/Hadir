@@ -72,25 +72,6 @@ async function actorFromOriginal(req: Request, env: Env) {
   if (!probe.ok) return null;
   return ((await probe.json().catch(() => ({}))) as any).user || null;
 }
-async function ensureWorkflowSchema(db: D1Database) {
-  await db.batch([
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY,recipient_id TEXT NOT NULL DEFAULT '',user_id TEXT,title TEXT,body TEXT,message TEXT,severity TEXT NOT NULL DEFAULT 'info',type TEXT NOT NULL DEFAULT 'info',read_at TEXT,created_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_id,read_at,created_at DESC)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id,created_at DESC)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS employee_checkout_policies(employee_id TEXT PRIMARY KEY,early_checkout_minutes INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_employee_checkout_policy_updated ON employee_checkout_policies(updated_at DESC)",
-    ),
-  ]);
-}
 async function notify(
   db: D1Database,
   recipientId: string,
@@ -153,7 +134,6 @@ export default {
       });
     if (!env.DB)
       return json({ ok: false, error: "D1 binding DB غير موجود" }, 503, origin);
-    await ensureWorkflowSchema(env.DB);
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/$/, "") || "/";
     const actor = await actorFromOriginal(req, env);

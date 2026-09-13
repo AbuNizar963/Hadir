@@ -73,49 +73,6 @@ async function verifyPassword(password: string, stored: string) {
     return false;
   }
 }
-async function ensureWorkforceSchema(db: D1Database) {
-  await db.batch([
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY,recipient_id TEXT NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',type TEXT NOT NULL DEFAULT 'info',read_at TEXT,created_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS n1 ON notifications(recipient_id,created_at DESC)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS violations(id TEXT PRIMARY KEY,employee_id TEXT NOT NULL,type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'warning',occurred_at TEXT NOT NULL,minutes INTEGER NOT NULL DEFAULT 0,reason TEXT,status TEXT NOT NULL DEFAULT 'open',reviewed_by TEXT,reviewed_at TEXT,created_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS v1 ON violations(employee_id,occurred_at DESC)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS leave_requests(id TEXT PRIMARY KEY,employee_id TEXT NOT NULL,type TEXT NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL,reason TEXT,status TEXT NOT NULL DEFAULT 'pending',reviewer_id TEXT,reviewed_at TEXT,created_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT,assignee_id TEXT,created_by TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'todo',priority TEXT NOT NULL DEFAULT 'normal',due_at TEXT,completed_at TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS performance_reviews(id TEXT PRIMARY KEY,employee_id TEXT NOT NULL,period_start TEXT NOT NULL,period_end TEXT NOT NULL,attendance_score REAL NOT NULL DEFAULT 0,punctuality_score REAL NOT NULL DEFAULT 0,reliability_score REAL NOT NULL DEFAULT 0,overall_score REAL NOT NULL DEFAULT 0,notes TEXT,reviewer_id TEXT,created_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS payroll_entries(id TEXT PRIMARY KEY,employee_id TEXT NOT NULL,period_start TEXT NOT NULL,period_end TEXT NOT NULL,regular_minutes INTEGER NOT NULL DEFAULT 0,overtime_minutes INTEGER NOT NULL DEFAULT 0,late_minutes INTEGER NOT NULL DEFAULT 0,absence_minutes INTEGER NOT NULL DEFAULT 0,adjustment_amount REAL NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'draft',approved_by TEXT,approved_at TEXT,created_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS anomaly_events(id TEXT PRIMARY KEY,employee_id TEXT,type TEXT NOT NULL,score REAL NOT NULL DEFAULT 0,evidence TEXT,status TEXT NOT NULL DEFAULT 'new',detected_at TEXT NOT NULL,resolved_at TEXT)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS ai_insights(id TEXT PRIMARY KEY,scope TEXT NOT NULL,scope_id TEXT,kind TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL,evidence TEXT,confidence REAL,created_at TEXT NOT NULL,expires_at TEXT)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS push_subscriptions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,endpoint TEXT NOT NULL UNIQUE,p256dh TEXT NOT NULL,auth TEXT NOT NULL,created_at TEXT NOT NULL,last_seen_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS escape_events(id TEXT PRIMARY KEY,employee_id TEXT NOT NULL,job_number TEXT NOT NULL,employee_name TEXT NOT NULL,status TEXT NOT NULL,timestamp TEXT NOT NULL,reason TEXT,actor_id TEXT,actor_name TEXT,lat REAL,lng REAL,created_at TEXT NOT NULL)",
-    ),
-    db.prepare(
-      "CREATE TABLE IF NOT EXISTS device_rebind_requests(id TEXT PRIMARY KEY,employee_id TEXT NOT NULL,job_number TEXT NOT NULL,employee_name TEXT NOT NULL,device_label TEXT,device_id TEXT,reason TEXT,status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,resolved_at TEXT,resolved_by TEXT)",
-    ),
-  ]);
-}
 let workforcePushEnv: {
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
@@ -190,7 +147,6 @@ export async function handleWorkforce(
   pathname: string,
 ) {
   workforcePushEnv = env;
-  await ensureWorkforceSchema(env.DB);
   const u = new URL(req.url);
   const method = req.method;
   if (pathname === "/api/workforce/live" && method === "POST" && !actor) {
