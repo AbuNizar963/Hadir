@@ -40,4 +40,49 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('admin'), findsOneWidget);
   });
+
+  test('restored employee session resumes the employee workspace', () {
+    expect(
+      resolveAuthenticatedRedirect(
+        location: '/',
+        employeeToken: 'employee-token',
+      ),
+      '/home',
+    );
+    expect(
+      resolveAuthenticatedRedirect(
+        location: '/employee-login',
+        employeeToken: 'employee-token',
+      ),
+      '/home',
+    );
+  });
+
+  test('restored admin session resumes the admin workspace', () {
+    expect(
+      resolveAuthenticatedRedirect(
+        location: '/',
+        adminToken: 'admin-token',
+      ),
+      '/admin',
+    );
+    expect(
+      resolveAuthenticatedRedirect(
+        location: '/manager/login',
+        adminToken: 'admin-token',
+      ),
+      '/admin',
+    );
+  });
+
+  test('protected routes still reject missing sessions', () {
+    expect(
+      resolveAuthenticatedRedirect(location: '/employee/scan/check-in'),
+      '/login',
+    );
+    expect(
+      resolveAuthenticatedRedirect(location: '/manager/reports'),
+      '/admin-login',
+    );
+  });
 }
