@@ -21,50 +21,73 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
 
+          function replaceOnce(source, pattern, replacement, label) {
+            const next = source.replace(pattern, replacement);
+            if (next === source) throw new Error(`${label} anchor not found`);
+            return next;
+          }
+
           const attendancePath = 'backend/src/attendance-engine.ts';
           let attendance = fs.readFileSync(attendancePath, 'utf8');
 
-          const employeeOld = 'FROM employees e WHERE e.status=\'active\' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?) ORDER BY e.name';
-          const employeeNew = 'FROM employees e WHERE (e.status=\'active\' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?)) AND (? != \'staff\' OR e.id=?) ORDER BY e.name';
-          if (!attendance.includes(employeeOld)) throw new Error('daily-status employee query anchor not found');
-          attendance = attendance.replace(employeeOld, employeeNew);
+          attendance = replaceOnce(
+            attendance,
+            /FROM employees e WHERE e\.status='active' OR EXISTS \(SELECT 1 FROM attendance a WHERE a\.employee_id=e\.id AND a\.timestamp>=\? AND a\.timestamp<\?\) ORDER BY e\.name/,
+            "FROM employees e WHERE (e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?)) AND (? != 'staff' OR e.id=?) ORDER BY e.name",
+            'daily-status employee query',
+          );
 
-          const oldAttendanceQuery = '        const attendanceQuery = await env.DB.prepare("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(from, to).all<any>();\n';
-          if (!attendance.includes(oldAttendanceQuery)) throw new Error('daily-status redundant attendance query anchor not found');
-          attendance = attendance.replace(oldAttendanceQuery, '');
+          attendance = replaceOnce(
+            attendance,
+            /\s*const attendanceQuery = await env\.DB\.prepare\("SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=\? AND timestamp<\? ORDER BY timestamp ASC"\)\.bind\(from, to\)\.all<any>\(\);/,
+            '',
+            'daily-status redundant attendance query',
+          );
 
-          const oldRequestQuery = '        const requestQuery = await env.DB.prepare("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\')").all<any>();\n';
-          const newRequestQuery = '        const requestQuery = await env.DB.prepare("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NOT NULL AND start_date <= ? AND COALESCE(end_date,start_date) >= ? UNION ALL SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NULL AND substr(created_at,1,10)=?").bind(day, day, day).all<any>();\n';
-          if (!attendance.includes(oldRequestQuery)) throw new Error('daily-status request query anchor not found');
-          attendance = attendance.replace(oldRequestQuery, newRequestQuery);
+          attendance = replaceOnce(
+            attendance,
+            /const requestQuery = await env\.DB\.prepare\("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN \('approved','confirmed'\) AND type IN \('leave','permission'\)"\)\.all<any>\(\);/,
+            'const requestQuery = await env.DB.prepare("SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NOT NULL AND start_date <= ? AND COALESCE(end_date,start_date) >= ? UNION ALL SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN (\'approved\',\'confirmed\') AND type IN (\'leave\',\'permission\') AND start_date IS NULL AND substr(created_at,1,10)=?").bind(day, day, day).all<any>();',
+            'daily-status request query',
+          );
 
-          const oldEmployeeBinding = '.bind(localDateTimeUtc(day, "00:00").toISOString(), localDateTimeUtc(nextDay, "00:00").toISOString()).all<EmployeeRow>();';
-          const newEmployeeBinding = '.bind(localDateTimeUtc(day, "00:00").toISOString(), localDateTimeUtc(nextDay, "00:00").toISOString(), String(actor.role), String(actor.id)).all<EmployeeRow>();';
-          if (!attendance.includes(oldEmployeeBinding)) throw new Error('daily-status employee binding anchor not found');
-          attendance = attendance.replace(oldEmployeeBinding, newEmployeeBinding);
+          attendance = replaceOnce(
+            attendance,
+            /\.bind\(localDateTimeUtc\(day, "00:00"\)\.toISOString\(\), localDateTimeUtc\(nextDay, "00:00"\)\.toISOString\(\)\)\.all<EmployeeRow>\(\);/,
+            '.bind(localDateTimeUtc(day, "00:00").toISOString(), localDateTimeUtc(nextDay, "00:00").toISOString(), String(actor.role), String(actor.id)).all<EmployeeRow>();',
+            'daily-status employee bindings',
+          );
 
-          const oldCollections = '        const employees = employeeQuery.results || [], attendance = attendanceQuery.results || [], requests = requestQuery.results || [];\n        const scopedEmployees = String(actor.role) === "staff" ? employees.filter(employee => String(employee.id) === String(actor.id)) : employees;\n        const byEmployee = new Map<string, any[]>();\n        for (const row of attendance) {\n            const id = String(row.employeeId || "");\n            if (id) {\n                const list = byEmployee.get(id) || [];\n                list.push(row);\n                byEmployee.set(id, list);\n            }\n        }\n';
-          const newCollections = '        const employees = employeeQuery.results || [], requests = requestQuery.results || [];\n        const scopedEmployees = employees;\n';
-          if (!attendance.includes(oldCollections)) throw new Error('daily-status collection anchor not found');
-          attendance = attendance.replace(oldCollections, newCollections);
+          attendance = replaceOnce(
+            attendance,
+            /\s*const employees = employeeQuery\.results \|\| \[\], attendance = attendanceQuery\.results \|\| \[\], requests = requestQuery\.results \|\| \[\];\s*const scopedEmployees = String\(actor\.role\) === "staff" \? employees\.filter\(employee => String\(employee\.id\) === String\(actor\.id\)\) : employees;\s*const byEmployee = new Map<string, any\[\]>\(\);\s*for \(const row of attendance\) \{\s*const id = String\(row\.employeeId \|\| ""\);\s*if \(id\) \{\s*const list = byEmployee\.get\(id\) \|\| \[\];\s*list\.push\(row\);\s*byEmployee\.set\(id, list\);\s*\}\s*\}\s*/,
+            '\n        const employees = employeeQuery.results || [], requests = requestQuery.results || [];\n        const scopedEmployees = employees;\n',
+            'daily-status collection block',
+          );
 
-          const oldHistorical = '        const historical = await env.DB.prepare("SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC").bind(historicalFrom, to).all<any>();';
-          if (!attendance.includes(oldHistorical)) throw new Error('daily-status historical query anchor not found');
-
-          const rowsAnchor = '            const rows = byEmployee.get(id) || [];';
-          if (!attendance.includes(rowsAnchor)) throw new Error('daily-status rows anchor not found');
-          attendance = attendance.replace(rowsAnchor, '            const rows = historicalByEmployee.get(id) || [];');
+          attendance = replaceOnce(
+            attendance,
+            /const rows = byEmployee\.get\(id\) \|\| \[\];/,
+            'const rows = historicalByEmployee.get(id) || [];',
+            'daily-status employee rows map',
+          );
 
           fs.writeFileSync(attendancePath, attendance);
 
           const requestsPath = 'backend/src/requests.ts';
           let requests = fs.readFileSync(requestsPath, 'utf8');
-          const schemaBlock = 'async function ensureRequestSchema(db:D1Database){await db.batch([db.prepare("ALTER TABLE requests ADD COLUMN start_date TEXT"),db.prepare("ALTER TABLE requests ADD COLUMN end_date TEXT")]).catch(()=>undefined);}\n';
-          if (!requests.includes(schemaBlock)) throw new Error('request schema hot-path block not found');
-          requests = requests.replace(schemaBlock, '');
-          const handlerAnchor = 'export async function handleRequests(req:Request,env:Env,actor:Actor|null,origin:string){await ensureRequestSchema(env.DB);const url=';
-          if (!requests.includes(handlerAnchor)) throw new Error('request handler schema call anchor not found');
-          requests = requests.replace(handlerAnchor, 'export async function handleRequests(req:Request,env:Env,actor:Actor|null,origin:string){const url=');
+          requests = replaceOnce(
+            requests,
+            /async function ensureRequestSchema\(db:D1Database\)\{.*?\}\n/,
+            '',
+            'request schema hot-path block',
+          );
+          requests = replaceOnce(
+            requests,
+            /export async function handleRequests\(req:Request,env:Env,actor:Actor\|null,origin:string\)\{await ensureRequestSchema\(env\.DB\);const url=/,
+            'export async function handleRequests(req:Request,env:Env,actor:Actor|null,origin:string){const url=',
+            'request schema hot-path call',
+          );
           fs.writeFileSync(requestsPath, requests);
           NODE
           npx --yes prettier@3.6.2 --write backend/src/attendance-engine.ts backend/src/requests.ts
