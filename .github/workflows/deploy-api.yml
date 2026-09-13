@@ -35,7 +35,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f backend/scripts/patch-session-security.mjs ]; then
+
+          migrate_session_source() {
             node backend/scripts/patch-session-security.mjs
             npx --yes prettier@3.6.2 --write \
               backend/src/index.ts \
@@ -46,20 +47,24 @@ jobs:
               .github/workflows/deploy-api.yml
 
             python3 - <<'PY'
-            from pathlib import Path
+from pathlib import Path
 
-            workflow = Path('.github/workflows/deploy-api.yml')
-            text = workflow.read_text(encoding='utf-8')
-            start_marker = '      - name: Migrate session security into canonical source\n'
-            end_marker = '      - name: Validate Worker bundle\n'
-            start = text.find(start_marker)
-            end = text.find(end_marker, start + len(start_marker))
-            if start < 0 or end < 0:
-                raise SystemExit('Could not locate the temporary migration step in deploy-api.yml')
-            workflow.write_text(text[:start] + text[end:], encoding='utf-8')
-            PY
+workflow = Path('.github/workflows/deploy-api.yml')
+text = workflow.read_text(encoding='utf-8')
+start_marker = '      - name: Migrate session security into canonical source\n'
+end_marker = '      - name: Validate Worker bundle\n'
+start = text.find(start_marker)
+end = text.find(end_marker, start + len(start_marker))
+if start < 0 or end < 0:
+    raise SystemExit('Could not locate the temporary migration step in deploy-api.yml')
+workflow.write_text(text[:start] + text[end:], encoding='utf-8')
+PY
 
             rm backend/scripts/patch-session-security.mjs
+          }
+
+          if [ -f backend/scripts/patch-session-security.mjs ]; then
+            migrate_session_source
           fi
 
           if grep -R --line-number --fixed-strings 'patch-session-security.mjs' .github/workflows backend/src backend/package.json; then
