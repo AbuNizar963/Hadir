@@ -19,8 +19,6 @@ if (!existsSync(vitePackage)) {
   }
 }
 
-run("node", ["scripts/patch-manager-report-header-preflight.mjs"]);
-run("node", ["scripts/patch-manager-report-header.mjs"]);
 run("node", ["scripts/patch-global-attendance-schedule-filter.mjs"]);
 run("node", ["scripts/patch-global-attendance-print-report.mjs"]);
 run("node", ["scripts/patch-global-attendance-print-layout.mjs"]);
@@ -75,9 +73,9 @@ if (bun.status === 0 && !bun.error) {
   run("npm", ["run", "build"]);
 }
 
-const scan = spawnSync("grep", ["-RIl", "سجل الحضور والغياب ليوم", "src/pages/ManagerReports.tsx", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-if (scan.status !== 0 || !scan.stdout?.trim()) {
-  throw new Error("Production build validation failed: branded daily report header was not found in source or dist.");
+const sourceHeaderScan = spawnSync("grep", ["-RIlE", "خدمة الدوام اليومية|settings\.brandName", "src/pages/ManagerReports.tsx", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+if (sourceHeaderScan.status !== 0 || !sourceHeaderScan.stdout?.trim()) {
+  throw new Error("Production build validation failed: canonical daily report branding was not found in source or dist.");
 }
 const shareMarkers = ["navigator.share", "html2canvas", "sharingPdf"];
 const shareScan = spawnSync("grep", ["-RIlE", shareMarkers.join("|"), "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -89,7 +87,7 @@ const legacyAssistant = spawnSync("grep", ["-RIl", "معاون رئيس القس
 if (legacy.status === 0 || legacyAssistant.status === 0) {
   throw new Error("Production build validation failed: legacy department owner/assistant header is still present in dist.");
 }
-console.log("Production report header and direct PDF sharing verified; legacy owner/assistant header absent.");
+console.log("Production report branding and direct PDF sharing verified; legacy owner/assistant header absent.");
 
 const faviconVersion = encodeURIComponent(commitSha);
 const emittedFiles = ["index.html", "manifest.webmanifest", "sw.js"];
