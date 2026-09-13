@@ -317,30 +317,47 @@ export async function handleDailyStatus(
     day = /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
       ? requestedDay
       : dayKey(new Date()),
-    nextDay = addDays(day, 1);
+    nextDay = addDays(day, 1),
+    requestedEmployeeId = String(
+      url.searchParams.get("employeeId") || "",
+    ).trim();
   try {
     const employeeQuery = await env.DB.prepare(
-      "SELECT e.id,e.name,e.job_number AS jobNumber,e.status,e.schedule_type AS scheduleType,e.work_start_time AS workStartTime,e.work_end_time AS workEndTime,e.work_days_json AS workDaysJson,e.rotation_start_date AS rotationStartDate,e.rotation_days_on AS rotationDaysOn,e.rotation_days_off AS rotationDaysOff,e.rotation_daily_attendance_enabled AS rotationDailyAttendanceEnabled,e.rotation_daily_attendance_time AS rotationDailyAttendanceTime,e.rotation_daily_attendance_grace_minutes AS rotationDailyAttendanceGraceMinutes,e.grace_period_minutes AS gracePeriodMinutes,e.is_vip AS isVip,e.auto_check_in AS autoCheckIn,e.auto_check_out AS autoCheckOut FROM employees e WHERE (e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?)) AND (? != 'staff' OR e.id=?) ORDER BY e.name",
+      "SELECT e.id,e.name,e.job_number AS jobNumber,e.status,e.schedule_type AS scheduleType,e.work_start_time AS workStartTime,e.work_end_time AS workEndTime,e.work_days_json AS workDaysJson,e.rotation_start_date AS rotationStartDate,e.rotation_days_on AS rotationDaysOn,e.rotation_days_off AS rotationDaysOff,e.rotation_daily_attendance_enabled AS rotationDailyAttendanceEnabled,e.rotation_daily_attendance_time AS rotationDailyAttendanceTime,e.rotation_daily_attendance_grace_minutes AS rotationDailyAttendanceGraceMinutes,e.grace_period_minutes AS gracePeriodMinutes,e.is_vip AS isVip,e.auto_check_in AS autoCheckIn,e.auto_check_out AS autoCheckOut FROM employees e WHERE (e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?)) AND (? != 'staff' OR e.id=?) AND (? = '' OR e.id=?) ORDER BY e.name",
     )
       .bind(
         localDateTimeUtc(day, "00:00").toISOString(),
         localDateTimeUtc(nextDay, "00:00").toISOString(),
         String(actor.role),
         String(actor.id),
+        requestedEmployeeId,
+        requestedEmployeeId,
       )
       .all<EmployeeRow>();
     const requestQuery = await env.DB.prepare(
-      "SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND start_date IS NOT NULL AND start_date <= ? AND COALESCE(end_date,start_date) >= ? UNION ALL SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND start_date IS NULL AND substr(created_at,1,10)=?",
+      "SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND start_date IS NOT NULL AND start_date <= ? AND COALESCE(end_date,start_date) >= ? AND (? = '' OR employee_id=?) UNION ALL SELECT employee_id AS employeeId,type,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND start_date IS NULL AND substr(created_at,1,10)=? AND (? = '' OR employee_id=?)",
     )
-      .bind(day, day, day)
+      .bind(
+        day,
+        day,
+        requestedEmployeeId,
+        requestedEmployeeId,
+        day,
+        requestedEmployeeId,
+        requestedEmployeeId,
+      )
       .all<any>();
     const now = new Date(),
       today = dayKey(now),
       escapeCutoff = day === today ? now : localDateTimeUtc(nextDay, "00:00");
     const escapeQuery = await env.DB.prepare(
-      "SELECT event.employee_id AS employeeId,event.status,event.timestamp FROM escape_events event INNER JOIN (SELECT employee_id,MAX(timestamp) AS latestTimestamp FROM escape_events WHERE timestamp<? GROUP BY employee_id) latest ON latest.employee_id=event.employee_id AND latest.latestTimestamp=event.timestamp ORDER BY event.timestamp DESC",
+      "SELECT event.employee_id AS employeeId,event.status,event.timestamp FROM escape_events event INNER JOIN (SELECT employee_id,MAX(timestamp) AS latestTimestamp FROM escape_events WHERE timestamp<? GROUP BY employee_id) latest ON latest.employee_id=event.employee_id AND latest.latestTimestamp=event.timestamp WHERE (? = '' OR event.employee_id=?) ORDER BY event.timestamp DESC",
     )
-      .bind(escapeCutoff.toISOString())
+      .bind(
+        escapeCutoff.toISOString(),
+        requestedEmployeeId,
+        requestedEmployeeId,
+      )
       .all<any>();
     const latestEscapeByEmployee = new Map<string, any>();
     for (const row of escapeQuery.results || []) {
@@ -394,9 +411,14 @@ export async function handleDailyStatus(
       "00:00",
     ).toISOString();
     const historical = await env.DB.prepare(
-      "SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
+      "SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? AND (? = '' OR employee_id=?) ORDER BY timestamp ASC",
     )
-      .bind(historicalFrom, historicalTo)
+      .bind(
+        historicalFrom,
+        historicalTo,
+        requestedEmployeeId,
+        requestedEmployeeId,
+      )
       .all<any>();
     const historicalByEmployee = new Map<string, any[]>();
     for (const row of historical.results || []) {
