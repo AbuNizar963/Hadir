@@ -4,7 +4,7 @@ const DEFAULT_TZ = "Asia/Damascus";
 function parts(date: Date, tz: string) { const p=new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date); const get=(t:string)=>p.find(x=>x.type===t)?.value||""; return {year:Number(get("year")),month:Number(get("month")),day:Number(get("day")),weekday:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(get("weekday")),hour:Number(get("hour"))%24,minute:Number(get("minute"))}; }
 export function dateKey(date: Date, tz = DEFAULT_TZ) { const p=parts(date,tz); return `${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}`; }
 function dayNumber(day:string){return Date.UTC(Number(day.slice(0,4)),Number(day.slice(5,7))-1,Number(day.slice(8,10)))/DAY_MS;}
-function addDays(day:string,n:number){return new Date((dayNumber(day)+n)*DAY_MS).toISOString().slice(0,10);}
+export function addDays(day:string,n:number){return new Date((dayNumber(day)+n)*DAY_MS).toISOString().slice(0,10);}
 function offsetMinutes(day:string,tz:string){const noon=new Date(`${day}T12:00:00Z`);const p=parts(noon,tz);return Math.round((Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute)-noon.getTime())/60000);}
 export function localDateTime(day:string,value:string|null|undefined,tz=DEFAULT_TZ){const m=/^(\d{1,2}):(\d{2})$/.exec(String(value||""));const h=Math.min(23,Math.max(0,Number(m?.[1]??9))),minute=Math.min(59,Math.max(0,Number(m?.[2]??0)));return new Date(Date.UTC(Number(day.slice(0,4)),Number(day.slice(5,7))-1,Number(day.slice(8,10)),h,minute)-offsetMinutes(day,tz)*60000);}
 function validTime(value:unknown){return /^(\d{1,2}):(\d{2})$/.test(String(value||""));}
