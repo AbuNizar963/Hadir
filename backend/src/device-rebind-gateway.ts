@@ -6,6 +6,7 @@ import { handleProfessionalAttendanceReport } from "./professional-attendance-re
 import { handleReportArchive } from "./report-archive";
 import { handleCompanyLogoRequest } from "./company-logo";
 import { runAutomaticVip } from "./automatic-vip";
+import { runAttendanceExceptionEngine } from "./attendance-exception-engine";
 
 type Env = {
   DB: D1Database;
@@ -142,9 +143,7 @@ export default {
         const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
         const result = normalizedPath === "/api/manager/daily-status"
           ? await handleDailyStatus(request, env, actor)
-          : normalizedPath === "/api/reports/professional-attendance"
-            ? await handleProfessionalAttendanceReport(request, env, actor)
-            : await handleProfessionalAttendanceReport(request, env, actor);
+          : await handleProfessionalAttendanceReport(request, env, actor);
         const headers = new Headers(result.headers);
         for (const [key, value] of Object.entries(cors)) headers.set(key, value);
         return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
@@ -159,11 +158,14 @@ export default {
 
   async scheduled(controller: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     try {
-      const run = runAutomaticVip(env);
-      ctx.waitUntil(run);
-      await run;
+      const automatic = runAutomaticVip(env);
+      ctx.waitUntil(automatic);
+      await automatic;
+      const exceptions = runAttendanceExceptionEngine(env);
+      ctx.waitUntil(exceptions);
+      await exceptions;
     } catch (error) {
-      console.error("automatic-vip cron failed", error);
+      console.error("attendance automation cron failed", error);
     }
   },
 };
