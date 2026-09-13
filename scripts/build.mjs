@@ -19,7 +19,6 @@ if (!existsSync(vitePackage)) {
   }
 }
 
-run("node", ["scripts/patch-manager-reports-live.mjs"]);
 run("node", ["scripts/patch-manager-report-header-preflight.mjs"]);
 run("node", ["scripts/patch-manager-report-header.mjs"]);
 run("node", ["scripts/patch-global-attendance-schedule-filter.mjs"]);
