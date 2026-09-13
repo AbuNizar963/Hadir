@@ -27,6 +27,20 @@ const API_URL = "https://hadir-api.abunizar963.workers.dev";
 const ADMIN_TOKEN_KEY = "hadir.api.token.admin";
 const EMPLOYEE_TOKEN_KEY = "hadir.api.token.employee";
 
+function normalizeActiveAttendance(data: DailyStatusResponse): DailyStatusResponse {
+  const employees = Array.isArray(data.employees)
+    ? data.employees.map((row) => row.status === "OPEN"
+      ? { ...row, status: "PRESENT" as const, statusLabel: "حاضر" }
+      : row)
+    : [];
+  const counts = { ...data.counts };
+  if (typeof counts.OPEN === "number") {
+    counts.PRESENT = (counts.PRESENT || 0) + counts.OPEN;
+    delete counts.OPEN;
+  }
+  return { ...data, employees, counts };
+}
+
 export async function getDailyStatus(day: string): Promise<DailyStatusResponse> {
   const token = typeof window === "undefined"
     ? ""
@@ -47,5 +61,5 @@ export async function getDailyStatus(day: string): Promise<DailyStatusResponse> 
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : `فشل جلب حالة الدوام (${response.status})`);
-  return data as DailyStatusResponse;
+  return normalizeActiveAttendance(data as DailyStatusResponse);
 }
