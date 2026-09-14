@@ -82,7 +82,6 @@ function connect() {
               detail: payload,
             }),
           );
-          window.dispatchEvent(new Event("hadir:d1-view-changed"));
         }
       } catch {
         // Ignore malformed realtime messages.
