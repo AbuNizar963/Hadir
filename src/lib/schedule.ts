@@ -30,17 +30,17 @@ function localDateTimeUtc(day: string, time: string) {
 export function getEmployeeScheduleStatus(employee: Employee | null | undefined, target: Date = new Date()): ScheduleStatus {
   const period = getEmployeeWorkPeriod(employee, target);
   if (!employee) return { isWorkDay: false, label: "غير محدد" };
-  if (period.kind === "NOT_STARTED") return { isWorkDay: false, label: "لم تبدأ المناوبة بعد", detail: period.detail };
+  if (period.kind === "NOT_STARTED") return { isWorkDay: false, label: "لم يبدأ العمل بعد", detail: period.detail };
   if (period.kind === "INVALID") return { isWorkDay: false, label: "جدول غير صالح", detail: period.detail };
   if (employee.scheduleType === "ROTATION") {
     const info = getRotationInfo(employee, target);
     if (!info) return { isWorkDay: false, label: "جدول غير صالح" };
     if (info.phase === "OFF") { const restDay = info.cycleDay - info.daysOn + 1; return { isWorkDay: false, label: "فترة راحة", detail: `اليوم ${normalizeDigits(String(restDay))} من ${normalizeDigits(String(info.daysOff))} في الراحة`, cycleDay: info.cycleDay + 1, cycleTotal: info.daysOn + info.daysOff }; }
-    return { isWorkDay: true, label: "في المناوبة", detail: `اليوم ${normalizeDigits(String(info.workDay + 1))} من ${normalizeDigits(String(info.daysOn))} في المناوبة`, cycleDay: info.cycleDay + 1, cycleTotal: info.daysOn + info.daysOff };
+    return { isWorkDay: true, label: "في العمل", detail: `اليوم ${normalizeDigits(String(info.workDay + 1))} من ${normalizeDigits(String(info.daysOn))} من أيام العمل`, cycleDay: info.cycleDay + 1, cycleTotal: info.daysOn + info.daysOff };
   }
   if (period.kind === "OFF") return { isWorkDay: false, label: "إجازة أسبوعية", detail: period.detail };
   if (period.end && target.getTime() >= period.end.getTime()) { const next = getNextAdminWorkStart(employee, target); return { isWorkDay: false, label: "فترة راحة", detail: next ? `انتهى دوام اليوم · العمل القادم ${formatDateTime(next)}` : "انتهى دوام اليوم" }; }
-  return { isWorkDay: true, label: "في المناوبة", detail: "يوم عمل (إداري)" };
+  return { isWorkDay: true, label: "في العمل", detail: "يوم عمل (إداري)" };
 }
 
 export function getEmployeeWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): WorkPeriod {
@@ -54,17 +54,17 @@ export function getEmployeeWorkPeriod(employee: Employee | null | undefined, tar
     const start = localDateTimeUtc(day, employee.workStartTime || "09:00");
     const rawEnd = localDateTimeUtc(day, employee.workEndTime || "16:00");
     const end = rawEnd.getTime() <= start.getTime() ? new Date(rawEnd.getTime() + DAY_MS) : rawEnd;
-    if (target.getTime() < start.getTime()) return { isWorkDay: false, kind: "NOT_STARTED", start, end, label: "لم تبدأ المناوبة بعد", detail: `تبدأ المناوبة الساعة ${formatTime(start)}` };
+    if (target.getTime() < start.getTime()) return { isWorkDay: false, kind: "NOT_STARTED", start, end, label: "لم يبدأ العمل بعد", detail: `يبدأ العمل الساعة ${formatTime(start)}` };
     return { isWorkDay: true, kind: "ADMIN", start, end, label: "دوام إداري", detail: `${formatTime(start)} → ${formatTime(end)}` };
   }
   const info = getRotationInfo(employee, target);
-  if (!info) return { isWorkDay: false, kind: "INVALID", start: null, end: null, label: "تاريخ بداية المناوبة غير صالح", detail: "حدد تاريخ أول مناوبة." };
-  if (info.phase === "NOT_STARTED") return { isWorkDay: false, kind: "NOT_STARTED", start: null, end: null, label: "لم تبدأ المناوبة بعد", detail: `تبدأ أول مناوبة في ${employee.rotationStartDate} الساعة ${formatTime(info.firstStart)}` };
+  if (!info) return { isWorkDay: false, kind: "INVALID", start: null, end: null, label: "تاريخ بداية العمل غير صالح", detail: "حدد تاريخ أول يوم عمل." };
+  if (info.phase === "NOT_STARTED") return { isWorkDay: false, kind: "NOT_STARTED", start: null, end: null, label: "لم يبدأ العمل بعد", detail: `يبدأ أول يوم عمل في ${employee.rotationStartDate} الساعة ${formatTime(info.firstStart)}` };
   if (info.phase === "OFF") return { isWorkDay: false, kind: "OFF", start: null, end: null, label: "راحة تناوبية", detail: `اليوم ${normalizeDigits(String(info.cycleDay - info.daysOn + 1))} من ${normalizeDigits(String(info.daysOff))} في الراحة` };
   const periodStart = info.periodStart;
   const end = new Date(periodStart.getTime() + info.daysOn * DAY_MS);
-  if (target.getTime() < periodStart.getTime()) return { isWorkDay: false, kind: "NOT_STARTED", start: periodStart, end, label: "لم تبدأ المناوبة بعد", detail: `تبدأ المناوبة الساعة ${formatTime(periodStart)}` };
-  return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "مناوبة تناوبية", detail: `من ${formatDateTime(periodStart)} → ${formatDateTime(end)}` };
+  if (target.getTime() < periodStart.getTime()) return { isWorkDay: false, kind: "NOT_STARTED", start: periodStart, end, label: "لم يبدأ العمل بعد", detail: `يبدأ العمل الساعة ${formatTime(periodStart)}` };
+  return { isWorkDay: true, kind: "ROTATION", start: periodStart, end, label: "عمل تناوبي", detail: `من ${formatDateTime(periodStart)} → ${formatDateTime(end)}` };
 }
 
 export function getActiveWorkPeriod(employee: Employee | null | undefined, target: Date = new Date()): WorkPeriod {
@@ -81,10 +81,10 @@ export function getActiveWorkPeriod(employee: Employee | null | undefined, targe
 export function getScheduleCountdown(employee: Employee | null | undefined, target: Date = new Date()): ScheduleCountdown {
   if (!employee) return { kind: "NONE", target: null, label: "" };
   const period = getEmployeeWorkPeriod(employee, target);
-  if (period.kind === "NOT_STARTED") return { kind: "NEXT_WORK_START", target: period.start, label: "تبدأ المناوبة خلال" };
-  if (period.isWorkDay && period.end && period.end.getTime() > target.getTime()) return { kind: "WORK_END", target: period.end, label: "تنتهي المناوبة خلال" };
-  if (employee.scheduleType === "ROTATION" && period.kind === "OFF") { const info = getRotationInfo(employee, target); if (!info) return { kind: "NONE", target: null, label: "" }; const next = new Date(info.periodStart.getTime() + (info.daysOn + info.daysOff) * DAY_MS); return { kind: "NEXT_WORK_START", target: next, label: "تبدأ المناوبة القادمة خلال" }; }
-  if ((employee.scheduleType ?? "ADMIN") === "ADMIN") { const next = getNextAdminWorkStart(employee, target); return next ? { kind: "NEXT_WORK_START", target: next, label: "تبدأ المناوبة القادمة خلال" } : { kind: "NONE", target: null, label: "" }; }
+  if (period.kind === "NOT_STARTED") return { kind: "NEXT_WORK_START", target: period.start, label: "يبدأ العمل خلال" };
+  if (period.isWorkDay && period.end && period.end.getTime() > target.getTime()) return { kind: "WORK_END", target: period.end, label: "ينتهي العمل خلال" };
+  if (employee.scheduleType === "ROTATION" && period.kind === "OFF") { const info = getRotationInfo(employee, target); if (!info) return { kind: "NONE", target: null, label: "" }; const next = new Date(info.periodStart.getTime() + (info.daysOn + info.daysOff) * DAY_MS); return { kind: "NEXT_WORK_START", target: next, label: "يبدأ العمل القادم خلال" }; }
+  if ((employee.scheduleType ?? "ADMIN") === "ADMIN") { const next = getNextAdminWorkStart(employee, target); return next ? { kind: "NEXT_WORK_START", target: next, label: "يبدأ العمل القادم خلال" } : { kind: "NONE", target: null, label: "" }; }
   return { kind: "NONE", target: null, label: "" };
 }
 
