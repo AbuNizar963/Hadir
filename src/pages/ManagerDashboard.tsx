@@ -118,7 +118,7 @@ export default function ManagerDashboard() {
   const today = todayKey();
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -170,20 +170,15 @@ export default function ManagerDashboard() {
       }
     };
 
-    window.addEventListener(
-      "hadir:cloud-data-changed",
-      refresh as EventListener,
-    );
+    // realtime.ts emits both cloud-data-changed and d1-view-changed for one
+    // server event. This page only needs the generic view-change signal, so
+    // listening to both would cause a redundant second D1 request.
     window.addEventListener("hadir:d1-view-changed", refresh);
     window.addEventListener("focus", refresh);
     window.addEventListener("online", refresh);
 
     return () => {
       active = false;
-      window.removeEventListener(
-        "hadir:cloud-data-changed",
-        refresh as EventListener,
-      );
       window.removeEventListener("hadir:d1-view-changed", refresh);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);
