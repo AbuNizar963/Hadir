@@ -83,7 +83,7 @@ if (!source.includes(canonicalNoteExpression)) {
 const legacyStatusCss =
   '        .global-attendance-print-status-permission { background: #e0f2fe !important; color: #0369a1 !important; }\n';
 const canonicalStatusCss =
-  `${legacyStatusCss}        .global-attendance-print-status-escaped { background: #fecaca !important; color: #7f1d1d !important; }\n`;
+  `${legacyStatusCss}        .global-attendance-print-status-escaped { background: #fecaca !important; color: #7f1d1d !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important; min-width: 42px !important; min-height: 24px !important; padding: 2px 8px !important; border-radius: 9999px !important; font-size: 11px !important; font-weight: 700 !important; line-height: 1.25 !important; }\n`;
 
 if (!source.includes(".global-attendance-print-status-escaped")) {
   replaceOnce(
@@ -103,7 +103,9 @@ if (
   !source.includes(openCanonical) ||
   !source.includes(canonicalStatusClassExpression) ||
   !source.includes(canonicalNoteExpression) ||
-  !source.includes(".global-attendance-print-status-escaped")
+  !source.includes(".global-attendance-print-status-escaped") ||
+  !source.includes("min-width: 42px") ||
+  !source.includes("min-height: 24px")
 ) {
   throw new Error(
     "GlobalAttendanceReports status-label patch: replacement validation failed.",
@@ -119,5 +121,5 @@ if (!changed) {
 
 writeFileSync(file, source, "utf8");
 console.log(
-  "GlobalAttendanceReports status-label patch: OPEN=حاضر, missing checkout note=لم يتم تسجيل الانصراف, ESCAPED=هروب, escaped note=هروب من العمل.",
+  "GlobalAttendanceReports status-label patch: OPEN=حاضر, missing checkout note=لم يتم تسجيل الانصراف, ESCAPED=هروب with a matching 42x24 status pill and darker red background, escaped note=هروب من العمل.",
 );
