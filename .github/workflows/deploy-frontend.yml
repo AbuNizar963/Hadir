@@ -28,11 +28,6 @@ on:
       - "scripts/patch-manager-settings-locations-dedicated.mjs"
       - "scripts/patch-manager-settings-locations-fixes.mjs"
       - "scripts/patch-manager-settings-reset-placement.mjs"
-      - "scripts/patch-global-attendance-schedule-filter.mjs"
-      - "scripts/patch-global-attendance-print-report.mjs"
-      - "scripts/patch-global-attendance-print-layout.mjs"
-      - "scripts/patch-global-attendance-print-qr.mjs"
-      - "scripts/patch-global-attendance-escaped-label.mjs"
       - ".github/workflows/deploy-frontend.yml"
 
 permissions:
