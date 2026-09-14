@@ -46,6 +46,7 @@ export interface Settings {
   lateGraceMinutes: number;
   earlyCheckoutGraceMinutes?: number;
   allowEarlyCheckIn?: boolean;
+  earlyCheckInGraceMinutes?: number;
   allowLateCheckOut?: boolean;
   lateCheckOutGraceMinutes?: number;
   ownerUsername?: string;
