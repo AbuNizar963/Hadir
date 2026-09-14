@@ -5,11 +5,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 p = ROOT / "src/types/index.ts"
 s = p.read_text(encoding="utf-8")
-if "specialties?: string[]; }" not in s:
-    marker = "locations?: Location[]; }"
+if not re.search(r"specialties\?:\s*string\[\]", s):
+    marker = "locations?: Location[];"
     if marker not in s:
         raise SystemExit("Settings type marker missing")
-    p.write_text(s.replace(marker, "locations?: Location[]; specialties?: string[]; }", 1), encoding="utf-8")
+    s = s.replace(marker, marker + " specialties?: string[];", 1)
+    p.write_text(s, encoding="utf-8")
 
 panel = ROOT / "src/components/settings/CompanySpecialtiesPanel.tsx"
 panel.parent.mkdir(parents=True, exist_ok=True)
@@ -71,10 +72,15 @@ elif "function CompanySpecialtySelect" not in s:
 # same save path. The old UI then issued a second PUT to a legacy endpoint that is
 # no longer part of the production gateway. Send the value in the canonical PATCH
 # payload and stop issuing that duplicate PUT.
-policy_marker = '        rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceGraceMinutes) || 0)) : 0,\n        locationId: form.locationId || null, specialties,'
-policy_replacement = '        rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceGraceMinutes) || 0)) : 0,\n        earlyCheckoutGraceMinutes: earlyCheckoutGrace,\n        locationId: form.locationId || null, specialties,'
+policy_marker = '        rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceMinutes) || 0)) : 0,\n        locationId: form.locationId || null, specialties,'
+policy_replacement = '        rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceMinutes) || 0)) : 0,\n        earlyCheckoutGraceMinutes: earlyCheckoutGrace,\n        locationId: form.locationId || null, specialties,'
 if policy_marker in s:
     s = s.replace(policy_marker, policy_replacement, 1)
+else:
+    policy_marker = '        rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceGraceMinutes) || 0)) : 0,\n        locationId: form.locationId || null, specialties,'
+    policy_replacement = '        rotationDailyAttendanceGraceMinutes: form.scheduleType === "ROTATION" && form.rotationDailyAttendanceEnabled ? Math.min(180, Math.max(0, Number(form.rotationDailyAttendanceGraceMinutes) || 0)) : 0,\n        earlyCheckoutGraceMinutes: earlyCheckoutGrace,\n        locationId: form.locationId || null, specialties,'
+    if policy_marker in s:
+        s = s.replace(policy_marker, policy_replacement, 1)
 call_marker = '        if (savedEmployeeId) await saveCheckoutPolicy(savedEmployeeId, earlyCheckoutGrace);\n'
 if call_marker in s:
     s = s.replace(call_marker, '', 1)
