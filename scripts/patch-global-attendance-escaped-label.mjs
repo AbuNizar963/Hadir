@@ -67,17 +67,21 @@ if (!source.includes(canonicalStatusClassExpression)) {
   );
 }
 
-const legacyNoteExpression =
-  '<td>{r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>';
+const legacyNoteExpressions = [
+  '<td>{r.status === "OPEN" ? "لم يتم تسجيل الانصراف" : r.status === "ESCAPED" ? "هروب من العمل" : r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>',
+  '<td>{r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>',
+];
 const canonicalNoteExpression =
-  '<td>{r.status === "OPEN" ? "لم يتم تسجيل الانصراف" : r.status === "ESCAPED" ? "هروب من العمل" : r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>';
+  '<td>{r.status === "OPEN" ? "لم يتم تسجيل الانصراف" : r.status === "ESCAPED" ? "هروب من العمل" : (r.status === "LEAVE" || r.status === "PERMISSION") && r.requestReason ? r.requestReason : r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>';
 
 if (!source.includes(canonicalNoteExpression)) {
-  replaceOnce(
-    legacyNoteExpression,
-    canonicalNoteExpression,
-    "print status-note",
-  );
+  const legacyNote = legacyNoteExpressions.find((value) => source.includes(value));
+  if (!legacyNote) {
+    throw new Error(
+      "GlobalAttendanceReports status-label patch: expected print note anchor was not found; refusing unsafe replacement.",
+    );
+  }
+  replaceOnce(legacyNote, canonicalNoteExpression, "print status-note");
 }
 
 const legacyStatusCss =
@@ -121,5 +125,5 @@ if (!changed) {
 
 writeFileSync(file, source, "utf8");
 console.log(
-  "GlobalAttendanceReports status-label patch: OPEN=حاضر, missing checkout note=لم يتم تسجيل الانصراف, ESCAPED=هروب with a matching 42x24 status pill and darker red background, escaped note=هروب من العمل.",
+  "GlobalAttendanceReports status-label patch: OPEN=حاضر, missing checkout note=لم يتم تسجيل الانصراف, ESCAPED=هروب with a matching 42x24 status pill and darker red background, leave/permission rows print their request reason.",
 );
