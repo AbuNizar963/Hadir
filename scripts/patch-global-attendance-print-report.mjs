@@ -3,28 +3,40 @@ import { readFileSync, writeFileSync } from "node:fs";
 const file = new URL("../src/pages/GlobalAttendanceReports.tsx", import.meta.url);
 let source = readFileSync(file, "utf8");
 
-if (!source.includes('import { getEmployees } from "@/lib/storage";')) throw new Error("GlobalAttendanceReports print: storage import anchor not found.");
-source = source.replace('import { getEmployees } from "@/lib/storage";', 'import { getEmployees, getSettings } from "@/lib/storage";');
-if (!source.includes('import { getBackendEmployees } from "@/lib/backend";')) throw new Error("GlobalAttendanceReports print: backend import anchor not found.");
-source = source.replace('import { getBackendEmployees } from "@/lib/backend";', 'import { getBackendEmployees, getBackendSettings } from "@/lib/backend";');
+if (!source.includes('import { getEmployees } from "@/lib/storage";')) {
+  throw new Error("GlobalAttendanceReports print: storage import anchor not found.");
+}
+source = source.replace(
+  'import { getEmployees } from "@/lib/storage";',
+  'import { getEmployees, getSettings } from "@/lib/storage";',
+);
+
+if (!source.includes('import { getBackendEmployees } from "@/lib/backend";')) {
+  throw new Error("GlobalAttendanceReports print: backend import anchor not found.");
+}
+source = source.replace(
+  'import { getBackendEmployees } from "@/lib/backend";',
+  'import { getBackendEmployees, getBackendSettings } from "@/lib/backend";',
+);
 
 const stateAnchor = '  const [detailError, setDetailError] = useState<string | null>(null);';
 const stateReplacement = `${stateAnchor}\n  const [reportSettings, setReportSettings] = useState(() => getSettings());`;
-if (!source.includes('const [reportSettings, setReportSettings]')) {
+if (!source.includes("const [reportSettings, setReportSettings]")) {
   if (!source.includes(stateAnchor)) throw new Error("GlobalAttendanceReports print: state anchor not found.");
   source = source.replace(stateAnchor, stateReplacement);
 }
 
-const effectAnchor = '  useEffect(() => { let alive = true; getBackendEmployees().then((rows) => { if (alive && Array.isArray(rows)) setEmployees(rows); }).catch(() => undefined); return () => { alive = false; }; }, []);';
-const effectReplacement = `${effectAnchor}\n  useEffect(() => { let alive = true; getBackendSettings().then((remote) => { if (alive && remote) setReportSettings(current => ({ ...current, ...remote })); }).catch(() => undefined); return () => { alive = false; }; }, []);`;
-if (!source.includes('getBackendSettings().then((remote)')) {
-  if (!source.includes(effectAnchor)) throw new Error("GlobalAttendanceReports print: employees effect anchor not found.");
-  source = source.replace(effectAnchor, effectReplacement);
+const settingsEffectMarker = "  useEffect(() => {";
+const settingsEffect = `  useEffect(() => {\n    let alive = true;\n    getBackendSettings().then((remote) => {\n      if (alive && remote) setReportSettings((current) => ({ ...current, ...remote }));\n    }).catch(() => undefined);\n    return () => { alive = false; };\n  }, []);`;
+if (!source.includes("getBackendSettings().then((remote)")) {
+  const effectPattern = /  useEffect\(\(\) => \{[\s\S]*?\n  \}, \[\]\);/;
+  if (!effectPattern.test(source)) throw new Error("GlobalAttendanceReports print: employees effect anchor not found.");
+  source = source.replace(effectPattern, (match) => `${match}\n${settingsEffect}`);
 }
 
-const printAnchor = '  const exportCsv = () => {';
-const printFunction = `  const printDailyReport = () => { if (!report || report.days !== 1) { window.print(); return; } window.requestAnimationFrame(() => window.print()); };\n\n`;
-if (!source.includes('const printDailyReport =')) {
+const printAnchor = "  const exportCsv = () => {";
+const printFunction = `  const printDailyReport = () => {\n    if (!report || report.days !== 1) {\n      window.print();\n      return;\n    }\n    window.requestAnimationFrame(() => window.print());\n  };\n\n`;
+if (!source.includes("const printDailyReport =")) {
   if (!source.includes(printAnchor)) throw new Error("GlobalAttendanceReports print: export CSV anchor not found.");
   source = source.replace(printAnchor, printFunction + printAnchor);
 }
