@@ -51,15 +51,6 @@ run("node", ["scripts/patch-manager-settings-locations-fixes.mjs"]);
 run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-screen.mjs"]);
 
-const managerDashboardSource = readFileSync(new URL("../src/pages/ManagerDashboard.tsx", import.meta.url), "utf8");
-const canonicalManagerDashboard = managerDashboardSource.includes("The backend attendance engine is the single source of truth")
-  && !managerDashboardSource.includes('import { getBackendEscapeEvents } from "@/lib/backend";');
-if (canonicalManagerDashboard) {
-  console.log("ManagerDashboard canonical patch: source already consumes central attendance-engine status; legacy build patch skipped safely.");
-} else {
-  run("node", ["scripts/patch-manager-dashboard-dedicated-status.mjs"]);
-}
-
 run("node", ["scripts/patch-manager-menu-autoclose-on-scroll.mjs"]);
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
 run("node", ["scripts/patch-qibla-page.mjs"]);
@@ -81,7 +72,7 @@ if (bun.status === 0 && !bun.error) {
   run("npm", ["run", "build"]);
 }
 
-const sourceHeaderScan = spawnSync("grep", ["-RIlE", "خدمة الدوام اليومية|settings\.brandName", "src/pages/ManagerReports.tsx", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+const sourceHeaderScan = spawnSync("grep", ["-RIlE", "خدمة الدوام اليومية|settings\\.brandName", "src/pages/ManagerReports.tsx", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (sourceHeaderScan.status !== 0 || !sourceHeaderScan.stdout?.trim()) {
   throw new Error("Production build validation failed: canonical daily report branding was not found in source or dist.");
 }
