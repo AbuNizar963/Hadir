@@ -37,6 +37,10 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
 
   const now=new Date();
   const currentPeriod=getEmployeeWorkPeriod(employee,now);
+  const earlyCheckInEnabled=settings.allowEarlyCheckIn===true;
+  const earlyCheckInGraceMinutes=earlyCheckInEnabled?Math.min(180,Math.max(0,Math.floor(Number(settings.earlyCheckInGraceMinutes??30)||0))):0;
+  const earlyWindowStart=currentPeriod.start?new Date(currentPeriod.start.getTime()-earlyCheckInGraceMinutes*60000):null;
+  const periodStartForRecords=earlyWindowStart||currentPeriod.start;
 
   let allEmployeeRecords: AttendanceRecord[];
   if(backendEnabled){
@@ -53,17 +57,20 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
     allEmployeeRecords=getAttendance().filter((r)=>r.employeeId===employee!.id).sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());
   }
 
-  const periodRecords=currentPeriod.start
+  const periodRecords=periodStartForRecords
     ? allEmployeeRecords.filter((record)=>{
         const t=new Date(record.timestamp).getTime();
-        return Number.isFinite(t) && t>=currentPeriod.start!.getTime() && (!currentPeriod.end || t<=currentPeriod.end.getTime()+60_000);
+        return Number.isFinite(t) && t>=periodStartForRecords!.getTime() && (!currentPeriod.end || t<=currentPeriod.end.getTime()+60_000);
       }).sort((a,b)=>new Date(a.timestamp).getTime()-new Date(b.timestamp).getTime())
     : allEmployeeRecords;
   const currentPeriodLast=periodRecords[periodRecords.length-1];
   const currentPeriodOpenSession=currentPeriodLast?.type==="check-in";
 
   if(args.type==="check-in"){
-    if(!currentPeriod.isWorkDay || !currentPeriod.start || !currentPeriod.end){return{ok:false,reason:`لا يوجد دوام للموظف الآن: ${currentPeriod.label}${currentPeriod.detail?` · ${currentPeriod.detail}`:""}`};}
+    const beforeStart=Boolean(currentPeriod.start&&now.getTime()<currentPeriod.start.getTime());
+    const withinEarlyWindow=Boolean(beforeStart&&earlyWindowStart&&now.getTime()>=earlyWindowStart.getTime());
+    const earlyCheckInAllowed=Boolean(currentPeriod.kind==="NOT_STARTED"&&currentPeriod.start&&currentPeriod.end&&earlyCheckInEnabled&&withinEarlyWindow);
+    if((!currentPeriod.isWorkDay&&!earlyCheckInAllowed)||!currentPeriod.start||!currentPeriod.end){return{ok:false,reason:`لا يوجد دوام للموظف الآن: ${currentPeriod.label}${currentPeriod.detail?` · ${currentPeriod.detail}`:""}`};}
     if(periodRecords.some((r)=>r.type==="check-in"))return{ok:false,reason:"تم تسجيل الحضور مسبقًا لهذه الفترة"};
   }else if(!currentPeriodOpenSession){return{ok:false,reason:"لا يمكن تسجيل الانصراف قبل تسجيل الحضور"};}
 
@@ -87,7 +94,7 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
   const end=periodForTiming.end;
   const grace=Math.max(0,employee.gracePeriodMinutes??settings.lateGraceMinutes??10);
   let lateMinutes=0,earlyMinutes=0,timeNote="";
-  if(args.type==="check-in"&&start){const diff=Math.round((now.getTime()-start.getTime())/60000);if(diff>grace){lateMinutes=diff;timeNote=`تم تسجيل الحضور متأخراً بمقدار ${formatMinutesToText(lateMinutes)}`;}else timeNote="تم تسجيل الحضور ضمن الوقت المسموح";}
+  if(args.type==="check-in"&&start){const diff=Math.round((now.getTime()-start.getTime())/60000);if(diff>grace){lateMinutes=diff;timeNote=`تم تسجيل الحضور متأخراً بمقدار ${formatMinutesToText(lateMinutes)}`;}else if(diff<0){timeNote=`تم تسجيل الحضور مبكرًا بمقدار ${formatMinutesToText(Math.abs(diff))}`;}else timeNote="تم تسجيل الحضور ضمن الوقت المسموح";}
   if(args.type==="check-out"&&end){
     const diff=Math.round((end.getTime()-now.getTime())/60000);
     if(diff>0){
