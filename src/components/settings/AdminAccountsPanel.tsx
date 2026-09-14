@@ -33,6 +33,8 @@ export default function AdminAccountsPanel() {
     if (!backendEnabled) return;
     try {
       setRemoteAccounts(await getBackendAdmins());
+      const remote = await getBackendSettings();
+      if (remote) setSettings(prev => ({ ...prev, ...remote } as Settings));
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "تعذر تحميل الحسابات من الخادم");
     }
@@ -121,6 +123,7 @@ export default function AdminAccountsPanel() {
     const next: Settings = {
       ...settings,
       allowEarlyCheckIn: Boolean(settings.allowEarlyCheckIn),
+      earlyCheckInGraceMinutes: Math.min(180, Math.max(0, Math.floor(Number(settings.earlyCheckInGraceMinutes ?? 30) || 0))),
       allowLateCheckOut: Boolean(settings.allowLateCheckOut),
       lateCheckOutGraceMinutes: Math.min(180, Math.max(0, Math.floor(Number(settings.lateCheckOutGraceMinutes ?? 30) || 0))),
     };
@@ -131,6 +134,7 @@ export default function AdminAccountsPanel() {
       if (backendEnabled) {
         await saveBackendSettings({
           allowEarlyCheckIn: next.allowEarlyCheckIn,
+          earlyCheckInGraceMinutes: next.earlyCheckInGraceMinutes,
           allowLateCheckOut: next.allowLateCheckOut,
           lateCheckOutGraceMinutes: next.lateCheckOutGraceMinutes,
         });
@@ -207,7 +211,7 @@ export default function AdminAccountsPanel() {
           </div>
           <div className="grid md:grid-cols-2 gap-3">
             <label className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 p-3 cursor-pointer">
-              <span><span className="block text-sm font-bold">السماح بالحضور قبل بداية العمل</span><span className="block text-[11px] text-muted-foreground mt-1">يسمح للموظف بتسجيل الحضور قبل وقت البداية المحدد.</span></span>
+              <span><span className="block text-sm font-bold">السماح بالحضور قبل بداية العمل</span><span className="block text-[11px] text-muted-foreground mt-1">يفتح التسجيل المبكر ضمن المهلة المحددة أدناه.</span></span>
               <input type="checkbox" className="h-5 w-5 accent-primary" checked={Boolean(settings.allowEarlyCheckIn)} onChange={e=>setSettings(prev=>({ ...prev, allowEarlyCheckIn: e.target.checked }))} />
             </label>
             <label className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 p-3 cursor-pointer">
@@ -215,7 +219,11 @@ export default function AdminAccountsPanel() {
               <input type="checkbox" className="h-5 w-5 accent-primary" checked={Boolean(settings.allowLateCheckOut)} onChange={e=>setSettings(prev=>({ ...prev, allowLateCheckOut: e.target.checked }))} />
             </label>
           </div>
-          <div className="mt-3 max-w-sm">
+          <div className="grid md:grid-cols-2 gap-3 mt-3">
+            <label className="text-xs">مهلة الحضور قبل بداية العمل (بالدقائق)
+              <input className="input mt-1" type="number" min="0" max="180" step="1" value={settings.earlyCheckInGraceMinutes ?? 30} onChange={e=>setSettings(prev=>({ ...prev, earlyCheckInGraceMinutes: Math.min(180, Math.max(0, Number(e.target.value) || 0)) }))} disabled={!settings.allowEarlyCheckIn} />
+              <span className="block text-[11px] text-muted-foreground mt-1">مثال: 30 يعني السماح بالحضور من 30 دقيقة قبل البداية.</span>
+            </label>
             <label className="text-xs">مهلة الانصراف بعد نهاية الدوام (بالدقائق)
               <input className="input mt-1" type="number" min="0" max="180" step="1" value={settings.lateCheckOutGraceMinutes ?? 30} onChange={e=>setSettings(prev=>({ ...prev, lateCheckOutGraceMinutes: Math.min(180, Math.max(0, Number(e.target.value) || 0)) }))} disabled={!settings.allowLateCheckOut} />
             </label>
