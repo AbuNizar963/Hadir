@@ -21,9 +21,34 @@ function Kpi({ title, value, detail, icon: Icon }: { title: string; value: strin
   return <Card><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><div className="text-sm text-muted-foreground">{title}</div><div className="mt-2 text-2xl font-black">{value}</div><div className="mt-1 text-xs text-muted-foreground">{detail}</div></div><div className="rounded-xl bg-primary/10 p-3 text-primary"><Icon className="h-5 w-5" /></div></div></CardContent></Card>;
 }
 
+function filterSingleDayReport(report: ProfessionalAttendanceReport): ProfessionalAttendanceReport {
+  if (report.from !== report.to) return report;
+
+  const filteredRows = report.rows.filter((row) => !["REST", "NOT_STARTED", "INVALID"].includes(String(row.status)));
+  const filteredIds = new Set(filteredRows.map((row) => String(row.employeeId)));
+
+  return {
+    ...report,
+    rows: filteredRows,
+    analytics: {
+      ...report.analytics,
+      employeeSummaries: report.analytics.employeeSummaries.filter((row) => filteredIds.has(String(row.employeeId))),
+      exceptions: report.analytics.exceptions.filter((row) => filteredIds.has(String(row.employeeId))),
+    },
+    summary: {
+      ...report.summary,
+      employees: filteredIds.size,
+      employeeDays: filteredRows.length,
+      rest: 0,
+      notStarted: 0,
+      invalid: 0,
+    },
+  };
+}
+
 export default function GlobalAttendanceReports() {
   const today = damascusToday();
-  const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
+  const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
   const [employeeId, setEmployeeId] = useState("");
   const [employees, setEmployees] = useState<Employee[]>(getEmployees());
@@ -38,7 +63,7 @@ export default function GlobalAttendanceReports() {
   const load = async () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) { setError("حدد فترة زمنية صحيحة."); return; }
     setLoading(true); setError(null);
-    try { setReport(await getProfessionalAttendanceReport(from, to, employeeId || undefined)); }
+    try { setReport(filterSingleDayReport(await getProfessionalAttendanceReport(from, to, employeeId || undefined))); }
     catch (e) { setError(e instanceof Error ? e.message : "تعذر تحميل التقرير"); }
     finally { setLoading(false); }
   };
