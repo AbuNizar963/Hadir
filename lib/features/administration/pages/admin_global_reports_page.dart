@@ -65,6 +65,20 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
         'OPEN': 'انصراف معلق',
       }[status] ?? status;
 
+  String _displayStatus(Map<String, dynamic> row) {
+    final status = '${row['status'] ?? ''}';
+    return _statusLabel(status == 'OPEN' ? 'PRESENT' : status);
+  }
+
+  String _note(Map<String, dynamic> row) {
+    final status = '${row['status'] ?? ''}';
+    final exceptionCode = '${row['exceptionCode'] ?? ''}'.trim();
+    if (status == 'OPEN' || exceptionCode == 'MISSING_CHECKOUT') {
+      return 'انصراف معلق';
+    }
+    return exceptionCode.isEmpty ? '—' : exceptionCode;
+  }
+
   String _clock(dynamic value) {
     if (value == null || '$value'.trim().isEmpty) return '—';
     final date = HadirTime.fromTimestamp(value);
@@ -356,6 +370,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
             DataColumn(label: Text('التاريخ')),
             DataColumn(label: Text('الموظف')),
             DataColumn(label: Text('الحالة')),
+            DataColumn(label: Text('ملاحظات')),
             DataColumn(label: Text('الحضور')),
             DataColumn(label: Text('الانصراف')),
             DataColumn(label: Text('الساعات')),
@@ -364,7 +379,8 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
           rows: _rows.map((row) => DataRow(cells: [
                 DataCell(Text('${row['attendanceDay'] ?? '—'}')),
                 DataCell(Text('${row['employeeName'] ?? row['employeeId'] ?? '—'}')),
-                DataCell(Text(_statusLabel('${row['status'] ?? ''}'))),
+                DataCell(Text(_displayStatus(row))),
+                DataCell(Text(_note(row))),
                 DataCell(Text(_clock(row['checkInAt']))),
                 DataCell(Text(_clock(row['checkOutAt']))),
                 DataCell(Text(_minutes(row['workedMinutes']))),
@@ -413,7 +429,8 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
           children: [
             const Text('تفاصيل السجل', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
             const SizedBox(height: 10),
-            Text('الحالة: ${_statusLabel('${data['status'] ?? ''}')}'),
+            Text('الحالة: ${_displayStatus(data)}'),
+            Text('ملاحظات: ${_note(data)}'),
             Text('الحضور: ${_clock(data['checkInAt'])}'),
             Text('الانصراف: ${_clock(data['checkOutAt'])}'),
             Text('الساعات: ${_minutes(data['workedMinutes'])}'),
@@ -432,11 +449,11 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
     if (_rows.isEmpty) return;
     setState(() => _exporting = true);
     try {
-      final buffer = StringBuffer('التاريخ,الموظف,الرقم الوظيفي,الحالة,الحضور,الانصراف,الساعات,التأخر,المبكر,الإضافي,الاستثناء\n');
+      final buffer = StringBuffer('التاريخ,الموظف,الرقم الوظيفي,الحالة,ملاحظات,الحضور,الانصراف,الساعات,التأخر,المبكر,الإضافي,الاستثناء\n');
       String quote(dynamic value) => '"${'${value ?? ''}'.replaceAll('"', '""')}"';
       for (final row in _rows) {
         buffer.writeln([
-          row['attendanceDay'], row['employeeName'], row['jobNumber'], _statusLabel('${row['status'] ?? ''}'),
+          row['attendanceDay'], row['employeeName'], row['jobNumber'], _displayStatus(row), _note(row),
           _clock(row['checkInAt']), _clock(row['checkOutAt']), _minutes(row['workedMinutes']), row['lateMinutes'] ?? 0,
           row['earlyLeaveMinutes'] ?? 0, row['overtimeMinutes'] ?? 0, row['exceptionCode'] ?? '',
         ].map(quote).join(','));
@@ -456,14 +473,14 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
     try {
       final excel = Excel.createExcel();
       final sheet = excel['تقرير الحضور'];
-      const headers = <String>['التاريخ', 'الموظف', 'الرقم الوظيفي', 'الحالة', 'الحضور', 'الانصراف', 'الساعات', 'التأخر', 'المبكر', 'الإضافي', 'الاستثناء'];
+      const headers = <String>['التاريخ', 'الموظف', 'الرقم الوظيفي', 'الحالة', 'ملاحظات', 'الحضور', 'الانصراف', 'الساعات', 'التأخر', 'المبكر', 'الإضافي', 'الاستثناء'];
       for (var column = 0; column < headers.length; column++) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: column, rowIndex: 0)).value = TextCellValue(headers[column]);
       }
       for (var index = 0; index < _rows.length; index++) {
         final row = _rows[index];
         final values = <String>[
-          '${row['attendanceDay'] ?? ''}', '${row['employeeName'] ?? ''}', '${row['jobNumber'] ?? ''}', _statusLabel('${row['status'] ?? ''}'),
+          '${row['attendanceDay'] ?? ''}', '${row['employeeName'] ?? ''}', '${row['jobNumber'] ?? ''}', _displayStatus(row), _note(row),
           _clock(row['checkInAt']), _clock(row['checkOutAt']), _minutes(row['workedMinutes']), '${row['lateMinutes'] ?? 0}',
           '${row['earlyLeaveMinutes'] ?? 0}', '${row['overtimeMinutes'] ?? 0}', '${row['exceptionCode'] ?? ''}',
         ];
@@ -490,7 +507,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
       final bold = await PdfGoogleFonts.notoSansArabicBold();
       final pdf = pw.Document();
       final data = _rows.map((row) => <String>[
-            '${row['attendanceDay'] ?? '—'}', '${row['employeeName'] ?? '—'}', _statusLabel('${row['status'] ?? ''}'),
+            '${row['attendanceDay'] ?? '—'}', '${row['employeeName'] ?? '—'}', _displayStatus(row), _note(row),
             _clock(row['checkInAt']), _clock(row['checkOutAt']), _minutes(row['workedMinutes']), '${row['lateMinutes'] ?? 0}',
             '${row['earlyLeaveMinutes'] ?? 0}', '${row['overtimeMinutes'] ?? 0}',
           ]).toList();
@@ -504,7 +521,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
           pw.SizedBox(height: 10),
           pw.TableHelper.fromTextArray(
             data: data,
-            headers: const ['التاريخ', 'الموظف', 'الحالة', 'الحضور', 'الانصراف', 'الساعات', 'التأخر', 'المبكر', 'الإضافي'],
+            headers: const ['التاريخ', 'الموظف', 'الحالة', 'ملاحظات', 'الحضور', 'الانصراف', 'الساعات', 'التأخر', 'المبكر', 'الإضافي'],
             headerStyle: pw.TextStyle(font: bold, fontSize: 7),
             cellStyle: pw.TextStyle(font: regular, fontSize: 7),
             tableDirection: pw.TextDirection.rtl,
