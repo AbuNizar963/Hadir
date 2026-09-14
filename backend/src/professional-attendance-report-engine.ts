@@ -45,6 +45,7 @@ const VALID_STATUSES = new Set([
   "INVALID",
   "OPEN",
 ]);
+
 const jsonArray = (value: string | null | undefined): string[] => {
   try {
     const parsed = JSON.parse(value || "[]");
@@ -60,18 +61,29 @@ const dateNumber = (day: string) =>
     Number(day.slice(5, 7)) - 1,
     Number(day.slice(8, 10)),
   ) / 86400000;
+
 const daysBetween = (from: string, to: string) =>
   Math.round(dateNumber(to) - dateNumber(from)) + 1;
+
 const damascusDay = (date = new Date()) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus" }).format(date);
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Damascus",
+  }).format(date);
 
 function validatePeriod(from: string, to: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(to)
+  ) {
     throw new Error("الفترة الزمنية غير صالحة");
+  }
+
   const days = daysBetween(from, to);
   if (days < 1) throw new Error("الفترة الزمنية غير صالحة");
-  if (days > MAX_DAYS)
+  if (days > MAX_DAYS) {
     throw new Error(`الفترة تتجاوز الحد المسموح (${MAX_DAYS} يومًا)`);
+  }
+
   return days;
 }
 
@@ -82,21 +94,98 @@ async function loadFacts(
   employeeId?: string,
 ): Promise<FactRow[]> {
   const sourceExpression = `(SELECT CASE
-    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE COALESCE(a.device_id,'') = 'AUTO_VIP' OR COALESCE(a.qr_code,'') = 'AUTO_VIP')
-      AND NOT EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE NOT (COALESCE(a.device_id,'') IN ('AUTO_VIP','ADMIN_DIRECT:التلقائي') OR COALESCE(a.qr_code,'') IN ('AUTO_VIP','AUTO_DIRECT'))) THEN 'AUTOMATIC_VIP'
-    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE COALESCE(a.qr_code,'') = 'AUTO_DIRECT' OR COALESCE(a.device_id,'') = 'ADMIN_DIRECT:التلقائي')
-      AND NOT EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE NOT (COALESCE(a.device_id,'') IN ('AUTO_VIP','ADMIN_DIRECT:التلقائي') OR COALESCE(a.qr_code,'') IN ('AUTO_VIP','AUTO_DIRECT'))) THEN 'AUTOMATIC'
-    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE COALESCE(a.device_id,'') IN ('AUTO_VIP','ADMIN_DIRECT:التلقائي') OR COALESCE(a.qr_code,'') IN ('AUTO_VIP','AUTO_DIRECT')) THEN 'MIXED'
-    WHEN EXISTS (SELECT 1 FROM json_each(f.attendance_event_ids_json) ids JOIN attendance a ON a.id = ids.value WHERE COALESCE(a.device_id,'') LIKE 'ADMIN_DIRECT:%' OR COALESCE(a.qr_code,'') = 'ADMIN_DIRECT') THEN 'MANUAL_OWNER'
+    WHEN EXISTS (
+      SELECT 1
+      FROM json_each(f.attendance_event_ids_json) ids
+      JOIN attendance a ON a.id = ids.value
+      WHERE COALESCE(a.device_id,'') = 'AUTO_VIP'
+         OR COALESCE(a.qr_code,'') = 'AUTO_VIP'
+    )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM json_each(f.attendance_event_ids_json) ids
+        JOIN attendance a ON a.id = ids.value
+        WHERE NOT (
+          COALESCE(a.device_id,'') IN ('AUTO_VIP','ADMIN_DIRECT:التلقائي')
+          OR COALESCE(a.qr_code,'') IN ('AUTO_VIP','AUTO_DIRECT')
+        )
+      ) THEN 'AUTOMATIC_VIP'
+    WHEN EXISTS (
+      SELECT 1
+      FROM json_each(f.attendance_event_ids_json) ids
+      JOIN attendance a ON a.id = ids.value
+      WHERE COALESCE(a.qr_code,'') = 'AUTO_DIRECT'
+         OR COALESCE(a.device_id,'') = 'ADMIN_DIRECT:التلقائي'
+    )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM json_each(f.attendance_event_ids_json) ids
+        JOIN attendance a ON a.id = ids.value
+        WHERE NOT (
+          COALESCE(a.device_id,'') IN ('AUTO_VIP','ADMIN_DIRECT:التلقائي')
+          OR COALESCE(a.qr_code,'') IN ('AUTO_VIP','AUTO_DIRECT')
+        )
+      ) THEN 'AUTOMATIC'
+    WHEN EXISTS (
+      SELECT 1
+      FROM json_each(f.attendance_event_ids_json) ids
+      JOIN attendance a ON a.id = ids.value
+      WHERE COALESCE(a.device_id,'') IN ('AUTO_VIP','ADMIN_DIRECT:التلقائي')
+         OR COALESCE(a.qr_code,'') IN ('AUTO_VIP','AUTO_DIRECT')
+    ) THEN 'MIXED'
+    WHEN EXISTS (
+      SELECT 1
+      FROM json_each(f.attendance_event_ids_json) ids
+      JOIN attendance a ON a.id = ids.value
+      WHERE COALESCE(a.device_id,'') LIKE 'ADMIN_DIRECT:%'
+         OR COALESCE(a.qr_code,'') = 'ADMIN_DIRECT'
+    ) THEN 'MANUAL_OWNER'
     WHEN json_array_length(f.attendance_event_ids_json) > 0 THEN 'MANUAL_EMPLOYEE'
     ELSE 'UNKNOWN'
-  END FROM attendance_reporting_facts f2 WHERE f2.attendance_day = f.attendance_day AND f2.employee_id = f.employee_id)`;
-  const sql = employeeId
-    ? `SELECT f.attendance_day AS attendanceDay,f.employee_id AS employeeId,f.job_number AS jobNumber,f.employee_name AS employeeName,f.location_id AS locationId,f.status,f.schedule_type AS scheduleType,f.scheduled_start AS scheduledStart,f.scheduled_end AS scheduledEnd,f.expected_minutes AS expectedMinutes,f.check_in_at AS checkInAt,f.check_out_at AS checkOutAt,f.worked_minutes AS workedMinutes,f.late_minutes AS lateMinutes,f.early_leave_minutes AS earlyLeaveMinutes,f.overtime_minutes AS overtimeMinutes,f.open,f.exception_code AS exceptionCode,f.attendance_event_ids_json AS attendanceEventIdsJson,f.request_ids_json AS requestIdsJson,f.audit_ids_json AS auditIdsJson,${sourceExpression} AS attendanceSource,f.calculation_source AS calculationSource,f.calculation_version AS calculationVersion,f.historical_data_quality AS historicalDataQuality,f.timezone,f.computed_at AS computedAt FROM attendance_reporting_facts f WHERE f.attendance_day>=? AND f.attendance_day<=? AND f.employee_id=? ORDER BY f.attendance_day ASC,f.employee_name ASC`
-    : `SELECT f.attendance_day AS attendanceDay,f.employee_id AS employeeId,f.job_number AS jobNumber,f.employee_name AS employeeName,f.location_id AS locationId,f.status,f.schedule_type AS scheduleType,f.scheduled_start AS scheduledStart,f.scheduled_end AS scheduledEnd,f.expected_minutes AS expectedMinutes,f.check_in_at AS checkInAt,f.check_out_at AS checkOutAt,f.worked_minutes AS workedMinutes,f.late_minutes AS lateMinutes,f.early_leave_minutes AS earlyLeaveMinutes,f.overtime_minutes AS overtimeMinutes,f.open,f.exception_code AS exceptionCode,f.attendance_event_ids_json AS attendanceEventIdsJson,f.request_ids_json AS requestIdsJson,f.audit_ids_json AS auditIdsJson,${sourceExpression} AS attendanceSource,f.calculation_source AS calculationSource,f.calculation_version AS calculationVersion,f.historical_data_quality AS historicalDataQuality,f.timezone,f.computed_at AS computedAt FROM attendance_reporting_facts f WHERE f.attendance_day>=? AND f.attendance_day<=? ORDER BY f.attendance_day ASC,f.employee_name ASC`;
+  END FROM attendance_reporting_facts f2
+  WHERE f2.attendance_day = f.attendance_day
+    AND f2.employee_id = f.employee_id)`;
+
+  const select = `SELECT
+    f.attendance_day AS attendanceDay,
+    f.employee_id AS employeeId,
+    f.job_number AS jobNumber,
+    f.employee_name AS employeeName,
+    f.location_id AS locationId,
+    f.status,
+    f.schedule_type AS scheduleType,
+    f.scheduled_start AS scheduledStart,
+    f.scheduled_end AS scheduledEnd,
+    f.expected_minutes AS expectedMinutes,
+    f.check_in_at AS checkInAt,
+    f.check_out_at AS checkOutAt,
+    f.worked_minutes AS workedMinutes,
+    f.late_minutes AS lateMinutes,
+    f.early_leave_minutes AS earlyLeaveMinutes,
+    f.overtime_minutes AS overtimeMinutes,
+    f.open,
+    f.exception_code AS exceptionCode,
+    f.attendance_event_ids_json AS attendanceEventIdsJson,
+    f.request_ids_json AS requestIdsJson,
+    f.audit_ids_json AS auditIdsJson,
+    ${sourceExpression} AS attendanceSource,
+    f.calculation_source AS calculationSource,
+    f.calculation_version AS calculationVersion,
+    f.historical_data_quality AS historicalDataQuality,
+    f.timezone,
+    f.computed_at AS computedAt
+  FROM attendance_reporting_facts f
+  WHERE f.attendance_day >= ?
+    AND f.attendance_day <= ?`;
+
   const query = employeeId
-    ? env.DB.prepare(sql).bind(from, to, employeeId)
-    : env.DB.prepare(sql).bind(from, to);
+    ? env.DB
+        .prepare(`${select} AND f.employee_id = ? ORDER BY f.attendance_day ASC, f.employee_name ASC`)
+        .bind(from, to, employeeId)
+    : env.DB
+        .prepare(`${select} ORDER BY f.attendance_day ASC, f.employee_name ASC`)
+        .bind(from, to);
+
   const result = await query.all<FactRow>();
   return result.results || [];
 }
@@ -138,37 +227,54 @@ async function loadLiveTodayFacts(
   day: string,
   employeeId: string | undefined,
   actor: any,
-): Promise<FactRow[]> {
-  if (day !== damascusDay() || !actor) return [];
+): Promise<FactRow[] | null> {
+  if (day !== damascusDay() || !actor) return null;
+
   try {
     const response = await handleDailyStatus(
       new Request(
-        `https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}${employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : ""}`,
+        `https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}${
+          employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : ""
+        }`,
       ),
       env,
       actor,
       false,
     );
-    if (!response.ok) return [];
+
+    if (!response.ok) return null;
+
     const payload = (await response.json()) as any;
     const liveEmployees = (
       Array.isArray(payload.employees) ? payload.employees : []
     ).filter(
       (row: any) => !employeeId || String(row.employeeId) === employeeId,
     );
+
+    // null means the live snapshot could not be obtained. An empty array is a
+    // valid snapshot only when the server explicitly returned an empty employee
+    // collection, and the caller can then safely use that snapshot.
+    if (!Array.isArray(payload.employees)) return null;
+    if (employeeId && !liveEmployees.length) return [];
     if (!liveEmployees.length) return [];
 
     const dayStart = new Date(`${day}T00:00:00+03:00`);
     const dayEnd = new Date(dayStart.getTime() + 86400000);
     const attendanceQuery = employeeId
-      ? env.DB.prepare(
-          "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
-        ).bind(employeeId, dayStart.toISOString(), dayEnd.toISOString())
-      : env.DB.prepare(
-          "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
-        ).bind(dayStart.toISOString(), dayEnd.toISOString());
+      ? env.DB
+          .prepare(
+            "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
+          )
+          .bind(employeeId, dayStart.toISOString(), dayEnd.toISOString())
+      : env.DB
+          .prepare(
+            "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
+          )
+          .bind(dayStart.toISOString(), dayEnd.toISOString());
+
     const attendanceRows = await attendanceQuery.all<any>();
     const eventsByEmployee = new Map<string, any[]>();
+
     for (const event of attendanceRows.results || []) {
       if (damascusDay(new Date(String(event.timestamp))) !== day) continue;
       const id = String(event.employeeId || "");
@@ -180,24 +286,29 @@ async function loadLiveTodayFacts(
 
     const classifySource = (events: any[]) => {
       const sources = new Set<string>();
+
       for (const event of events) {
         const deviceId = String(event.deviceId || "");
         const qrCode = String(event.qrCode || "");
-        if (deviceId === "AUTO_VIP" || qrCode === "AUTO_VIP")
+
+        if (deviceId === "AUTO_VIP" || qrCode === "AUTO_VIP") {
           sources.add("AUTOMATIC_VIP");
-        else if (
+        } else if (
           qrCode === "AUTO_DIRECT" ||
           deviceId === "ADMIN_DIRECT:التلقائي"
-        )
+        ) {
           sources.add("AUTOMATIC");
-        else if (
+        } else if (
           deviceId.startsWith("ADMIN_DIRECT:") ||
           deviceId === "ADMIN_DIRECT" ||
           qrCode === "ADMIN_DIRECT"
-        )
+        ) {
           sources.add("MANUAL_OWNER");
-        else sources.add("MANUAL_EMPLOYEE");
+        } else {
+          sources.add("MANUAL_EMPLOYEE");
+        }
       }
+
       if (!sources.size) return "UNKNOWN";
       if (sources.size === 1) return Array.from(sources)[0];
       return "MIXED";
@@ -266,6 +377,7 @@ async function loadLiveTodayFacts(
                 : overtimeMinutes
                   ? "OVERTIME"
                   : null;
+
       return {
         attendanceDay: day,
         employeeId: String(row.employeeId),
@@ -300,7 +412,7 @@ async function loadLiveTodayFacts(
     });
   } catch (error) {
     console.error("professional attendance live read failed", { day, error });
-    return [];
+    return null;
   }
 }
 
@@ -317,13 +429,29 @@ export async function buildProfessionalAttendanceReport(
   const liveRows =
     from <= currentDay && currentDay <= to
       ? await loadLiveTodayFacts(env, currentDay, employeeId, actor)
-      : [];
-  const rows = [
-    ...sourceRows.filter((row) => row.attendanceDay !== currentDay),
-    ...liveRows,
-  ]
+      : null;
+
+  // Historical facts are authoritative for completed days. For the current day
+  // the live engine is preferred, but it must never make a report lose employees
+  // merely because the live snapshot was temporarily incomplete/unavailable.
+  // Merge by employee/day so a fresh live row replaces its fact while every fact
+  // without a live counterpart remains visible as the stable fallback.
+  const rowsByKey = new Map<string, FactRow>();
+
+  for (const row of sourceRows) {
+    rowsByKey.set(`${row.attendanceDay}:${row.employeeId}`, row);
+  }
+
+  if (liveRows !== null) {
+    for (const row of liveRows) {
+      rowsByKey.set(`${row.attendanceDay}:${row.employeeId}`, row);
+    }
+  }
+
+  const rows = Array.from(rowsByKey.values())
     .filter((row) => VALID_STATUSES.has(row.status))
     .map(toPublicRow);
+
   const employees = new Map<
     string,
     {
@@ -377,14 +505,18 @@ export async function buildProfessionalAttendanceReport(
     else if (row.status === "NOT_STARTED") notStarted++;
     else if (row.status === "INVALID") invalid++;
     if (row.open) open++;
+
     workedMinutes += Number(row.workedMinutes || 0);
     expectedMinutes += Number(row.expectedMinutes || 0);
     lateMinutes += row.lateMinutes;
     earlyLeaveMinutes += row.earlyLeaveMinutes;
     overtimeMinutes += row.overtimeMinutes;
-    if (row.exceptionCode)
+
+    if (row.exceptionCode) {
       exceptionCounts[row.exceptionCode] =
         (exceptionCounts[row.exceptionCode] || 0) + 1;
+    }
+
     qualityCounts[row.historicalDataQuality] =
       (qualityCounts[row.historicalDataQuality] || 0) + 1;
     sourceCounts[row.attendanceSource] =
@@ -409,6 +541,7 @@ export async function buildProfessionalAttendanceReport(
       earlyLeaveMinutes: 0,
       overtimeMinutes: 0,
     };
+
     current.days++;
     if (row.status === "PRESENT") current.present++;
     if (row.status === "LATE") current.late++;
@@ -441,6 +574,7 @@ export async function buildProfessionalAttendanceReport(
       earlyLeaveMinutes: 0,
       overtimeMinutes: 0,
     };
+
     if (row.status === "PRESENT") series.present++;
     if (row.status === "LATE") series.late++;
     if (row.status === "ABSENT") series.absent++;
