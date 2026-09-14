@@ -125,6 +125,10 @@ const DEFAULT_SETTINGS: Record<string, unknown> = {
   workEnd: "16:00",
   lateGraceMinutes: 10,
   earlyCheckoutGraceMinutes: 0,
+  allowEarlyCheckIn: false,
+  earlyCheckInGraceMinutes: 30,
+  allowLateCheckOut: false,
+  lateCheckOutGraceMinutes: 30,
   ownerUsername: "",
   ownerName: "المالك",
   managerUsername: "",
@@ -182,6 +186,17 @@ async function saveCompanySettings(req: Request, env: Env, origin: string) {
       const values = Array.from(new Set((input[key] as unknown[]).map(v => String(v).trim()).filter(Boolean)));
       if (values.some(v => v.length > 120)) return json({ error: `قيم ${key} لا يمكن أن تتجاوز 120 محرفًا` }, 400, origin);
       entries.push([key, JSON.stringify(values)]);
+      continue;
+    }
+    if (["allowEarlyCheckIn", "allowLateCheckOut"].includes(key)) {
+      if (typeof input[key] !== "boolean") return json({ error: `قيمة ${key} يجب أن تكون true أو false` }, 400, origin);
+      entries.push([key, JSON.stringify(input[key])]);
+      continue;
+    }
+    if (["earlyCheckInGraceMinutes", "lateCheckOutGraceMinutes"].includes(key)) {
+      const value = Number(input[key]);
+      if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0 || value > 180) return json({ error: `قيمة ${key} يجب أن تكون عددًا صحيحًا بين 0 و180 دقيقة` }, 400, origin);
+      entries.push([key, JSON.stringify(value)]);
       continue;
     }
     entries.push([key, JSON.stringify(input[key])]);
