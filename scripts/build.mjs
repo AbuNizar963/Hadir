@@ -19,7 +19,6 @@ if (!existsSync(vitePackage)) {
   }
 }
 
-run("node", ["scripts/patch-global-attendance-schedule-filter.mjs"]);
 run("node", ["scripts/patch-global-attendance-print-report.mjs"]);
 run("node", ["scripts/patch-global-attendance-print-layout.mjs"]);
 run("node", ["scripts/patch-global-attendance-print-qr.mjs"]);
