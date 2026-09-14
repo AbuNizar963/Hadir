@@ -207,7 +207,7 @@ export default function EmployeeHome() {
         PRESENT: { label: "حاضر", detail: "أنت مسجل حضور الآن.", tone: "primary" },
         LATE: { label: "متأخر", detail: "تم تسجيل حضورك بعد بداية الفترة.", tone: "warning" },
         REST: { label: "راحة", detail: "اليوم ليس ضمن أيام العمل.", tone: "accent" },
-        NOT_STARTED: { label: "لم تبدأ المناوبة", detail: "لم يحن وقت بداية المناوبة بعد.", tone: "secondary" },
+        NOT_STARTED: { label: "لم يبدأ العمل بعد", detail: "لم يحن وقت بداية المناوبة بعد.", tone: "secondary" },
         INVALID: { label: "جدول غير صالح", detail: "تعذر تحديد جدول الدوام المعتمد.", tone: "danger" },
         OPEN: { label: "مفتوح", detail: "حالة الدوام مفتوحة.", tone: "secondary" },
     } as const;
