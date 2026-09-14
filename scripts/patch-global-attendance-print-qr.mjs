@@ -5,22 +5,35 @@ let source = readFileSync(file, "utf8");
 
 const storageImport = 'import { getEmployees, getSettings } from "@/lib/storage";';
 if (!source.includes(storageImport)) throw new Error("GlobalAttendanceReports QR: storage import anchor not found.");
-source = source.replace(storageImport, 'import { getEmployees, getSettings, getManagerSession } from "@/lib/storage";');
+source = source.replace(
+  storageImport,
+  'import { getEmployees, getSettings, getManagerSession } from "@/lib/storage";',
+);
+
 if (!source.includes('import { QRCodeSVG } from "qrcode.react";')) {
-  const lucideImport = 'import { BarChart3, CalendarDays, Clock3, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users } from "lucide-react";';
-  if (!source.includes(lucideImport)) throw new Error("GlobalAttendanceReports QR: icon import anchor not found.");
-  source = source.replace(lucideImport, lucideImport + '\nimport { QRCodeSVG } from "qrcode.react";');
+  const lucideImportPattern = /import\s+\{[\s\S]*?\}\s+from\s+"lucide-react";/;
+  if (!lucideImportPattern.test(source)) {
+    throw new Error("GlobalAttendanceReports QR: icon import anchor not found.");
+  }
+  source = source.replace(
+    lucideImportPattern,
+    (match) => `${match}\nimport { QRCodeSVG } from "qrcode.react";`,
+  );
 }
 
 const stateAnchor = '  const [detailError, setDetailError] = useState<string | null>(null);';
 if (!source.includes('const [printGeneratedAt, setPrintGeneratedAt]')) {
   if (!source.includes(stateAnchor)) throw new Error("GlobalAttendanceReports QR: state anchor not found.");
-  source = source.replace(stateAnchor, stateAnchor + '\n  const [printGeneratedAt, setPrintGeneratedAt] = useState(() => new Date().toISOString());');
+  source = source.replace(
+    stateAnchor,
+    `${stateAnchor}\n  const [printGeneratedAt, setPrintGeneratedAt] = useState(() => new Date().toISOString());`,
+  );
 }
 
-const printFunctionAnchor = '  const printDailyReport = () => { if (!report || report.days !== 1) { window.print(); return; } window.requestAnimationFrame(() => window.print()); };';
-const printFunctionReplacement = '  const printDailyReport = () => { if (!report || report.days !== 1) { window.print(); return; } setPrintGeneratedAt(new Date().toISOString()); window.requestAnimationFrame(() => window.print()); };';
-if (source.includes(printFunctionAnchor)) source = source.replace(printFunctionAnchor, printFunctionReplacement);
+const printFunctionPattern = /  const printDailyReport = \(\) => \{[\s\S]*?\n  \};/;
+if (printFunctionPattern.test(source)) {
+  source = source.replace(printFunctionPattern, `  const printDailyReport = () => {\n    if (!report || report.days !== 1) {\n      window.print();\n      return;\n    }\n    setPrintGeneratedAt(new Date().toISOString());\n    window.requestAnimationFrame(() => window.print());\n  };`);
+}
 
 const headerAnchor = '      <header className="global-attendance-print-header">';
 if (!source.includes(headerAnchor)) throw new Error("GlobalAttendanceReports QR: print header anchor not found.");
