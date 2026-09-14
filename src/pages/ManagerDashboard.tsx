@@ -170,16 +170,17 @@ export default function ManagerDashboard() {
       }
     };
 
-    // realtime.ts emits both cloud-data-changed and d1-view-changed for one
-    // server event. This page only needs the generic view-change signal, so
-    // listening to both would cause a redundant second D1 request.
-    window.addEventListener("hadir:d1-view-changed", refresh);
+    // A realtime server message is exposed as cloud-data-changed. The generic
+    // d1-view-changed event remains reserved for local D1-view mutations and
+    // fallback/visibility refreshes, so this page listens to the actual server
+    // event without creating a second D1 request for the same message.
+    window.addEventListener("hadir:cloud-data-changed", refresh);
     window.addEventListener("focus", refresh);
     window.addEventListener("online", refresh);
 
     return () => {
       active = false;
-      window.removeEventListener("hadir:d1-view-changed", refresh);
+      window.removeEventListener("hadir:cloud-data-changed", refresh);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);
     };
