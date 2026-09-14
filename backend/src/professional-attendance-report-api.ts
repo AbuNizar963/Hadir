@@ -20,6 +20,7 @@ type ReportRow = {
   overtimeMinutes: number;
   open: boolean;
   exceptionCode: string | null;
+  requestReason: string | null;
   attendanceEventIds: string[];
   requestIds: string[];
   auditIds: string[];
@@ -77,6 +78,30 @@ function classifyAttendanceSource(attendance: Record<string, unknown>[]) {
 
 function damascusDay(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus" }).format(date);
+}
+
+async function attachRequestReasons(env: Env, report: any) {
+  const rows = (report.rows || []) as ReportRow[];
+  const requestIds = Array.from(new Set(rows.flatMap((row) => row.requestIds || []).filter(Boolean)));
+  if (!requestIds.length) return report;
+
+  const requests = await fetchByIds(env.DB, "requests", requestIds);
+  const reasonsById = new Map(
+    requests.map((request) => [String(request.id), String(request.reason || "").trim()]),
+  );
+
+  return {
+    ...report,
+    rows: rows.map((row) => {
+      if (row.status !== "LEAVE" && row.status !== "PERMISSION") {
+        return row;
+      }
+      const requestReason = (row.requestIds || [])
+        .map((id) => reasonsById.get(String(id)) || "")
+        .find((reason) => Boolean(reason)) || null;
+      return { ...row, requestReason };
+    }),
+  };
 }
 
 function filterFutureCurrentDayRows(report: any) {
@@ -330,7 +355,7 @@ export async function handleProfessionalAttendanceReport(req: Request, env: Env,
     }
 
     const report = await buildProfessionalAttendanceReport(env, from, to, employeeId, actor);
-    return json(filterFutureCurrentDayRows(report), 200, origin);
+    return json(filterFutureCurrentDayRows(await attachRequestReasons(env, report)), 200, origin);
   } catch (error) {
     const message = error instanceof Error ? error.message : "تعذر بناء التقرير";
     console.error("professional attendance report failed", error);
