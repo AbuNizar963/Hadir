@@ -21,6 +21,8 @@ const json = (data: unknown, status: number, origin: string) =>
 const dayFromRequest = (url: URL) => String(url.searchParams.get("date") || "").trim();
 const fromRequest = (url: URL) => String(url.searchParams.get("from") || dayFromRequest(url)).trim();
 const toRequest = (url: URL) => String(url.searchParams.get("to") || dayFromRequest(url)).trim();
+const damascusDay = (date = new Date()) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus" }).format(date);
 
 const parseIds = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -44,8 +46,9 @@ async function buildAttendanceCenterDrilldown(env: Env, attendanceDay: string, e
   const factPromise = row.calculationSource === "attendance-engine-live"
     ? Promise.resolve(null)
     : env.DB.prepare("SELECT schedule_snapshot_json FROM attendance_reporting_facts WHERE attendance_day = ? AND employee_id = ? LIMIT 1")
-      .bind(attendanceDay, employeeId)
-      .first<Record<string, unknown>>();
+        .bind(attendanceDay, employeeId)
+        .first<Record<string, unknown>>();
+
   const [fact, attendance, requests, audit] = await Promise.all([
     factPromise,
     fetchByIds(env.DB, "attendance", parseIds(row.attendanceEventIds)),
@@ -57,13 +60,19 @@ async function buildAttendanceCenterDrilldown(env: Env, attendanceDay: string, e
   if (typeof fact?.schedule_snapshot_json === "string") {
     try {
       const parsed = JSON.parse(fact.schedule_snapshot_json);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) scheduleSnapshot = parsed as Record<string, unknown>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        scheduleSnapshot = parsed as Record<string, unknown>;
+      }
     } catch {
       scheduleSnapshot = {};
     }
   }
 
-  const sourceOfTruth = row.calculationSource === "attendance-engine-live" ? "attendance-engine" : "attendance_reporting_facts";
+  const sourceOfTruth =
+    row.calculationSource === "attendance-engine-live"
+      ? "attendance-engine"
+      : "attendance_reporting_facts";
+
   return {
     ok: true,
     attendanceDay,
@@ -109,6 +118,53 @@ async function buildAttendanceCenterDrilldown(env: Env, attendanceDay: string, e
   };
 }
 
+async function assertCurrentDayCompleteness(
+  env: Env,
+  from: string,
+  to: string,
+  employeeId: string | undefined,
+  report: { rows: Array<{ attendanceDay: string; employeeId: string }> },
+  actor: any,
+) {
+  const today = damascusDay();
+  if (today < from || today > to) return;
+
+  const response = await handleDailyStatus(
+    new Request(`https://internal/api/manager/daily-status?date=${encodeURIComponent(today)}${employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : ""}`),
+    env,
+    actor,
+    false,
+  );
+  if (!response.ok) {
+    throw new Error("تعذر التحقق من اكتمال بيانات اليوم الحالي للتقرير");
+  }
+
+  const payload = await response.json().catch(() => null) as { employees?: unknown[] } | null;
+  const expectedEmployees = Array.isArray(payload?.employees) ? payload.employees : [];
+  const actualEmployeeIds = new Set(
+    report.rows
+      .filter((row) => row.attendanceDay === today)
+      .map((row) => String(row.employeeId)),
+  );
+  const expectedEmployeeIds = new Set(
+    expectedEmployees
+      .map((row: any) => String(row?.employeeId || ""))
+      .filter(Boolean),
+  );
+
+  if (actualEmployeeIds.size !== expectedEmployeeIds.size) {
+    throw new Error(
+      `لم يكتمل التقرير الحالي: تم احتساب ${actualEmployeeIds.size} من أصل ${expectedEmployeeIds.size} موظفًا. أعد المحاولة بعد اكتمال مزامنة بيانات الحضور.`,
+    );
+  }
+
+  for (const employee of expectedEmployeeIds) {
+    if (!actualEmployeeIds.has(employee)) {
+      throw new Error("لم يكتمل التقرير الحالي: توجد سجلات موظفين مفقودة من مصدر الحضور الرسمي.");
+    }
+  }
+}
+
 export async function handleAttendanceCenter(req: Request, env: Env, actor: any) {
   const url = new URL(req.url);
   const requestOrigin = String(req.headers.get("origin") || "").trim().replace(/\/$/, "");
@@ -116,18 +172,24 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS(origin) });
   if (req.method !== "GET") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
-  if (!actor || !["owner", "manager", "supervisor"].includes(String(actor.role))) return json({ error: "غير مصرح" }, 403, origin);
+  if (!actor || !["owner", "manager", "supervisor"].includes(String(actor.role))) {
+    return json({ error: "غير مصرح" }, 403, origin);
+  }
 
   const date = dayFromRequest(url);
   const from = fromRequest(url);
   const to = toRequest(url);
-  if (!DAY_RE.test(date) || !DAY_RE.test(from) || !DAY_RE.test(to)) return json({ error: "التاريخ أو الفترة الزمنية غير صالحة" }, 400, origin);
+  if (!DAY_RE.test(date) || !DAY_RE.test(from) || !DAY_RE.test(to)) {
+    return json({ error: "التاريخ أو الفترة الزمنية غير صالحة" }, 400, origin);
+  }
 
   const employeeId = String(url.searchParams.get("employeeId") || "").trim() || undefined;
 
   try {
     if (url.searchParams.get("drilldown") === "1") {
-      if (from !== to || !employeeId || date !== from) return json({ error: "التفصيل يحتاج يومًا واحدًا وموظفًا محددًا" }, 400, origin);
+      if (from !== to || !employeeId || date !== from) {
+        return json({ error: "التفصيل يحتاج يومًا واحدًا وموظفًا محددًا" }, 400, origin);
+      }
       const detail = await buildAttendanceCenterDrilldown(env, from, employeeId, actor);
       if (!detail) return json({ error: "سجل التقرير المطلوب غير موجود" }, 404, origin);
       return json(detail, 200, origin);
@@ -147,25 +209,34 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
       return json(payload, dailyStatus.status, origin);
     }
 
-    const report = filterFutureCurrentDayRows(await buildProfessionalAttendanceReport(env, from, to, employeeId, actor));
+    const report = filterFutureCurrentDayRows(
+      await buildProfessionalAttendanceReport(env, from, to, employeeId, actor),
+    );
+
+    await assertCurrentDayCompleteness(env, from, to, employeeId, report, actor);
+
     const live = await dailyStatus.json();
 
-    return json({
-      ok: true,
-      centerVersion: "1.2",
-      timezone: "Asia/Damascus",
-      date,
-      from,
-      to,
-      attendance: live,
-      report,
-      integrity: {
-        readOnly: true,
-        noRawAttendanceMutation: true,
-        attendanceSource: "attendance-engine",
-        historicalReportSource: "attendance_reporting_facts",
+    return json(
+      {
+        ok: true,
+        centerVersion: "1.3",
+        timezone: "Asia/Damascus",
+        date,
+        from,
+        to,
+        attendance: live,
+        report,
+        integrity: {
+          readOnly: true,
+          noRawAttendanceMutation: true,
+          attendanceSource: "attendance-engine",
+          historicalReportSource: "attendance_reporting_facts",
+        },
       },
-    }, 200, origin);
+      200,
+      origin,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "تعذر قراءة مركز الحضور والتقارير";
     console.error("attendance center failed", error);
