@@ -31,25 +31,7 @@ if (printStart < 0 || resetStart < 0) {
   fail("print function boundaries not found");
 }
 
-const printFunction = `  const printQr = () => {
-    const sheet = printRef.current;
-    if (!sheet) {
-      toast.error("تعذر تجهيز رمز QR للطباعة", "افتح قسم رمز الموقع ثم حاول مرة أخرى.");
-      return;
-    }
-
-    const originalParent = sheet.parentElement;
-    const originalNextSibling = sheet.nextSibling;
-    if (!originalParent) {
-      toast.error("تعذر تجهيز رمز QR للطباعة", "تعذر تحديد موضع بطاقة الطباعة.");
-      return;
-    }
-
-    document.body.appendChild(sheet);
-
-    const style = document.createElement("style");
-    style.id = "hadir-qr-print-style";
-    style.textContent = \`${String.raw`@page {
+const printCss = String.raw`@page {
   size: A4 portrait;
   margin: 0;
 }
@@ -193,7 +175,27 @@ const printFunction = `  const printQr = () => {
     direction: ltr !important;
     white-space: nowrap !important;
   }
-}`}`;
+}`;
+
+const printFunction = `  const printQr = () => {
+    const sheet = printRef.current;
+    if (!sheet) {
+      toast.error("تعذر تجهيز رمز QR للطباعة", "افتح قسم رمز الموقع ثم حاول مرة أخرى.");
+      return;
+    }
+
+    const originalParent = sheet.parentElement;
+    const originalNextSibling = sheet.nextSibling;
+    if (!originalParent) {
+      toast.error("تعذر تجهيز رمز QR للطباعة", "تعذر تحديد موضع بطاقة الطباعة.");
+      return;
+    }
+
+    document.body.appendChild(sheet);
+
+    const style = document.createElement("style");
+    style.id = "hadir-qr-print-style";
+    style.textContent = ${JSON.stringify(printCss)};
     document.head.appendChild(style);
 
     let cleaned = false;
@@ -235,5 +237,5 @@ if (printSheetMatch) {
 
 writeFileSync(file, source, "utf8");
 console.log(
-  "ManagerSettings QR patch: uses a 292mm in-flow A4 print canvas with a 5mm top compensation to prevent trailing blank pages without moving the QR card.",
+  "ManagerSettings QR patch: uses a 292mm in-flow A4 canvas with 5mm top compensation to prevent trailing blank pages while preserving the centered card.",
 );
