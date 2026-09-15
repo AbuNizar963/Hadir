@@ -17,7 +17,7 @@ if (!source.includes(qrImport)) {
 }
 
 const remoteQrPattern = /<img src=\{(?:`https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=\$\{encodeURIComponent\(s\.qrCode \|\| loginUrl\)\}`|"https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=" \+ encodeURIComponent\(s\.qrCode \|\| loginUrl\))\} alt="QR" className="(?:w-full h-full|h-full w-full)"(?: loading="eager")?\s*\/>/;
-const localQr = '<QRCodeSVG value={s.qrCode || loginUrl} size={700} level="H" includeMargin bgColor="#ffffff" fgColor="#111111" className="block w-full h-full" aria-label="QR" imageSettings={{ src: s.brandLogo || PROJECT_LOGO, width: 84, height: 84, excavate: true }} />';
+const localQr = '<QRCodeSVG value={s.qrCode || loginUrl} size={700} level="H" includeMargin bgColor="#ffffff" fgColor="#111111" className="block w-full h-full" aria-label="QR" imageSettings={{ src: s.brandLogo || PROJECT_LOGO, width: 64, height: 64, excavate: true }} />';
 
 if (remoteQrPattern.test(source)) {
   source = source.replace(remoteQrPattern, localQr);
@@ -70,9 +70,9 @@ const printCss = String.raw`@page {
 
   body > #hadir-qr-print-sheet {
     position: relative !important;
-    width: 210mm !important;
-    max-width: 210mm !important;
-    min-width: 210mm !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
@@ -81,7 +81,7 @@ const printCss = String.raw`@page {
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
-    align-items: center !important;
+    align-items: stretch !important;
     justify-content: flex-start !important;
     overflow: hidden !important;
     border: 0 !important;
@@ -103,7 +103,7 @@ const printCss = String.raw`@page {
     display: block !important;
     width: max-content !important;
     height: auto !important;
-    margin: 0 0 8mm !important;
+    margin: 0 auto 8mm !important;
     padding: 0 !important;
     font-family: 'Cairo', system-ui, sans-serif !important;
     font-size: 24px !important;
@@ -120,7 +120,7 @@ const printCss = String.raw`@page {
     min-height: 122mm !important;
     max-width: 122mm !important;
     max-height: 122mm !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 4mm !important;
     box-sizing: border-box !important;
     border: 3mm solid #16a34a !important;
@@ -164,7 +164,7 @@ const printCss = String.raw`@page {
     display: block !important;
     width: max-content !important;
     height: auto !important;
-    margin: 2mm 0 0 !important;
+    margin: 2mm auto 0 !important;
     padding: 0 !important;
     font-family: 'Cairo', system-ui, sans-serif !important;
     font-size: 15px !important;
@@ -190,6 +190,11 @@ const printFunction = `  const printQr = () => {
     }
 
     document.body.appendChild(sheet);
+
+    const qrLogo = sheet.querySelector("svg image");
+    if (qrLogo) {
+      qrLogo.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    }
 
     const style = document.createElement("style");
     style.id = "hadir-qr-print-style";
@@ -235,5 +240,5 @@ if (printSheetMatch) {
 
 writeFileSync(file, source, "utf8");
 console.log(
-  "ManagerSettings QR patch: embeds the configured company logo inside the QR modules and removes the separate overlay logo, while preserving the validated one-page centered print layout.",
+  "ManagerSettings QR patch: centers the QR card against the full print width and preserves the configured company logo aspect ratio while keeping the validated one-page print layout.",
 );
