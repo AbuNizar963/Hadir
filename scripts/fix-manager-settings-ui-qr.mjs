@@ -164,10 +164,11 @@ const printFunction = [
 
 source = source.slice(0, printStart) + printFunction + source.slice(resetStart);
 
-const printSheetPattern = /<div ref=\{printRef\} className="mx-auto rounded-2xl bg-white p-5 text-center text-black shadow-inner">/;
-const printSheetReplacement = '<div id="hadir-qr-print-sheet" ref={printRef} className="mx-auto rounded-2xl bg-white p-5 text-center text-black shadow-inner">';
-if (printSheetPattern.test(source)) {
-  source = source.replace(printSheetPattern, printSheetReplacement);
+const printSheetPattern = /<div ref=\{printRef\} className="[^"]*">/;
+const printSheetReplacement = '<div id="hadir-qr-print-sheet" ref={printRef} className="$&">';
+const printSheetMatch = source.match(printSheetPattern);
+if (printSheetMatch) {
+  source = source.replace(printSheetPattern, printSheetMatch[0].replace('<div ref={printRef}', '<div id="hadir-qr-print-sheet" ref={printRef}'));
 } else if (!source.includes('id="hadir-qr-print-sheet" ref={printRef}')) {
   fail("print sheet anchor not found");
 }
