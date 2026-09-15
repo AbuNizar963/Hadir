@@ -409,6 +409,7 @@ export default function EmployeeHome() {
     | "PERMISSION"
     | "ESCAPED"
     | "NOT_STARTED"
+    | "COMPLETED"
     | "INVALID";
 
   if (isEscaped) {
@@ -417,6 +418,8 @@ export default function EmployeeHome() {
     attendanceStatus = "LEAVE";
   } else if (activePermission) {
     attendanceStatus = "PERMISSION";
+  } else if (checkOut) {
+    attendanceStatus = "COMPLETED";
   } else if (period.kind === "NOT_STARTED") {
     // Time-dependent state: this must be derived from `now`, not a stale API snapshot.
     attendanceStatus = "NOT_STARTED";
@@ -467,6 +470,11 @@ export default function EmployeeHome() {
       label: "لم يبدأ العمل بعد",
       detail: "لم يحن وقت بداية العمل بعد.",
       tone: "secondary",
+    },
+    COMPLETED: {
+      label: "انتهى الدوام",
+      detail: "تم تسجيل انصرافك بنجاح، انتهى دوامك لهذا اليوم.",
+      tone: "accent",
     },
     INVALID: {
       label: "جدول غير صالح",
