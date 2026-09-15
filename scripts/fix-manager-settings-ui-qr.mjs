@@ -17,12 +17,17 @@ if (!source.includes(qrImport)) {
 }
 
 const remoteQrPattern = /<img src=\{(?:`https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=\$\{encodeURIComponent\(s\.qrCode \|\| loginUrl\)\}`|"https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=" \+ encodeURIComponent\(s\.qrCode \|\| loginUrl\))\} alt="QR" className="(?:w-full h-full|h-full w-full)"(?: loading="eager")?\s*\/>/;
-const localQr = '<QRCodeSVG value={s.qrCode || loginUrl} size={700} level="H" includeMargin bgColor="#ffffff" fgColor="#111111" className="block w-full h-full" aria-label="QR" />';
+const localQr = '<QRCodeSVG value={s.qrCode || loginUrl} size={700} level="H" includeMargin bgColor="#ffffff" fgColor="#111111" className="block w-full h-full" aria-label="QR" imageSettings={{ src: PROJECT_LOGO, width: 84, height: 84, excavate: true }} />';
 
 if (remoteQrPattern.test(source)) {
   source = source.replace(remoteQrPattern, localQr);
 } else if (!source.includes(localQr)) {
   fail("QR image anchor not found");
+}
+
+const logoOverlayPattern = /\s*<div className="absolute left-1\/2 top-1\/2 -translate-x-1\/2 -translate-y-1\/2 w-14 h-14 rounded-2xl bg-white border-4 border-white shadow-lg overflow-hidden grid place-items-center">\s*<img src=\{PROJECT_LOGO\}[^>]*\/>\s*<\/div>/;
+if (logoOverlayPattern.test(source)) {
+  source = source.replace(logoOverlayPattern, "");
 }
 
 const printStart = source.indexOf("  const printQr = () => {");
@@ -230,5 +235,5 @@ if (printSheetMatch) {
 
 writeFileSync(file, source, "utf8");
 console.log(
-  "ManagerSettings QR patch: uses intrinsic print height with a fixed top offset, avoiding a fixed A4-height canvas that can create a trailing blank page.",
+  "ManagerSettings QR patch: embeds the Hadir logo inside the QR modules using QRCodeSVG imageSettings and removes the old overlay logo, while preserving the validated one-page print layout.",
 );
