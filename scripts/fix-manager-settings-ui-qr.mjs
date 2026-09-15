@@ -17,7 +17,7 @@ if (!source.includes(qrImport)) {
 }
 
 const remoteQrPattern = /<img src=\{(?:`https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=\$\{encodeURIComponent\(s\.qrCode \|\| loginUrl\)\}`|"https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=" \+ encodeURIComponent\(s\.qrCode \|\| loginUrl\))\} alt="QR" className="(?:w-full h-full|h-full w-full)"(?: loading="eager")?\s*\/>/;
-const localQr = '<QRCodeSVG value={s.qrCode || loginUrl} size={700} level="H" includeMargin bgColor="#ffffff" fgColor="#111111" className="block w-full h-full" aria-label="QR" imageSettings={{ src: PROJECT_LOGO, width: 84, height: 84, excavate: true }} />';
+const localQr = '<QRCodeSVG value={s.qrCode || loginUrl} size={700} level="H" includeMargin bgColor="#ffffff" fgColor="#111111" className="block w-full h-full" aria-label="QR" imageSettings={{ src: s.brandLogo || PROJECT_LOGO, width: 84, height: 84, excavate: true }} />';
 
 if (remoteQrPattern.test(source)) {
   source = source.replace(remoteQrPattern, localQr);
@@ -235,5 +235,5 @@ if (printSheetMatch) {
 
 writeFileSync(file, source, "utf8");
 console.log(
-  "ManagerSettings QR patch: embeds the Hadir logo inside the QR modules using QRCodeSVG imageSettings and removes the old overlay logo, while preserving the validated one-page print layout.",
+  "ManagerSettings QR patch: embeds the configured company logo inside the QR modules and removes the separate overlay logo, while preserving the validated one-page centered print layout.",
 );
