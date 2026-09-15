@@ -3,12 +3,11 @@ import EmployeeScan from "@/pages/EmployeeScan";
 /**
  * Compatibility route kept for existing employee links.
  *
- * IMPORTANT: this route must never request permissions or click controls on
- * behalf of the employee. Camera and geolocation are privacy-sensitive APIs
- * and must only start after an explicit user action.
- *
- * EmployeeScan already owns the complete verification flow and exposes the
- * explicit actions for location, QR camera and manual QR entry.
+ * The employee action is explicit because the employee navigates to this
+ * route by choosing check-in or check-out. EmployeeScan then opens the rear
+ * camera, waits for a QR scan, requests geolocation only after the QR step,
+ * and submits the attendance operation through the existing verification
+ * service.
  */
 export default function EmployeeScanAutoFlow() {
   return <EmployeeScan />;
