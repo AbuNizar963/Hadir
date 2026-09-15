@@ -42,11 +42,11 @@ if (canonicalHistoricalReports) {
 
 run("node", ["scripts/patch-manager-reports-damascus-date.mjs"]);
 run("node", ["scripts/patch-manager-settings-ui.mjs"]);
-run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-ui.mjs"]);
 run("node", ["scripts/normalize-manager-settings-locations-anchor.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-dedicated.mjs"]);
 run("node", ["scripts/patch-manager-settings-locations-fixes.mjs"]);
+run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
 run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-screen.mjs"]);
 
@@ -85,7 +85,16 @@ const legacyAssistant = spawnSync("grep", ["-RIl", "معاون رئيس القس
 if (legacy.status === 0 || legacyAssistant.status === 0) {
   throw new Error("Production build validation failed: legacy department owner/assistant header is still present in dist.");
 }
-console.log("Production report branding and direct PDF sharing verified; legacy owner/assistant header absent.");
+
+const remoteQrScan = spawnSync("grep", ["-RIl", "api.qrserver.com", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+if (remoteQrScan.status === 0 && remoteQrScan.stdout?.trim()) {
+  throw new Error("Production build validation failed: remote QR image dependency is still present in dist.");
+}
+const qrPrintScan = spawnSync("grep", ["-RIl", "hadir-qr-print-sheet", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+if (qrPrintScan.status !== 0 || !qrPrintScan.stdout?.trim()) {
+  throw new Error("Production build validation failed: direct QR print sheet is missing from dist.");
+}
+console.log("Production report branding, direct PDF sharing, and local QR printing verified; legacy owner/assistant header absent.");
 
 const faviconVersion = encodeURIComponent(commitSha);
 const emittedFiles = ["index.html", "manifest.webmanifest", "sw.js"];
