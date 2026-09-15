@@ -165,7 +165,6 @@ const printFunction = [
 source = source.slice(0, printStart) + printFunction + source.slice(resetStart);
 
 const printSheetPattern = /<div ref=\{printRef\} className="[^"]*">/;
-const printSheetReplacement = '<div id="hadir-qr-print-sheet" ref={printRef} className="$&">';
 const printSheetMatch = source.match(printSheetPattern);
 if (printSheetMatch) {
   source = source.replace(printSheetPattern, printSheetMatch[0].replace('<div ref={printRef}', '<div id="hadir-qr-print-sheet" ref={printRef}'));
