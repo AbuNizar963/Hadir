@@ -14,7 +14,7 @@ if (!source.includes(qrImport)) {
   source = source.replace(importAnchor, `${importAnchor}\n${qrImport}`);
 }
 
-const remoteQrPattern = /<img src=\{(?:`https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=\$\{encodeURIComponent\(s\.qrCode \|\| loginUrl\)\}`|"https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=" \+ encodeURIComponent\(s\.qrCode \|\| loginUrl\))\} alt="QR" className="(?:w-full h-full|h-full w-full)"(?: loading="eager")?\/>/;
+const remoteQrPattern = /<img src=\{(?:`https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=\$\{encodeURIComponent\(s\.qrCode \|\| loginUrl\)\}`|"https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=" \+ encodeURIComponent\(s\.qrCode \|\| loginUrl\))\} alt="QR" className="(?:w-full h-full|h-full w-full)"(?: loading="eager")?\s*\/>/;
 const localQr = '<QRCodeSVG value={s.qrCode || loginUrl} size={700} level="H" includeMargin bgColor="#ffffff" fgColor="#111111" className="block w-full h-full" aria-label="QR" />';
 
 if (remoteQrPattern.test(source)) {
