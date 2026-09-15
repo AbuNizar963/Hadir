@@ -14,7 +14,7 @@ if (!source.includes(qrImport)) {
   source = source.replace(importAnchor, `${importAnchor}\n${qrImport}`);
 }
 
-const remoteQrPattern = /<img src=\{(?:`https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=\$\{encodeURIComponent\(s\.qrCode \|\| loginUrl\)\}`|"https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=" \+ encodeURIComponent\(s\.qrCode \|\| loginUrl\))\} alt="QR" className="w-full h-full"(?: loading="eager")?\/>/;
+const remoteQrPattern = /<img src=\{(?:`https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=\$\{encodeURIComponent\(s\.qrCode \|\| loginUrl\)\}`|"https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?size=700x700&ecc=H&margin=3&color=111111&bgcolor=ffffff&data=" \+ encodeURIComponent\(s\.qrCode \|\| loginUrl\))\} alt="QR" className="(?:w-full h-full|h-full w-full)"(?: loading="eager")?\/>/;
 const localQr = '<QRCodeSVG value={s.qrCode || loginUrl} size={700} level="H" includeMargin bgColor="#ffffff" fgColor="#111111" className="block w-full h-full" aria-label="QR" />';
 
 if (remoteQrPattern.test(source)) {
@@ -164,8 +164,8 @@ const printFunction = [
 
 source = source.slice(0, printStart) + printFunction + source.slice(resetStart);
 
-const printSheetPattern = /<div ref=\{printRef\} className="bg-white text-black rounded-xl p-5 text-center mx-auto">/;
-const printSheetReplacement = '<div id="hadir-qr-print-sheet" ref={printRef} className="bg-white text-black rounded-xl p-5 text-center mx-auto">';
+const printSheetPattern = /<div ref=\{printRef\} className="mx-auto rounded-2xl bg-white p-5 text-center text-black shadow-inner">/;
+const printSheetReplacement = '<div id="hadir-qr-print-sheet" ref={printRef} className="mx-auto rounded-2xl bg-white p-5 text-center text-black shadow-inner">';
 if (printSheetPattern.test(source)) {
   source = source.replace(printSheetPattern, printSheetReplacement);
 } else if (!source.includes('id="hadir-qr-print-sheet" ref={printRef}')) {
