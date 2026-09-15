@@ -9,7 +9,13 @@ import { getSettings } from "@/lib/storage";
 import { formatTime } from "@/lib/utils";
 import type { Settings } from "@/types";
 
-type ScanStep = "camera" | "qr-verified" | "locating" | "submitting" | "success" | "error";
+type ScanStep =
+  | "camera"
+  | "qr-verified"
+  | "locating"
+  | "submitting"
+  | "success"
+  | "error";
 
 type AttendanceResult = {
   timestamp: string;
@@ -26,17 +32,15 @@ const SUCCESS_REDIRECT_MS = 2200;
 export default function EmployeeScan() {
   const { type } = useParams<{ type: "check-in" | "check-out" }>();
   const navigate = useNavigate();
-  const session = currentSession();
+  const [session] = useState(() => currentSession());
   const [settings] = useState<Settings>(() => getSettings());
   const [step, setStep] = useState<ScanStep>("camera");
   const [error, setError] = useState<string | null>(null);
-  const [qrValue, setQrValue] = useState("");
   const [result, setResult] = useState<AttendanceResult | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const scannerRef = useRef<BrowserQRCodeReader | null>(null);
   const scannerControlsRef = useRef<ScannerControls | null>(null);
   const scanHandledRef = useRef(false);
   const mountedRef = useRef(true);
@@ -48,8 +52,6 @@ export default function EmployeeScan() {
   const stopScanner = useCallback(() => {
     scannerControlsRef.current?.stop();
     scannerControlsRef.current = null;
-    scannerRef.current?.reset();
-    scannerRef.current = null;
 
     const video = videoRef.current;
     if (video?.srcObject instanceof MediaStream) {
@@ -59,68 +61,6 @@ export default function EmployeeScan() {
 
     setCameraReady(false);
   }, []);
-
-  const startScanner = useCallback(async () => {
-    if (!mountedRef.current || !videoRef.current) return;
-
-    stopScanner();
-    scanHandledRef.current = false;
-    setError(null);
-    setStep("camera");
-    setCameraReady(false);
-
-    try {
-      const reader = new BrowserQRCodeReader();
-      scannerRef.current = reader;
-
-      const controls = await reader.decodeFromVideoDevice(
-        undefined,
-        videoRef.current,
-        (result) => {
-          if (!result || scanHandledRef.current || !mountedRef.current) return;
-
-          const value = result.getText().trim();
-          if (!value) return;
-
-          scanHandledRef.current = true;
-          scannerControlsRef.current?.stop();
-          scannerControlsRef.current = null;
-          setQrValue(value);
-          setError(null);
-
-          const expectedQr = String(settings.qrCode || "").trim();
-          if (expectedQr && value !== expectedQr) {
-            scanHandledRef.current = false;
-            setError("رمز QR غير صحيح أو لا يخص موقع العمل. حاول مسح الرمز الموجود في مقر العمل.");
-            window.setTimeout(() => {
-              if (mountedRef.current) void startScanner();
-            }, 900);
-            return;
-          }
-
-          setStep("qr-verified");
-          void verifyLocationAndSubmit(value);
-        },
-      );
-
-      if (!mountedRef.current) {
-        controls.stop();
-        return;
-      }
-
-      scannerControlsRef.current = controls;
-      setCameraReady(true);
-    } catch (scannerError) {
-      if (!mountedRef.current) return;
-
-      console.error("تعذر تشغيل ماسح QR:", scannerError);
-      setCameraReady(false);
-      setStep("error");
-      setError(
-        "تعذر فتح الكاميرا. تأكد من منح صلاحية الكاميرا واستخدام اتصال HTTPS، ثم أعد المحاولة.",
-      );
-    }
-  }, [settings.qrCode, stopScanner]);
 
   const verifyLocationAndSubmit = useCallback(
     async (scannedQr: string) => {
@@ -178,7 +118,9 @@ export default function EmployeeScan() {
         setStep("success");
 
         redirectTimerRef.current = window.setTimeout(() => {
-          if (mountedRef.current) navigate("/employee", { replace: true });
+          if (mountedRef.current) {
+            navigate("/employee", { replace: true });
+          }
         }, SUCCESS_REDIRECT_MS);
       } catch (submitError) {
         if (!mountedRef.current) return;
@@ -193,6 +135,76 @@ export default function EmployeeScan() {
     },
     [action, navigate, session, stopScanner],
   );
+
+  const startScanner = useCallback(async () => {
+    if (!mountedRef.current || !videoRef.current) return;
+
+    stopScanner();
+    scanHandledRef.current = false;
+    setError(null);
+    setStep("camera");
+    setCameraReady(false);
+
+    try {
+      const reader = new BrowserQRCodeReader();
+      const controls = await reader.decodeFromConstraints(
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: "environment" },
+          },
+        },
+        videoRef.current,
+        (scanResult) => {
+          if (!scanResult || scanHandledRef.current || !mountedRef.current) {
+            return;
+          }
+
+          const value = scanResult.getText().trim();
+          if (!value) return;
+
+          scanHandledRef.current = true;
+          scannerControlsRef.current?.stop();
+          scannerControlsRef.current = null;
+          setError(null);
+
+          const expectedQr = String(settings.qrCode || "").trim();
+          if (expectedQr && value !== expectedQr) {
+            scanHandledRef.current = false;
+            setError(
+              "رمز QR غير صحيح أو لا يخص موقع العمل. حاول مسح الرمز الموجود في مقر العمل.",
+            );
+            window.setTimeout(() => {
+              if (mountedRef.current) {
+                void startScanner();
+              }
+            }, 900);
+            return;
+          }
+
+          setStep("qr-verified");
+          void verifyLocationAndSubmit(value);
+        },
+      );
+
+      if (!mountedRef.current) {
+        controls.stop();
+        return;
+      }
+
+      scannerControlsRef.current = controls;
+      setCameraReady(true);
+    } catch (scannerError) {
+      if (!mountedRef.current) return;
+
+      console.error("تعذر تشغيل ماسح QR:", scannerError);
+      setCameraReady(false);
+      setStep("error");
+      setError(
+        "تعذر فتح الكاميرا. تأكد من منح صلاحية الكاميرا واستخدام اتصال HTTPS، ثم أعد المحاولة.",
+      );
+    }
+  }, [settings.qrCode, stopScanner, verifyLocationAndSubmit]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -210,13 +222,12 @@ export default function EmployeeScan() {
 
   const retry = () => {
     setIsRetrying(true);
-    setQrValue("");
     setResult(null);
-    window.setTimeout(() => {
-      if (!mountedRef.current) return;
-      setIsRetrying(false);
-      void startScanner();
-    }, 120);
+    void startScanner().finally(() => {
+      if (mountedRef.current) {
+        setIsRetrying(false);
+      }
+    });
   };
 
   const close = () => {
@@ -270,13 +281,13 @@ export default function EmployeeScan() {
                 </div>
               </div>
 
-              <div className="absolute inset-0 z-10 grid place-items-center px-8 pointer-events-none">
+              <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center px-8">
                 <div className="relative aspect-square w-full max-w-[320px] rounded-[30px] border-[3px] border-primary shadow-[0_0_35px_hsl(var(--primary)/.35),0_0_0_9999px_rgba(0,0,0,.28)]">
                   <span className="absolute -left-1 -top-1 h-12 w-12 rounded-tl-[28px] border-l-[5px] border-t-[5px] border-primary" />
                   <span className="absolute -right-1 -top-1 h-12 w-12 rounded-tr-[28px] border-r-[5px] border-t-[5px] border-primary" />
                   <span className="absolute -bottom-1 -left-1 h-12 w-12 rounded-bl-[28px] border-b-[5px] border-l-[5px] border-primary" />
                   <span className="absolute -bottom-1 -right-1 h-12 w-12 rounded-br-[28px] border-b-[5px] border-r-[5px] border-primary" />
-                  <span className="absolute inset-x-[10%] top-1/2 h-0.5 -translate-y-1/2 bg-primary shadow-[0_0_16px_hsl(var(--primary))] animate-pulse" />
+                  <span className="absolute inset-x-[10%] top-1/2 h-0.5 -translate-y-1/2 animate-pulse bg-primary shadow-[0_0_16px_hsl(var(--primary))]" />
                 </div>
               </div>
 
@@ -377,12 +388,6 @@ export default function EmployeeScan() {
               </button>
             </div>
           </section>
-        )}
-
-        {qrValue && step !== "camera" && step !== "success" && (
-          <div className="mt-4 text-center text-[10px] text-muted-foreground">
-            تم استلام رمز QR بنجاح وسيتم استخدامه ضمن التحقق النهائي.
-          </div>
         )}
       </main>
     </div>
