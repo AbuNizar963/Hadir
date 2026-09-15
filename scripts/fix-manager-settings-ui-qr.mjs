@@ -10,7 +10,9 @@ const fail = (message) => {
 const qrImport = 'import { QRCodeSVG } from "qrcode.react";';
 if (!source.includes(qrImport)) {
   const importAnchor = 'import { useEffect, useRef, useState } from "react";';
-  if (!source.includes(importAnchor)) fail("React import anchor not found");
+  if (!source.includes(importAnchor)) {
+    fail("React import anchor not found");
+  }
   source = source.replace(importAnchor, `${importAnchor}\n${qrImport}`);
 }
 
@@ -25,207 +27,195 @@ if (remoteQrPattern.test(source)) {
 
 const printStart = source.indexOf("  const printQr = () => {");
 const resetStart = source.indexOf("\n  const reset = () =>", printStart);
-if (printStart < 0 || resetStart < 0) fail("print function boundaries not found");
+if (printStart < 0 || resetStart < 0) {
+  fail("print function boundaries not found");
+}
 
-const printFunction = [
-  "  const printQr = () => {",
-  "    const sheet = printRef.current;",
-  "    if (!sheet) {",
-  '      toast.error("تعذر تجهيز رمز QR للطباعة", "افتح قسم رمز الموقع ثم حاول مرة أخرى.");',
-  "      return;",
-  "    }",
-  "",
-  "    const originalParent = sheet.parentElement;",
-  "    const originalNextSibling = sheet.nextSibling;",
-  "    if (!originalParent) {",
-  '      toast.error("تعذر تجهيز رمز QR للطباعة", "تعذر تحديد موضع بطاقة الطباعة.");',
-  "      return;",
-  "    }",
-  "",
-  "    document.body.appendChild(sheet);",
-  "",
-  '    const styleId = "hadir-qr-print-style";',
-  "    const style = document.createElement(\"style\");",
-  "    style.id = styleId;",
-  "    document.head.appendChild(style);",
-  "",
-  "    style.textContent = `@page {",
-  "  size: A4 portrait;",
-  "  margin: 0;",
-  "}",
-  "",
-  "@media print {",
-  "  html {",
-  "    width: 210mm !important;",
-  "    height: 296mm !important;",
-  "    min-width: 210mm !important;",
-  "    min-height: 296mm !important;",
-  "    max-width: 210mm !important;",
-  "    max-height: 296mm !important;",
-  "    margin: 0 !important;",
-  "    padding: 0 !important;",
-  "    overflow: hidden !important;",
-  "  }",
-  "",
-  "  body {",
-  "    position: relative !important;",
-  "    width: 210mm !important;",
-  "    height: 296mm !important;",
-  "    min-width: 210mm !important;",
-  "    min-height: 296mm !important;",
-  "    max-width: 210mm !important;",
-  "    max-height: 296mm !important;",
-  "    margin: 0 !important;",
-  "    padding: 0 !important;",
-  "    overflow: hidden !important;",
-  "    background: #fff !important;",
-  "    color: #111 !important;",
-  "    font-family: 'Cairo', system-ui, sans-serif !important;",
-  "  }",
-  "",
-  "  body > *:not(#hadir-qr-print-sheet) {",
-  "    display: none !important;",
-  "  }",
-  "",
-  "  #hadir-qr-print-sheet,",
-  "  #hadir-qr-print-sheet * {",
-  "    visibility: visible !important;",
-  "  }",
-  "",
-  "  body > #hadir-qr-print-sheet {",
-  "    position: relative !important;",
-  "    top: auto !important;",
-  "    left: auto !important;",
-  "    width: 210mm !important;",
-  "    height: 296mm !important;",
-  "    min-width: 210mm !important;",
-  "    min-height: 296mm !important;",
-  "    max-width: 210mm !important;",
-  "    max-height: 296mm !important;",
-  "    margin: 0 !important;",
-  "    padding: 0 !important;",
-  "    box-sizing: border-box !important;",
-  "    display: grid !important;",
-  "    grid-template-columns: 1fr !important;",
-  "    grid-template-rows: 1fr !important;",
-  "    place-items: center !important;",
-  "    overflow: hidden !important;",
-  "    border: 0 !important;",
-  "    border-radius: 0 !important;",
-  "    box-shadow: none !important;",
-  "    background: #fff !important;",
-  "    color: #111 !important;",
-  "    font-family: 'Cairo', system-ui, sans-serif !important;",
-  "    text-align: center !important;",
-  "    break-before: avoid !important;",
-  "    break-after: avoid !important;",
-  "    break-inside: avoid !important;",
-  "    page-break-before: avoid !important;",
-  "    page-break-after: avoid !important;",
-  "    page-break-inside: avoid !important;",
-  "  }",
-  "",
-  "  #hadir-qr-print-sheet > b,",
-  "  #hadir-qr-print-sheet > div,",
-  "  #hadir-qr-print-sheet > small {",
-  "    grid-area: 1 / 1 !important;",
-  "    justify-self: center !important;",
-  "  }",
-  "",
-  "  #hadir-qr-print-sheet > b {",
-  "    align-self: center !important;",
-  "    transform: translateY(-74mm) !important;",
-  "    display: block !important;",
-  "    width: max-content !important;",
-  "    margin: 0 !important;",
-  "    font-family: 'Cairo', system-ui, sans-serif !important;",
-  "    font-size: 24px !important;",
-  "    line-height: 1.35 !important;",
-  "    font-weight: 800 !important;",
-  "    white-space: nowrap !important;",
-  "  }",
-  "",
-  "  #hadir-qr-print-sheet > div {",
-  "    align-self: center !important;",
-  "    transform: none !important;",
-  "    width: 122mm !important;",
-  "    height: 122mm !important;",
-  "    min-width: 122mm !important;",
-  "    min-height: 122mm !important;",
-  "    max-width: 122mm !important;",
-  "    max-height: 122mm !important;",
-  "    margin: 0 !important;",
-  "    padding: 4mm !important;",
-  "    box-sizing: border-box !important;",
-  "    border: 3mm solid #16a34a !important;",
-  "    border-radius: 8mm !important;",
-  "    background: #fff !important;",
-  "    box-shadow: 0 2mm 8mm rgba(22, 163, 74, 0.12) !important;",
-  "    overflow: hidden !important;",
-  "  }",
-  "",
-  "  #hadir-qr-print-sheet > div > div {",
-  "    width: 100% !important;",
-  "    height: 100% !important;",
-  "    min-width: 0 !important;",
-  "    min-height: 0 !important;",
-  "  }",
-  "",
-  "  #hadir-qr-print-sheet svg {",
-  "    width: 100% !important;",
-  "    height: 100% !important;",
-  "    display: block !important;",
-  "  }",
-  "",
-  "  #hadir-qr-print-sheet > div > div > div {",
-  "    width: 15mm !important;",
-  "    height: 15mm !important;",
-  "    border-radius: 4mm !important;",
-  "    border-width: 2mm !important;",
-  "    box-shadow: 0 1mm 4mm rgba(0, 0, 0, 0.18) !important;",
-  "  }",
-  "",
-  "  #hadir-qr-print-sheet > div > div > div img {",
-  "    width: 100% !important;",
-  "    height: 100% !important;",
-  "    object-fit: contain !important;",
-  "  }",
-  "",
-  "  #hadir-qr-print-sheet > small {",
-  "    align-self: center !important;",
-  "    transform: translateY(66mm) !important;",
-  "    display: block !important;",
-  "    width: max-content !important;",
-  "    margin: 0 !important;",
-  "    font-family: 'Cairo', system-ui, sans-serif !important;",
-  "    font-size: 15px !important;",
-  "    line-height: 1.5 !important;",
-  "    font-weight: 600 !important;",
-  "    direction: ltr !important;",
-  "    white-space: nowrap !important;",
-  "  }",
-  "}`;",
-  "",
-  "    let cleaned = false;",
-  "    const cleanup = () => {",
-  "      if (cleaned) return;",
-  "      cleaned = true;",
-  "      style.remove();",
-  "      if (originalNextSibling && originalNextSibling.parentNode === originalParent) {",
-  "        originalParent.insertBefore(sheet, originalNextSibling);",
-  "      } else {",
-  "        originalParent.appendChild(sheet);",
-  "      }",
-  "    };",
-  "",
-  '    window.addEventListener("afterprint", cleanup, { once: true });',
-  "    window.requestAnimationFrame(() => {",
-  "      window.requestAnimationFrame(() => {",
-  "        window.print();",
-  "      });",
-  "    });",
-  "  };",
-].join("\n");
+const printFunction = `  const printQr = () => {
+    const sheet = printRef.current;
+    if (!sheet) {
+      toast.error("تعذر تجهيز رمز QR للطباعة", "افتح قسم رمز الموقع ثم حاول مرة أخرى.");
+      return;
+    }
+
+    const originalParent = sheet.parentElement;
+    const originalNextSibling = sheet.nextSibling;
+    if (!originalParent) {
+      toast.error("تعذر تجهيز رمز QR للطباعة", "تعذر تحديد موضع بطاقة الطباعة.");
+      return;
+    }
+
+    document.body.appendChild(sheet);
+
+    const style = document.createElement("style");
+    style.id = "hadir-qr-print-style";
+    style.textContent = \`${String.raw`@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+  }
+
+  body {
+    color: #111 !important;
+    font-family: 'Cairo', system-ui, sans-serif !important;
+  }
+
+  body > *:not(#hadir-qr-print-sheet) {
+    display: none !important;
+  }
+
+  #hadir-qr-print-sheet,
+  #hadir-qr-print-sheet * {
+    visibility: visible !important;
+  }
+
+  body > #hadir-qr-print-sheet {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 210mm !important;
+    height: 292mm !important;
+    min-width: 210mm !important;
+    min-height: 292mm !important;
+    max-width: 210mm !important;
+    max-height: 292mm !important;
+    margin: 0 !important;
+    padding: 5mm 0 0 !important;
+    box-sizing: border-box !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr !important;
+    place-items: center !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #111 !important;
+    font-family: 'Cairo', system-ui, sans-serif !important;
+    text-align: center !important;
+    break-before: avoid !important;
+    break-after: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  #hadir-qr-print-sheet > b,
+  #hadir-qr-print-sheet > div,
+  #hadir-qr-print-sheet > small {
+    grid-area: 1 / 1 !important;
+    justify-self: center !important;
+  }
+
+  #hadir-qr-print-sheet > b {
+    align-self: center !important;
+    transform: translateY(-74mm) !important;
+    display: block !important;
+    width: max-content !important;
+    margin: 0 !important;
+    font-family: 'Cairo', system-ui, sans-serif !important;
+    font-size: 24px !important;
+    line-height: 1.35 !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+  }
+
+  #hadir-qr-print-sheet > div {
+    align-self: center !important;
+    transform: none !important;
+    width: 122mm !important;
+    height: 122mm !important;
+    min-width: 122mm !important;
+    min-height: 122mm !important;
+    max-width: 122mm !important;
+    max-height: 122mm !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    box-sizing: border-box !important;
+    border: 3mm solid #16a34a !important;
+    border-radius: 8mm !important;
+    background: #fff !important;
+    box-shadow: 0 2mm 8mm rgba(22, 163, 74, 0.12) !important;
+    overflow: hidden !important;
+  }
+
+  #hadir-qr-print-sheet > div > div {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  #hadir-qr-print-sheet svg {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  #hadir-qr-print-sheet > div > div > div {
+    width: 15mm !important;
+    height: 15mm !important;
+    border-radius: 4mm !important;
+    border-width: 2mm !important;
+    box-shadow: 0 1mm 4mm rgba(0, 0, 0, 0.18) !important;
+  }
+
+  #hadir-qr-print-sheet > div > div > div img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  #hadir-qr-print-sheet > small {
+    align-self: center !important;
+    transform: translateY(66mm) !important;
+    display: block !important;
+    width: max-content !important;
+    margin: 0 !important;
+    font-family: 'Cairo', system-ui, sans-serif !important;
+    font-size: 15px !important;
+    line-height: 1.5 !important;
+    font-weight: 600 !important;
+    direction: ltr !important;
+    white-space: nowrap !important;
+  }
+}`}`;
+    document.head.appendChild(style);
+
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      style.remove();
+
+      if (originalNextSibling && originalNextSibling.parentNode === originalParent) {
+        originalParent.insertBefore(sheet, originalNextSibling);
+      } else {
+        originalParent.appendChild(sheet);
+      }
+    };
+
+    window.addEventListener("afterprint", cleanup, { once: true });
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.print();
+      });
+    });
+  };`;
 
 source = source.slice(0, printStart) + printFunction + source.slice(resetStart);
 
@@ -244,4 +234,6 @@ if (printSheetMatch) {
 }
 
 writeFileSync(file, source, "utf8");
-console.log("ManagerSettings QR patch: uses a bounded 296mm A4 print canvas to prevent a trailing blank page.");
+console.log(
+  "ManagerSettings QR patch: uses a 292mm in-flow A4 print canvas with a 5mm top compensation to prevent trailing blank pages without moving the QR card.",
+);
