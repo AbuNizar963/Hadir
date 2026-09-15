@@ -65,21 +65,19 @@ const printCss = String.raw`@page {
 
   body > #hadir-qr-print-sheet {
     position: relative !important;
-    top: auto !important;
-    left: auto !important;
     width: 210mm !important;
-    height: 292mm !important;
-    min-width: 210mm !important;
-    min-height: 292mm !important;
     max-width: 210mm !important;
-    max-height: 292mm !important;
+    min-width: 210mm !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     margin: 0 !important;
-    padding: 5mm 0 0 !important;
+    padding: 80mm 0 0 !important;
     box-sizing: border-box !important;
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    grid-template-rows: 1fr !important;
-    place-items: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
     overflow: hidden !important;
     border: 0 !important;
     border-radius: 0 !important;
@@ -96,19 +94,12 @@ const printCss = String.raw`@page {
     page-break-inside: avoid !important;
   }
 
-  #hadir-qr-print-sheet > b,
-  #hadir-qr-print-sheet > div,
-  #hadir-qr-print-sheet > small {
-    grid-area: 1 / 1 !important;
-    justify-self: center !important;
-  }
-
   #hadir-qr-print-sheet > b {
-    align-self: center !important;
-    transform: translateY(-74mm) !important;
     display: block !important;
     width: max-content !important;
-    margin: 0 !important;
+    height: auto !important;
+    margin: 0 0 8mm !important;
+    padding: 0 !important;
     font-family: 'Cairo', system-ui, sans-serif !important;
     font-size: 24px !important;
     line-height: 1.35 !important;
@@ -117,8 +108,7 @@ const printCss = String.raw`@page {
   }
 
   #hadir-qr-print-sheet > div {
-    align-self: center !important;
-    transform: none !important;
+    display: block !important;
     width: 122mm !important;
     height: 122mm !important;
     min-width: 122mm !important;
@@ -133,6 +123,9 @@ const printCss = String.raw`@page {
     background: #fff !important;
     box-shadow: 0 2mm 8mm rgba(22, 163, 74, 0.12) !important;
     overflow: hidden !important;
+    flex: 0 0 122mm !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   #hadir-qr-print-sheet > div > div {
@@ -163,11 +156,11 @@ const printCss = String.raw`@page {
   }
 
   #hadir-qr-print-sheet > small {
-    align-self: center !important;
-    transform: translateY(66mm) !important;
     display: block !important;
     width: max-content !important;
-    margin: 0 !important;
+    height: auto !important;
+    margin: 2mm 0 0 !important;
+    padding: 0 !important;
     font-family: 'Cairo', system-ui, sans-serif !important;
     font-size: 15px !important;
     line-height: 1.5 !important;
@@ -237,5 +230,5 @@ if (printSheetMatch) {
 
 writeFileSync(file, source, "utf8");
 console.log(
-  "ManagerSettings QR patch: uses a 292mm in-flow A4 canvas with 5mm top compensation to prevent trailing blank pages while preserving the centered card.",
+  "ManagerSettings QR patch: uses intrinsic print height with a fixed top offset, avoiding a fixed A4-height canvas that can create a trailing blank page.",
 );
