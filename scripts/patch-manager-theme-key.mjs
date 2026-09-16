@@ -13,6 +13,8 @@ const notificationImport = 'import {\n  NOTIFICATIONS_CHANGED_EVENT,\n  type App
 const notificationServiceImport = 'import {\n  clearNotifications,\n  getNotifications,\n  markAllAsRead,\n  markAsRead as markNotificationAsRead,\n  removeNotification,\n  syncNotificationsFromD1,\n} from "@/lib/notifications";';
 const mergedNotificationImport = 'import {\n  NOTIFICATIONS_CHANGED_EVENT,\n  clearNotifications,\n  getNotifications,\n  markAllAsRead,\n  markAsRead as markNotificationAsRead,\n  removeNotification,\n  syncNotificationsFromD1,\n  type AppNotification,\n} from "@/lib/notifications";';
 const notificationDetailType = `type NotificationsChangedDetail = {\n  notificationIds?: string[];\n};`;
+const navigationType = `type ManagerNavItem = {\n  to: string;\n  label: string;\n  icon: typeof LayoutDashboard;\n  end?: boolean;\n  editRoles?: string[];\n};`;
+const navigationDefinition = `const NAV: ManagerNavItem[] = [\n  {\n    to: "/manager",\n    label: "لوحة التحكم",\n    icon: LayoutDashboard,\n    end: true,\n    editRoles: ["owner", "manager", "supervisor"],\n  },\n  {\n    to: "/manager/employees",\n    label: "الموظفون",\n    icon: Users,\n    editRoles: ["owner", "manager", "supervisor"],\n  },\n  {\n    to: "/manager/workforce",\n    label: "قوى العمل",\n    icon: ClipboardCheck,\n    editRoles: ["owner", "manager", "supervisor"],\n  },\n  {\n    to: "/manager/requests",\n    label: "الطلبات",\n    icon: ClipboardList,\n    editRoles: ["owner", "manager"],\n  },\n  {\n    to: "/manager/audit",\n    label: "التدقيق",\n    icon: Wrench,\n    editRoles: ["owner", "manager", "supervisor"],\n  },\n  {\n    to: "/manager/reports",\n    label: "التقارير",\n    icon: BarChart3,\n    editRoles: ["owner", "manager"],\n  },\n  {\n    to: "/manager/report-archive",\n    label: "أرشيف التقارير",\n    icon: Archive,\n    editRoles: ["owner", "manager"],\n  },\n  {\n    to: "/manager/settings",\n    label: "الإعدادات",\n    icon: Settings,\n    editRoles: ["owner"],\n  },\n];`;
 
 if (!source.includes(themeDeclaration)) {
   if (!source.includes("THEME_KEY")) {
@@ -66,6 +68,25 @@ if (!source.includes(notificationDetailType)) {
   );
 }
 
+if (!source.includes(navigationDefinition)) {
+  if (source.includes("const NAV:")) {
+    throw new Error(`An unexpected NAV definition already exists in ${file}.`);
+  }
+
+  if (!source.includes("const filteredNav = NAV.filter(")) {
+    throw new Error(`Expected NAV usage was not found in ${file}.`);
+  }
+
+  if (!source.includes(notificationDetailType)) {
+    throw new Error(`Notification detail type is missing from ${file}.`);
+  }
+
+  source = source.replace(
+    `${notificationDetailType}\n`,
+    `${notificationDetailType}\n\n${navigationType}\n\n${navigationDefinition}\n`,
+  );
+}
+
 if (source.split(themeDeclaration).length - 1 !== 1) {
   throw new Error(`Expected exactly one theme key declaration in ${file}.`);
 }
@@ -78,5 +99,13 @@ if (source.split(notificationDetailType).length - 1 !== 1) {
   throw new Error(`Expected exactly one notification detail type in ${file}.`);
 }
 
+if (source.split(navigationType).length - 1 !== 1) {
+  throw new Error(`Expected exactly one manager navigation type in ${file}.`);
+}
+
+if (source.split(navigationDefinition).length - 1 !== 1) {
+  throw new Error(`Expected exactly one manager navigation definition in ${file}.`);
+}
+
 fs.writeFileSync(filePath, source, "utf8");
-console.log("ManagerLayout theme and notification definitions normalized successfully.");
+console.log("ManagerLayout theme, notification, and navigation definitions normalized successfully.");
