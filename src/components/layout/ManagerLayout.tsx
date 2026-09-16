@@ -35,7 +35,10 @@ import {
   removeNotification,
   syncNotificationsFromD1,
 } from "@/lib/notifications";
-import type { AppNotification } from "@/lib/notifications";
+import {
+  NOTIFICATIONS_CHANGED_EVENT,
+  type AppNotification,
+} from "@/lib/notifications";
 import { getManagerSession, setManagerSession } from "@/lib/storage";
 import { backendLogout } from "@/lib/backend";
 import {
@@ -45,6 +48,10 @@ import {
 } from "@/lib/systemDiagnostics";
 
 const THEME_KEY = "hadir.theme";
+
+type NotificationsChangedDetail = {
+  notificationIds?: string[];
+};
 
 async function loadServerNotifications(): Promise<AppNotification[]> {
   await syncNotificationsFromD1();
