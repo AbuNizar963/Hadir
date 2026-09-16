@@ -54,6 +54,11 @@ const replacements = [
     from: "تعليم الكل كمقروء",
     to: "تحديد الكل كمقروء",
   },
+  {
+    file: "src/App.tsx",
+    from: "جاري استعادة جلسة الدخول…",
+    to: "جارٍ استعادة جلسة الدخول…",
+  },
 ];
 
 for (const replacement of replacements) {
