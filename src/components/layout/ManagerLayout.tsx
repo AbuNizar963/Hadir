@@ -44,6 +44,8 @@ import {
   type DiagnosticEntry,
 } from "@/lib/systemDiagnostics";
 
+const THEME_KEY = "hadir.theme";
+
 async function loadServerNotifications(): Promise<AppNotification[]> {
   await syncNotificationsFromD1();
   return getNotifications();
