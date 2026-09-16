@@ -61,14 +61,14 @@
   text-align: right;
 }
 
-/* Keep the theme submenu inside the notification-sized menu on touch screens. */
-.employee-shell .employee-utility-menu .absolute {
-  right: 0 !important;
-  left: auto !important;
-  top: 100% !important;
-  margin-top: 0.25rem !important;
-  margin-right: 0 !important;
-  max-width: calc(100vw - 1.5rem);
+/* Keep the theme options inside the hamburger flow so the panel grows with its content. */
+.employee-shell .employee-utility-menu .relative > .absolute {
+  position: static !important;
+  inset: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0.25rem 0 0 !important;
+  border-radius: 0.75rem;
 }
 
 @keyframes hadir-employee-menu-in {
