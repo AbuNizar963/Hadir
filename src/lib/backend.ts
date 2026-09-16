@@ -646,20 +646,25 @@ export async function getBackendEmployeeProfile() {
   }
 }
 export async function getBackendEmployees() {
-  const employees = await request<Employee[]>("/api/employees", {}, "admin");
-  const controls = await request<
-    Array<{
-      id: string;
-      isVip?: boolean;
-      autoCheckIn?: boolean;
-      autoCheckOut?: boolean;
-    }>
-  >("/api/manager/workforce-controls", {}, "admin").catch(() => []);
+  const [employees, controls] = await Promise.all([
+    request<Employee[]>("/api/employees", {}, "admin"),
+    request<
+      Array<{
+        id: string;
+        isVip?: boolean;
+        autoCheckIn?: boolean;
+        autoCheckOut?: boolean;
+      }>
+    >("/api/manager/workforce-controls", {}, "admin").catch(() => []),
+  ]);
+
   const byId = new Map(
     controls.map((control) => [String(control.id), control]),
   );
+
   return employees.map((employee) => {
     const control = byId.get(String(employee.id));
+
     return {
       ...employee,
       ...(control
