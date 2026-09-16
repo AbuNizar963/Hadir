@@ -43,9 +43,15 @@ if (matches.length !== 1) {
 }
 
 const currentFunction = matches[0][0];
+const parallelMarker = "const [employees, controls] = await Promise.all([";
+const controlsPathMarker = '"/api/manager/workforce-controls"';
+const partitionMarker = "PARTITION BY";
+const latestAttendanceMarker = "const byId = new Map";
+
 const alreadyParallel =
-  currentFunction.includes("const [employees, controls] = await Promise.all([") &&
-  currentFunction.includes('"/api/manager/workforce-controls"');
+  currentFunction.includes(parallelMarker) &&
+  currentFunction.includes(controlsPathMarker) &&
+  currentFunction.includes(latestAttendanceMarker) === false;
 
 if (alreadyParallel) {
   console.log(
@@ -60,11 +66,9 @@ const expectedEmployeeRead = currentFunction.includes(
 const expectedControlsRead = currentFunction.includes(
   'const controls = await request<',
 );
-const expectedControlsPath = currentFunction.includes(
-  '"/api/manager/workforce-controls"',
-);
+const expectedControlsPath = currentFunction.includes(controlsPathMarker);
 const expectedMerge =
-  currentFunction.includes("const byId = new Map") &&
+  currentFunction.includes(latestAttendanceMarker) === true &&
   currentFunction.includes("avatar: employeeAvatarUrl(employee.avatar, employee.id)");
 
 if (
@@ -92,8 +96,8 @@ const next =
   source.slice(functionStart + currentFunction.length);
 
 if (
-  !next.includes("const [employees, controls] = await Promise.all([") ||
-  !next.includes('"/api/manager/workforce-controls"') ||
+  !next.includes(parallelMarker) ||
+  !next.includes(controlsPathMarker) ||
   next.includes('const employees = await request<Employee[]>("/api/employees", {}, "admin");')
 ) {
   throw new Error(
