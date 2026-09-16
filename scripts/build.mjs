@@ -49,6 +49,7 @@ run("node", ["scripts/patch-manager-settings-locations-fixes.mjs"]);
 run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-screen.mjs"]);
 run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
+run("node", ["scripts/patch-manager-settings-location-accuracy.mjs"]);
 
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
 run("node", ["scripts/patch-qibla-page.mjs"]);
