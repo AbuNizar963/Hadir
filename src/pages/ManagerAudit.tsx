@@ -89,9 +89,7 @@ function exportExcel(rows: AuditEntry[], scope: "filtered" | "all") {
     [
       "عدد الموظفين",
       new Set(
-        rows
-          .map((entry) => entry.jobNumber || entry.actorName)
-          .filter(Boolean),
+        rows.map((entry) => entry.jobNumber || entry.actorName).filter(Boolean),
       ).size,
     ],
     [
