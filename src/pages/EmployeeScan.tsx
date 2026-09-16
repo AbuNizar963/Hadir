@@ -295,7 +295,7 @@ export default function EmployeeScan() {
                 <div className="mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/60 p-4 text-center text-white backdrop-blur-md">
                   <div className="flex items-center justify-center gap-2 text-sm font-bold">
                     <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary" />
-                    {cameraReady ? "جاري البحث عن رمز QR..." : "جاري تشغيل الكاميرا..."}
+                    {cameraReady ? "جارٍ البحث عن رمز QR..." : "جارٍ تشغيل الكاميرا..."}
                   </div>
                   <p className="mt-1 text-[11px] leading-5 text-white/70">
                     لن يتم طلب الموقع إلا بعد قراءة رمز QR بنجاح.
@@ -317,7 +317,7 @@ export default function EmployeeScan() {
         {step === "locating" && (
           <StatusCard
             icon="⌖"
-            title="جاري تحديد موقعك"
+            title="جارٍ تحديد موقعك"
             description="يرجى الانتظار لحظات حتى يتم الحصول على موقع جهازك والتحقق من نطاق مقر العمل."
             loading
           />
@@ -326,7 +326,7 @@ export default function EmployeeScan() {
         {step === "submitting" && (
           <StatusCard
             icon="…"
-            title="جاري تسجيل العملية"
+            title="جارٍ تسجيل العملية"
             description="تم تحديد موقعك. جارٍ الآن التحقق النهائي وحفظ العملية في النظام."
             loading
           />

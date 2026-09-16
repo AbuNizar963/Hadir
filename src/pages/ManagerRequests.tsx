@@ -302,7 +302,7 @@ export default function ManagerRequests() {
 
       {loading ? (
         <div className="hud-card p-5 text-center mt-4">
-          جاري تحميل الطلبات…
+          جارٍ تحميل الطلبات…
         </div>
       ) : (
         <>
