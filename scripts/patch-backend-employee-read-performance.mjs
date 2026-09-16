@@ -45,13 +45,10 @@ if (matches.length !== 1) {
 const currentFunction = matches[0][0];
 const parallelMarker = "const [employees, controls] = await Promise.all([";
 const controlsPathMarker = '"/api/manager/workforce-controls"';
-const partitionMarker = "PARTITION BY";
-const latestAttendanceMarker = "const byId = new Map";
 
 const alreadyParallel =
   currentFunction.includes(parallelMarker) &&
-  currentFunction.includes(controlsPathMarker) &&
-  currentFunction.includes(latestAttendanceMarker) === false;
+  currentFunction.includes(controlsPathMarker);
 
 if (alreadyParallel) {
   console.log(
@@ -68,7 +65,7 @@ const expectedControlsRead = currentFunction.includes(
 );
 const expectedControlsPath = currentFunction.includes(controlsPathMarker);
 const expectedMerge =
-  currentFunction.includes(latestAttendanceMarker) === true &&
+  currentFunction.includes("const byId = new Map") &&
   currentFunction.includes("avatar: employeeAvatarUrl(employee.avatar, employee.id)");
 
 if (
