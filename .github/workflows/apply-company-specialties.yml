@@ -32,6 +32,9 @@ jobs:
       - name: Apply workforce live attendance read optimization
         run: node scripts/patch-workforce-live-attendance-read.mjs
 
+      - name: Apply backend employee read performance optimization
+        run: node scripts/patch-backend-employee-read-performance.mjs
+
       - name: Format frontend source
         run: |
           set -euo pipefail
@@ -59,7 +62,7 @@ jobs:
           set -euo pipefail
           git config user.name "HADIR Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/types/index.ts src/components/settings/CompanySpecialtiesPanel.tsx src/pages/ManagerSettings.tsx src/pages/ManagerEmployees.tsx src/pages/ManagerReports.tsx src/pages/EmployeeHome.tsx src/pages/EmployeeScan.tsx src/pages/EmployeeNotifications.tsx src/pages/ReportArchive.tsx src/pages/ManagerRequests.tsx src/App.tsx src/lib/backend.ts src/lib/cloudDataSync.ts src/pages/ManagerAudit.tsx src/pages/ManagerWorkforceControls.tsx public/report-print.css backend/src/recovery.ts backend/src/index.ts backend/src/entry.ts backend/src/ai-entry.ts backend/src/employee-save-production-gateway.ts backend/src/workforce.ts backend/src/device-rebind-api.ts backend/src/requests.ts backend/src/attendance-engine-commands.ts backend/src/report-archive.ts backend/src/deviceSecurity.ts backend/src/notification-api.ts scripts/apply_job_number_update.py scripts/patch-arabic-language.mjs scripts/patch-manager-theme-key.mjs scripts/patch-notification-network-centralization.mjs scripts/patch-workforce-live-attendance-read.mjs src/components/layout/ManagerLayout.tsx src/components/layout/EmployeeLayout.tsx
+          git add src/types/index.ts src/components/settings/CompanySpecialtiesPanel.tsx src/pages/ManagerSettings.tsx src/pages/ManagerEmployees.tsx src/pages/ManagerReports.tsx src/pages/EmployeeHome.tsx src/pages/EmployeeScan.tsx src/pages/EmployeeNotifications.tsx src/pages/ReportArchive.tsx src/pages/ManagerRequests.tsx src/App.tsx src/lib/backend.ts src/lib/cloudDataSync.ts src/pages/ManagerAudit.tsx src/pages/ManagerWorkforceControls.tsx public/report-print.css backend/src/recovery.ts backend/src/index.ts backend/src/entry.ts backend/src/ai-entry.ts backend/src/employee-save-production-gateway.ts backend/src/workforce.ts backend/src/device-rebind-api.ts backend/src/requests.ts backend/src/attendance-engine-commands.ts backend/src/report-archive.ts backend/src/deviceSecurity.ts backend/src/notification-api.ts scripts/apply_job_number_update.py scripts/patch-arabic-language.mjs scripts/patch-manager-theme-key.mjs scripts/patch-notification-network-centralization.mjs scripts/patch-workforce-live-attendance-read.mjs scripts/patch-backend-employee-read-performance.mjs src/components/layout/ManagerLayout.tsx src/components/layout/EmployeeLayout.tsx
           if git diff --cached --quiet; then echo "No changes needed"; exit 0; fi
           git commit -m "chore: apply canonical repository patches"
           git push
