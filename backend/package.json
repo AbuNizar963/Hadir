@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "check": "node scripts/patch-pdf-filename-metadata.mjs && node scripts/patch-company-logo-cache-version.mjs && node scripts/patch-company-logo-settings-read.mjs && wrangler deploy --dry-run",
+    "check": "node scripts/patch-pdf-filename-metadata.mjs && node scripts/patch-company-logo-cache-version.mjs && node scripts/patch-company-logo-settings-read.mjs && node scripts/patch-employee-delete-integrity.mjs && wrangler deploy --dry-run",
     "format": "npx --yes prettier@3.6.2 --write src/index.ts src/entry.ts src/ai-entry.ts src/employee-save-production-gateway.ts src/workforce.ts",
     "deploy": "wrangler deploy",
     "migrate": "wrangler d1 migrations apply Hadir --remote"
