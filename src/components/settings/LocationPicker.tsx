@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { getCurrentPosition } from "@/lib/geo";
 
 type LocationPickerProps = {
   lat: number;
@@ -17,7 +18,12 @@ const SATELLITE_ATTRIBUTION = "© Esri, Maxar, Earthstar Geographics";
 function validCoordinate(lat: unknown, lng: unknown): boolean {
   const latitude = Number(lat);
   const longitude = Number(lng);
-  return Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+  return Number.isFinite(latitude)
+    && Number.isFinite(longitude)
+    && latitude >= -90
+    && latitude <= 90
+    && longitude >= -180
+    && longitude <= 180;
 }
 
 export default function LocationPicker({ lat, lng, radiusMeters, onChange, className = "" }: LocationPickerProps) {
@@ -47,29 +53,34 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
       onAdd(map: L.Map) {
         const button = L.DomUtil.create("button", "hadir-map-location-control");
         button.type = "button";
-        button.title = "تحديد موقعي";
-        button.setAttribute("aria-label", "تحديد موقعي");
+        button.title = "تحديد موقعي بدقة";
+        button.setAttribute("aria-label", "تحديد موقعي بدقة");
         button.innerHTML = "<span aria-hidden=\"true\">⌾</span>";
         L.DomEvent.disableClickPropagation(button);
         L.DomEvent.on(button, "click", (event) => {
           L.DomEvent.stop(event);
-          if (!("geolocation" in navigator)) return;
+          if (disposed) return;
           button.disabled = true;
           button.setAttribute("aria-busy", "true");
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
+
+          void getCurrentPosition()
+            .then((position) => {
               if (!disposed) {
-                map.setView([position.coords.latitude, position.coords.longitude], Math.max(map.getZoom(), 17), { animate: true });
+                map.setView(
+                  [position.lat, position.lng],
+                  Math.max(map.getZoom(), 18),
+                  { animate: true },
+                );
+                onChangeRef.current(position.lat, position.lng);
               }
+            })
+            .catch((error) => {
+              console.warn("تعذر تحديد الموقع بدقة:", error);
+            })
+            .finally(() => {
               button.disabled = false;
               button.removeAttribute("aria-busy");
-            },
-            () => {
-              button.disabled = false;
-              button.removeAttribute("aria-busy");
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-          );
+            });
         });
         return button;
       },
@@ -81,10 +92,6 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
       try {
         if (disposed || !host.isConnected || mapRef.current) return;
 
-        // Read the latest coordinates at the moment the map is created.
-        // Backend settings may arrive after this component mounts but before
-        // IntersectionObserver initializes the map; never fall back to stale
-        // coordinates captured by the first render.
         const initialLat = Number(latRef.current);
         const initialLng = Number(lngRef.current);
         const initialRadius = Number(radiusMetersRef.current);
@@ -209,7 +216,7 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
       `}</style>
       <div ref={hostRef} className="h-64 w-full sm:h-80" aria-label="خريطة القمر الصناعي لتحديد الموقع" />
       <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-card/90 px-3 py-2 text-[10px] text-muted-foreground">
-        <span>اضغط زر ⌾ لتحديد موقعك، أو اضغط على الخريطة لاختيار النقطة</span>
+        <span>اضغط زر ⌾ للحصول على GPS دقيق، أو اضغط على الخريطة لاختيار النقطة</span>
         <span className="mono">{validCoordinate(lat, lng) ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}` : "—"}</span>
       </div>
     </div>
