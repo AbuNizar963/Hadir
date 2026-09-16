@@ -89,7 +89,9 @@ function exportExcel(rows: AuditEntry[], scope: "filtered" | "all") {
     [
       "عدد الموظفين",
       new Set(
-        rows.map((entry) => entry.jobNumber || entry.actorName).filter(Boolean),
+        rows
+          .map((entry) => entry.jobNumber || entry.actorName)
+          .filter(Boolean),
       ).size,
     ],
     [
@@ -174,7 +176,7 @@ export default function ManagerAudit() {
       if (action !== "all" && entry.action !== action) return false;
       if (
         search &&
-        !`${entry.actorName ?? ""} ${entry.jobNumber ?? ""} ${entry.reason ?? ""}`
+        !`${entry.actorName ?? ""} ${entry.jobNumber ?? ""} ${entry.reason ?? ""} ${actionLabel(entry.action)} ${entry.deviceId ?? ""} ${entry.ip ?? ""}`
           .toLowerCase()
           .includes(search)
       ) {
