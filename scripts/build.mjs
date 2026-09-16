@@ -52,6 +52,7 @@ run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
 run("node", ["scripts/patch-manager-settings-location-accuracy.mjs"]);
 
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
+run("node", ["scripts/patch-manager-employees-performance.mjs"]);
 run("node", ["scripts/patch-qibla-page.mjs"]);
 run("node", ["scripts/patch-employee-center-loading.mjs"]);
 run("node", ["scripts/patch-manager-employee-edit-panel.mjs"]);
