@@ -3,8 +3,6 @@ import { readFileSync, writeFileSync } from "node:fs";
 const fileUrl = new URL("../src/lib/backend.ts", import.meta.url);
 const source = readFileSync(fileUrl, "utf8");
 
-const legacy = `export async function getBackendEmployees() { const employees = await request<Employee[]>("/api/employees", {}, "admin"); const controls = await request<Array<{ id: string; isVip?: boolean; autoCheckIn?: boolean; autoCheckOut?: boolean }>>("/api/manager/workforce-controls", {}, "admin").catch(() => []); const byId = new Map(controls.map((control) => [String(control.id), control])); return employees.map((employee) => { const control = byId.get(String(employee.id)); return { ...employee, ...(control ? { isVip: Boolean(control.isVip), autoCheckIn: Boolean(control.autoCheckIn), autoCheckOut: Boolean(control.autoCheckOut) } : {}), avatar: employeeAvatarUrl(employee.avatar, employee.id) }; }); }`;
-
 const optimized = `export async function getBackendEmployees() {
   const [employees, controls] = await Promise.all([
     request<Employee[]>("/api/employees", {}, "admin"),
@@ -34,39 +32,69 @@ const optimized = `export async function getBackendEmployees() {
   });
 }`;
 
-function countOccurrences(value, fragment) {
-  return value.split(fragment).length - 1;
-}
+const functionPattern =
+  /export async function getBackendEmployees\(\) \{[\s\S]*?\n\}\n(?=export async function createBackendEmployee)/g;
+const matches = [...source.matchAll(functionPattern)];
 
-const functionMarker = "export async function getBackendEmployees()";
-const parallelMarker = "const [employees, controls] = await Promise.all([";
-const controlsPathMarker = '"/api/manager/workforce-controls"';
-
-if (source.includes(parallelMarker) && source.includes(controlsPathMarker)) {
-  const functionStart = source.indexOf(functionMarker);
-  const parallelStart = source.indexOf(parallelMarker);
-
-  if (functionStart >= 0 && parallelStart > functionStart) {
-    console.log(
-      "Backend employee read performance patch: already applied; skipping.",
-    );
-    process.exit(0);
-  }
-}
-
-const legacyOccurrences = countOccurrences(source, legacy);
-if (legacyOccurrences !== 1) {
+if (matches.length !== 1) {
   throw new Error(
-    `Backend employee read performance patch: expected exactly one legacy getBackendEmployees implementation, found ${legacyOccurrences}; refusing unsafe replacement.`,
+    `Backend employee read performance patch: expected exactly one getBackendEmployees function, found ${matches.length}; refusing unsafe replacement.`,
   );
 }
 
-const next = source.replace(legacy, optimized);
+const currentFunction = matches[0][0];
+const alreadyParallel =
+  currentFunction.includes("const [employees, controls] = await Promise.all([") &&
+  currentFunction.includes('"/api/manager/workforce-controls"');
+
+if (alreadyParallel) {
+  console.log(
+    "Backend employee read performance patch: already applied; skipping.",
+  );
+  process.exit(0);
+}
+
+const expectedEmployeeRead = currentFunction.includes(
+  'const employees = await request<Employee[]>("/api/employees", {}, "admin");',
+);
+const expectedControlsRead = currentFunction.includes(
+  'const controls = await request<',
+);
+const expectedControlsPath = currentFunction.includes(
+  '"/api/manager/workforce-controls"',
+);
+const expectedMerge =
+  currentFunction.includes("const byId = new Map") &&
+  currentFunction.includes("avatar: employeeAvatarUrl(employee.avatar, employee.id)");
 
 if (
-  !next.includes(parallelMarker) ||
-  !next.includes(controlsPathMarker) ||
-  next.includes(legacy)
+  !expectedEmployeeRead ||
+  !expectedControlsRead ||
+  !expectedControlsPath ||
+  !expectedMerge
+) {
+  throw new Error(
+    "Backend employee read performance patch: current getBackendEmployees implementation does not match the expected sequential-read shape; refusing unsafe replacement.",
+  );
+}
+
+const functionStart = matches[0].index;
+if (functionStart == null) {
+  throw new Error(
+    "Backend employee read performance patch: function location could not be determined; refusing unsafe replacement.",
+  );
+}
+
+const next =
+  source.slice(0, functionStart) +
+  optimized +
+  "\n" +
+  source.slice(functionStart + currentFunction.length);
+
+if (
+  !next.includes("const [employees, controls] = await Promise.all([") ||
+  !next.includes('"/api/manager/workforce-controls"') ||
+  next.includes('const employees = await request<Employee[]>("/api/employees", {}, "admin");')
 ) {
   throw new Error(
     "Backend employee read performance patch: post-replacement validation failed; refusing partial write.",
