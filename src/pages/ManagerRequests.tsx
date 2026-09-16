@@ -135,10 +135,7 @@ async function markRelatedRequestNotificationsRead(request: any) {
         return title === "طلب إعادة ربط هاتف";
       }
 
-      return (
-        title === "طلب موظف جديد" &&
-        body.includes(requestLabel)
-      );
+      return title === "طلب موظف جديد" && body.includes(requestLabel);
     })
     .map((notification) => String(notification.id || ""))
     .filter(Boolean);
@@ -158,7 +155,11 @@ async function markRelatedRequestNotificationsRead(request: any) {
     ),
   );
 
-  window.dispatchEvent(new Event("hadir:notifications-changed"));
+  window.dispatchEvent(
+    new CustomEvent("hadir:notifications-changed", {
+      detail: { notificationIds: matchingIds },
+    }),
+  );
 }
 
 export default function ManagerRequests() {
