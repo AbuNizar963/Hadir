@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { XLSX, autoFitColumns, styleExcelTable, styleReportWorkbook, setExcelRtl, type ExcelCell } from "@/lib/excelExport";
+import {
+  XLSX,
+  autoFitColumns,
+  styleExcelTable,
+  styleReportWorkbook,
+  setExcelRtl,
+  type ExcelCell,
+} from "@/lib/excelExport";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getAudit } from "@/lib/storage";
 import { getBackendAudit } from "@/lib/backend";
@@ -26,8 +33,8 @@ const ACTIONS: Record<AuditEntry["action"], string> = {
 
 function safeAudit(value: unknown): AuditEntry[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
-    (entry): entry is AuditEntry => Boolean(entry && typeof entry === "object"),
+  return value.filter((entry): entry is AuditEntry =>
+    Boolean(entry && typeof entry === "object"),
   );
 }
 
@@ -80,9 +87,7 @@ function exportExcel(rows: AuditEntry[], scope: "filtered" | "all") {
     [
       "عدد الموظفين",
       new Set(
-        rows
-          .map((entry) => entry.jobNumber || entry.actorName)
-          .filter(Boolean),
+        rows.map((entry) => entry.jobNumber || entry.actorName).filter(Boolean),
       ).size,
     ],
     [
@@ -99,10 +104,12 @@ function exportExcel(rows: AuditEntry[], scope: "filtered" | "all") {
     headers,
     ...body,
   ]);
-  wsData["!merges"] = [{
-    s: { r: 0, c: 0 },
-    e: { r: 0, c: headers.length - 1 },
-  }];
+  wsData["!merges"] = [
+    {
+      s: { r: 0, c: 0 },
+      e: { r: 0, c: headers.length - 1 },
+    },
+  ];
   wsData["!autofilter"] = {
     ref: `A3:${XLSX.utils.encode_col(headers.length - 1)}${Math.max(
       3,
@@ -299,7 +306,10 @@ export default function ManagerAudit() {
             <tbody>
               {loading ? (
                 <tr>
-                  <Td colSpan={8} className="py-8 text-center text-muted-foreground">
+                  <Td
+                    colSpan={8}
+                    className="py-8 text-center text-muted-foreground"
+                  >
                     جارٍ تحميل سجل التدقيق…
                   </Td>
                 </tr>
@@ -331,7 +341,9 @@ export default function ManagerAudit() {
                       <Td className="text-xs">{actionLabel(entry.action)}</Td>
                       <Td>
                         {entry.result === "success" ? (
-                          <span className="badge bg-primary/15 text-primary">نجاح</span>
+                          <span className="badge bg-primary/15 text-primary">
+                            نجاح
+                          </span>
                         ) : (
                           <span className="badge bg-destructive/15 text-destructive">
                             رفض

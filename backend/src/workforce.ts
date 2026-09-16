@@ -326,17 +326,10 @@ export async function handleWorkforce(
     ]);
     const att = await rows(
       env.DB,
-      "SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=datetime('now','-1 day') ORDER BY timestamp DESC LIMIT 5000",
+      "SELECT employee_id AS employeeId,type,timestamp FROM (SELECT employee_id,type,timestamp,ROW_NUMBER() OVER (PARTITION BY employee_id ORDER BY timestamp DESC) AS rowNumber FROM attendance WHERE timestamp>=datetime('now','-1 day')) WHERE rowNumber=1",
     );
-    const checkedIn = new Set(
-      (att as any[])
-        .filter((x) => x.type === "check-in")
-        .map((x) => x.employeeId),
-    );
-    const checkedOut = new Set(
-      (att as any[])
-        .filter((x) => x.type === "check-out")
-        .map((x) => x.employeeId),
+    const latestAttendance = new Map(
+      (att as any[]).map((x) => [String(x.employeeId), x]),
     );
     const active = (employees as any[]).filter((x) => x.status === "active");
     return J({
@@ -345,9 +338,11 @@ export async function handleWorkforce(
         total: employees.length,
         active: active.length,
         checkedIn: active.filter(
-          (x) => checkedIn.has(x.id) && !checkedOut.has(x.id),
+          (x) => latestAttendance.get(String(x.id))?.type === "check-in",
         ).length,
-        checkedOut: active.filter((x) => checkedOut.has(x.id)).length,
+        checkedOut: active.filter(
+          (x) => latestAttendance.get(String(x.id))?.type === "check-out",
+        ).length,
       },
       employees,
       notifications,

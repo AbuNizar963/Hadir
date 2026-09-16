@@ -157,9 +157,7 @@ export default function ManagerWorkforceControls() {
       await load();
       setError("");
     } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "تعذر تنفيذ العملية",
-      );
+      setError(error instanceof Error ? error.message : "تعذر تنفيذ العملية");
     } finally {
       setBusy(null);
     }
@@ -231,7 +229,9 @@ export default function ManagerWorkforceControls() {
                   <div className="rounded-xl border border-border/60 p-2">
                     <span className="text-muted-foreground">النوع</span>
                     <div className="mt-1 font-bold">
-                      {employee.scheduleType === "ROTATION" ? "تناوبي" : "إداري"}
+                      {employee.scheduleType === "ROTATION"
+                        ? "تناوبي"
+                        : "إداري"}
                     </div>
                   </div>
                 </div>
