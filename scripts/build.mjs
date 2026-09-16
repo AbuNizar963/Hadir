@@ -52,6 +52,7 @@ run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
 run("node", ["scripts/patch-manager-settings-location-accuracy.mjs"]);
 run("node", ["scripts/patch-backend-employee-read-performance.mjs"]);
 run("node", ["scripts/patch-backend-request-retry-safety.mjs"]);
+run("node", ["scripts/patch-workforce-live-attendance-read.mjs"]);
 
 run("node", ["scripts/patch-manager-employee-locations.mjs"]);
 run("node", ["scripts/patch-manager-employees-performance.mjs"]);
