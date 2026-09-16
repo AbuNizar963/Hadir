@@ -126,12 +126,23 @@
   white-space: nowrap;
 }
 
-.manager-shell .manager-utility-menu .absolute {
-  right: 0 !important;
-  left: auto !important;
-  top: 100% !important;
-  margin-top: 0.25rem !important;
-  margin-right: 0 !important;
+/* Keep the theme choices in normal document flow so the menu grows to fit them. */
+.manager-shell .manager-utility-menu .relative {
+  width: 100%;
+}
+
+.manager-shell .manager-utility-menu .relative > .absolute {
+  position: static !important;
+  inset: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0.25rem 0 0 !important;
+  padding: 0.25rem !important;
+  transform: none !important;
+}
+
+.manager-shell .manager-utility-menu .relative > .absolute button {
+  min-height: 42px;
 }
 
 /* A selected Settings category is a viewport-level workspace below the two manager bars. */
@@ -254,6 +265,14 @@
     max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h)) - 18px) !important;
     padding-bottom: 0.5rem !important;
     border-radius: 16px !important;
+  }
+
+  .manager-shell .manager-brand-row {
+    min-height: 72px;
+  }
+
+  .manager-shell .manager-utility-menu .relative > .absolute {
+    margin-top: 0.25rem !important;
   }
 
   .manager-shell .settings-detail-screen {
