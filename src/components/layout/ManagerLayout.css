@@ -67,19 +67,22 @@
   }
 }
 
-/* The hamburger menu is a compact floating panel anchored to its trigger. */
+/* The hamburger opens in the same viewport workspace geometry as notifications. */
 .manager-shell .manager-topbar .manager-tool[aria-label="القائمة"] {
   anchor-name: --hadir-manager-menu-trigger;
 }
 
 .manager-shell .manager-utility-menu {
   position: fixed !important;
-  inset: auto !important;
-  z-index: 70 !important;
-  width: max-content !important;
-  min-width: 10rem;
-  max-width: min(18rem, calc(100vw - 1rem));
-  max-height: min(60vh, 24rem);
+  top: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 12px) !important;
+  left: max(12px, env(safe-area-inset-left)) !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 100 !important;
+  width: 24rem !important;
+  min-width: 0 !important;
+  max-width: calc(100vw - 1.5rem) !important;
+  max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h)) - 24px) !important;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -88,11 +91,19 @@
   border: 1px solid hsl(var(--border) / 0.75);
   border-radius: 1rem;
   background: hsl(var(--card) / 0.98);
-  box-shadow: 0 18px 42px hsl(var(--foreground) / 0.2);
-  animation: hadir-overlay-down 0.16s ease-out both;
-  position-anchor: --hadir-manager-menu-trigger;
-  position-area: left center;
-  position-try: right center, bottom center, top center;
+  color: hsl(var(--card-foreground));
+  box-shadow: 0 24px 70px hsl(var(--foreground) / 0.28);
+  animation: hadir-overlay-down 0.18s ease-out both;
+  transform: none;
+}
+
+.manager-shell .manager-utility-menu::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: hsl(0 0% 0% / 0.5);
+  pointer-events: none;
 }
 
 .manager-shell .manager-utility-menu > div {
@@ -115,14 +126,12 @@
   white-space: nowrap;
 }
 
-/* Fallback for browsers without CSS anchor positioning. */
-@supports not (position-anchor: --hadir-manager-menu-trigger) {
-  .manager-shell .manager-utility-menu {
-    top: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 0.5rem) !important;
-    right: 0.75rem !important;
-    bottom: auto !important;
-    left: auto !important;
-  }
+.manager-shell .manager-utility-menu .absolute {
+  right: 0 !important;
+  left: auto !important;
+  top: 100% !important;
+  margin-top: 0.25rem !important;
+  margin-right: 0 !important;
 }
 
 /* A selected Settings category is a viewport-level workspace below the two manager bars. */
@@ -238,9 +247,13 @@
   }
 
   .manager-shell .manager-utility-menu {
-    max-width: min(18rem, calc(100vw - 1rem));
-    max-height: min(55vh, 22rem);
+    top: calc(var(--hadir-manager-topbar-h, var(--manager-topbar-h)) + 8px) !important;
+    left: max(10px, env(safe-area-inset-left)) !important;
+    width: min(30rem, calc(100vw - 20px)) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - var(--hadir-manager-topbar-h, var(--manager-topbar-h)) - 18px) !important;
     padding-bottom: 0.5rem !important;
+    border-radius: 16px !important;
   }
 
   .manager-shell .settings-detail-screen {
