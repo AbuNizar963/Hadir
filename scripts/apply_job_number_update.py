@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Production-safe/idempotent: normalize only the exact job-number patch route.
 # Never replace source files wholesale and never touch historical attendance rows.
+# Every mutation below is marker-based and fails closed when the expected source shape changes.
 
 def patch_index():
     target = ROOT / "backend/src/index.ts"
@@ -77,21 +78,3 @@ def patch_keyboard_fields():
         print("manager employee job-number keyboard patch already present")
     else:
         raise SystemExit("Refusing unsafe keyboard patch: ManagerEmployees job-number marker was not found")
-
-    login = ROOT / "src/pages/EmployeeLogin.tsx"
-    text = login.read_text(encoding="utf-8")
-    old = 'type="text" inputMode="numeric" autoComplete="username" className="input w-full p-3.5 rounded-2xl border border-border bg-secondary/45 text-base" value={jobNumber} onChange={e=>setJobNumber(e.target.value)} placeholder="مثال: 1001"'
-    new = 'type="text" inputMode="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" className="input w-full p-3.5 rounded-2xl border border-border bg-secondary/45 text-base" value={jobNumber} onChange={e=>setJobNumber(e.target.value)} placeholder="مثال: D718075"'
-    if old in text:
-        text = text.replace(old, new, 1)
-        login.write_text(text, encoding="utf-8")
-        print("employee login job-number keyboard/inputMode patched")
-    elif 'type="text" inputMode="text" autoComplete="username" autoCapitalize="none" autoCorrect="off"' in text:
-        print("employee login job-number keyboard patch already present")
-    else:
-        raise SystemExit("Refusing unsafe keyboard patch: EmployeeLogin job-number marker was not found")
-
-
-patch_index()
-patch_recovery()
-patch_keyboard_fields()
