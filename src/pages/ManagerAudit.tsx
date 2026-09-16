@@ -21,6 +21,8 @@ const ACTIONS: Record<AuditEntry["action"], string> = {
   "check-in": "حضور",
   "check-out": "انصراف",
   "device-bound": "ربط جهاز",
+  "device-bind": "محاولة ربط جهاز",
+  "workforce-controls": "تحكم قوى العمل",
   "manager-login": "دخول مدير",
   "manager-login-failed": "دخول مدير فاشل",
   "supervisor-login": "دخول مشرف",
@@ -87,7 +89,9 @@ function exportExcel(rows: AuditEntry[], scope: "filtered" | "all") {
     [
       "عدد الموظفين",
       new Set(
-        rows.map((entry) => entry.jobNumber || entry.actorName).filter(Boolean),
+        rows
+          .map((entry) => entry.jobNumber || entry.actorName)
+          .filter(Boolean),
       ).size,
     ],
     [
