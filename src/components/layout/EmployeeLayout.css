@@ -1,5 +1,6 @@
 .employee-shell {
   --employee-menu-gap: 0.5rem;
+  --employee-topbar-h: 124px;
 }
 
 .employee-shell .employee-menu-trigger {
@@ -9,7 +10,7 @@
 /* The hamburger uses the same viewport panel geometry as the notifications workspace. */
 .employee-shell .employee-utility-menu {
   position: fixed !important;
-  top: 88px !important;
+  top: calc(var(--employee-topbar-h) + 12px) !important;
   left: max(12px, env(safe-area-inset-left)) !important;
   right: auto !important;
   bottom: auto !important;
@@ -17,7 +18,7 @@
   width: 24rem;
   min-width: 0;
   max-width: calc(100vw - 1.5rem);
-  max-height: calc(100dvh - 112px);
+  max-height: calc(100dvh - var(--employee-topbar-h) - 24px);
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -82,12 +83,16 @@
 }
 
 @media (max-width: 767px) {
+  .employee-shell {
+    --employee-topbar-h: 124px;
+  }
+
   .employee-shell .employee-utility-menu {
-    top: 84px !important;
+    top: calc(var(--employee-topbar-h) + 8px) !important;
     left: max(10px, env(safe-area-inset-left)) !important;
     width: min(30rem, calc(100vw - 20px));
     max-width: calc(100vw - 20px);
-    max-height: calc(100dvh - 102px);
+    max-height: calc(100dvh - var(--employee-topbar-h) - 18px);
     border-radius: 16px;
   }
 }
