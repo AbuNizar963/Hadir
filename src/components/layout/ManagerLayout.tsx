@@ -28,15 +28,13 @@ import SessionWelcome from "@/components/SessionWelcome";
 import "./ManagerLayout.css";
 import { cn } from "@/lib/utils";
 import {
+  NOTIFICATIONS_CHANGED_EVENT,
   clearNotifications,
   getNotifications,
   markAllAsRead,
   markAsRead as markNotificationAsRead,
   removeNotification,
   syncNotificationsFromD1,
-} from "@/lib/notifications";
-import {
-  NOTIFICATIONS_CHANGED_EVENT,
   type AppNotification,
 } from "@/lib/notifications";
 import { getManagerSession, setManagerSession } from "@/lib/storage";
