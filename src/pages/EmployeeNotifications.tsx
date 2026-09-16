@@ -143,7 +143,7 @@ export default function EmployeeNotifications() {
               className="font-semibold text-primary"
             >
               <CheckCheck className="ml-1 inline h-4 w-4" />
-              تعليم الكل كمقروء
+              تحديد الكل كمقروء
             </button>
           )}
         </div>
@@ -152,7 +152,7 @@ export default function EmployeeNotifications() {
       <section className="hud-card overflow-hidden">
         {loading && items.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
-            جاري تحميل الإشعارات...
+            جارٍ تحميل الإشعارات...
           </div>
         ) : items.length === 0 ? (
           <div className="p-10 text-center">
