@@ -34,15 +34,46 @@ const optimized = `export async function getBackendEmployees() {
   });
 }`;
 
-if (source.includes(optimized)) {
-  console.log("Backend employee read performance patch: already applied; skipping.");
-  process.exit(0);
+function countOccurrences(value, fragment) {
+  return value.split(fragment).length - 1;
 }
 
-if (!source.includes(legacy)) {
-  throw new Error("Backend employee read performance patch: expected getBackendEmployees implementation was not found; refusing unsafe replacement.");
+const functionMarker = "export async function getBackendEmployees()";
+const parallelMarker = "const [employees, controls] = await Promise.all([";
+const controlsPathMarker = '"/api/manager/workforce-controls"';
+
+if (source.includes(parallelMarker) && source.includes(controlsPathMarker)) {
+  const functionStart = source.indexOf(functionMarker);
+  const parallelStart = source.indexOf(parallelMarker);
+
+  if (functionStart >= 0 && parallelStart > functionStart) {
+    console.log(
+      "Backend employee read performance patch: already applied; skipping.",
+    );
+    process.exit(0);
+  }
+}
+
+const legacyOccurrences = countOccurrences(source, legacy);
+if (legacyOccurrences !== 1) {
+  throw new Error(
+    `Backend employee read performance patch: expected exactly one legacy getBackendEmployees implementation, found ${legacyOccurrences}; refusing unsafe replacement.`,
+  );
 }
 
 const next = source.replace(legacy, optimized);
+
+if (
+  !next.includes(parallelMarker) ||
+  !next.includes(controlsPathMarker) ||
+  next.includes(legacy)
+) {
+  throw new Error(
+    "Backend employee read performance patch: post-replacement validation failed; refusing partial write.",
+  );
+}
+
 writeFileSync(fileUrl, next, "utf8");
-console.log("Backend employee read performance patch: parallel employee/control reads applied.");
+console.log(
+  "Backend employee read performance patch: parallel employee/control reads applied.",
+);
