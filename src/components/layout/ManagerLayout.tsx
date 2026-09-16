@@ -247,9 +247,10 @@ export default function ManagerLayout({
     if (!el) return;
 
     const sync = () => {
+      const rect = el.getBoundingClientRect();
       document.documentElement.style.setProperty(
         "--hadir-manager-topbar-h",
-        `${Math.ceil(el.getBoundingClientRect().height)}px`,
+        `${Math.max(0, Math.ceil(rect.bottom))}px`,
       );
     };
 
@@ -264,6 +265,22 @@ export default function ManagerLayout({
       window.removeEventListener("resize", sync);
     };
   }, []);
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+
+    const onScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (menuOpen && currentScrollY > lastScrollY + 2) {
+        setMenuOpen(false);
+        setThemeMenuOpen(false);
+      }
+      lastScrollY = currentScrollY;
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [menuOpen]);
 
   useEffect(() => {
     let active = true;
