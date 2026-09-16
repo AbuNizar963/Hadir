@@ -40,31 +40,60 @@ const optimizedCounts = `        checkedIn: active.filter(
           (x) => latestAttendance.get(String(x.id))?.type === "check-out",
         ).length,`;
 
-if (
+function countOccurrences(value, fragment) {
+  return value.split(fragment).length - 1;
+}
+
+const alreadyApplied =
   source.includes(optimizedQuery) &&
   source.includes(optimizedSummary) &&
-  source.includes(optimizedCounts)
-) {
+  source.includes(optimizedCounts);
+
+if (alreadyApplied) {
+  if (
+    source.includes(legacyQuery) ||
+    source.includes(legacySummary) ||
+    source.includes(legacyCounts)
+  ) {
+    throw new Error(
+      "Workforce live attendance read patch: both legacy and optimized implementations are present; refusing ambiguous source.",
+    );
+  }
+
   console.log("Workforce live attendance read patch: already applied; skipping.");
   process.exit(0);
 }
 
-if (!source.includes(legacyQuery) || !source.includes(legacySummary)) {
-  throw new Error(
-    "Workforce live attendance read patch: expected attendance implementation was not found; refusing unsafe replacement.",
-  );
+for (const [name, fragment] of [
+  ["legacy query", legacyQuery],
+  ["legacy summary", legacySummary],
+  ["legacy counts", legacyCounts],
+]) {
+  const occurrences = countOccurrences(source, fragment);
+  if (occurrences !== 1) {
+    throw new Error(
+      `Workforce live attendance read patch: expected exactly one ${name}, found ${occurrences}; refusing unsafe replacement.`,
+    );
+  }
 }
 
 let next = source.replace(legacyQuery, optimizedQuery);
 next = next.replace(legacySummary, optimizedSummary);
+next = next.replace(legacyCounts, optimizedCounts);
 
-if (!next.includes(legacyCounts)) {
+if (
+  !next.includes(optimizedQuery) ||
+  !next.includes(optimizedSummary) ||
+  !next.includes(optimizedCounts) ||
+  next.includes(legacyQuery) ||
+  next.includes(legacySummary) ||
+  next.includes(legacyCounts)
+) {
   throw new Error(
-    "Workforce live attendance read patch: expected attendance summary counts were not found after the first replacement; refusing partial write.",
+    "Workforce live attendance read patch: post-replacement validation failed; refusing partial write.",
   );
 }
 
-next = next.replace(legacyCounts, optimizedCounts);
 writeFileSync(fileUrl, next, "utf8");
 console.log(
   "Workforce live attendance read patch: latest-per-employee attendance query applied.",
