@@ -9,6 +9,26 @@ const replacements = [
     from: "يتم مزامنة الجدول والحضور من الخادم.",
     to: "تتم مزامنة الجدول والحضور من الخادم.",
   },
+  {
+    file: "src/pages/EmployeeScan.tsx",
+    from: "جاري البحث عن رمز QR...",
+    to: "جارٍ البحث عن رمز QR...",
+  },
+  {
+    file: "src/pages/EmployeeScan.tsx",
+    from: "جاري تشغيل الكاميرا...",
+    to: "جارٍ تشغيل الكاميرا...",
+  },
+  {
+    file: "src/pages/EmployeeScan.tsx",
+    from: "جاري تحديد موقعك",
+    to: "جارٍ تحديد موقعك",
+  },
+  {
+    file: "src/pages/EmployeeScan.tsx",
+    from: "جاري تسجيل العملية",
+    to: "جارٍ تسجيل العملية",
+  },
 ];
 
 for (const replacement of replacements) {
