@@ -51,6 +51,66 @@ type NotificationsChangedDetail = {
   notificationIds?: string[];
 };
 
+type ManagerNavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+  editRoles?: string[];
+};
+
+const NAV: ManagerNavItem[] = [
+  {
+    to: "/manager",
+    label: "لوحة التحكم",
+    icon: LayoutDashboard,
+    end: true,
+    editRoles: ["owner", "manager", "supervisor"],
+  },
+  {
+    to: "/manager/employees",
+    label: "الموظفون",
+    icon: Users,
+    editRoles: ["owner", "manager", "supervisor"],
+  },
+  {
+    to: "/manager/workforce",
+    label: "قوى العمل",
+    icon: ClipboardCheck,
+    editRoles: ["owner", "manager", "supervisor"],
+  },
+  {
+    to: "/manager/requests",
+    label: "الطلبات",
+    icon: ClipboardList,
+    editRoles: ["owner", "manager"],
+  },
+  {
+    to: "/manager/audit",
+    label: "التدقيق",
+    icon: Wrench,
+    editRoles: ["owner", "manager", "supervisor"],
+  },
+  {
+    to: "/manager/reports",
+    label: "التقارير",
+    icon: BarChart3,
+    editRoles: ["owner", "manager"],
+  },
+  {
+    to: "/manager/report-archive",
+    label: "أرشيف التقارير",
+    icon: Archive,
+    editRoles: ["owner", "manager"],
+  },
+  {
+    to: "/manager/settings",
+    label: "الإعدادات",
+    icon: Settings,
+    editRoles: ["owner"],
+  },
+];
+
 async function loadServerNotifications(): Promise<AppNotification[]> {
   await syncNotificationsFromD1();
   return getNotifications();
