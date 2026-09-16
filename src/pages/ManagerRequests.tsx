@@ -1,6 +1,11 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getBackendRequests, updateBackendRequest } from "@/lib/backend";
+import {
+  getNotifications,
+  markAsRead as markNotificationAsRead,
+  syncNotificationsFromD1,
+} from "@/lib/notifications";
 
 const API_URL = String(
   import.meta.env.VITE_API_URL ||
@@ -99,67 +104,31 @@ async function reviewDeviceRebind(
 }
 
 async function markRelatedRequestNotificationsRead(request: any) {
-  const token = localStorage.getItem("hadir.api.token.admin") || "";
-  if (!token || !request?.employeeName) return;
+  if (!request?.employeeName) return;
 
-  const response = await fetch(`${API_URL}/api/notifications`, {
-    headers: {
-      authorization: `Bearer ${token}`,
-    },
-    credentials: "include",
-    cache: "no-store",
-  });
-
-  if (!response.ok) return;
-
-  const rows = (await response.json().catch(() => [])) as Array<{
-    id?: string;
-    title?: string;
-    message?: string;
-    body?: string;
-    readAt?: string | null;
-  }>;
+  await syncNotificationsFromD1();
 
   const employeeName = String(request.employeeName).trim();
   const requestLabel = typeLabel(String(request.type || ""));
-  const matchingIds = rows
+  const matchingIds = getNotifications()
     .filter((notification) => {
-      if (notification.readAt) return false;
+      if (notification.read) return false;
 
-      const title = String(notification.title || "");
-      const body = String(notification.message ?? notification.body ?? "");
-
-      if (!body.includes(employeeName)) return false;
+      if (!notification.body.includes(employeeName)) return false;
 
       if (request.type === "device-rebind") {
-        return title === "طلب إعادة ربط هاتف";
+        return notification.title === "طلب إعادة ربط هاتف";
       }
 
-      return title === "طلب موظف جديد" && body.includes(requestLabel);
+      return (
+        notification.title === "طلب موظف جديد" &&
+        notification.body.includes(requestLabel)
+      );
     })
-    .map((notification) => String(notification.id || ""))
+    .map((notification) => notification.id)
     .filter(Boolean);
 
-  await Promise.all(
-    matchingIds.map((id) =>
-      fetch(`${API_URL}/api/notifications/read`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${token}`,
-          "content-type": "application/json",
-        },
-        credentials: "include",
-        cache: "no-store",
-        body: JSON.stringify({ id }),
-      }).catch(() => undefined),
-    ),
-  );
-
-  window.dispatchEvent(
-    new CustomEvent("hadir:notifications-changed", {
-      detail: { notificationIds: matchingIds },
-    }),
-  );
+  matchingIds.forEach((id) => markNotificationAsRead(id));
 }
 
 export default function ManagerRequests() {

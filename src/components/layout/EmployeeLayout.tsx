@@ -21,7 +21,10 @@ import Brand from "@/components/Brand";
 import { cn } from "@/lib/utils";
 import { currentSession } from "@/lib/auth";
 import { backendLogout } from "@/lib/backend";
-import { getNotifications } from "@/lib/notifications";
+import {
+  getNotifications,
+  syncNotificationsFromD1,
+} from "@/lib/notifications";
 import "./EmployeeLayout.css";
 
 const NAV = [
@@ -76,41 +79,22 @@ function applyTheme(theme: Theme) {
   document.documentElement.style.colorScheme = dark ? "dark" : "light";
 }
 
-const API_URL = String(
-  import.meta.env.VITE_API_URL ||
-    "https://hadir-api.abunizar963.workers.dev",
-).replace(/\/$/, "");
-
 async function loadEmployeeUnreadCount(employeeId: string) {
   if (!employeeId) return 0;
 
   try {
-    const token = localStorage.getItem("hadir.api.token.employee") || "";
-    const headers: Record<string, string> = {};
-
-    if (token) {
-      headers.authorization = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${API_URL}/api/notifications`, {
-      headers,
-      credentials: "include",
-      cache: "no-store",
-    });
-
-    if (response.ok) {
-      const rows = (await response.json()) as any[];
-      if (Array.isArray(rows)) {
-        return rows.filter((notification) => !notification.readAt).length;
-      }
-    }
-  } catch {}
-
-  try {
-    return getNotifications(employeeId).filter((notification) => !notification.read)
-      .length;
+    await syncNotificationsFromD1();
+    return getNotifications(employeeId).filter(
+      (notification) => !notification.read,
+    ).length;
   } catch {
-    return 0;
+    try {
+      return getNotifications(employeeId).filter(
+        (notification) => !notification.read,
+      ).length;
+    } catch {
+      return 0;
+    }
   }
 }
 
@@ -188,7 +172,17 @@ export default function EmployeeLayout({
 
     window.addEventListener("hadir:cloud-data-changed", refresh);
     window.addEventListener("hadir:d1-view-changed", refresh);
-    window.addEventListener("hadir:notifications-changed", refresh);
+    window.addEventListener("hadir:notifications-changed", () => {
+      try {
+        setUnreadNotifications(
+          getNotifications(employeeId).filter(
+            (notification) => !notification.read,
+          ).length,
+        );
+      } catch {
+        setUnreadNotifications(0);
+      }
+    });
     window.addEventListener("storage", refresh);
     window.addEventListener("online", refresh);
 

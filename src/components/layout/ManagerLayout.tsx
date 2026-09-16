@@ -33,6 +33,7 @@ import {
   markAllAsRead,
   markAsRead as markNotificationAsRead,
   removeNotification,
+  syncNotificationsFromD1,
 } from "@/lib/notifications";
 import type { AppNotification } from "@/lib/notifications";
 import { getManagerSession, setManagerSession } from "@/lib/storage";
@@ -43,155 +44,17 @@ import {
   type DiagnosticEntry,
 } from "@/lib/systemDiagnostics";
 
-const API_URL = String(
-  import.meta.env.VITE_API_URL ||
-    "https://hadir-api.abunizar963.workers.dev",
-).replace(/\/$/, "");
-const THEME_KEY = "hadir.theme";
-const NOTIFICATIONS_CHANGED_EVENT = "hadir:notifications-changed";
-
-type NotificationsChangedDetail = {
-  notificationIds?: string[];
-};
-
-const NAV = [
-  {
-    to: "/manager",
-    label: "لوحة القيادة",
-    icon: LayoutDashboard,
-    end: true,
-    editRoles: ["owner", "manager", "supervisor"],
-  },
-  {
-    to: "/manager/requests",
-    label: "إدارة الطلبات",
-    icon: ClipboardList,
-    editRoles: ["owner", "manager", "supervisor"],
-  },
-  {
-    to: "/manager/employees",
-    label: "الموظفون",
-    icon: Users,
-    editRoles: ["owner", "manager", "supervisor"],
-  },
-  {
-    to: "/manager/audit",
-    label: "سجل التدقيق",
-    icon: ClipboardCheck,
-    editRoles: ["owner", "manager", "supervisor"],
-  },
-  {
-    to: "/manager/reports",
-    label: "التقارير",
-    icon: BarChart3,
-    editRoles: ["owner", "manager"],
-  },
-  {
-    to: "/manager/report-archive",
-    label: "أرشيف التقارير",
-    icon: Archive,
-    editRoles: ["owner", "manager"],
-  },
-  {
-    to: "/manager/settings",
-    label: "الإعدادات",
-    icon: Settings,
-    editRoles: ["owner"],
-  },
-];
-
-function adminToken() {
-  return typeof window === "undefined"
-    ? ""
-    : localStorage.getItem("hadir.api.token.admin") || "";
-}
-
 async function loadServerNotifications(): Promise<AppNotification[]> {
-  const token = adminToken();
-  if (!token) return [];
-
-  const response = await fetch(`${API_URL}/api/notifications`, {
-    headers: { authorization: `Bearer ${token}` },
-    credentials: "include",
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`notifications:${response.status}`);
-  }
-
-  const rows = (await response.json()) as Array<{
-    id: string;
-    userId?: string;
-    recipientId?: string;
-    title: string;
-    message: string;
-    body?: string;
-    type: AppNotification["type"];
-    severity?: string;
-    readAt: string | null;
-    createdAt: string;
-  }>;
-
-  return rows.map((notification) => ({
-    id: notification.id,
-    userId: String(
-      notification.recipientId ?? notification.userId ?? "",
-    ),
-    title: notification.title,
-    body: notification.message ?? notification.body ?? "",
-    type:
-      notification.type ??
-      (notification.severity === "danger"
-        ? "error"
-        : notification.severity === "warning"
-          ? "warning"
-          : notification.severity === "success"
-            ? "success"
-            : "info"),
-    read: Boolean(notification.readAt),
-    createdAt: notification.createdAt,
-  }));
+  await syncNotificationsFromD1();
+  return getNotifications();
 }
 
 async function markServerNotificationRead(id: string) {
-  const token = adminToken();
-  if (!token) throw new Error("ADMIN_TOKEN_REQUIRED");
-
-  const response = await fetch(`${API_URL}/api/notifications/read`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    credentials: "include",
-    cache: "no-store",
-    body: JSON.stringify({ id }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`notification-read:${response.status}`);
-  }
+  markNotificationAsRead(id);
 }
 
 async function markServerNotificationsRead() {
-  const token = adminToken();
-  if (!token) throw new Error("ADMIN_TOKEN_REQUIRED");
-
-  const response = await fetch(`${API_URL}/api/notifications/read`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    credentials: "include",
-    cache: "no-store",
-    body: "{}",
-  });
-
-  if (!response.ok) {
-    throw new Error(`notifications-read:${response.status}`);
-  }
+  markAllAsRead();
 }
 
 function readTheme(): "light" | "dark" | "system" {
@@ -364,7 +227,18 @@ export default function ManagerLayout({
         );
       }
 
-      refresh();
+      const all = getNotifications(currentUserId);
+      setNotifications(
+        Array.isArray(all)
+          ? all.filter(
+              (notification) =>
+                notification.userId === currentUserId ||
+                notification.userId === "manager" ||
+                notification.userId === "admin" ||
+                notification.userId === "all",
+            )
+          : [],
+      );
     };
 
     const onStorage = (event: StorageEvent) => {
