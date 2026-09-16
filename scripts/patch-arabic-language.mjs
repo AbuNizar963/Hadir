@@ -29,6 +29,26 @@ const replacements = [
     from: "جاري تسجيل العملية",
     to: "جارٍ تسجيل العملية",
   },
+  {
+    file: "src/pages/EmployeeHome.tsx",
+    from: "جاري تحميل بياناتك",
+    to: "جارٍ تحميل بياناتك",
+  },
+  {
+    file: "src/pages/ManagerRequests.tsx",
+    from: "جاري تحميل الطلبات…",
+    to: "جارٍ تحميل الطلبات…",
+  },
+  {
+    file: "src/pages/ReportArchive.tsx",
+    from: "جاري تحميل الأرشيف…",
+    to: "جارٍ تحميل الأرشيف…",
+  },
+  {
+    file: "src/pages/EmployeeNotifications.tsx",
+    from: "جاري تحميل الإشعارات...",
+    to: "جارٍ تحميل الإشعارات...",
+  },
 ];
 
 for (const replacement of replacements) {
