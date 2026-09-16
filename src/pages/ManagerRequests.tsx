@@ -98,6 +98,69 @@ async function reviewDeviceRebind(
   }
 }
 
+async function markRelatedRequestNotificationsRead(request: any) {
+  const token = localStorage.getItem("hadir.api.token.admin") || "";
+  if (!token || !request?.employeeName) return;
+
+  const response = await fetch(`${API_URL}/api/notifications`, {
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!response.ok) return;
+
+  const rows = (await response.json().catch(() => [])) as Array<{
+    id?: string;
+    title?: string;
+    message?: string;
+    body?: string;
+    readAt?: string | null;
+  }>;
+
+  const employeeName = String(request.employeeName).trim();
+  const requestLabel = typeLabel(String(request.type || ""));
+  const matchingIds = rows
+    .filter((notification) => {
+      if (notification.readAt) return false;
+
+      const title = String(notification.title || "");
+      const body = String(notification.message ?? notification.body ?? "");
+
+      if (!body.includes(employeeName)) return false;
+
+      if (request.type === "device-rebind") {
+        return title === "طلب إعادة ربط هاتف";
+      }
+
+      return (
+        title === "طلب موظف جديد" &&
+        body.includes(requestLabel)
+      );
+    })
+    .map((notification) => String(notification.id || ""))
+    .filter(Boolean);
+
+  await Promise.all(
+    matchingIds.map((id) =>
+      fetch(`${API_URL}/api/notifications/read`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        credentials: "include",
+        cache: "no-store",
+        body: JSON.stringify({ id }),
+      }).catch(() => undefined),
+    ),
+  );
+
+  window.dispatchEvent(new Event("hadir:notifications-changed"));
+}
+
 export default function ManagerRequests() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,6 +237,7 @@ export default function ManagerRequests() {
 
     window.addEventListener("hadir:cloud-data-changed", scheduleRefresh);
     window.addEventListener("hadir:d1-view-changed", scheduleRefresh);
+    window.addEventListener("hadir:notifications-changed", scheduleRefresh);
     window.addEventListener("focus", scheduleRefresh);
     window.addEventListener("online", scheduleRefresh);
     document.addEventListener("visibilitychange", onVisibility);
@@ -185,6 +249,7 @@ export default function ManagerRequests() {
 
       window.removeEventListener("hadir:cloud-data-changed", scheduleRefresh);
       window.removeEventListener("hadir:d1-view-changed", scheduleRefresh);
+      window.removeEventListener("hadir:notifications-changed", scheduleRefresh);
       window.removeEventListener("focus", scheduleRefresh);
       window.removeEventListener("online", scheduleRefresh);
       document.removeEventListener("visibilitychange", onVisibility);
@@ -208,10 +273,18 @@ export default function ManagerRequests() {
     setBusy(id);
 
     try {
+      const request = requests.find(
+        (item) => String(item.id) === String(id) && item.type === type,
+      );
+
       if (type === "device-rebind") {
         await reviewDeviceRebind(id, status);
       } else {
         await updateBackendRequest(id, status);
+      }
+
+      if (request) {
+        await markRelatedRequestNotificationsRead(request);
       }
 
       await load(false);
@@ -238,9 +311,7 @@ export default function ManagerRequests() {
       <section className="hud-card p-5 border-primary/25">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-extrabold">
-              طلبات بانتظار المراجعة
-            </h2>
+            <h2 className="text-lg font-extrabold">طلبات بانتظار المراجعة</h2>
             <p className="text-xs text-muted-foreground mt-1">
               طلبات فك ربط الهاتف التي يرسلها الموظف من شاشة تسجيل الدخول تظهر
               هنا أيضًا.
@@ -349,9 +420,7 @@ const RequestCard = memo(function RequestCard({
   return (
     <section
       className={`hud-card p-4 ${
-        isRebind
-          ? "border-warning/40 bg-warning/5"
-          : "border-primary/20"
+        isRebind ? "border-warning/40 bg-warning/5" : "border-primary/20"
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
