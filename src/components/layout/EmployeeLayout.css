@@ -1,0 +1,89 @@
+.employee-shell {
+  --employee-menu-gap: 0.5rem;
+}
+
+.employee-shell .employee-menu-trigger {
+  anchor-name: --hadir-employee-menu-trigger;
+}
+
+.employee-shell .employee-utility-menu {
+  position: fixed;
+  inset: auto;
+  z-index: 70;
+  width: max-content;
+  min-width: 10rem;
+  max-width: min(18rem, calc(100vw - 1rem));
+  max-height: min(60vh, 24rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.5rem;
+  border: 1px solid hsl(var(--border) / 0.75);
+  border-radius: 1rem;
+  background: hsl(var(--card) / 0.98);
+  color: hsl(var(--card-foreground));
+  box-shadow: 0 18px 42px hsl(var(--foreground) / 0.2);
+  animation: hadir-employee-menu-in 0.16s ease-out both;
+  position-anchor: --hadir-employee-menu-trigger;
+  position-area: left center;
+  position-try: right center, bottom center, top center;
+}
+
+.employee-shell .employee-utility-menu > div {
+  min-width: 10rem;
+  width: max-content;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.employee-shell .employee-utility-menu > div > .relative {
+  width: 100%;
+}
+
+.employee-shell .employee-utility-menu button {
+  min-height: 42px;
+  width: 100%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.employee-shell .employee-utility-menu .absolute {
+  max-width: calc(100vw - 1rem);
+}
+
+@keyframes hadir-employee-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  .employee-shell .employee-utility-menu {
+    max-width: min(17rem, calc(100vw - 0.75rem));
+    max-height: min(55vh, 22rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .employee-shell .employee-utility-menu {
+    animation: none;
+  }
+}
+
+/* Keep a usable fallback for browsers that do not implement CSS anchor positioning. */
+@supports not (position-anchor: --hadir-employee-menu-trigger) {
+  .employee-shell .employee-utility-menu {
+    top: 0.75rem;
+    right: 0.75rem;
+    bottom: auto;
+    left: auto;
+  }
+}
