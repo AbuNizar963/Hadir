@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import Landing from "@/pages/Landing";
 import EmployeeLogin from "@/features/auth/employee/EmployeeLogin";
 import EmployeeHome from "@/pages/EmployeeHome";
@@ -32,23 +38,38 @@ import { enableWebPush } from "@/lib/push";
 import type { Employee, AdminAccount } from "@/types";
 import { ToastProvider } from "@/components/system/ToastProvider";
 
-const ManagerOnly = ({ children }: { children: React.ReactNode }) => <ProtectedManager>{children}</ProtectedManager>;
-const EmployeeShell = ({ children }: { children: React.ReactNode }) => <ProtectedEmployee><EmployeeLayout>{children}</EmployeeLayout></ProtectedEmployee>;
+const ManagerOnly = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedManager>{children}</ProtectedManager>
+);
+const EmployeeShell = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedEmployee>
+    <EmployeeLayout>{children}</EmployeeLayout>
+  </ProtectedEmployee>
+);
 const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
-const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+const API_URL = String(
+  import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev",
+).replace(/\/$/, "");
 
 type Role = "admin" | "employee";
 type User = AdminAccount | Employee;
-type TokenRestoreResult = { status: "restored"; user: User } | { status: "invalid" | "transient" };
+type TokenRestoreResult =
+  | { status: "restored"; user: User }
+  | { status: "invalid" | "transient" };
 
 function PushSessionBridge() {
   const location = useLocation();
   const manager = currentManager();
   useEffect(() => {
-    if (!location.pathname.startsWith("/manager") || location.pathname === "/manager/login" || !manager?.accountId) return;
+    if (
+      !location.pathname.startsWith("/manager") ||
+      location.pathname === "/manager/login" ||
+      !manager?.accountId
+    )
+      return;
     const key = `hadir.push.manager.${manager.accountId}`;
     if (sessionStorage.getItem(key) === "enabled") return;
-    void enableWebPush(String(manager.accountId)).then(result => {
+    void enableWebPush(String(manager.accountId)).then((result) => {
       if (result === "enabled") sessionStorage.setItem(key, "enabled");
     });
   }, [location.pathname, manager?.accountId]);
@@ -57,7 +78,10 @@ function PushSessionBridge() {
 
 type LaunchState = "checking" | "landing" | "employee" | "manager" | "offline";
 
-async function validateStoredToken(role: Role, token: string): Promise<TokenRestoreResult> {
+async function validateStoredToken(
+  role: Role,
+  token: string,
+): Promise<TokenRestoreResult> {
   try {
     const response = await fetch(`${API_URL}/api/me`, {
       method: "GET",
@@ -65,13 +89,23 @@ async function validateStoredToken(role: Role, token: string): Promise<TokenRest
       credentials: "include",
       cache: "no-store",
     });
-    if (response.status === 401 || response.status === 403) return { status: "invalid" };
+    if (response.status === 401 || response.status === 403)
+      return { status: "invalid" };
     if (!response.ok) return { status: "transient" };
-    const data = await response.json().catch(() => null) as { user?: User } | null;
+    const data = (await response.json().catch(() => null)) as {
+      user?: User;
+    } | null;
     const user = data?.user;
     if (!user || typeof user !== "object") return { status: "transient" };
-    if (role === "admin" && !["owner", "manager", "supervisor"].includes(String((user as AdminAccount).role))) return { status: "invalid" };
-    if (role === "employee" && String((user as Employee).role) !== "staff") return { status: "invalid" };
+    if (
+      role === "admin" &&
+      !["owner", "manager", "supervisor"].includes(
+        String((user as AdminAccount).role),
+      )
+    )
+      return { status: "invalid" };
+    if (role === "employee" && String((user as Employee).role) !== "staff")
+      return { status: "invalid" };
     return { status: "restored", user };
   } catch {
     return { status: "transient" };
@@ -92,8 +126,10 @@ function LaunchGateway() {
 
     const restore = async () => {
       if (typeof window === "undefined") return;
-      const adminToken = localStorage.getItem("hadir.api.token.admin")?.trim() || "";
-      const employeeToken = localStorage.getItem("hadir.api.token.employee")?.trim() || "";
+      const adminToken =
+        localStorage.getItem("hadir.api.token.admin")?.trim() || "";
+      const employeeToken =
+        localStorage.getItem("hadir.api.token.employee")?.trim() || "";
       if (!adminToken && !employeeToken) {
         if (alive) setState("landing");
         return;
@@ -157,42 +193,191 @@ function LaunchGateway() {
     };
   }, [state]);
 
-  if (state === "checking") return <div dir="rtl" className="min-h-screen grid place-items-center bg-background px-6"><div className="text-center"><div className="text-3xl">🔐</div><p className="mt-3 font-bold">جاري استعادة جلسة الدخول…</p><p className="mt-2 text-sm text-muted-foreground">لن يتم تسجيل خروجك بسبب انقطاع مؤقت في الاتصال.</p></div></div>;
-  if (state === "offline") return <div dir="rtl" className="min-h-screen grid place-items-center bg-background px-6"><div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 text-center shadow-lg"><div className="text-3xl">📡</div><p className="mt-3 font-bold">الجلسة محفوظة</p><p className="mt-2 text-sm leading-6 text-muted-foreground">الخادم غير متاح مؤقتًا. لم يتم حذف تسجيل الدخول، وستتم إعادة المحاولة تلقائيًا.</p></div></div>;
+  if (state === "checking")
+    return (
+      <div
+        dir="rtl"
+        className="min-h-screen grid place-items-center bg-background px-6"
+      >
+        <div className="text-center">
+          <div className="text-3xl">🔐</div>
+          <p className="mt-3 font-bold">جارٍ استعادة جلسة الدخول…</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            لن يتم تسجيل خروجك بسبب انقطاع مؤقت في الاتصال.
+          </p>
+        </div>
+      </div>
+    );
+  if (state === "offline")
+    return (
+      <div
+        dir="rtl"
+        className="min-h-screen grid place-items-center bg-background px-6"
+      >
+        <div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 text-center shadow-lg">
+          <div className="text-3xl">📡</div>
+          <p className="mt-3 font-bold">الجلسة محفوظة</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            الخادم غير متاح مؤقتًا. لم يتم حذف تسجيل الدخول، وستتم إعادة
+            المحاولة تلقائيًا.
+          </p>
+        </div>
+      </div>
+    );
   if (state === "employee") return <Navigate to="/employee" replace />;
   if (state === "manager") return <Navigate to="/manager" replace />;
   return <Landing />;
 }
 
 export default function App() {
-  return <BrowserRouter basename={basename}>
-    <PushSessionBridge />
-    <PWAExperience />
-    <ToastProvider />
-    <Routes>
-      <Route path="/" element={<LaunchGateway />} />
-      <Route path="/login" element={<EmployeeLogin />} />
-      <Route path="/weather" element={<WeatherPage />} />
-      <Route path="/prayer" element={<PrayerPage />} />
-      <Route path="/ai" element={<AIAssistant />} />
-      <Route path="/employee" element={<EmployeeShell><EmployeeHome /></EmployeeShell>} />
-      <Route path="/employee/center" element={<EmployeeShell><EmployeeCenter /></EmployeeShell>} />
-      <Route path="/employee/premium" element={<Navigate to="/employee/center" replace />} />
-      <Route path="/employee/profile" element={<EmployeeShell><EmployeeProfile /></EmployeeShell>} />
-      <Route path="/employee/history" element={<EmployeeShell><EmployeeHistory /></EmployeeShell>} />
-      <Route path="/employee/notifications" element={<EmployeeShell><EmployeeNotifications /></EmployeeShell>} />
-      <Route path="/employee/scan/:type" element={<EmployeeShell><EmployeeScanAutoFlow /></EmployeeShell>} />
-      <Route path="/manager/login" element={<ManagerLogin />} />
-      <Route path="/manager" element={<ManagerOnly><ManagerDashboard /></ManagerOnly>} />
-      <Route path="/manager/employees" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerEmployees /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/workforce" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerWorkforceControls /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/requests" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ManagerRequests /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/audit" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager", "supervisor"]}><ManagerAudit /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/reports" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><GlobalAttendanceReports /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/report-archive" element={<ManagerOnly><RequireManagerRole roles={["owner", "manager"]}><ReportArchive /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager/settings" element={<ManagerOnly><RequireManagerRole roles={["owner"]}><ManagerSettings /></RequireManagerRole></ManagerOnly>} />
-      <Route path="/manager-home" element={<Navigate to="/manager" replace />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  </BrowserRouter>;
+  return (
+    <BrowserRouter basename={basename}>
+      <PushSessionBridge />
+      <PWAExperience />
+      <ToastProvider />
+      <Routes>
+        <Route path="/" element={<LaunchGateway />} />
+        <Route path="/login" element={<EmployeeLogin />} />
+        <Route path="/weather" element={<WeatherPage />} />
+        <Route path="/prayer" element={<PrayerPage />} />
+        <Route path="/ai" element={<AIAssistant />} />
+        <Route
+          path="/employee"
+          element={
+            <EmployeeShell>
+              <EmployeeHome />
+            </EmployeeShell>
+          }
+        />
+        <Route
+          path="/employee/center"
+          element={
+            <EmployeeShell>
+              <EmployeeCenter />
+            </EmployeeShell>
+          }
+        />
+        <Route
+          path="/employee/premium"
+          element={<Navigate to="/employee/center" replace />}
+        />
+        <Route
+          path="/employee/profile"
+          element={
+            <EmployeeShell>
+              <EmployeeProfile />
+            </EmployeeShell>
+          }
+        />
+        <Route
+          path="/employee/history"
+          element={
+            <EmployeeShell>
+              <EmployeeHistory />
+            </EmployeeShell>
+          }
+        />
+        <Route
+          path="/employee/notifications"
+          element={
+            <EmployeeShell>
+              <EmployeeNotifications />
+            </EmployeeShell>
+          }
+        />
+        <Route
+          path="/employee/scan/:type"
+          element={
+            <EmployeeShell>
+              <EmployeeScanAutoFlow />
+            </EmployeeShell>
+          }
+        />
+        <Route path="/manager/login" element={<ManagerLogin />} />
+        <Route
+          path="/manager"
+          element={
+            <ManagerOnly>
+              <ManagerDashboard />
+            </ManagerOnly>
+          }
+        />
+        <Route
+          path="/manager/employees"
+          element={
+            <ManagerOnly>
+              <RequireManagerRole roles={["owner", "manager", "supervisor"]}>
+                <ManagerEmployees />
+              </RequireManagerRole>
+            </ManagerOnly>
+          }
+        />
+        <Route
+          path="/manager/workforce"
+          element={
+            <ManagerOnly>
+              <RequireManagerRole roles={["owner", "manager", "supervisor"]}>
+                <ManagerWorkforceControls />
+              </RequireManagerRole>
+            </ManagerOnly>
+          }
+        />
+        <Route
+          path="/manager/requests"
+          element={
+            <ManagerOnly>
+              <RequireManagerRole roles={["owner", "manager"]}>
+                <ManagerRequests />
+              </RequireManagerRole>
+            </ManagerOnly>
+          }
+        />
+        <Route
+          path="/manager/audit"
+          element={
+            <ManagerOnly>
+              <RequireManagerRole roles={["owner", "manager", "supervisor"]}>
+                <ManagerAudit />
+              </RequireManagerRole>
+            </ManagerOnly>
+          }
+        />
+        <Route
+          path="/manager/reports"
+          element={
+            <ManagerOnly>
+              <RequireManagerRole roles={["owner", "manager"]}>
+                <GlobalAttendanceReports />
+              </RequireManagerRole>
+            </ManagerOnly>
+          }
+        />
+        <Route
+          path="/manager/report-archive"
+          element={
+            <ManagerOnly>
+              <RequireManagerRole roles={["owner", "manager"]}>
+                <ReportArchive />
+              </RequireManagerRole>
+            </ManagerOnly>
+          }
+        />
+        <Route
+          path="/manager/settings"
+          element={
+            <ManagerOnly>
+              <RequireManagerRole roles={["owner"]}>
+                <ManagerSettings />
+              </RequireManagerRole>
+            </ManagerOnly>
+          }
+        />
+        <Route
+          path="/manager-home"
+          element={<Navigate to="/manager" replace />}
+        />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
