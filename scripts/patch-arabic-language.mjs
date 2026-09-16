@@ -49,6 +49,11 @@ const replacements = [
     from: "جاري تحميل الإشعارات...",
     to: "جارٍ تحميل الإشعارات...",
   },
+  {
+    file: "src/pages/EmployeeNotifications.tsx",
+    from: "تعليم الكل كمقروء",
+    to: "تحديد الكل كمقروء",
+  },
 ];
 
 for (const replacement of replacements) {
