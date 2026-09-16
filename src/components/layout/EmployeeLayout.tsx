@@ -172,7 +172,7 @@ export default function EmployeeLayout({
 
     window.addEventListener("hadir:cloud-data-changed", refresh);
     window.addEventListener("hadir:d1-view-changed", refresh);
-    window.addEventListener("hadir:notifications-changed", () => {
+    const onNotificationsChanged = () => {
       try {
         setUnreadNotifications(
           getNotifications(employeeId).filter(
@@ -182,7 +182,9 @@ export default function EmployeeLayout({
       } catch {
         setUnreadNotifications(0);
       }
-    });
+    };
+
+    window.addEventListener("hadir:notifications-changed", onNotificationsChanged);
     window.addEventListener("storage", refresh);
     window.addEventListener("online", refresh);
 
@@ -205,7 +207,7 @@ export default function EmployeeLayout({
 
       window.removeEventListener("hadir:cloud-data-changed", refresh);
       window.removeEventListener("hadir:d1-view-changed", refresh);
-      window.removeEventListener("hadir:notifications-changed", refresh);
+      window.removeEventListener("hadir:notifications-changed", onNotificationsChanged);
       window.removeEventListener("storage", refresh);
       window.removeEventListener("online", refresh);
       document.removeEventListener("visibilitychange", onVisibility);
