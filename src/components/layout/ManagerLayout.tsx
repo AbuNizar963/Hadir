@@ -50,6 +50,10 @@ const API_URL = String(
 const THEME_KEY = "hadir.theme";
 const NOTIFICATIONS_CHANGED_EVENT = "hadir:notifications-changed";
 
+type NotificationsChangedDetail = {
+  notificationIds?: string[];
+};
+
 const NAV = [
   {
     to: "/manager",
@@ -132,7 +136,7 @@ async function loadServerNotifications(): Promise<AppNotification[]> {
   return rows.map((notification) => ({
     id: notification.id,
     userId: String(
-      notification.userId ?? notification.recipientId ?? "",
+      notification.recipientId ?? notification.userId ?? "",
     ),
     title: notification.title,
     body: notification.message ?? notification.body ?? "",
@@ -344,6 +348,25 @@ export default function ManagerLayout({
       if (document.visibilityState === "visible") void load();
     };
 
+    const onNotificationsChanged = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationsChangedDetail>).detail;
+      const ids = Array.isArray(detail?.notificationIds)
+        ? detail.notificationIds.map(String).filter(Boolean)
+        : [];
+
+      if (ids.length > 0) {
+        setNotifications((current) =>
+          current.map((notification) =>
+            ids.includes(notification.id)
+              ? { ...notification, read: true }
+              : notification,
+          ),
+        );
+      }
+
+      refresh();
+    };
+
     const onStorage = (event: StorageEvent) => {
       if (
         event.key === "hadir.api.token.admin" ||
@@ -364,7 +387,7 @@ export default function ManagerLayout({
     void load();
     window.addEventListener("hadir:cloud-data-changed", refresh);
     window.addEventListener("hadir:d1-view-changed", refresh);
-    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onNotificationsChanged);
     window.addEventListener("online", refresh);
     window.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("storage", onStorage);
@@ -374,7 +397,7 @@ export default function ManagerLayout({
       window.clearTimeout(fallbackTimer);
       window.removeEventListener("hadir:cloud-data-changed", refresh);
       window.removeEventListener("hadir:d1-view-changed", refresh);
-      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onNotificationsChanged);
       window.removeEventListener("online", refresh);
       window.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("storage", onStorage);
@@ -398,7 +421,9 @@ export default function ManagerLayout({
     return () => media.removeEventListener?.("change", onChange);
   }, [theme]);
 
-  const unreadCount = notifications.filter((notification) => !notification.read).length;
+  const unreadCount = notifications.filter(
+    (notification) => !notification.read,
+  ).length;
 
   const closeTransient = () => {
     setMenuOpen(false);
@@ -502,7 +527,11 @@ export default function ManagerLayout({
 
     try {
       await markServerNotificationRead(id);
-      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { notificationIds: [id] } satisfies NotificationsChangedDetail,
+        }),
+      );
     } catch {
       await reloadNotifications();
     }
@@ -542,7 +571,10 @@ export default function ManagerLayout({
   );
 
   return (
-    <div className="manager-shell min-h-screen bg-background text-foreground" dir="rtl">
+    <div
+      className="manager-shell min-h-screen bg-background text-foreground"
+      dir="rtl"
+    >
       <div
         ref={topbarRef}
         className="manager-topbar sticky top-0 z-[60] border-b border-border/70 bg-background/95 backdrop-blur-md"
@@ -666,7 +698,8 @@ export default function ManagerLayout({
                 className="rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-secondary"
               >
                 <Wrench className="mr-1 inline h-4 w-4" />
-                سجل الأخطاء ({getDiagnostics().filter((entry) => entry.level === "error").length})
+                سجل الأخطاء (
+                {getDiagnostics().filter((entry) => entry.level === "error").length})
               </button>
             )}
 
