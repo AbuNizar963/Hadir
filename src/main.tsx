@@ -13,6 +13,7 @@ import "./styles/rotation-form.css";
 import "./styles/employee-name.css";
 import "./styles/settings-compact.css";
 import "./styles/workforce-card-polish.css";
+import "./styles/attendance-actions.css";
 import { seedIfEmpty } from "@/lib/storage";
 import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnostics";
 import { startRealtimeSync } from "@/lib/realtime";
