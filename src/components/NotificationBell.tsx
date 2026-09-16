@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, BrainCircuit, CloudSun, Landmark, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
+  clearNotifications,
   getNotifications,
   markAllAsRead,
   markAsRead,
   NOTIFICATIONS_CHANGED_EVENT,
+  removeNotification,
+  syncNotificationsFromD1,
   type AppNotification,
 } from "@/lib/notifications";
 import { enableWebPush } from "@/lib/push";
@@ -14,83 +17,7 @@ interface Props {
   userId?: string;
 }
 
-const API_URL = String(
-  import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev",
-).replace(/\/$/, "");
-
 const FALLBACK_REFRESH_MS = 120000;
-
-function notificationAuthHeaders() {
-  const headers = new Headers();
-  const token =
-    localStorage.getItem("hadir.api.token.admin") ||
-    localStorage.getItem("hadir.api.token.employee") ||
-    "";
-
-  if (token) {
-    headers.set("authorization", `Bearer ${token}`);
-  }
-
-  return headers;
-}
-
-async function backendNotifications(): Promise<AppNotification[]> {
-  try {
-    const headers = notificationAuthHeaders();
-    const response = await fetch(`${API_URL}/api/notifications`, {
-      headers,
-      credentials: "include",
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      return [];
-    }
-
-    const rows = (await response.json()) as any[];
-    return Array.isArray(rows)
-      ? rows.map(
-          (notification): AppNotification => ({
-            id: String(notification.id),
-            userId: String(
-              notification.recipientId ?? notification.userId ?? "",
-            ),
-            title: String(notification.title || "إشعار"),
-            body: String(notification.message ?? notification.body ?? ""),
-            type: (notification.severity === "danger"
-              ? "error"
-              : notification.severity === "warning"
-                ? "warning"
-                : notification.severity === "success"
-                  ? "success"
-                  : (notification.type ?? "info")) as AppNotification["type"],
-            read: Boolean(notification.readAt),
-            createdAt: String(notification.createdAt),
-          }),
-        )
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-async function deleteBackendNotification(id: string) {
-  const headers = new Headers(notificationAuthHeaders());
-  headers.set("content-type", "application/json");
-
-  const response = await fetch(`${API_URL}/api/notifications`, {
-    method: "DELETE",
-    headers,
-    credentials: "include",
-    body: JSON.stringify({ id }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`notification delete failed: ${response.status}`);
-  }
-
-  return response.json().catch(() => ({ ok: true }));
-}
 
 export default function NotificationBell({ userId }: Props) {
   const [open, setOpen] = useState(false);
@@ -100,8 +27,13 @@ export default function NotificationBell({ userId }: Props) {
 
   const refresh = useMemo(
     () => async () => {
-      const remote = await backendNotifications();
-      setItems(remote.length ? remote : userId ? getNotifications(userId) : []);
+      if (!userId) {
+        setItems([]);
+        return;
+      }
+
+      await syncNotificationsFromD1();
+      setItems(getNotifications(userId));
     },
     [userId],
   );
@@ -123,6 +55,7 @@ export default function NotificationBell({ userId }: Props) {
       timer = window.setTimeout(() => {
         timer = undefined;
         void refresh();
+        schedule();
       }, FALLBACK_REFRESH_MS);
     };
 
@@ -185,19 +118,13 @@ export default function NotificationBell({ userId }: Props) {
     [items],
   );
 
-  const handleNotification = async (notification: AppNotification) => {
-    await fetch(`${API_URL}/api/notifications/read`, {
-      method: "POST",
-      headers: new Headers({
-        ...Object.fromEntries(notificationAuthHeaders().entries()),
-        "content-type": "application/json",
-      }),
-      credentials: "include",
-      body: JSON.stringify({ id: notification.id }),
-    }).catch(() => undefined);
-
+  const handleNotification = (notification: AppNotification) => {
     markAsRead(notification.id);
-    void refresh();
+    setItems((current) =>
+      current.map((item) =>
+        item.id === notification.id ? { ...item, read: true } : item,
+      ),
+    );
     setOpen(false);
 
     const route = notificationRoute(notification);
@@ -206,7 +133,7 @@ export default function NotificationBell({ userId }: Props) {
     }
   };
 
-  const handleBellClick = async () => {
+  const handleBellClick = () => {
     if (userId) {
       void enableWebPush(userId);
     }
@@ -214,30 +141,25 @@ export default function NotificationBell({ userId }: Props) {
     setOpen((value) => !value);
   };
 
-  const handleClearAll = async () => {
+  const handleMarkAllAsRead = () => {
+    markAllAsRead(userId);
+    setItems((current) => current.map((item) => ({ ...item, read: true })));
+  };
+
+  const handleClearAll = () => {
     if (!items.length) {
       return;
     }
 
-    const ids = items.map((notification) => notification.id);
-
-    try {
-      await Promise.all(ids.map(deleteBackendNotification));
-      setItems([]);
-    } catch {
-      await refresh();
-    }
+    clearNotifications(userId);
+    setItems([]);
   };
 
-  const handleRemove = async (id: string) => {
-    try {
-      await deleteBackendNotification(id);
-      setItems((current) =>
-        current.filter((notification) => notification.id !== id),
-      );
-    } catch {
-      void refresh();
-    }
+  const handleRemove = (id: string) => {
+    removeNotification(id);
+    setItems((current) =>
+      current.filter((notification) => notification.id !== id),
+    );
   };
 
   if (!userId) {
@@ -267,7 +189,7 @@ export default function NotificationBell({ userId }: Props) {
       <div className="relative" ref={wrapRef}>
         <button
           type="button"
-          onClick={() => void handleBellClick()}
+          onClick={handleBellClick}
           className="relative h-12 w-12 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground grid place-items-center shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
           aria-label="الإشعارات"
           aria-expanded={open}
@@ -288,22 +210,7 @@ export default function NotificationBell({ userId }: Props) {
                 {unreadCount > 0 && (
                   <button
                     type="button"
-                    onClick={async () => {
-                      await fetch(`${API_URL}/api/notifications/read`, {
-                        method: "POST",
-                        headers: new Headers({
-                          ...Object.fromEntries(
-                            notificationAuthHeaders().entries(),
-                          ),
-                          "content-type": "application/json",
-                        }),
-                        credentials: "include",
-                        body: "{}",
-                      }).catch(() => undefined);
-
-                      markAllAsRead(userId);
-                      void refresh();
-                    }}
+                    onClick={handleMarkAllAsRead}
                     className="text-[11px] text-primary font-semibold"
                   >
                     تعليم الكل كمقروء
@@ -313,7 +220,7 @@ export default function NotificationBell({ userId }: Props) {
                 {items.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => void handleClearAll()}
+                    onClick={handleClearAll}
                     className="text-[11px] text-destructive font-semibold"
                   >
                     حذف الكل
@@ -332,7 +239,7 @@ export default function NotificationBell({ userId }: Props) {
                   {items.map((notification) => (
                     <li
                       key={notification.id}
-                      onClick={() => void handleNotification(notification)}
+                      onClick={() => handleNotification(notification)}
                       className={`p-3 cursor-pointer transition hover:bg-secondary/50 ${
                         !notification.read ? "bg-primary/5" : ""
                       }`}
@@ -348,7 +255,7 @@ export default function NotificationBell({ userId }: Props) {
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                void handleRemove(notification.id);
+                                handleRemove(notification.id);
                               }}
                               className="text-muted-foreground hover:text-destructive shrink-0"
                               aria-label="حذف"
@@ -404,12 +311,7 @@ function notificationRoute(notification: AppNotification) {
   if (
     text.includes("إعادة ربط") ||
     text.includes("فك ربط") ||
-    text.includes("هاتف جديد")
-  ) {
-    return "/manager/requests";
-  }
-
-  if (
+    text.includes("هاتف جديد") ||
     text.includes("طلب") ||
     text.includes("إجازة") ||
     text.includes("استئذان")
