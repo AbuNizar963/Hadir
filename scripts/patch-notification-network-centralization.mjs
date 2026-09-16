@@ -27,6 +27,8 @@ function patchManagerLayout() {
   const file = filePath(path);
   let source = readFileSync(file, "utf8");
 
+  // This file may already contain the centralized implementation from an earlier
+  // commit. In that case there is nothing to rewrite here.
   if (!source.includes("syncNotificationsFromD1")) {
     source = replaceExactly(
       path,
@@ -42,18 +44,6 @@ function patchManagerLayout() {
       /const API_URL = String\([\s\S]*?\n\nasync function markServerNotificationsRead\(\) \{[\s\S]*?\n\}\n\nfunction readTheme/s,
       `async function loadServerNotifications(): Promise<AppNotification[]> {\n  await syncNotificationsFromD1();\n  return getNotifications();\n}\n\nasync function markServerNotificationRead(id: string) {\n  markNotificationAsRead(id);\n}\n\nasync function markServerNotificationsRead() {\n  markAllAsRead();\n}\n\nfunction readTheme`,
       "direct notification API helpers",
-    );
-  }
-
-  if (
-    source.includes('window.addEventListener("hadir:notifications-changed", refresh);')
-  ) {
-    source = replaceExactly(
-      path,
-      source,
-      /      refresh\(\);\n    };\n\n    const onStorage = \(event: StorageEvent\) =>/,
-      `      const all = getNotifications(currentUserId);\n      setNotifications(\n        Array.isArray(all)\n          ? all.filter(\n              (notification) =>\n                notification.userId === currentUserId ||\n                notification.userId === "manager" ||\n                notification.userId === "admin" ||\n                notification.userId === "all",\n            )\n          : [],\n      );\n    };\n\n    const onStorage = (event: StorageEvent) =>`,
-      "notification-change refresh loop",
     );
   }
 
@@ -83,6 +73,8 @@ function patchEmployeeLayout() {
     );
   }
 
+  // Anonymous event listeners cannot be removed during unmount. Replace only the
+  // exact listener body with a named handler so React cleanup remains reliable.
   const oldListener =
     '    window.addEventListener("hadir:notifications-changed", () => {\n' +
     "      try {\n" +
@@ -110,7 +102,13 @@ function patchEmployeeLayout() {
     '    window.addEventListener("hadir:notifications-changed", onNotificationsChanged);';
 
   if (source.includes(oldListener)) {
-    source = source.replace(oldListener, newListener);
+    source = replaceExactly(
+      path,
+      source,
+      new RegExp(oldListener.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      newListener,
+      "anonymous notification listener",
+    );
   }
 
   if (
@@ -131,6 +129,8 @@ function patchManagerRequests() {
   const file = filePath(path);
   let source = readFileSync(file, "utf8");
 
+  // If the service import is already present, the related-request helper was
+  // already centralized by an earlier safe patch. Do not rewrite it again.
   if (!source.includes("syncNotificationsFromD1")) {
     source = replaceExactly(
       path,
