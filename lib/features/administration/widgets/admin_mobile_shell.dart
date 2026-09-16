@@ -22,8 +22,7 @@ class AdminMobileShell extends StatelessWidget {
     if (path == '/manager/requests') return 3;
     if (path == '/admin/audit' || path == '/manager/audit') return 4;
     if (path == '/admin/reports' || path == '/manager/reports') return 5;
-    if (path == '/admin/reports/archive' ||
-        path == '/manager/report-archive') {
+    if (path == '/admin/reports/archive' || path == '/manager/report-archive') {
       return 6;
     }
     if (path == '/admin/settings' || path == '/manager/settings') return 7;
@@ -255,9 +254,7 @@ class AdminMobileShell extends StatelessWidget {
                 children: [
                   Icon(
                     active ? item.$2 : item.$1,
-                    color: active
-                        ? scheme.primary
-                        : scheme.onSurfaceVariant,
+                    color: active ? scheme.primary : scheme.onSurfaceVariant,
                     size: 20,
                   ),
                   const SizedBox(height: 1),
@@ -266,12 +263,9 @@ class AdminMobileShell extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: active
-                          ? scheme.primary
-                          : scheme.onSurfaceVariant,
+                      color: active ? scheme.primary : scheme.onSurfaceVariant,
                       fontSize: 11,
-                      fontWeight:
-                          active ? FontWeight.w900 : FontWeight.w700,
+                      fontWeight: active ? FontWeight.w900 : FontWeight.w700,
                     ),
                   ),
                 ],
