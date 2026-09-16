@@ -13,6 +13,7 @@ import '../../features/employee/widgets/employee_mobile_shell.dart';
 final _session = HadirSession();
 String? _validatedEmployeeToken;
 String? _validatedAdminToken;
+String? _validatedAdminRole;
 
 Future<bool> _isTokenValid(String token, {required String role}) async {
   try {
@@ -25,6 +26,7 @@ Future<bool> _isTokenValid(String token, {required String role}) async {
     if (role == 'admin') {
       return const {'owner', 'manager', 'supervisor'}.contains(actualRole);
     }
+
     return actualRole == 'staff';
   } on DioException catch (error) {
     final status = error.response?.statusCode;
@@ -33,6 +35,54 @@ Future<bool> _isTokenValid(String token, {required String role}) async {
   } catch (_) {
     return true;
   }
+}
+
+Future<String?> _readAdminRole(String token) async {
+  try {
+    final data = await HadirApi(token: token).me();
+    final user = data['user'] is Map
+        ? Map<String, dynamic>.from(data['user'] as Map)
+        : data;
+    final role = user['role']?.toString();
+
+    if (const {'owner', 'manager', 'supervisor'}.contains(role)) {
+      return role;
+    }
+  } catch (_) {
+    // A temporary network failure must not log out an already authenticated user.
+  }
+
+  return null;
+}
+
+Set<String>? _requiredAdminRoles(String location) {
+  const ownerOnly = {'owner'};
+  const managerAndOwner = {'owner', 'manager'};
+  const managerSupervisorOwner = {'owner', 'manager', 'supervisor'};
+
+  if (location == '/admin/roles') return ownerOnly;
+  if (location == '/admin/settings' || location == '/manager/settings') {
+    return ownerOnly;
+  }
+  if (location == '/admin/operations') return managerAndOwner;
+
+  if (location == '/admin/manage' ||
+      location == '/manager/employees' ||
+      location == '/manager/workforce' ||
+      location == '/admin/audit' ||
+      location == '/manager/audit') {
+    return managerSupervisorOwner;
+  }
+
+  if (location == '/admin/reports' ||
+      location == '/admin/reports/archive' ||
+      location == '/manager/requests' ||
+      location == '/manager/reports' ||
+      location == '/manager/report-archive') {
+    return managerAndOwner;
+  }
+
+  return null;
 }
 
 String? resolveAuthenticatedRedirect({
@@ -84,7 +134,10 @@ String? resolveAuthenticatedRedirect({
     '/manager/settings',
     '/manager/employees/transfer',
   };
-  if (!hasAdminToken && adminPaths.contains(location)) return '/admin-login';
+
+  if (!hasAdminToken && adminPaths.contains(location)) {
+    return '/admin-login';
+  }
 
   const employeePaths = {
     '/home',
@@ -104,7 +157,9 @@ String? resolveAuthenticatedRedirect({
     '/services',
   };
   final isEmployeeScan = location.startsWith('/employee/scan/');
-  if (!hasEmployeeToken && (employeePaths.contains(location) || isEmployeeScan)) {
+
+  if (!hasEmployeeToken &&
+      (employeePaths.contains(location) || isEmployeeScan)) {
     return '/login';
   }
 
@@ -112,104 +167,310 @@ String? resolveAuthenticatedRedirect({
 }
 
 GoRouter buildAppRouter() => GoRouter(
-  initialLocation: '/',
-  redirect: (_, state) async {
-    final employeeToken = await _session.token();
-    final adminToken = await _session.adminToken();
-    final location = state.matchedLocation;
+      initialLocation: '/',
+      redirect: (_, state) async {
+        final employeeToken = await _session.token();
+        final adminToken = await _session.adminToken();
+        final location = state.matchedLocation;
 
-    if (employeeToken == null || employeeToken.isEmpty) {
-      _validatedEmployeeToken = null;
-    }
-    if (adminToken == null || adminToken.isEmpty) {
-      _validatedAdminToken = null;
-    }
+        if (employeeToken == null || employeeToken.isEmpty) {
+          _validatedEmployeeToken = null;
+        }
+        if (adminToken == null || adminToken.isEmpty) {
+          _validatedAdminToken = null;
+          _validatedAdminRole = null;
+        }
 
-    if (employeeToken != null &&
-        employeeToken.isNotEmpty &&
-        employeeToken != _validatedEmployeeToken) {
-      final valid = await _isTokenValid(employeeToken, role: 'employee');
-      if (!valid) {
-        _validatedEmployeeToken = null;
-        await _session.clearEmployee();
-        return resolveAuthenticatedRedirect(
-          location: location,
-          adminToken: await _session.adminToken(),
-        );
-      }
-      _validatedEmployeeToken = employeeToken;
-    }
+        if (employeeToken != null &&
+            employeeToken.isNotEmpty &&
+            employeeToken != _validatedEmployeeToken) {
+          final valid = await _isTokenValid(employeeToken, role: 'employee');
+          if (!valid) {
+            _validatedEmployeeToken = null;
+            await _session.clearEmployee();
+            return resolveAuthenticatedRedirect(
+              location: location,
+              adminToken: await _session.adminToken(),
+            );
+          }
+          _validatedEmployeeToken = employeeToken;
+        }
 
-    if (adminToken != null &&
-        adminToken.isNotEmpty &&
-        adminToken != _validatedAdminToken) {
-      final valid = await _isTokenValid(adminToken, role: 'admin');
-      if (!valid) {
-        _validatedAdminToken = null;
-        await _session.clearAdmin();
+        if (adminToken != null &&
+            adminToken.isNotEmpty &&
+            adminToken != _validatedAdminToken) {
+          final valid = await _isTokenValid(adminToken, role: 'admin');
+          if (!valid) {
+            _validatedAdminToken = null;
+            _validatedAdminRole = null;
+            await _session.clearAdmin();
+            return resolveAuthenticatedRedirect(
+              location: location,
+              employeeToken: await _session.token(),
+            );
+          }
+
+          _validatedAdminToken = adminToken;
+          _validatedAdminRole = await _readAdminRole(adminToken);
+        }
+
+        final requiredRoles = _requiredAdminRoles(location);
+        if (requiredRoles != null &&
+            _validatedAdminRole != null &&
+            !requiredRoles.contains(_validatedAdminRole)) {
+          return '/manager';
+        }
+
         return resolveAuthenticatedRedirect(
           location: location,
           employeeToken: await _session.token(),
+          adminToken: await _session.adminToken(),
         );
-      }
-      _validatedAdminToken = adminToken;
-    }
-
-    return resolveAuthenticatedRedirect(
-      location: location,
-      employeeToken: await _session.token(),
-      adminToken: await _session.adminToken(),
+      },
+      errorBuilder: (_, __) => const _NotFoundPage(),
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const LandingPage(),
+        ),
+        GoRoute(
+          path: '/login',
+          builder: (_, __) => const EmployeeLoginPage(),
+        ),
+        GoRoute(
+          path: '/employee-login',
+          builder: (_, __) => const EmployeeLoginPage(),
+        ),
+        GoRoute(
+          path: '/admin-login',
+          builder: (_, __) => const AdminLoginPage(),
+        ),
+        GoRoute(
+          path: '/manager/login',
+          builder: (_, __) => const AdminLoginPage(),
+        ),
+        GoRoute(
+          path: '/admin',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminMobileHomePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/admin/roles',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminMobileHomePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/admin/manage',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminManagementPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/admin/operations',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminOperationsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/admin/reports',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminReportsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/admin/reports/archive',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminReportArchivePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/admin/audit',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminAuditPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/admin/settings',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminMobileSettingsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/manager',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminMobileHomePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/manager-home',
+          redirect: (_, __) => '/manager',
+        ),
+        GoRoute(
+          path: '/manager/employees',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminManagementPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/manager/employees/transfer',
+          builder: (_, __) => const SwipeBackPage(
+            child: EmployeeTransferPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/manager/workforce',
+          builder: (_, __) => const SwipeBackPage(
+            child: ManagerWorkforcePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/manager/requests',
+          builder: (_, __) => const SwipeBackPage(
+            child: ManagerRequestsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/manager/audit',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminAuditPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/manager/reports',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminReportsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/manager/report-archive',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminReportArchivePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/manager/settings',
+          builder: (_, __) => const SwipeBackPage(
+            child: AdminMobileSettingsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/home',
+          builder: (_, __) => const SwipeBackPage(
+            child: HadirWorkspacePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/employee',
+          builder: (_, __) => const SwipeBackPage(
+            child: HadirWorkspacePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/center',
+          builder: (_, __) => const SwipeBackPage(
+            child: EmployeeCenterPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/employee/center',
+          builder: (_, __) => const SwipeBackPage(
+            child: EmployeeCenterPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/employee/premium',
+          redirect: (_, __) => '/employee/center',
+        ),
+        GoRoute(
+          path: '/attendance',
+          builder: (_, state) => SwipeBackPage(
+            child: AttendancePage(
+              type: state.uri.queryParameters['type'] ?? 'check-in',
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/employee/scan/:type',
+          builder: (_, state) => SwipeBackPage(
+            child: AttendancePage(
+              type: state.pathParameters['type'] ?? 'check-in',
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/history',
+          builder: (_, __) => const SwipeBackPage(
+            child: JibbleHistoryPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/employee/history',
+          builder: (_, __) => const SwipeBackPage(
+            child: JibbleHistoryPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/insights',
+          builder: (_, __) => const SwipeBackPage(
+            child: AttendanceInsightsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/requests',
+          builder: (_, __) => const SwipeBackPage(
+            child: RequestsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (_, __) => const SwipeBackPage(
+            child: NotificationsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/employee/notifications',
+          builder: (_, __) => const SwipeBackPage(
+            child: NotificationsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/profile',
+          builder: (_, __) => const SwipeBackPage(
+            child: ProfilePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/employee/profile',
+          builder: (_, __) => const SwipeBackPage(
+            child: ProfilePage(),
+          ),
+        ),
+        GoRoute(
+          path: '/services',
+          builder: (_, __) => const SwipeBackPage(
+            child: ServicesPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/weather',
+          builder: (_, __) => const ServicesPage(initialTab: 0),
+        ),
+        GoRoute(
+          path: '/prayer',
+          builder: (_, __) => const ServicesPage(initialTab: 1),
+        ),
+        GoRoute(
+          path: '/ai',
+          builder: (_, __) => const AIAssistantPage(),
+        ),
+      ],
     );
-  },
-  errorBuilder: (_, __) => const _NotFoundPage(),
-  routes: [
-    GoRoute(path: '/', builder: (_, __) => const LandingPage()),
-    GoRoute(path: '/login', builder: (_, __) => const EmployeeLoginPage()),
-    GoRoute(path: '/employee-login', builder: (_, __) => const EmployeeLoginPage()),
-    GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginPage()),
-    GoRoute(path: '/manager/login', builder: (_, __) => const AdminLoginPage()),
-    GoRoute(path: '/admin', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
-    GoRoute(path: '/admin/roles', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
-    GoRoute(path: '/admin/manage', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
-    GoRoute(path: '/admin/operations', builder: (_, __) => const SwipeBackPage(child: AdminOperationsPage())),
-    GoRoute(path: '/admin/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
-    GoRoute(path: '/admin/reports/archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
-    GoRoute(path: '/admin/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
-    GoRoute(path: '/admin/settings', builder: (_, __) => const SwipeBackPage(child: AdminMobileSettingsPage())),
-    GoRoute(path: '/manager', builder: (_, __) => const SwipeBackPage(child: AdminMobileHomePage())),
-    GoRoute(path: '/manager-home', redirect: (_, __) => '/manager'),
-    GoRoute(path: '/manager/employees', builder: (_, __) => const SwipeBackPage(child: AdminManagementPage())),
-    GoRoute(path: '/manager/employees/transfer', builder: (_, __) => const SwipeBackPage(child: EmployeeTransferPage())),
-    GoRoute(path: '/manager/workforce', builder: (_, __) => const SwipeBackPage(child: ManagerWorkforcePage())),
-    GoRoute(path: '/manager/requests', builder: (_, __) => const SwipeBackPage(child: ManagerRequestsPage())),
-    GoRoute(path: '/manager/audit', builder: (_, __) => const SwipeBackPage(child: AdminAuditPage())),
-    GoRoute(path: '/manager/reports', builder: (_, __) => const SwipeBackPage(child: AdminReportsPage())),
-    GoRoute(path: '/manager/report-archive', builder: (_, __) => const SwipeBackPage(child: AdminReportArchivePage())),
-    GoRoute(path: '/manager/settings', builder: (_, __) => const SwipeBackPage(child: AdminMobileSettingsPage())),
-    GoRoute(path: '/home', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
-    GoRoute(path: '/employee', builder: (_, __) => const SwipeBackPage(child: HadirWorkspacePage())),
-    GoRoute(path: '/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
-    GoRoute(path: '/employee/center', builder: (_, __) => const SwipeBackPage(child: EmployeeCenterPage())),
-    GoRoute(path: '/employee/premium', redirect: (_, __) => '/employee/center'),
-    GoRoute(path: '/attendance', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.uri.queryParameters['type'] ?? 'check-in'))),
-    GoRoute(path: '/employee/scan/:type', builder: (_, s) => SwipeBackPage(child: AttendancePage(type: s.pathParameters['type'] ?? 'check-in'))),
-    GoRoute(path: '/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
-    GoRoute(path: '/employee/history', builder: (_, __) => const SwipeBackPage(child: JibbleHistoryPage())),
-    GoRoute(path: '/insights', builder: (_, __) => const SwipeBackPage(child: AttendanceInsightsPage())),
-    GoRoute(path: '/requests', builder: (_, __) => const SwipeBackPage(child: RequestsPage())),
-    GoRoute(path: '/notifications', builder: (_, __) => const SwipeBackPage(child: NotificationsPage())),
-    GoRoute(path: '/employee/notifications', builder: (_, __) => const SwipeBackPage(child: NotificationsPage())),
-    GoRoute(path: '/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
-    GoRoute(path: '/employee/profile', builder: (_, __) => const SwipeBackPage(child: ProfilePage())),
-    GoRoute(path: '/services', builder: (_, __) => const SwipeBackPage(child: ServicesPage())),
-    GoRoute(path: '/weather', builder: (_, __) => const ServicesPage(initialTab: 0)),
-    GoRoute(path: '/prayer', builder: (_, __) => const ServicesPage(initialTab: 1)),
-    GoRoute(path: '/ai', builder: (_, __) => const AIAssistantPage()),
-  ],
-);
 
 class SwipeBackPage extends StatefulWidget {
   const SwipeBackPage({super.key, required this.child});
+
   final Widget child;
 
   @override
@@ -225,8 +486,10 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
 
   void _start(DragStartDetails details) {
     if (!context.canPop()) return;
+
     final width = MediaQuery.sizeOf(context).width;
     final x = details.globalPosition.dx;
+
     if (x <= _edgeWidth) {
       _tracking = true;
       _fromLeft = true;
@@ -240,19 +503,29 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
 
   void _update(DragUpdateDetails details) {
     if (!_tracking) return;
+
     final delta = details.primaryDelta ?? 0;
     _dragDistance += _fromLeft ? delta : -delta;
-    if (_dragDistance < 0) _dragDistance = 0;
+
+    if (_dragDistance < 0) {
+      _dragDistance = 0;
+    }
   }
 
   void _end(DragEndDetails details) {
     if (!_tracking) return;
+
     final velocity = details.primaryVelocity ?? 0;
     final effectiveVelocity = _fromLeft ? velocity : -velocity;
-    final shouldPop = _dragDistance >= _triggerDistance || effectiveVelocity > 700;
+    final shouldPop =
+        _dragDistance >= _triggerDistance || effectiveVelocity > 700;
+
     _tracking = false;
     _dragDistance = 0;
-    if (shouldPop && mounted && context.canPop()) context.pop();
+
+    if (shouldPop && mounted && context.canPop()) {
+      context.pop();
+    }
   }
 
   void _cancel() {
@@ -263,11 +536,13 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
   @override
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
-    final isAdminArea = path == '/admin' ||
+    final isAdminArea =
+        path == '/admin' ||
         path.startsWith('/admin/') ||
         path == '/manager' ||
         path.startsWith('/manager/');
-    final isEmployeeArea = path == '/home' ||
+    final isEmployeeArea =
+        path == '/home' ||
         path == '/employee' ||
         path == '/center' ||
         path == '/employee/center' ||
@@ -283,6 +558,7 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
         path == '/employee/profile' ||
         path == '/services' ||
         path.startsWith('/employee/scan/');
+
     final content = isAdminArea
         ? AdminMobileShell(child: widget.child)
         : isEmployeeArea
@@ -331,7 +607,11 @@ class _NotFoundPage extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline_rounded, color: Color(0xFF0B6B5A), size: 40),
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Color(0xFF0B6B5A),
+                      size: 40,
+                    ),
                     const SizedBox(height: 12),
                     const Text(
                       'الصفحة غير موجودة',
