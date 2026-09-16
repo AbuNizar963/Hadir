@@ -227,9 +227,9 @@ jobs:
           from pathlib import Path
 
           sw = Path("/tmp/sw.js").read_text(encoding="utf-8")
-          version_match = re.search(r'const BUILD_VERSION="([0-9a-f]{40})";', sw)
+          version_match = re.search(r'const\s+BUILD_VERSION\s*=\s*"([0-9a-f]{40})"\s*;', sw)
           assert version_match, "production service-worker build version declaration is missing"
-          assert re.search(r'const CACHE=`hadir-shell-\$\{BUILD_VERSION\}`;', sw), "production service-worker shell cache declaration is missing"
+          assert re.search(r'const\s+CACHE\s*=\s*`hadir-shell-\$\{BUILD_VERSION\}`\s*;', sw), "production service-worker shell cache declaration is missing"
           assert "SKIP_WAITING" in sw, "service-worker update activation handler is missing"
           assert "notificationclick" in sw, "service-worker notification click handler is missing"
           expected = os.environ["GITHUB_SHA"]
