@@ -91,7 +91,7 @@ const newBlock = `if (
         }
 
         return env.DB.prepare(
-          `DELETE FROM ${table} WHERE ${column}=?`,
+          "DELETE FROM " + table + " WHERE " + column + "=?",
         ).bind(employeeId);
       });
 
