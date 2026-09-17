@@ -138,7 +138,7 @@ function rotationWorkDay(
     return { isWorkDay: false, isLastWorkDay: false };
   }
 
-  const diff = Math.floor(dayNumber(day) - dayNumber(startDay));
+  const diff = Math.floor(dateNumber(day) - dateNumber(startDay));
 
   if (diff < 0) {
     return { isWorkDay: false, isLastWorkDay: false };
