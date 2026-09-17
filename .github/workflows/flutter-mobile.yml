@@ -13,6 +13,7 @@ on:
       - 'scripts/**'
       - 'backend/src/**'
       - 'backend/package.json'
+      - 'backend/scripts/**'
       - 'analysis_options.yaml'
       - 'pubspec.yaml'
       - '.github/workflows/flutter-mobile.yml'
@@ -26,6 +27,7 @@ on:
       - 'scripts/**'
       - 'backend/src/**'
       - 'backend/package.json'
+      - 'backend/scripts/**'
       - 'analysis_options.yaml'
       - 'pubspec.yaml'
       - '.github/workflows/flutter-mobile.yml'
@@ -56,11 +58,14 @@ jobs:
       - run: flutter pub get
       - name: Apply safe mobile menu patch
         run: node scripts/patch-admin-mobile-menu-scroll.mjs
+      - name: Apply employee deletion integrity patch
+        working-directory: backend
+        run: node scripts/patch-employee-delete-integrity.mjs
       - name: Format mobile shell sources
         run: dart format lib/features/administration/widgets/admin_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell_reference.dart
       - name: Format backend worker source
         run: npx --yes prettier@3.6.2 --write backend/src/index.ts
-      - name: Persist formatting changes
+      - name: Persist source formatting and lifecycle fixes
         shell: bash
         run: |
           set -euo pipefail
@@ -71,13 +76,13 @@ jobs:
             backend/src/index.ts
           )
           if git diff --quiet -- "${files[@]}"; then
-            echo "Mobile shell and backend worker sources are already formatted."
+            echo "Mobile shell and backend worker sources are already current."
             exit 0
           fi
           git config user.name "HADIR Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "${files[@]}"
-          git commit -m "chore(apps): format mobile and backend sources"
+          git commit -m "fix(apps): persist employee lifecycle and source formatting"
           git push origin Apps
       - run: flutter analyze
       - run: flutter test
@@ -147,6 +152,9 @@ jobs:
       - run: flutter pub get
       - name: Apply safe mobile menu patch
         run: node scripts/patch-admin-mobile-menu-scroll.mjs
+      - name: Apply employee deletion integrity patch
+        working-directory: backend
+        run: node scripts/patch-employee-delete-integrity.mjs
       - name: Format mobile shell sources
         run: dart format lib/features/administration/widgets/admin_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell_reference.dart
       - name: Format backend worker source
