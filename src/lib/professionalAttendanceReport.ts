@@ -145,10 +145,9 @@ const adminHeaders = () => {
   return token ? { authorization: `Bearer ${token}` } : {};
 };
 
-// The report client deliberately accepts the server's complete row set as-is.
-// Filtering employee/day records in the browser caused current-day reports to
-// hide NOT_STARTED/REST rows and made the visible employee count diverge from
-// the authoritative attendance engine. Completeness belongs to the API layer.
+// The report client deliberately accepts the server's reportable row set as-is.
+// Employee/day eligibility is owned by the authoritative reporting engine;
+// the browser must not independently add, remove, or reinterpret report rows.
 export async function getProfessionalAttendanceReport(from: string, to: string, employeeId?: string) {
   const query = new URLSearchParams({ date: to, from, to });
   if (employeeId) query.set("employeeId", employeeId);
