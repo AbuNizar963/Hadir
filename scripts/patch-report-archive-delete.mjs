@@ -10,26 +10,52 @@ if (source.includes("deleteArchivedReport")) {
   process.exit(0);
 }
 
-const readOnlyArchiveImport = 'import { archivedReportUrl, listArchivedReports } from "@/lib/reportArchive";';
+const readOnlyArchiveImport =
+  'import { archivedReportUrl, listArchivedReports } from "@/lib/reportArchive";';
+
 if (source.includes(readOnlyArchiveImport)) {
-  console.log("ReportArchive patch: read-only archive page detected; deletion patch is not applicable.");
+  console.log(
+    "ReportArchive patch: read-only archive page detected; deletion patch is not applicable.",
+  );
   process.exit(0);
 }
 
-const oldImport = 'import { archiveReportFile, archivedReportUrl, listArchivedReports } from "@/lib/reportArchive";';
-const newImport = 'import { archiveReportFile, archivedReportUrl, deleteArchivedReport, listArchivedReports } from "@/lib/reportArchive";';
-if (!source.includes(oldImport) && !source.includes("deleteArchivedReport")) throw new Error("ReportArchive: archive import anchor not found.");
+const oldImport =
+  'import { archiveReportFile, archivedReportUrl, listArchivedReports } from "@/lib/reportArchive";';
+const newImport =
+  'import { archiveReportFile, archivedReportUrl, deleteArchivedReport, listArchivedReports } from "@/lib/reportArchive";';
+
+if (!source.includes(oldImport) && !source.includes("deleteArchivedReport")) {
+  throw new Error("ReportArchive: archive import anchor not found.");
+}
 
 let next = source.replace(oldImport, newImport);
-const oldIcon = 'import { Archive, Download, FileSpreadsheet, RefreshCw, ShieldCheck } from "lucide-react";';
-const newIcon = 'import { Archive, Download, FileSpreadsheet, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";';
-if (!next.includes(oldIcon) && !next.includes("Trash2")) throw new Error("ReportArchive: icon import anchor not found.");
+
+const oldIcon =
+  'import { Archive, Download, FileSpreadsheet, RefreshCw, ShieldCheck } from "lucide-react";';
+const newIcon =
+  'import { Archive, Download, FileSpreadsheet, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";';
+
+if (!next.includes(oldIcon) && !next.includes("Trash2")) {
+  throw new Error("ReportArchive: icon import anchor not found.");
+}
+
 next = next.replace(oldIcon, newIcon);
 
-const oldActions = '<a className="font-semibold text-primary underline" href={archivedReportUrl(String(x.report_id))} target="_blank" rel="noreferrer"><Download className="mr-1 inline h-4 w-4" />تنزيل</a>';
-const newActions = '<a className="font-semibold text-primary underline" href={archivedReportUrl(String(x.report_id))} target="_blank" rel="noreferrer"><Download className="mr-1 inline h-4 w-4" />تنزيل</a><Button variant="ghost" size="sm" className="text-destructive" disabled={saving} onClick={async () => { if (!window.confirm("هل تريد حذف هذا التقرير من الأرشيف نهائيًا؟")) return; setSaving(true); setError(null); setMessage(null); try { await deleteArchivedReport(String(x.report_id)); setMessage("تم حذف التقرير من الأرشيف."); await refreshArchives(); } catch (e) { setError(e instanceof Error ? e.message : "تعذر حذف التقرير"); } finally { setSaving(false); } }}><Trash2 className="mr-1 inline h-4 w-4" />حذف</Button>';
-if (!next.includes(oldActions) && !next.includes("حذف التقرير من الأرشيف")) throw new Error("ReportArchive: archive row action anchor not found.");
+const oldActions =
+  '<a className="font-semibold text-primary underline" href={archivedReportUrl(String(x.report_id))} target="_blank" rel="noreferrer"><Download className="mr-1 inline h-4 w-4" />تنزيل</a>';
+
+const newActions =
+  '<a className="font-semibold text-primary underline" href={archivedReportUrl(String(x.report_id))} target="_blank" rel="noreferrer"><Download className="mr-1 inline h-4 w-4" />تنزيل</a><Button variant="ghost" size="sm" className="text-destructive" disabled={saving} onClick={async () => { if (!window.confirm("هل تريد حذف هذا التقرير من الأرشيف نهائيًا؟")) return; setSaving(true); setError(null); setMessage(null); try { await deleteArchivedReport(String(x.report_id)); setMessage("تم حذف التقرير من الأرشيف."); await refreshArchives(); } catch (e) { setError(e instanceof Error ? e.message : "تعذر حذف التقرير"); } finally { setSaving(false); } }}><Trash2 className="mr-1 inline h-4 w-4" />حذف</Button>';
+
+if (!next.includes(oldActions) && !next.includes("حذف التقرير من الأرشيف")) {
+  throw new Error("ReportArchive: archive row action anchor not found.");
+}
+
 next = next.replace(oldActions, newActions);
 
-if (!next.includes("deleteArchivedReport") || !next.includes("حذف</Button>")) throw new Error("ReportArchive: delete action was not applied.");
+if (!next.includes("deleteArchivedReport") || !next.includes("حذف</Button>")) {
+  throw new Error("ReportArchive: delete action was not applied.");
+}
+
 console.log("ReportArchive patch: added manager/owner archive deletion action.");
