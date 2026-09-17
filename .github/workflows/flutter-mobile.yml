@@ -11,8 +11,10 @@ on:
       - 'test/**'
       - 'third_party/**'
       - 'scripts/**'
-      - 'pubspec.yaml'
+      - 'backend/src/**'
+      - 'backend/package.json'
       - 'analysis_options.yaml'
+      - 'pubspec.yaml'
       - '.github/workflows/flutter-mobile.yml'
   pull_request:
     paths:
@@ -22,8 +24,10 @@ on:
       - 'test/**'
       - 'third_party/**'
       - 'scripts/**'
-      - 'pubspec.yaml'
+      - 'backend/src/**'
+      - 'backend/package.json'
       - 'analysis_options.yaml'
+      - 'pubspec.yaml'
       - '.github/workflows/flutter-mobile.yml'
 
 permissions:
@@ -54,7 +58,9 @@ jobs:
         run: node scripts/patch-admin-mobile-menu-scroll.mjs
       - name: Format mobile shell sources
         run: dart format lib/features/administration/widgets/admin_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell_reference.dart
-      - name: Persist mobile shell changes
+      - name: Format backend worker source
+        run: npx --yes prettier@3.6.2 --write backend/src/index.ts
+      - name: Persist formatting changes
         shell: bash
         run: |
           set -euo pipefail
@@ -62,15 +68,16 @@ jobs:
             lib/features/administration/widgets/admin_mobile_shell.dart
             lib/features/employee/widgets/employee_mobile_shell.dart
             lib/features/employee/widgets/employee_mobile_shell_reference.dart
+            backend/src/index.ts
           )
           if git diff --quiet -- "${files[@]}"; then
-            echo "Mobile shell sources are already current and formatted."
+            echo "Mobile shell and backend worker sources are already formatted."
             exit 0
           fi
           git config user.name "HADIR Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "${files[@]}"
-          git commit -m "fix(apps): format and harden mobile shell menus"
+          git commit -m "chore(apps): format mobile and backend sources"
           git push origin Apps
       - run: flutter analyze
       - run: flutter test
@@ -142,6 +149,8 @@ jobs:
         run: node scripts/patch-admin-mobile-menu-scroll.mjs
       - name: Format mobile shell sources
         run: dart format lib/features/administration/widgets/admin_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell_reference.dart
+      - name: Format backend worker source
+        run: npx --yes prettier@3.6.2 --write backend/src/index.ts
       - run: flutter analyze
       - run: flutter test
       - run: flutter build ios --no-codesign
