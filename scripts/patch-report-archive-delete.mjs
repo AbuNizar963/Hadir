@@ -42,11 +42,24 @@ if (!next.includes(oldIcon) && !next.includes("Trash2")) {
 
 next = next.replace(oldIcon, newIcon);
 
-const oldActions =
-  '<a className="font-semibold text-primary underline" href={archivedReportUrl(String(x.report_id))} target="_blank" rel="noreferrer"><Download className="mr-1 inline h-4 w-4" />تنزيل</a>';
+const oldActions = [
+  '<a className="font-semibold text-primary underline" href={archivedReportUrl(String(x.report_id))} target="_blank" rel="noreferrer">',
+  '<Download className="mr-1 inline h-4 w-4" />تنزيل</a>',
+].join("");
 
-const newActions =
-  '<a className="font-semibold text-primary underline" href={archivedReportUrl(String(x.report_id))} target="_blank" rel="noreferrer"><Download className="mr-1 inline h-4 w-4" />تنزيل</a><Button variant="ghost" size="sm" className="text-destructive" disabled={saving} onClick={async () => { if (!window.confirm("هل تريد حذف هذا التقرير من الأرشيف نهائيًا؟")) return; setSaving(true); setError(null); setMessage(null); try { await deleteArchivedReport(String(x.report_id)); setMessage("تم حذف التقرير من الأرشيف."); await refreshArchives(); } catch (e) { setError(e instanceof Error ? e.message : "تعذر حذف التقرير"); } finally { setSaving(false); } }}><Trash2 className="mr-1 inline h-4 w-4" />حذف</Button>';
+const newActions = [
+  '<a className="font-semibold text-primary underline" href={archivedReportUrl(String(x.report_id))} target="_blank" rel="noreferrer">',
+  '<Download className="mr-1 inline h-4 w-4" />تنزيل</a>',
+  '<Button variant="ghost" size="sm" className="text-destructive" disabled={saving} ',
+  'onClick={async () => {',
+  'if (!window.confirm("هل تريد حذف هذا التقرير من الأرشيف نهائيًا؟")) return; ',
+  'setSaving(true); setError(null); setMessage(null); ',
+  'try { await deleteArchivedReport(String(x.report_id)); ',
+  'setMessage("تم حذف التقرير من الأرشيف."); await refreshArchives(); ',
+  '} catch (e) { setError(e instanceof Error ? e.message : "تعذر حذف التقرير"); ',
+  '} finally { setSaving(false); } }}>',
+  '<Trash2 className="mr-1 inline h-4 w-4" />حذف</Button>',
+].join("");
 
 if (!next.includes(oldActions) && !next.includes("حذف التقرير من الأرشيف")) {
   throw new Error("ReportArchive: archive row action anchor not found.");
