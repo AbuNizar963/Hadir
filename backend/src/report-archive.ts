@@ -443,11 +443,27 @@ export async function archiveClosedMonth(
 }
 export async function listReportArchives(env: Env, limit = 25) {
   const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
-  const result = await env.DB.prepare(
+  let result = await env.DB.prepare(
     "SELECT report_id,report_type,period_from,period_to,employee_id,generated_at,generated_by,generated_by_name,report_version,data_snapshot_hash,status,file_key,file_name,file_size,mime_type,file_sha256,created_at,locked_at,locked_by,revision FROM report_archives WHERE status='LOCKED' ORDER BY period_from DESC LIMIT ?",
   )
     .bind(safeLimit)
     .all<ArchiveRow>();
+
+  if (!result.results?.length) {
+    // Recover a missed scheduled archive without recreating an archive that
+    // the owner intentionally deleted.
+    try {
+      await archiveClosedMonth(env);
+      result = await env.DB.prepare(
+        "SELECT report_id,report_type,period_from,period_to,employee_id,generated_at,generated_by,generated_by_name,report_version,data_snapshot_hash,status,file_key,file_name,file_size,mime_type,file_sha256,created_at,locked_at,locked_by,revision FROM report_archives WHERE status='LOCKED' ORDER BY period_from DESC LIMIT ?",
+      )
+        .bind(safeLimit)
+        .all<ArchiveRow>();
+    } catch (error) {
+      console.error("[report-archive] lazy archive repair failed", error);
+    }
+  }
+
   return result.results || [];
 }
 export async function getReportArchive(env: Env, id: string) {
