@@ -55,7 +55,9 @@ jobs:
             src/deviceSecurity.ts \
             src/device-rebind-api.ts \
             src/notification-api.ts \
-            src/workforce.ts
+            src/workforce.ts \
+            src/ai.ts \
+            src/professional-attendance-fact-builder.ts
 
       - name: Commit patch
         run: |
