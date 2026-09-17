@@ -1,5 +1,10 @@
 import { handleDailyStatus } from "./daily-status-api";
 
+/**
+ * Materializes the authoritative attendance facts used by reporting.
+ * Raw attendance events are never modified by this module.
+ */
+
 type Env = { DB: D1Database };
 const TZ = "Asia/Damascus";
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
