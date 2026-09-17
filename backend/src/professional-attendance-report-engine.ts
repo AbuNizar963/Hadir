@@ -180,6 +180,10 @@ function shouldIncludeReportRow(
   );
 }
 
+/**
+ * Applies the single reportable-day policy shared by daily and historical reports.
+ * The policy is evaluated server-side so every report consumer receives the same rows.
+ */
 async function filterReportableRows(
   env: Env,
   rows: FactRow[],
