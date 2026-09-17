@@ -72,7 +72,9 @@ const newBlock = `      if (
           const tableNames = cleanupTables.map(([table]) => table);
           const placeholders = tableNames.map(() => "?").join(",");
           const existingRows = await env.DB.prepare(
-            `SELECT name FROM sqlite_master WHERE type='table' AND name IN (${placeholders})`,
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN (" +
+              placeholders +
+              ")",
           )
             .bind(...tableNames)
             .all<{ name: string }>();
@@ -90,7 +92,7 @@ const newBlock = `      if (
               }
 
               return env.DB.prepare(
-                `DELETE FROM ${table} WHERE ${column}=?`,
+                "DELETE FROM " + table + " WHERE " + column + "=?",
               ).bind(employeeId);
             });
 
@@ -149,7 +151,7 @@ const updated = source.replace(oldBlock, newBlock);
 if (!updated.includes("const cleanupTables = [")) {
   throw new Error("Employee delete patch validation failed: cleanup block is missing.");
 }
-if (updated.includes('DELETE FROM employees WHERE id=?")')) {
+if (updated.includes("await env.DB.prepare(\"DELETE FROM employees WHERE id=?\")\n          .bind(decodeURIComponent")) {
   throw new Error(
     "Employee delete patch validation failed: the unguarded direct delete remains.",
   );
