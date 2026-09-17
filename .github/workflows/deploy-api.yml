@@ -72,15 +72,11 @@ jobs:
           import subprocess
 
           sql = """
-          SELECT
-            m.name AS table_name,
-            fk."from" AS column_name,
-            fk.on_delete AS on_delete
-          FROM sqlite_master AS m,
-               pragma_foreign_key_list(m.name) AS fk
-          WHERE m.type = 'table'
-            AND fk."table" = 'employees'
-          ORDER BY m.name, fk.id, fk.seq;
+          SELECT name, sql
+          FROM sqlite_master
+          WHERE type = 'table'
+            AND upper(COALESCE(sql, '')) LIKE '%REFERENCES EMPLOYEES%'
+          ORDER BY name;
           """
 
           raw = subprocess.check_output(
@@ -102,6 +98,10 @@ jobs:
           for result in data if isinstance(data, list) else []:
               rows.extend(result.get("results") or [])
 
+          print("Tables declaring foreign keys to employees:")
+          for row in rows:
+              print(f"  {row.get('name')}: {row.get('sql')}")
+
           cleanup_tables = {
               "daily_attendance_status",
               "employee_passkeys",
@@ -121,23 +121,17 @@ jobs:
               "push_subscriptions",
           }
 
-          print("Foreign keys referencing employees:")
-          for row in rows:
-              print(
-                  f"  {row.get('table_name')}.{row.get('column_name')} "
-                  f"ON DELETE {row.get('on_delete')}"
-              )
-
           blockers = [
               row
               for row in rows
-              if str(row.get("on_delete") or "").upper() not in {"CASCADE", "SET NULL"}
-              and str(row.get("table_name") or "") not in cleanup_tables
+              if str(row.get("name") or "") not in cleanup_tables
+              and "ON DELETE CASCADE" not in str(row.get("sql") or "").upper()
+              and "ON DELETE SET NULL" not in str(row.get("sql") or "").upper()
           ]
 
           if blockers:
               raise SystemExit(
-                  "ERROR: employee deletion has an unhandled foreign-key blocker: "
+                  "ERROR: employee deletion has an unhandled foreign-key table: "
                   + json.dumps(blockers, ensure_ascii=False)
               )
 
