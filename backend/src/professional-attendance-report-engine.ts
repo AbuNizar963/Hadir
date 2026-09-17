@@ -468,7 +468,8 @@ async function loadLiveTodayFacts(
       const events = eventsByEmployee.get(String(row.employeeId)) || [];
       const checkInAt = row.checkInAt || null;
       const checkOutAt = row.checkOutAt || null;
-      const expectedStart = row.scheduledStart || null;      const expectedEnd = row.scheduledEnd || null;
+      const expectedStart = row.scheduledStart || null;
+      const expectedEnd = row.scheduledEnd || null;
       const expectedMinutes =
         expectedStart && expectedEnd
           ? Math.max(
