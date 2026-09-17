@@ -1,5 +1,9 @@
 import { handleDailyStatus } from "./attendance-engine";
-import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
+import {
+  buildProfessionalAttendanceReport,
+  isReportableEmployeeDay,
+  type ScheduleMeta,
+} from "./professional-attendance-report-engine";
 import { filterFutureCurrentDayRows } from "./professional-attendance-report-view";
 
 type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string };
@@ -146,8 +150,44 @@ async function assertCurrentDayCompleteness(
       .filter((row) => row.attendanceDay === today)
       .map((row) => String(row.employeeId)),
   );
+  const expectedIds = expectedEmployees
+    .map((row: any) => String(row?.employeeId || ""))
+    .filter(Boolean);
+
+  if (!expectedIds.length) return;
+
+  const placeholders = expectedIds.map(() => "?").join(",");
+  const scheduleResult = await env.DB.prepare(
+    `SELECT
+      id,
+      schedule_type AS scheduleType,
+      work_days_json AS workDaysJson,
+      rotation_start_date AS rotationStartDate,
+      rotation_days_on AS rotationDaysOn,
+      rotation_days_off AS rotationDaysOff
+     FROM employees
+     WHERE id IN (${placeholders})`,
+  )
+    .bind(...expectedIds)
+    .all<ScheduleMeta & { id: string }>();
+
+  const scheduleByEmployee = new Map(
+    (scheduleResult.results || []).map((employee) => [
+      String(employee.id),
+      employee as ScheduleMeta & { id: string },
+    ]),
+  );
+
   const expectedEmployeeIds = new Set(
     expectedEmployees
+      .filter((row: any) =>
+        isReportableEmployeeDay(
+          today,
+          String(row?.status || ""),
+          scheduleByEmployee.get(String(row?.employeeId || "")),
+          true,
+        ),
+      )
       .map((row: any) => String(row?.employeeId || ""))
       .filter(Boolean),
   );
