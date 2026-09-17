@@ -66,8 +66,8 @@ async function fetchByIds(
 
 /**
  * Attach the approved request reason without changing the report row set.
- * Completeness is owned by the reporting engine; this endpoint must never
- * remove NOT_STARTED, REST, or OPEN rows merely because a shift is unfinished.
+ * The reporting engine owns reportable-day eligibility; this endpoint must
+ * never add, remove, or reinterpret rows based on request-reason enrichment.
  */
 async function attachRequestReasons(env: Env, report: any) {
   const rows = (report.rows || []) as ReportRow[];
