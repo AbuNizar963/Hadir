@@ -87,6 +87,141 @@ function validatePeriod(from: string, to: string) {
   return days;
 }
 
+
+type ScheduleMeta = {
+  scheduleType: string;
+  workDaysJson: string | null;
+  rotationStartDate: string | null;
+  rotationDaysOn: number | null;
+  rotationDaysOff: number | null;
+};
+
+function normalizeWorkDays(value: string | null): number[] {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    if (Array.isArray(parsed)) {
+      const days = parsed
+        .filter(
+          (day): day is number =>
+            Number.isInteger(day) && day >= 0 && day <= 6,
+        )
+        .map(Number);
+
+      if (days.length) return [...new Set(days)].sort((a, b) => a - b);
+    }
+  } catch {
+    // Use the canonical administrative default below.
+  }
+
+  return [0, 1, 2, 3, 4];
+}
+
+function dayWeekday(day: string): number {
+  return new Date(dayNumber(day) * 86400000).getUTCDay();
+}
+
+function rotationWorkDay(
+  day: string,
+  meta: ScheduleMeta,
+): { isWorkDay: boolean; isLastWorkDay: boolean } {
+  const startDay = String(meta.rotationStartDate || "").slice(0, 10);
+
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(startDay)) {
+    return { isWorkDay: false, isLastWorkDay: false };
+  }
+
+  const daysOn = Math.max(1, Math.floor(Number(meta.rotationDaysOn ?? 4)));
+  const daysOff = Math.max(0, Math.floor(Number(meta.rotationDaysOff ?? 4)));
+  const cycleLength = daysOn + daysOff;
+
+  if (cycleLength <= 0) {
+    return { isWorkDay: false, isLastWorkDay: false };
+  }
+
+  const diff = Math.floor(dayNumber(day) - dayNumber(startDay));
+
+  if (diff < 0) {
+    return { isWorkDay: false, isLastWorkDay: false };
+  }
+
+  const cycleDay = diff % cycleLength;
+
+  return {
+    isWorkDay: cycleDay < daysOn,
+    isLastWorkDay: cycleDay === daysOn - 1,
+  };
+}
+
+function shouldIncludeReportRow(
+  row: FactRow,
+  meta: ScheduleMeta | undefined,
+  dailyReport: boolean,
+): boolean {
+  if (!meta) {
+    // Do not manufacture a schedule for a deleted/missing employee. Preserve
+    // the historical fact so the report can expose the data-quality issue.
+    return true;
+  }
+
+  const scheduleType = String(meta.scheduleType || "ADMIN")
+    .trim()
+    .toUpperCase();
+
+  if (scheduleType === "ROTATION") {
+    const rotation = rotationWorkDay(row.attendanceDay, meta);
+
+    if (!rotation.isWorkDay) return false;
+
+    // A daily report represents the employee's rotation at the end of the
+    // working block so the final check-out can be verified. Period reports
+    // retain every scheduled rotation work day.
+    return !dailyReport || rotation.isLastWorkDay;
+  }
+
+  return normalizeWorkDays(meta.workDaysJson).includes(
+    dayWeekday(row.attendanceDay),
+  );
+}
+
+async function filterReportableRows(
+  env: Env,
+  rows: FactRow[],
+  dailyReport: boolean,
+): Promise<FactRow[]> {
+  if (!rows.length) return [];
+
+  const employeeIds = [...new Set(rows.map((row) => row.employeeId))];
+  const placeholders = employeeIds.map(() => "?").join(",");
+  const result = await env.DB.prepare(
+    `SELECT
+      id,
+      schedule_type AS scheduleType,
+      work_days_json AS workDaysJson,
+      rotation_start_date AS rotationStartDate,
+      rotation_days_on AS rotationDaysOn,
+      rotation_days_off AS rotationDaysOff
+     FROM employees
+     WHERE id IN (${placeholders})`,
+  )
+    .bind(...employeeIds)
+    .all<ScheduleMeta & { id: string }>();
+
+  const scheduleByEmployee = new Map(
+    (result.results || []).map((employee) => [
+      String(employee.id),
+      employee as ScheduleMeta & { id: string },
+    ]),
+  );
+
+  return rows.filter((row) =>
+    shouldIncludeReportRow(
+      row,
+      scheduleByEmployee.get(row.employeeId),
+      dailyReport,
+    ),
+  );
+}
+
 async function loadFacts(
   env: Env,
   from: string,
@@ -425,6 +560,11 @@ export async function buildProfessionalAttendanceReport(
 ) {
   const dayCount = validatePeriod(from, to);
   const sourceRows = await loadFacts(env, from, to, employeeId);
+  const reportRows = await filterReportableRows(
+    env,
+    sourceRows,
+    dayCount === 1,
+  );
   const currentDay = damascusDay();
   const liveRows =
     from <= currentDay && currentDay <= to
@@ -438,12 +578,18 @@ export async function buildProfessionalAttendanceReport(
   // without a live counterpart remains visible as the stable fallback.
   const rowsByKey = new Map<string, FactRow>();
 
-  for (const row of sourceRows) {
+  for (const row of reportRows) {
     rowsByKey.set(`${row.attendanceDay}:${row.employeeId}`, row);
   }
 
   if (liveRows !== null) {
-    for (const row of liveRows) {
+    const filteredLiveRows = await filterReportableRows(
+      env,
+      liveRows,
+      dayCount === 1,
+    );
+
+    for (const row of filteredLiveRows) {
       rowsByKey.set(`${row.attendanceDay}:${row.employeeId}`, row);
     }
   }
