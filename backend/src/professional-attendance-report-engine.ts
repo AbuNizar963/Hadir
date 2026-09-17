@@ -110,7 +110,7 @@ function normalizeWorkDays(value: string | null): number[] {
       if (days.length) return [...new Set(days)].sort((a, b) => a - b);
     }
   } catch {
-    // Use the canonical administrative default below.
+    // Fall back to the canonical administrative work week.
   }
 
   return [0, 1, 2, 3, 4];
@@ -157,11 +157,7 @@ function shouldIncludeReportRow(
   meta: ScheduleMeta | undefined,
   dailyReport: boolean,
 ): boolean {
-  if (!meta) {
-    // Do not manufacture a schedule for a deleted/missing employee. Preserve
-    // the historical fact so the report can expose the data-quality issue.
-    return true;
-  }
+  if (!meta) return true;
 
   const scheduleType = String(meta.scheduleType || "ADMIN")
     .trim()
@@ -172,9 +168,6 @@ function shouldIncludeReportRow(
 
     if (!rotation.isWorkDay) return false;
 
-    // A daily report represents the employee's rotation at the end of the
-    // working block so the final check-out can be verified. Period reports
-    // retain every scheduled rotation work day.
     return !dailyReport || rotation.isLastWorkDay;
   }
 
@@ -192,6 +185,7 @@ async function filterReportableRows(
 
   const employeeIds = [...new Set(rows.map((row) => row.employeeId))];
   const placeholders = employeeIds.map(() => "?").join(",");
+
   const result = await env.DB.prepare(
     `SELECT
       id,
@@ -593,7 +587,6 @@ export async function buildProfessionalAttendanceReport(
       rowsByKey.set(`${row.attendanceDay}:${row.employeeId}`, row);
     }
   }
-
   const rows = Array.from(rowsByKey.values())
     .filter((row) => VALID_STATUSES.has(row.status))
     .map(toPublicRow);
@@ -758,3 +751,71 @@ export async function buildProfessionalAttendanceReport(
     filters: { employeeId: employeeId || null },
     summary: {
       employees: employees.size,
+      employeeDays: rows.length,
+      present,
+      late,
+      absent,
+      leave,
+      permission,
+      rest,
+      escaped,
+      notStarted,
+      invalid,
+      open,
+      workedMinutes,
+      expectedMinutes,
+      workVarianceMinutes,
+      lateMinutes,
+      earlyLeaveMinutes,
+      overtimeMinutes,
+      attendanceRate,
+      punctualityRate,
+    },
+    analytics: {
+      dailySeries: Array.from(daily.values()).sort((a, b) =>
+        a.attendanceDay.localeCompare(b.attendanceDay),
+      ),
+      employeeSummaries: Array.from(employees.values()).sort((a, b) =>
+        a.employeeName.localeCompare(b.employeeName, "ar"),
+      ),
+      exceptionCounts,
+      attendanceSourceCounts: sourceCounts,
+      exceptions: rows
+        .filter((row) => row.exceptionCode)
+        .map((row) => ({
+          attendanceDay: row.attendanceDay,
+          employeeId: row.employeeId,
+          employeeName: row.employeeName,
+          jobNumber: row.jobNumber,
+          code: row.exceptionCode,
+          status: row.status,
+          attendanceSource: row.attendanceSource,
+          minutes:
+            row.lateMinutes ||
+            row.earlyLeaveMinutes ||
+            row.overtimeMinutes ||
+            0,
+          attendanceEventIds: row.attendanceEventIds,
+          requestIds: row.requestIds,
+          auditIds: row.auditIds,
+        })),
+    },
+    rows,
+    dataQuality: {
+      byStatus: qualityCounts,
+      complete: (qualityCounts.exact || 0) === rows.length,
+    },
+    integrity: {
+      sourceOfTruth: "attendance_reporting_facts",
+      rawSource: "attendance",
+      noRawAttendanceMutation: true,
+      periodScoped: true,
+      maxDays: MAX_DAYS,
+      drillDownAvailable: true,
+      sourceEventIdsIncluded: true,
+      requestIdsIncluded: true,
+      auditIdsIncluded: true,
+      attendanceSourceDerivedFromRawEvents: true,
+    },
+  };
+}
