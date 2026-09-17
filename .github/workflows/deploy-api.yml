@@ -22,18 +22,22 @@ jobs:
       PRODUCTION_APP_ORIGIN: https://hadir-9rq.pages.dev
     steps:
       - uses: actions/checkout@v5
+
       - name: Validate Cloudflare credentials
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test "${#CLOUDFLARE_API_TOKEN}" -ge 20
+
       - name: Install backend dependencies
         working-directory: backend
         run: npm install --package-lock=false
+
       - name: Validate Worker bundle
         working-directory: backend
         run: npm run check
+
       - name: Preflight D1 access
         working-directory: backend
         shell: bash
@@ -53,9 +57,93 @@ jobs:
             fi
             exit "$status"
           fi
+
       - name: Apply remote D1 migrations
         working-directory: backend
         run: npx wrangler d1 migrations apply Hadir --remote
+
+      - name: Verify employee foreign-key lifecycle
+        working-directory: backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import subprocess
+
+          sql = """
+          SELECT
+            m.name AS table_name,
+            fk."from" AS column_name,
+            fk.on_delete AS on_delete
+          FROM sqlite_master AS m,
+               pragma_foreign_key_list(m.name) AS fk
+          WHERE m.type = 'table'
+            AND fk."table" = 'employees'
+          ORDER BY m.name, fk.id, fk.seq;
+          """
+
+          raw = subprocess.check_output(
+              [
+                  "npx",
+                  "wrangler",
+                  "d1",
+                  "execute",
+                  "Hadir",
+                  "--remote",
+                  "--json",
+                  "--command",
+                  sql,
+              ],
+              text=True,
+          )
+          data = json.loads(raw)
+          rows = []
+          for result in data if isinstance(data, list) else []:
+              rows.extend(result.get("results") or [])
+
+          cleanup_tables = {
+              "daily_attendance_status",
+              "employee_passkeys",
+              "webauthn_challenges",
+              "employee_webauthn_credentials",
+              "employee_webauthn_challenges",
+              "employee_device_events",
+              "employee_requests",
+              "requests",
+              "violations",
+              "leave_requests",
+              "performance_reviews",
+              "payroll_entries",
+              "anomaly_events",
+              "auth_sessions",
+              "notifications",
+              "push_subscriptions",
+          }
+
+          print("Foreign keys referencing employees:")
+          for row in rows:
+              print(
+                  f"  {row.get('table_name')}.{row.get('column_name')} "
+                  f"ON DELETE {row.get('on_delete')}"
+              )
+
+          blockers = [
+              row
+              for row in rows
+              if str(row.get("on_delete") or "").upper() not in {"CASCADE", "SET NULL"}
+              and str(row.get("table_name") or "") not in cleanup_tables
+          ]
+
+          if blockers:
+              raise SystemExit(
+                  "ERROR: employee deletion has an unhandled foreign-key blocker: "
+                  + json.dumps(blockers, ensure_ascii=False)
+              )
+
+          print("Employee foreign-key lifecycle is compatible with the deletion handler.")
+          PY
+
       - name: Verify canonical reporting schemas
         working-directory: backend
         shell: bash
@@ -84,6 +172,7 @@ jobs:
           print(f"daily_attendance_status rows: {daily[0].get('total',0) if daily else 0}")
           print("report_archives schema: verified.")
           PY
+
       - name: Verify and repair auth session schema
         working-directory: backend
         shell: bash
@@ -110,6 +199,7 @@ jobs:
           if "revoked_at" not in columns: raise SystemExit("ERROR: auth_sessions.revoked_at is still missing after schema repair.")
           print("auth_sessions schema is compatible with session security.")
           PY
+
       - name: Prepare Worker secrets
         working-directory: backend
         shell: bash
@@ -122,9 +212,11 @@ jobs:
           values={"JWT_SECRET":os.environ["JWT_SECRET"],"OWNER_RECOVERY_CODE":os.environ["OWNER_RECOVERY_CODE"],"VAPID_PUBLIC_KEY":os.environ["VAPID_PUBLIC_KEY"],"VAPID_PRIVATE_KEY":os.environ["VAPID_PRIVATE_KEY"],"VAPID_SUBJECT":os.environ["VAPID_SUBJECT"]}
           with open('.secrets.json','w',encoding='utf-8') as f: json.dump(values,f)
           PY
+
       - name: Deploy hadir-api once
         working-directory: backend
         run: npx wrangler deploy --secrets-file .secrets.json
+
       - name: Verify Cloudflare Worker secrets
         working-directory: backend
         shell: bash
@@ -132,10 +224,12 @@ jobs:
           set -euo pipefail
           secrets="$(npx wrangler secret list 2>/dev/null)"; printf '%s\n' "$secrets"
           printf '%s\n' "$secrets" | grep -q 'GEMINI_API_KEY' || { echo 'GEMINI_API_KEY is not configured on the deployed Cloudflare Worker.'; exit 1; }
+
       - name: Remove temporary secrets file
         if: always()
         working-directory: backend
         run: rm -f .secrets.json
+
       - name: Verify API health
         shell: bash
         run: |
@@ -147,6 +241,7 @@ jobs:
           with open(sys.argv[1],encoding='utf-8') as f: data=json.load(f)
           assert data.get('ok') is True,data; assert data.get('d1') is True,data
           PY
+
       - name: Verify production Pages CORS
         shell: bash
         run: |
@@ -155,12 +250,14 @@ jobs:
           printf '%s\n' "$headers"; normalized_headers="$(printf '%s\n' "$headers" | tr -d '\r')"
           printf '%s\n' "$normalized_headers" | grep -Fqi "access-control-allow-origin: $PRODUCTION_APP_ORIGIN"
           printf '%s\n' "$normalized_headers" | grep -Fqi 'access-control-allow-credentials: true'
+
       - name: Verify bootstrap compatibility
         shell: bash
         run: |
           set -euo pipefail
           code="$(curl -sS -o /tmp/bootstrap.json -w '%{http_code}' https://hadir-api.abunizar963.workers.dev/api/bootstrap)"; cat /tmp/bootstrap.json
           case "$code" in 200|401) exit 0;; *) echo "Unexpected /api/bootstrap status: $code"; exit 1;; esac
+
       - name: Verify previous-month archive manifest
         working-directory: backend
         shell: bash
