@@ -5,7 +5,7 @@ const target = path.resolve("src/index.ts");
 const source = fs.readFileSync(target, "utf8");
 
 const handlerPattern =
-  /if\(path\.startsWith\("\/api\/employees\/"\)&&req\.method==="DELETE"&&!path\.endsWith\("\/device"\)\)\{.*?return json\(\{ok:true\},200,origin\);\}/s;
+  /if\s*\(\s*path\.startsWith\("\/api\/employees\/"\)\s*&&\s*req\.method\s*===\s*"DELETE"\s*&&\s*!path\.endsWith\("\/device"\)\s*\)\s*\{[\s\S]*?await\s+env\.DB\.prepare\(\s*["']DELETE FROM employees WHERE id=\?["']\s*\)[\s\S]*?return\s+json\(\s*\{\s*ok\s*:\s*true\s*\}\s*,\s*200\s*,\s*origin\s*\)\s*;\s*\}/;
 
 const matches = source.match(handlerPattern) || [];
 
