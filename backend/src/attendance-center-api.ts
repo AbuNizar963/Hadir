@@ -4,7 +4,6 @@ import {
   isReportableEmployeeDay,
   type ScheduleMeta,
 } from "./professional-attendance-report-engine";
-import { filterFutureCurrentDayRows } from "./professional-attendance-report-view";
 
 type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string };
 
@@ -249,8 +248,12 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
       return json(payload, dailyStatus.status, origin);
     }
 
-    const report = filterFutureCurrentDayRows(
-      await buildProfessionalAttendanceReport(env, from, to, employeeId, actor),
+    const report = await buildProfessionalAttendanceReport(
+      env,
+      from,
+      to,
+      employeeId,
+      actor,
     );
 
     await assertCurrentDayCompleteness(env, from, to, employeeId, report, actor);
