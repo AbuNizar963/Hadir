@@ -25,7 +25,9 @@ const newBlock = `      if (
         if (!canWrite(actor.role))
           return json({ error: "لا تملك صلاحية الكتابة" }, 403, origin);
 
-        const employeeId = decodeURIComponent(path.split("/").pop() || "").trim();
+        const employeeId = decodeURIComponent(
+          path.split("/").pop() || "",
+        ).trim();
         if (!employeeId)
           return json({ error: "معرّف الموظف غير صالح" }, 400, origin);
 
@@ -40,18 +42,71 @@ const newBlock = `      if (
 
         try {
           /*
-           * Clean employee-owned rows that can retain restrictive foreign keys
-           * on legacy D1 installations before removing the employee itself.
-           * Historical attendance/audit/reporting rows are intentionally kept.
+           * Employee-owned operational records must not prevent lifecycle
+           * deletion. Historical attendance, audit, escape, reporting and
+           * archive records intentionally remain untouched because they carry
+           * their own employee name/job-number snapshots.
+           *
+           * The allowlist is checked against sqlite_master first so legacy D1
+           * installations can safely omit newer workforce/security tables.
            */
-          await env.DB.batch([
-            env.DB.prepare("DELETE FROM daily_attendance_status WHERE employee_id=?").bind(employeeId),
-            env.DB.prepare("DELETE FROM employee_webauthn_credentials WHERE employee_id=?").bind(employeeId),
-            env.DB.prepare("DELETE FROM employee_device_events WHERE employee_id=?").bind(employeeId),
-            env.DB.prepare("DELETE FROM employee_webauthn_challenges WHERE employee_id=?").bind(employeeId),
-            env.DB.prepare("DELETE FROM auth_sessions WHERE user_id=? AND user_type='employee'").bind(employeeId),
+          const cleanupTables = [
+            ["daily_attendance_status", "employee_id"],
+            ["employee_passkeys", "employee_id"],
+            ["webauthn_challenges", "employee_id"],
+            ["employee_webauthn_credentials", "employee_id"],
+            ["employee_webauthn_challenges", "employee_id"],
+            ["employee_device_events", "employee_id"],
+            ["employee_requests", "employee_id"],
+            ["requests", "employee_id"],
+            ["violations", "employee_id"],
+            ["leave_requests", "employee_id"],
+            ["performance_reviews", "employee_id"],
+            ["payroll_entries", "employee_id"],
+            ["anomaly_events", "employee_id"],
+            ["auth_sessions", "user_id"],
+            ["notifications", "recipient_id"],
+            ["push_subscriptions", "user_id"],
+          ] as const;
+
+          const tableNames = cleanupTables.map(([table]) => table);
+          const placeholders = tableNames.map(() => "?").join(",");
+          const existingRows = await env.DB.prepare(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name IN (${placeholders})`,
+          )
+            .bind(...tableNames)
+            .all<{ name: string }>();
+          const existingTables = new Set(
+            existingRows.results.map((row) => String(row.name)),
+          );
+
+          const cleanupStatements = cleanupTables
+            .filter(([table]) => existingTables.has(table))
+            .map(([table, column]) => {
+              if (table === "auth_sessions") {
+                return env.DB.prepare(
+                  "DELETE FROM auth_sessions WHERE user_id=? AND user_type='employee'",
+                ).bind(employeeId);
+              }
+
+              return env.DB.prepare(
+                `DELETE FROM ${table} WHERE ${column}=?`,
+              ).bind(employeeId);
+            });
+
+          if (existingTables.has("tasks")) {
+            cleanupStatements.push(
+              env.DB.prepare(
+                "UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?",
+              ).bind(employeeId),
+            );
+          }
+
+          cleanupStatements.push(
             env.DB.prepare("DELETE FROM employees WHERE id=?").bind(employeeId),
-          ]);
+          );
+
+          await env.DB.batch(cleanupStatements);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error || "");
           console.error("employee-delete-failed", { employeeId, message });
@@ -66,7 +121,14 @@ const newBlock = `      if (
         }
 
         return json(
-          { ok: true, deleted: { id: employee.id, jobNumber: employee.jobNumber, name: employee.name } },
+          {
+            ok: true,
+            deleted: {
+              id: employee.id,
+              jobNumber: employee.jobNumber,
+              name: employee.name,
+            },
+          },
           200,
           origin,
         );
@@ -78,8 +140,20 @@ if (source.includes(newBlock)) {
 }
 
 if (!source.includes(oldBlock)) {
-  throw new Error("Expected employee DELETE handler was not found; refusing to patch an unknown source layout.");
+  throw new Error(
+    "Expected employee DELETE handler was not found; refusing to patch an unknown source layout.",
+  );
 }
 
-fs.writeFileSync(target, source.replace(oldBlock, newBlock), "utf8");
+const updated = source.replace(oldBlock, newBlock);
+if (!updated.includes("const cleanupTables = [")) {
+  throw new Error("Employee delete patch validation failed: cleanup block is missing.");
+}
+if (updated.includes('DELETE FROM employees WHERE id=?")')) {
+  throw new Error(
+    "Employee delete patch validation failed: the unguarded direct delete remains.",
+  );
+}
+
+fs.writeFileSync(target, updated, "utf8");
 process.stdout.write("employee delete integrity patch applied\n");
