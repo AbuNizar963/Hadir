@@ -21,12 +21,11 @@ type ReportRow = {
 };
 
 /**
- * The report engine is the source of truth for the complete employee/day set.
+ * The report engine is the source of truth for the reportable employee/day set.
  *
- * Do not hide current-day NOT_STARTED rows here. A report must represent every
- * employee returned by the attendance engine, including employees whose shift
- * has not started yet. UI consumers may choose how to present those states,
- * but the reporting API must never silently remove records.
+ * This adapter intentionally performs no additional filtering. Eligibility for
+ * work days, rotation days, and excluded REST/NOT_STARTED states is decided by
+ * the reporting engine so every consumer sees the same row set.
  */
 export function filterFutureCurrentDayRows<T extends { rows: ReportRow[] }>(report: T): T {
   return report;
