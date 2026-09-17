@@ -117,7 +117,7 @@ function normalizeWorkDays(value: string | null): number[] {
 }
 
 function dayWeekday(day: string): number {
-  return new Date(dayNumber(day) * 86400000).getUTCDay();
+  return new Date(dateNumber(day) * 86400000).getUTCDay();
 }
 
 function rotationWorkDay(
