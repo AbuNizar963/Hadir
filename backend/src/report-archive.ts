@@ -342,7 +342,11 @@ async function claimArchive(
     .first<ArchiveRow>();
 }
 
-export async function archiveClosedMonth(env: Env, now = new Date()) {
+export async function archiveClosedMonth(
+  env: Env,
+  now = new Date(),
+  force = false,
+) {
   if (!env.REPORT_ARCHIVES)
     throw new Error("R2 binding REPORT_ARCHIVES غير موجود");
   const timezone = String(env.APP_TIMEZONE || "Asia/Damascus"),
@@ -350,16 +354,27 @@ export async function archiveClosedMonth(env: Env, now = new Date()) {
     id = `attendance_period_${period.from}`,
     key = archiveKey(period);
   const existing = await claimArchive(env, id, period.from, period.to, key);
-  if (existing?.status === "LOCKED" || existing?.status === "DELETED")
+  if (existing?.status === "LOCKED") {
     return {
       ok: true,
       archived: false,
-      reason:
-        existing.status === "LOCKED" ? "already_locked" : "deleted_by_admin",
+      reason: "already_locked",
       id,
       key,
       period,
     };
+  }
+
+  if (existing?.status === "DELETED" && !force) {
+    return {
+      ok: true,
+      archived: false,
+      reason: "deleted_by_admin",
+      id,
+      key,
+      period,
+    };
+  }
   const report = await buildProfessionalAttendanceReport(
     env,
     period.from,
