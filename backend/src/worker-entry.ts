@@ -105,6 +105,42 @@ export default {
           "cache-control": "no-store",
         },
       });
+    if (
+      path === "/api/reports/archive/refresh" &&
+      request.method === "POST"
+    ) {
+      const a = await archiveActor(request, env);
+
+      if (!archiveDeleteAllowed(a)) {
+        return json({ error: "تحديث الأرشيف متاح للمالك فقط" }, 403, o);
+      }
+
+      if (!env.REPORT_ARCHIVES) {
+        return json(
+          { error: "R2 binding REPORT_ARCHIVES غير موجود" },
+          503,
+          o,
+        );
+      }
+
+      try {
+        const result = await archiveClosedMonth(env, new Date(), true);
+        return json(result, 200, o);
+      } catch (error) {
+        console.error("[report-archive] manual refresh failed", error);
+        return json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "تعذر إنشاء أرشيف الشهر المغلق",
+          },
+          500,
+          o,
+        );
+      }
+    }
+
     if (path === "/api/reports/archive" && request.method === "GET") {
       const a = await archiveActor(request, env);
       if (!archiveAllowed(a)) return json({ error: "غير مصرح" }, 403, o);
