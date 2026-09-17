@@ -77,6 +77,27 @@ export async function listArchivedReports(limit = 25) {
   return rows;
 }
 
+export async function refreshReportArchive() {
+  const response = await fetch(`${API_URL}/api/reports/archive/refresh`, {
+    method: "POST",
+    headers: adminHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  const data = (await response
+    .json()
+    .catch(() => null)) as { error?: string; archived?: boolean } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      String(data?.error || `HTTP ${response.status}`),
+    );
+  }
+
+  return data;
+}
+
 export async function downloadArchivedReport(
   reportId: string,
   fileName: string,
