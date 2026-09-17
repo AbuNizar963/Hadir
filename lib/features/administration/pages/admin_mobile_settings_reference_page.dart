@@ -13,10 +13,12 @@ class AdminMobileSettingsReferencePage extends StatefulWidget {
   const AdminMobileSettingsReferencePage({super.key});
 
   @override
-  State<AdminMobileSettingsReferencePage> createState() => _AdminMobileSettingsReferencePageState();
+  State<AdminMobileSettingsReferencePage> createState() =>
+      _AdminMobileSettingsReferencePageState();
 }
 
-class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsReferencePage> {
+class _AdminMobileSettingsReferencePageState
+    extends State<AdminMobileSettingsReferencePage> {
   static const bg = Color(0xFF080D18);
   static const card = Color(0xFF111827);
   static const inner = Color(0xFF151E30);
@@ -144,11 +146,16 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
     if (busy || logoBusy) return;
     try {
       final picker = ImagePicker();
-      final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024, imageQuality: 88);
+      final image = await picker.pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1024,
+          maxHeight: 1024,
+          imageQuality: 88);
       if (image == null || !mounted) return;
       setState(() => pendingLogoPath = image.path);
     } catch (e) {
-      if (mounted) toast('تعذر اختيار الشعار: ${HadirApi.errorMessage(e)}', danger: true);
+      if (mounted)
+        toast('تعذر اختيار الشعار: ${HadirApi.errorMessage(e)}', danger: true);
     }
   }
 
@@ -162,10 +169,14 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
       await apiClient.uploadCompanyLogo(path);
       final remote = await apiClient.settings();
       if (!mounted) return;
-      setState(() { settings = Map<String, dynamic>.from(remote); pendingLogoPath = null; });
+      setState(() {
+        settings = Map<String, dynamic>.from(remote);
+        pendingLogoPath = null;
+      });
       toast('تم حفظ شعار الشركة مركزيًا');
     } catch (e) {
-      if (mounted) toast('تعذر حفظ الشعار: ${HadirApi.errorMessage(e)}', danger: true);
+      if (mounted)
+        toast('تعذر حفظ الشعار: ${HadirApi.errorMessage(e)}', danger: true);
     } finally {
       if (mounted) setState(() => logoBusy = false);
     }
@@ -173,7 +184,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
 
   Future<void> removeCompanyLogo() async {
     if (logoBusy) return;
-    final confirmed = await confirm('إزالة شعار الشركة', 'سيتم إزالة الشعار المركزي من R2 وإخفاؤه من هوية الجهة.');
+    final confirmed = await confirm('إزالة شعار الشركة',
+        'سيتم إزالة الشعار المركزي من R2 وإخفاؤه من هوية الجهة.');
     if (!confirmed) return;
     setState(() => logoBusy = true);
     try {
@@ -182,10 +194,14 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
       await apiClient.deleteCompanyLogo();
       final remote = await apiClient.settings();
       if (!mounted) return;
-      setState(() { settings = Map<String, dynamic>.from(remote); pendingLogoPath = null; });
+      setState(() {
+        settings = Map<String, dynamic>.from(remote);
+        pendingLogoPath = null;
+      });
       toast('تمت إزالة شعار الشركة');
     } catch (e) {
-      if (mounted) toast('تعذر إزالة الشعار: ${HadirApi.errorMessage(e)}', danger: true);
+      if (mounted)
+        toast('تعذر إزالة الشعار: ${HadirApi.errorMessage(e)}', danger: true);
     } finally {
       if (mounted) setState(() => logoBusy = false);
     }
@@ -213,7 +229,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
         backgroundColor: inner,
         title: Text(
           title,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
         ),
         content: Text(message, style: const TextStyle(color: muted)),
         actions: [
@@ -281,7 +298,9 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
         child: child,
       );
 
-  Widget sectionHead(String title, String subtitle, IconData icon, {Color color = green}) => Row(
+  Widget sectionHead(String title, String subtitle, IconData icon,
+          {Color color = green}) =>
+      Row(
         children: [
           iconBox(icon, color: color),
           const SizedBox(width: 9),
@@ -421,11 +440,16 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
               decoration: BoxDecoration(
                 color: const Color(0xFF1B2437),
                 shape: BoxShape.circle,
-                border: Border.all(color: green.withValues(alpha: .25), width: 2),
+                border:
+                    Border.all(color: green.withValues(alpha: .25), width: 2),
               ),
               child: ClipOval(
-                child: (settings['brandLogo']?.toString().trim().isNotEmpty ?? false)
-                    ? Image.network(settings['brandLogo'].toString(), fit: BoxFit.contain, errorBuilder: (_, __, ___) => Image.asset('assets/branding/hadir_logo_transparent.png'))
+                child: (settings['brandLogo']?.toString().trim().isNotEmpty ??
+                        false)
+                    ? Image.network(settings['brandLogo'].toString(),
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Image.asset(
+                            'assets/branding/hadir_logo_transparent.png'))
                     : Image.asset('assets/branding/hadir_logo_transparent.png'),
               ),
             ),
@@ -446,14 +470,17 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
               onPressed: () => setState(() => view = SettingsRefView.identity),
               child: const Text(
                 'إدارة الهوية',
-                style: TextStyle(color: red, fontSize: 10, fontWeight: FontWeight.w900),
+                style: TextStyle(
+                    color: red, fontSize: 10, fontWeight: FontWeight.w900),
               ),
             ),
           ],
         ),
       );
 
-  Widget homeRow(String title, String subtitle, IconData icon, SettingsRefView target) => InkWell(
+  Widget homeRow(String title, String subtitle, IconData icon,
+          SettingsRefView target) =>
+      InkWell(
         onTap: () {
           setState(() => view = target);
           if (target == SettingsRefView.identity) load(withAdmins: true);
@@ -497,7 +524,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
       children: [
-        pageHeader('الهوية والحسابات', 'هوية الشركة والحسابات الإدارية', Icons.badge_outlined),
+        pageHeader('الهوية والحسابات', 'هوية الشركة والحسابات الإدارية',
+            Icons.badge_outlined),
         const SizedBox(height: 9),
         box(
           Column(
@@ -511,24 +539,100 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
               const SizedBox(height: 14),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: inner, borderRadius: BorderRadius.circular(18), border: Border.all(color: green.withValues(alpha: .18))),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Row(children: [iconBox(Icons.image_outlined), const SizedBox(width: 9), const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('الشعار الرسمي', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
-                    Text('الشعار الذي يظهر كهوية الشركة داخل النظام', style: TextStyle(color: muted, fontSize: 9.5)),
-                  ]))]),
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    Container(width: 72, height: 72, padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF070C16), borderRadius: BorderRadius.circular(16), border: Border.all(color: line)), child: pendingLogoPath != null ? Image.file(File(pendingLogoPath!), fit: BoxFit.contain) : ((settings['brandLogo']?.toString().trim().isNotEmpty ?? false) ? Image.network(settings['brandLogo'].toString(), fit: BoxFit.contain, errorBuilder: (_, __, ___) => Image.asset('assets/branding/hadir_logo_transparent.png')) : Image.asset('assets/branding/hadir_logo_transparent.png'))),
-                    const SizedBox(width: 10),
-                    Expanded(child: Wrap(spacing: 7, runSpacing: 7, children: [
-                      OutlinedButton.icon(onPressed: logoBusy ? null : pickCompanyLogo, icon: const Icon(Icons.add_photo_alternate_outlined, size: 17), label: Text(settings['brandLogo']?.toString().trim().isNotEmpty ?? false ? 'تغيير الشعار' : 'اختيار الشعار')),
-                      if (pendingLogoPath != null) FilledButton.icon(onPressed: logoBusy ? null : saveCompanyLogo, icon: const Icon(Icons.check_rounded, size: 17), label: const Text('حفظ الشعار'), style: FilledButton.styleFrom(backgroundColor: green, foregroundColor: Colors.black)),
-                      if (settings['brandLogo']?.toString().trim().isNotEmpty ?? false) TextButton.icon(onPressed: logoBusy ? null : removeCompanyLogo, icon: const Icon(Icons.delete_outline_rounded, size: 17), label: const Text('إزالة'), style: TextButton.styleFrom(foregroundColor: red)),
-                    ])),
-                  ]),
-                  if (pendingLogoPath != null) const Padding(padding: EdgeInsets.only(top: 8), child: Text('تم تجهيز صورة جديدة. اضغط «حفظ الشعار» لرفعها إلى R2.', textAlign: TextAlign.right, style: TextStyle(color: cyan, fontSize: 9.5))),
-                ]),
+                decoration: BoxDecoration(
+                    color: inner,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: green.withValues(alpha: .18))),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        iconBox(Icons.image_outlined),
+                        const SizedBox(width: 9),
+                        const Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text('الشعار الرسمي',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900)),
+                              Text('الشعار الذي يظهر كهوية الشركة داخل النظام',
+                                  style:
+                                      TextStyle(color: muted, fontSize: 9.5)),
+                            ]))
+                      ]),
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        Container(
+                            width: 72,
+                            height: 72,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                                color: const Color(0xFF070C16),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: line)),
+                            child: pendingLogoPath != null
+                                ? Image.file(File(pendingLogoPath!),
+                                    fit: BoxFit.contain)
+                                : ((settings['brandLogo']
+                                            ?.toString()
+                                            .trim()
+                                            .isNotEmpty ??
+                                        false)
+                                    ? Image.network(
+                                        settings['brandLogo'].toString(),
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (_, __, ___) => Image.asset(
+                                            'assets/branding/hadir_logo_transparent.png'))
+                                    : Image.asset(
+                                        'assets/branding/hadir_logo_transparent.png'))),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: Wrap(spacing: 7, runSpacing: 7, children: [
+                          OutlinedButton.icon(
+                              onPressed: logoBusy ? null : pickCompanyLogo,
+                              icon: const Icon(
+                                  Icons.add_photo_alternate_outlined,
+                                  size: 17),
+                              label: Text(settings['brandLogo']
+                                          ?.toString()
+                                          .trim()
+                                          .isNotEmpty ??
+                                      false
+                                  ? 'تغيير الشعار'
+                                  : 'اختيار الشعار')),
+                          if (pendingLogoPath != null)
+                            FilledButton.icon(
+                                onPressed: logoBusy ? null : saveCompanyLogo,
+                                icon: const Icon(Icons.check_rounded, size: 17),
+                                label: const Text('حفظ الشعار'),
+                                style: FilledButton.styleFrom(
+                                    backgroundColor: green,
+                                    foregroundColor: Colors.black)),
+                          if (settings['brandLogo']
+                                  ?.toString()
+                                  .trim()
+                                  .isNotEmpty ??
+                              false)
+                            TextButton.icon(
+                                onPressed: logoBusy ? null : removeCompanyLogo,
+                                icon: const Icon(Icons.delete_outline_rounded,
+                                    size: 17),
+                                label: const Text('إزالة'),
+                                style:
+                                    TextButton.styleFrom(foregroundColor: red)),
+                        ])),
+                      ]),
+                      if (pendingLogoPath != null)
+                        const Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: Text(
+                                'تم تجهيز صورة جديدة. اضغط «حفظ الشعار» لرفعها إلى R2.',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(color: cyan, fontSize: 9.5))),
+                    ]),
               ),
               field(
                 'اسم الشركة / الجهة',
@@ -540,7 +644,10 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                 alignment: Alignment.centerRight,
                 child: Text(
                   'تخصصات العمل',
-                  style: TextStyle(color: muted, fontSize: 10.5, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                      color: muted,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 6),
@@ -569,7 +676,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
               for (final entry in specialtyItems.asMap().entries)
                 Container(
                   margin: const EdgeInsets.only(top: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   decoration: BoxDecoration(
                     color: inner,
                     borderRadius: BorderRadius.circular(10),
@@ -578,7 +686,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                     children: [
                       IconButton(
                         onPressed: () => removeSpecialty(entry.value),
-                        icon: const Icon(Icons.delete_outline, color: red, size: 16),
+                        icon: const Icon(Icons.delete_outline,
+                            color: red, size: 16),
                       ),
                       Expanded(
                         child: Text(
@@ -591,7 +700,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                           ),
                         ),
                       ),
-                      const Icon(Icons.drag_indicator_rounded, color: muted, size: 15),
+                      const Icon(Icons.drag_indicator_rounded,
+                          color: muted, size: 15),
                     ],
                   ),
                 ),
@@ -638,7 +748,9 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
 
   List<String> specialties() {
     final value = settings['specialties'];
-    return value is List ? List<String>.from(value.map((e) => '$e')) : <String>[];
+    return value is List
+        ? List<String>.from(value.map((e) => '$e'))
+        : <String>[];
   }
 
   Future<void> addSpecialty() async {
@@ -680,7 +792,9 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
     );
   }
 
-  Widget fieldController(String hint, TextEditingController controller, {bool obscure = false}) => TextField(
+  Widget fieldController(String hint, TextEditingController controller,
+          {bool obscure = false}) =>
+      TextField(
         controller: controller,
         obscureText: obscure,
         textDirection: TextDirection.rtl,
@@ -693,7 +807,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
       'ownerName': ownerName.text.trim(),
       'ownerUsername': ownerUsername.text.trim(),
     };
-    if (ownerPassword.text.isNotEmpty) patch['ownerPassword'] = ownerPassword.text;
+    if (ownerPassword.text.isNotEmpty)
+      patch['ownerPassword'] = ownerPassword.text;
     await save(patch);
     ownerPassword.clear();
   }
@@ -726,12 +841,15 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
             for (final raw in admins)
               Builder(
                 builder: (context) {
-                  final account = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+                  final account = raw is Map
+                      ? Map<String, dynamic>.from(raw)
+                      : <String, dynamic>{};
                   final active = account['active'] != false;
                   final id = '${account['id'] ?? ''}';
                   return Container(
                     margin: const EdgeInsets.only(top: 5),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
                       color: inner,
                       borderRadius: BorderRadius.circular(10),
@@ -739,7 +857,9 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                     child: Row(
                       children: [
                         Icon(
-                          active ? Icons.check_circle_outline : Icons.block_outlined,
+                          active
+                              ? Icons.check_circle_outline
+                              : Icons.block_outlined,
                           color: active ? green : red,
                           size: 16,
                         ),
@@ -756,11 +876,14 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                         ),
                         Switch(
                           value: active,
-                          onChanged: id.isEmpty ? null : (value) => toggleAdmin(id, value),
+                          onChanged: id.isEmpty
+                              ? null
+                              : (value) => toggleAdmin(id, value),
                         ),
                         IconButton(
                           onPressed: id.isEmpty ? null : () => deleteAdmin(id),
-                          icon: const Icon(Icons.delete_outline, color: red, size: 17),
+                          icon: const Icon(Icons.delete_outline,
+                              color: red, size: 17),
                         ),
                       ],
                     ),
@@ -808,7 +931,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
         backgroundColor: inner,
         title: Text(
           hint,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
         ),
         content: TextField(
           controller: controller,
@@ -862,7 +986,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
   Widget locationsView() => ListView(
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
         children: [
-          pageHeader('المواقع و QR', 'مواقع العمل ورموز الحضور', Icons.location_on_outlined),
+          pageHeader('المواقع و QR', 'مواقع العمل ورموز الحضور',
+              Icons.location_on_outlined),
           const SizedBox(height: 9),
           box(
             Column(
@@ -876,18 +1001,22 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                 for (final raw in locations)
                   Builder(
                     builder: (context) {
-                      final location = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+                      final location = raw is Map
+                          ? Map<String, dynamic>.from(raw)
+                          : <String, dynamic>{};
                       final id = '${location['id'] ?? ''}';
                       return Container(
                         margin: const EdgeInsets.only(top: 5),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
                         decoration: BoxDecoration(
                           color: inner,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.location_on_outlined, color: green, size: 18),
+                            const Icon(Icons.location_on_outlined,
+                                color: green, size: 18),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Column(
@@ -903,19 +1032,22 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                                   ),
                                   Text(
                                     '${location['lat'] ?? '—'} · ${location['lng'] ?? '—'} · ${location['radiusMeters'] ?? '—'} م',
-                                    style: const TextStyle(color: muted, fontSize: 9),
+                                    style: const TextStyle(
+                                        color: muted, fontSize: 9),
                                   ),
                                 ],
                               ),
                             ),
                             IconButton(
                               onPressed: () => editLocation(location),
-                              icon: const Icon(Icons.edit_outlined, color: cyan, size: 17),
+                              icon: const Icon(Icons.edit_outlined,
+                                  color: cyan, size: 17),
                             ),
                             if (id != 'main')
                               IconButton(
                                 onPressed: () => deleteLocation(id),
-                                icon: const Icon(Icons.delete_outline, color: red, size: 17),
+                                icon: const Icon(Icons.delete_outline,
+                                    color: red, size: 17),
                               ),
                           ],
                         ),
@@ -949,7 +1081,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () => setState(() => addingLocation = false),
+                          onPressed: () =>
+                              setState(() => addingLocation = false),
                           child: const Text('إلغاء'),
                         ),
                       ),
@@ -1000,14 +1133,18 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                 const SizedBox(height: 7),
                 Text(
                   '${settings['qrCode'] ?? 'HADIR-SITE-01-STATIC'}',
-                  style: const TextStyle(color: muted, fontSize: 9, fontFamily: 'monospace'),
+                  style: const TextStyle(
+                      color: muted, fontSize: 9, fontFamily: 'monospace'),
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => save({'qrCode': 'HADIR-${DateTime.now().millisecondsSinceEpoch}'}),
+                        onPressed: () => save({
+                          'qrCode':
+                              'HADIR-${DateTime.now().millisecondsSinceEpoch}'
+                        }),
                         icon: const Icon(Icons.qr_code_2, size: 16),
                         label: const Text('توليد رمز جديد'),
                       ),
@@ -1015,7 +1152,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                     const SizedBox(width: 7),
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: () => toast('الرمز جاهز للطباعة أو المشاركة من الجهاز'),
+                        onPressed: () =>
+                            toast('الرمز جاهز للطباعة أو المشاركة من الجهاز'),
                         icon: const Icon(Icons.print_outlined, size: 16),
                         label: const Text('طباعة الرمز'),
                         style: FilledButton.styleFrom(
@@ -1052,7 +1190,11 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
     final lat = double.tryParse(locationLat.text);
     final lng = double.tryParse(locationLng.text);
     final radius = double.tryParse(locationRadius.text);
-    if (locationName.text.trim().isEmpty || lat == null || lng == null || radius == null || radius <= 0) {
+    if (locationName.text.trim().isEmpty ||
+        lat == null ||
+        lng == null ||
+        radius == null ||
+        radius <= 0) {
       toast('بيانات الموقع غير صالحة', danger: true);
       return;
     }
@@ -1062,7 +1204,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
       await apiClient.dio.put(
         '/api/locations',
         data: {
-          'id': editingLocation ?? 'loc_${DateTime.now().millisecondsSinceEpoch}',
+          'id':
+              editingLocation ?? 'loc_${DateTime.now().millisecondsSinceEpoch}',
           'name': locationName.text.trim(),
           'lat': lat,
           'lng': lng,
@@ -1078,7 +1221,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
   }
 
   Future<void> deleteLocation(String id) async {
-    if (!await confirm('حذف الموقع', 'سيتم حذف الموقع من قائمة مواقع العمل.')) return;
+    if (!await confirm('حذف الموقع', 'سيتم حذف الموقع من قائمة مواقع العمل.'))
+      return;
     try {
       final apiClient = await api();
       if (apiClient == null) return;
@@ -1093,7 +1237,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
   Widget security() => ListView(
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
         children: [
-          pageHeader('الأمان والصلاحيات', 'حساب المالك والعمليات الجماعية للموظفين', Icons.shield_outlined),
+          pageHeader('الأمان والصلاحيات',
+              'حساب المالك والعمليات الجماعية للموظفين', Icons.shield_outlined),
           const SizedBox(height: 9),
           box(
             Column(
@@ -1110,29 +1255,52 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                   style: const TextStyle(color: Colors.white, fontSize: 11),
                   decoration: input('اختيار إعداد'),
                   items: const [
-                    DropdownMenuItem(value: 'password', child: Text('تغيير كلمة مرور جميع الموظفين')),
-                    DropdownMenuItem(value: 'avatar', child: Text('تغيير الصورة الشخصية للجميع')),
-                    DropdownMenuItem(value: 'grace', child: Text('مهلة التأخر')),
-                    DropdownMenuItem(value: 'earlyCheckout', child: Text('مهلة الانصراف المبكر')),
-                    DropdownMenuItem(value: 'adminWorkHours', child: Text('أوقات دوام الموظفين الإداريين')),
-                    DropdownMenuItem(value: 'rotationWorkHours', child: Text('أوقات دوام الموظفين التناوبيين')),
-                    DropdownMenuItem(value: 'rotationDays', child: Text('أيام التناوب للموظفين التناوبيين')),
-                    DropdownMenuItem(value: 'unlinkDevices', child: Text('فك ربط جميع الأجهزة')),
-                    DropdownMenuItem(value: 'revokeSessions', child: Text('تسجيل خروج جميع الموظفين')),
+                    DropdownMenuItem(
+                        value: 'password',
+                        child: Text('تغيير كلمة مرور جميع الموظفين')),
+                    DropdownMenuItem(
+                        value: 'avatar',
+                        child: Text('تغيير الصورة الشخصية للجميع')),
+                    DropdownMenuItem(
+                        value: 'grace', child: Text('مهلة التأخر')),
+                    DropdownMenuItem(
+                        value: 'earlyCheckout',
+                        child: Text('مهلة الانصراف المبكر')),
+                    DropdownMenuItem(
+                        value: 'adminWorkHours',
+                        child: Text('أوقات دوام الموظفين الإداريين')),
+                    DropdownMenuItem(
+                        value: 'rotationWorkHours',
+                        child: Text('أوقات دوام الموظفين التناوبيين')),
+                    DropdownMenuItem(
+                        value: 'rotationDays',
+                        child: Text('أيام التناوب للموظفين التناوبيين')),
+                    DropdownMenuItem(
+                        value: 'unlinkDevices',
+                        child: Text('فك ربط جميع الأجهزة')),
+                    DropdownMenuItem(
+                        value: 'revokeSessions',
+                        child: Text('تسجيل خروج جميع الموظفين')),
                   ],
-                  onChanged: (value) => setState(() => bulkAction = value ?? ''),
+                  onChanged: (value) =>
+                      setState(() => bulkAction = value ?? ''),
                 ),
                 const SizedBox(height: 8),
                 if (bulkAction == 'grace' || bulkAction == 'earlyCheckout')
                   fieldController('عدد الدقائق', bulkMinutes),
-                if (bulkAction == 'adminWorkHours' || bulkAction == 'rotationWorkHours')
-                  info('08:00 → 16:00', 'وقت البداية والنهاية يطبقان حسب نوع الدوام.'),
+                if (bulkAction == 'adminWorkHours' ||
+                    bulkAction == 'rotationWorkHours')
+                  info('08:00 → 16:00',
+                      'وقت البداية والنهاية يطبقان حسب نوع الدوام.'),
                 if (bulkAction == 'rotationDays')
-                  info('4 أيام مناوبة + 4 أيام راحة', 'دورة التناوب للموظفين التناوبيين.'),
+                  info('4 أيام مناوبة + 4 أيام راحة',
+                      'دورة التناوب للموظفين التناوبيين.'),
                 if (bulkAction == 'avatar')
-                  info('الصورة الموحدة', 'رفع الصورة الموحدة يتم من واجهة الموظفين الذكية.'),
+                  info('الصورة الموحدة',
+                      'رفع الصورة الموحدة يتم من واجهة الموظفين الذكية.'),
                 if (bulkAction == 'password')
-                  info('كلمة مرور جديدة', 'سيتم إلغاء الجلسات الحالية بعد التطبيق.'),
+                  info('كلمة مرور جديدة',
+                      'سيتم إلغاء الجلسات الحالية بعد التطبيق.'),
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -1164,7 +1332,10 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
           children: [
             Text(
               title,
-              style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800),
             ),
             Text(
               subtitle,
@@ -1201,14 +1372,18 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
       payload['rotationDaysOff'] = 4;
     }
     if ((bulkAction == 'unlinkDevices' || bulkAction == 'revokeSessions') &&
-        !await confirm('تأكيد العملية', 'ستؤثر هذه العملية على جميع الموظفين.')) {
+        !await confirm(
+            'تأكيد العملية', 'ستؤثر هذه العملية على جميع الموظفين.')) {
       return;
     }
     try {
       final apiClient = await api();
       if (apiClient == null) return;
-      final response = await apiClient.dio.post('/api/owner/bulk-settings', data: payload);
-      final data = response.data is Map ? Map<String, dynamic>.from(response.data as Map) : <String, dynamic>{};
+      final response =
+          await apiClient.dio.post('/api/owner/bulk-settings', data: payload);
+      final data = response.data is Map
+          ? Map<String, dynamic>.from(response.data as Map)
+          : <String, dynamic>{};
       toast(data['message']?.toString() ?? 'تم تنفيذ العملية بنجاح');
     } catch (e) {
       toast(HadirApi.errorMessage(e), danger: true);
@@ -1218,12 +1393,14 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
   Widget diagnostics() => ListView(
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
         children: [
-          pageHeader('التشخيص وإعادة التهيئة', 'مراجعة صحة النظام وإجراءات المالك', Icons.gps_fixed_outlined),
+          pageHeader('التشخيص وإعادة التهيئة',
+              'مراجعة صحة النظام وإجراءات المالك', Icons.gps_fixed_outlined),
           const SizedBox(height: 9),
           box(
             Column(
               children: [
-                sectionHead('تشخيص النظام', 'SYSTEM HEALTH · 07', Icons.gps_fixed_outlined),
+                sectionHead('تشخيص النظام', 'SYSTEM HEALTH · 07',
+                    Icons.gps_fixed_outlined),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -1268,7 +1445,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
         ],
       );
 
-  Widget danger(String code, String title, String subtitle, String button) => box(
+  Widget danger(String code, String title, String subtitle, String button) =>
+      box(
         Column(
           children: [
             sectionHead(title, subtitle, Icons.security_outlined, color: red),
@@ -1300,9 +1478,12 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
         context: context,
         builder: (dialogContext) => AlertDialog(
           backgroundColor: inner,
-          title: const Text('حالة الخادم', style: TextStyle(color: Colors.white)),
+          title:
+              const Text('حالة الخادم', style: TextStyle(color: Colors.white)),
           content: Text(
-            health.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n'),
+            health.entries
+                .map((entry) => '${entry.key}: ${entry.value}')
+                .join('\n'),
             style: const TextStyle(color: muted),
           ),
           actions: [
@@ -1332,7 +1513,9 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
         '/api/workforce/reset',
         data: {'confirmation': 'تأكيد'},
       );
-      final data = response.data is Map ? Map<String, dynamic>.from(response.data as Map) : <String, dynamic>{};
+      final data = response.data is Map
+          ? Map<String, dynamic>.from(response.data as Map)
+          : <String, dynamic>{};
       toast(data['message']?.toString() ?? 'تمت إعادة التهيئة');
       await load();
     } catch (e) {
@@ -1407,7 +1590,8 @@ class _AdminMobileSettingsReferencePageState extends State<AdminMobileSettingsRe
                     ),
                     child: Text(
                       busy ? 'جارٍ الحفظ…' : 'حفظ الإعدادات',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+                      style: const TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
