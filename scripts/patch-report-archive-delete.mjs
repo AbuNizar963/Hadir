@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 const file = new URL("../src/pages/ReportArchive.tsx", import.meta.url);
 const source = readFileSync(file, "utf8");
 
-const managedArchiveImport = 'import { deleteArchivedReport, downloadArchivedReport, listArchivedReports } from "@/lib/reportArchive";';
-if (source.includes(managedArchiveImport)) {
-  console.log("ReportArchive patch: current download-gated archive deletion page detected; no legacy patch required.");
+if (source.includes("deleteArchivedReport")) {
+  console.log(
+    "ReportArchive patch: canonical archive deletion is already implemented; no legacy patch required.",
+  );
   process.exit(0);
 }
 
