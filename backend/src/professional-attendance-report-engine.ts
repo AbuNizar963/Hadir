@@ -126,7 +126,7 @@ function rotationWorkDay(
 ): { isWorkDay: boolean; isLastWorkDay: boolean } {
   const startDay = String(meta.rotationStartDate || "").slice(0, 10);
 
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(startDay)) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDay)) {
     return { isWorkDay: false, isLastWorkDay: false };
   }
 
@@ -758,71 +758,3 @@ export async function buildProfessionalAttendanceReport(
     filters: { employeeId: employeeId || null },
     summary: {
       employees: employees.size,
-      employeeDays: rows.length,
-      present,
-      late,
-      absent,
-      leave,
-      permission,
-      rest,
-      escaped,
-      notStarted,
-      invalid,
-      open,
-      workedMinutes,
-      expectedMinutes,
-      workVarianceMinutes,
-      lateMinutes,
-      earlyLeaveMinutes,
-      overtimeMinutes,
-      attendanceRate,
-      punctualityRate,
-    },
-    analytics: {
-      dailySeries: Array.from(daily.values()).sort((a, b) =>
-        a.attendanceDay.localeCompare(b.attendanceDay),
-      ),
-      employeeSummaries: Array.from(employees.values()).sort((a, b) =>
-        a.employeeName.localeCompare(b.employeeName, "ar"),
-      ),
-      exceptionCounts,
-      attendanceSourceCounts: sourceCounts,
-      exceptions: rows
-        .filter((row) => row.exceptionCode)
-        .map((row) => ({
-          attendanceDay: row.attendanceDay,
-          employeeId: row.employeeId,
-          employeeName: row.employeeName,
-          jobNumber: row.jobNumber,
-          code: row.exceptionCode,
-          status: row.status,
-          attendanceSource: row.attendanceSource,
-          minutes:
-            row.lateMinutes ||
-            row.earlyLeaveMinutes ||
-            row.overtimeMinutes ||
-            0,
-          attendanceEventIds: row.attendanceEventIds,
-          requestIds: row.requestIds,
-          auditIds: row.auditIds,
-        })),
-    },
-    rows,
-    dataQuality: {
-      byStatus: qualityCounts,
-      complete: (qualityCounts.exact || 0) === rows.length,
-    },
-    integrity: {
-      sourceOfTruth: "attendance_reporting_facts",
-      rawSource: "attendance",
-      noRawAttendanceMutation: true,
-      periodScoped: true,
-      maxDays: MAX_DAYS,
-      drillDownAvailable: true,
-      sourceEventIdsIncluded: true,
-      requestIdsIncluded: true,
-      auditIdsIncluded: true,
-      attendanceSourceDerivedFromRawEvents: true,
-    },
-  };
-}
