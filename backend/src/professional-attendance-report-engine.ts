@@ -88,7 +88,7 @@ function validatePeriod(from: string, to: string) {
 }
 
 
-type ScheduleMeta = {
+export type ScheduleMeta = {
   scheduleType: string;
   workDaysJson: string | null;
   rotationStartDate: string | null;
@@ -153,7 +153,7 @@ function rotationWorkDay(
 }
 
 function shouldIncludeReportRow(
-  row: FactRow,
+  row: Pick<FactRow, "attendanceDay" | "status">,
   meta: ScheduleMeta | undefined,
   dailyReport: boolean,
 ): boolean {
@@ -184,6 +184,19 @@ function shouldIncludeReportRow(
  * Applies the single reportable-day policy shared by daily and historical reports.
  * The policy is evaluated server-side so every report consumer receives the same rows.
  */
+export function isReportableEmployeeDay(
+  attendanceDay: string,
+  status: string,
+  meta: ScheduleMeta | undefined,
+  dailyReport: boolean,
+): boolean {
+  return shouldIncludeReportRow(
+    { attendanceDay, status },
+    meta,
+    dailyReport,
+  );
+}
+
 async function filterReportableRows(
   env: Env,
   rows: FactRow[],
