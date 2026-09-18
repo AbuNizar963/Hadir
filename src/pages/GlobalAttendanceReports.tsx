@@ -66,7 +66,11 @@ const statusBadgeClasses: Record<string, string> = {
   INVALID: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
 };
 
-const isRotationShiftFinished = (row: ProfessionalAttendanceReport["rows"][number]) => {
+const isRotationShiftFinished = (row: {
+  attendanceDay: string;
+  scheduleType: string;
+  scheduledEnd: string | null;
+}) => {
   if (String(row.scheduleType || "").toUpperCase() !== "ROTATION" || !row.scheduledEnd) {
     return false;
   }
