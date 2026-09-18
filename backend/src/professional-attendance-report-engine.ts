@@ -156,38 +156,15 @@ function adminWorkDay(day: string, meta: ScheduleMeta): boolean {
 }
 
 function shouldIncludeReportRow(
-  row: Pick<FactRow, "attendanceDay" | "status" | "scheduledStart" | "scheduledEnd">,
-  meta: ScheduleMeta | undefined,
-  dailyReport: boolean,
+  _row: Pick<FactRow, "attendanceDay" | "status" | "scheduledStart" | "scheduledEnd">,
+  _meta: ScheduleMeta | undefined,
+  _dailyReport: boolean,
 ): boolean {
-  if (!dailyReport) {
-    // Historical and period reports preserve every materialized fact status.
-    // Re-reading the employee's current schedule here could rewrite history
-    // after a later schedule change. Daily-only visibility rules must therefore
-    // never erase REST/NOT_STARTED rows from period reports or their analytics.
-    return true;
-  }
-
-  // The daily report is a complete workforce roster, not a workday-only
-  // exception list. Every employee returned by the canonical daily-status
-  // engine must remain visible so the manager can distinguish PRESENT, LATE,
-  // ABSENT, LEAVE, PERMISSION, REST and NOT_STARTED without the report silently
-  // dropping employees on non-working days.
-  //
-  // This also makes the report resilient to schedule changes: the canonical
-  // daily-status row already contains the schedule/status decision for the
-  // requested day, while the fact layer remains responsible for history.
-  if (!meta) return true;
-
-  const scheduleType = String(meta.scheduleType || "ADMIN")
-    .trim()
-    .toUpperCase();
-
-  // Keep the schedule fields above available for the type-safe row
-  // contract and for future schedule-specific metadata, but do not use them to
-  // hide a roster row. Visibility is a roster concern; status is the attendance
-  // concern.
-  void scheduleType;
+  // Reports are roster-complete. The canonical attendance engine decides the
+  // status for each employee/day (including REST and NOT_STARTED); the report
+  // must not hide a valid employee simply because the employee is off duty.
+  // Historical facts are already materialized with the same employee/day key,
+  // so the visibility policy is intentionally uniform here.
   return true;
 }
 
