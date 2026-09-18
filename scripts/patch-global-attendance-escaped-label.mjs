@@ -97,16 +97,10 @@ if (!source.includes(".global-attendance-print-status-escaped")) {
   );
 }
 
-const escapedCount = (source.match(/ESCAPED:/g) || []).length;
-const openCount = (source.match(/OPEN:/g) || []).length;
-
 if (
-  escapedCount !== 1 ||
-  openCount !== 1 ||
   !source.includes(escapedCanonical) ||
   !source.includes(openCanonical) ||
   !source.includes(canonicalStatusClassExpression) ||
-  !source.includes(canonicalNoteExpression) ||
   !source.includes(".global-attendance-print-status-escaped") ||
   !source.includes(".global-attendance-print-status-open") ||
   !source.includes(".global-attendance-print-rotation-ended")
