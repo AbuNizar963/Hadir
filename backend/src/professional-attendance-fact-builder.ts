@@ -233,7 +233,10 @@ export async function materializeDay(
       }
       const scheduledStartMs = Date.parse(String(e.scheduledStart || ""));
       const scheduledEndMs = Date.parse(String(e.scheduledEnd || ""));
-      if (Number.isFinite(scheduledStartMs) && Number.isFinite(scheduledEndMs)) {
+      if (
+        Number.isFinite(scheduledStartMs) &&
+        Number.isFinite(scheduledEndMs)
+      ) {
         // Keep source events attached to the actual shift interval. This is
         // essential for overnight ADMIN shifts whose check-in belongs to the
         // previous calendar day while the reporting day is the shift's active
@@ -284,7 +287,10 @@ export async function materializeDay(
       }
       const scheduledStartMs = Date.parse(String(e.scheduledStart || ""));
       const scheduledEndMs = Date.parse(String(e.scheduledEnd || ""));
-      if (Number.isFinite(scheduledStartMs) && Number.isFinite(scheduledEndMs)) {
+      if (
+        Number.isFinite(scheduledStartMs) &&
+        Number.isFinite(scheduledEndMs)
+      ) {
         // Keep source events attached to the actual shift interval. This is
         // essential for overnight ADMIN shifts whose check-in belongs to the
         // previous calendar day while the reporting day is the shift's active
