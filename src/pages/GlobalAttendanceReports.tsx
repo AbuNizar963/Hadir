@@ -47,10 +47,38 @@ const labels: Record<string, string> = {
   LEAVE: "إجازة",
   PERMISSION: "استئذان",
   REST: "راحة",
-  ESCAPED: "انصراف دون تسجيل",
+  ESCAPED: "هروب",
   NOT_STARTED: "لم يبدأ",
   INVALID: "غير صالح",
-  OPEN: "دوام مفتوح",
+  OPEN: "انصراف معلق",
+};
+
+const statusBadgeClasses: Record<string, string> = {
+  PRESENT: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  ABSENT: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200",
+  LATE: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
+  PERMISSION: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200",
+  LEAVE: "bg-blue-700 text-white dark:bg-blue-800",
+  ESCAPED: "bg-red-900 text-white dark:bg-red-950",
+  OPEN: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200",
+  REST: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+  NOT_STARTED: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  INVALID: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+};
+
+const isRotationShiftFinished = (row: ProfessionalAttendanceReport["rows"][number]) => {
+  if (String(row.scheduleType || "").toUpperCase() !== "ROTATION" || !row.scheduledEnd) {
+    return false;
+  }
+  const end = Date.parse(row.scheduledEnd);
+  if (!Number.isFinite(end)) return false;
+  const today = damascusToday();
+  return row.attendanceDay < today || (row.attendanceDay === today && end <= Date.now());
+};
+
+const statusText = (row: ProfessionalAttendanceReport["rows"][number]) => {
+  const base = labels[row.status] || row.status;
+  return isRotationShiftFinished(row) ? base : base;
 };
 
 const fmt = (minutes: number) =>
@@ -508,9 +536,16 @@ export default function GlobalAttendanceReports() {
                             <div className="text-xs text-muted-foreground">{row.jobNumber || "—"}</div>
                           </td>
                           <td className="p-3">
-                            <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-bold">
-                              {labels[row.status] || row.status}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[row.status] || "bg-primary/10 text-primary"}`}>
+                                {statusText(row)}
+                              </span>
+                              {isRotationShiftFinished(row) && (
+                                <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
+                                  انتهت المناوبة
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-3">
                             {row.checkInAt
@@ -691,7 +726,16 @@ export default function GlobalAttendanceReports() {
                   <CardContent className="p-4">
                     <div className="text-xs text-muted-foreground">اليوم / الحالة</div>
                     <div className="mt-1 font-bold">{detail.fact.attendanceDay}</div>
-                    <div className="text-xs">{labels[detail.fact.status] || detail.fact.status}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[detail.fact.status] || "bg-primary/10 text-primary"}`}>
+                        {labels[detail.fact.status] || detail.fact.status}
+                      </span>
+                      {String(detail.fact.scheduleType || "").toUpperCase() === "ROTATION" && detail.fact.scheduledEnd && (
+                        <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
+                          انتهت المناوبة
+                        </span>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
