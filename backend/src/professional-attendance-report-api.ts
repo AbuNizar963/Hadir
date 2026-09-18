@@ -49,13 +49,20 @@ async function fetchByIds(
 ) {
   if (!ids.length) return [];
 
-  const placeholders = ids.map(() => "?").join(",");
-  const result = await db
-    .prepare(`SELECT * FROM ${table} WHERE id IN (${placeholders})`)
-    .bind(...ids)
-    .all();
+  const rows: Record<string, unknown>[] = [];
+  const chunkSize = 80;
 
-  const rows = (result.results || []) as Record<string, unknown>[];
+  for (let offset = 0; offset < ids.length; offset += chunkSize) {
+    const chunk = ids.slice(offset, offset + chunkSize);
+    const placeholders = chunk.map(() => "?").join(",");
+    const result = await db
+      .prepare(`SELECT * FROM ${table} WHERE id IN (${placeholders})`)
+      .bind(...chunk)
+      .all();
+
+    rows.push(...((result.results || []) as Record<string, unknown>[]));
+  }
+
   const order = new Map(ids.map((id, index) => [id, index]));
 
   return rows.sort(
