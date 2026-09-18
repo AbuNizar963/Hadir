@@ -209,6 +209,34 @@ function rotationScheduleAt(employee: EmployeeRow, instant: Date) {
     end: periodEnd,
   };
 }
+export function isRotationVisibleDay(
+  employee: Pick<
+    EmployeeRow,
+    | "scheduleType"
+    | "workStartTime"
+    | "rotationStartDate"
+    | "rotationDaysOn"
+    | "rotationDaysOff"
+  >,
+  day: string,
+) {
+  const kind = String(employee.scheduleType || "")
+    .trim()
+    .toUpperCase();
+  if (kind !== "ROTATION") return true;
+
+  const schedule = rotationScheduleAt(employee as EmployeeRow, localDateTimeUtc(day, employee.workStartTime || "09:00"));
+  if (schedule.work) return true;
+
+  // A rotation remains visible only on the local calendar day containing the
+  // actual end of its work block, so management can verify checkout. Once that
+  // calendar day has ended, the employee is hidden until the next work block.
+  return (
+    schedule.status === "REST" &&
+    !!schedule.end &&
+    dayKey(schedule.end) === day
+  );
+}
 function rotationDailyScheduleFor(employee: EmployeeRow, day: string) {
   const p = rotationParams(employee);
   if (!p)
@@ -377,9 +405,11 @@ export async function handleDailyStatus(
       if (id && !latestEscapeByEmployee.has(id))
         latestEscapeByEmployee.set(id, row);
     }
-    const employees = employeeQuery.results || [],
-      requests = requestQuery.results || [];
-    const scopedEmployees = employees;
+    const employees = employeeQuery.results || [];
+    const requests = requestQuery.results || [];
+    const scopedEmployees = employees.filter((employee) =>
+      isRotationVisibleDay(employee, day),
+    );
     const requestActive = (r: any) => {
       const start = String(r.startDate || r.createdAt || "").slice(0, 10);
       const end = String(r.endDate || r.startDate || r.createdAt || "").slice(
@@ -445,12 +475,6 @@ export async function handleDailyStatus(
         dailyRotationAttendance =
           isRotation && Number(employee.rotationDailyAttendanceEnabled) === 1;
       let schedule = scheduleFor(employee, day);
-
-      // A work period is defined by the employee's configured start/end time,
-      // not by the calendar date boundary. For an overnight ADMIN shift (for
-      // example 20:00 → 04:00), an employee can still be actively working on
-      // the following calendar day. Keep the report anchored to the requested
-      // attendance day while using the actual shift that contains "now".
       if (
         !isRotation &&
         day === today &&
@@ -470,7 +494,6 @@ export async function handleDailyStatus(
           schedule = previousSchedule;
         }
       }
-
       const rows = historicalByEmployee.get(id) || [];
       let checkIn = null;
       let checkOut = null;
@@ -597,10 +620,7 @@ export async function handleDailyStatus(
         status = "NOT_STARTED";
       else if (!schedule.work) status = "REST";
       else status = "ABSENT";
-      const vipCheckIn =
-        isScheduledVip && !checkIn
-          ? schedule.start?.toISOString() || null
-          : checkIn?.timestamp || null;
+      const vipCheckIn = isScheduledVip && !checkIn ? schedule.start?.toISOString() || null : checkIn?.timestamp || null;
       const vipCheckOut =
         isScheduledVip &&
         Number(employee.autoCheckOut) === 1 &&
