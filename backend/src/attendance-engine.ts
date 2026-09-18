@@ -506,7 +506,11 @@ export async function handleDailyStatus(
             : [];
         const checkoutCutoffAt =
           schedule.work && schedule.start && schedule.end
-            ? schedule.end.getTime()
+            ? checkoutCutoff(
+                employee,
+                { start: schedule.start, end: schedule.end },
+                day,
+              ).getTime()
             : 0;
         const scopedRows =
           schedule.work && schedule.start && schedule.end
