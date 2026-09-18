@@ -343,7 +343,12 @@ export async function materializeDay(
       ),
     );
   }
-  if (statements.length) await env.DB.batch(statements);
+  if (statements.length) {
+    const batchSize = 25;
+    for (let offset = 0; offset < statements.length; offset += batchSize) {
+      await env.DB.batch(statements.slice(offset, offset + batchSize));
+    }
+  }
   return statements.length;
 }
 
