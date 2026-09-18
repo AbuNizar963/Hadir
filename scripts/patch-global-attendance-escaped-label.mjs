@@ -22,7 +22,7 @@ const replaceOnce = (value, replacement, description) => {
 };
 
 const escapedCanonical = 'ESCAPED: "هروب"';
-const openCanonical = 'OPEN: "حاضر"';
+const openCanonical = 'OPEN: "انصراف معلق"';
 
 if (!source.includes(escapedCanonical)) {
   const escapedLegacy = [
@@ -41,8 +41,8 @@ if (!source.includes(escapedCanonical)) {
 
 if (!source.includes(openCanonical)) {
   const openLegacy = [
+    'OPEN: "حاضر"',
     'OPEN: "دوام مفتوح"',
-    'OPEN: "انصراف معلق"',
   ].find((value) => source.includes(value));
 
   if (!openLegacy) {
