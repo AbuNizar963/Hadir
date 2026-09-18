@@ -1,4 +1,7 @@
-import { handleDailyStatus } from "./attendance-engine";
+import {
+  handleDailyStatus,
+  isRotationVisibleDay,
+} from "./attendance-engine";
 
 type Env = { DB: D1Database };
 
@@ -99,15 +102,36 @@ export type ScheduleMeta = {
 };
 
 function shouldIncludeReportRow(
-  _row: Pick<FactRow, "attendanceDay" | "status" | "scheduledStart" | "scheduledEnd">,
-  _meta: ScheduleMeta | undefined,
-  _dailyReport: boolean,
+  row: Pick<
+    FactRow,
+    "attendanceDay" | "status" | "scheduledStart" | "scheduledEnd" | "scheduleType"
+  >,
+  meta: ScheduleMeta | undefined,
+  dailyReport: boolean,
 ): boolean {
-  // Reports are roster-complete. The canonical attendance engine decides the
-  // status for each employee/day (including REST and NOT_STARTED); the report
-  // must not hide a valid employee simply because the employee is off duty.
-  // Historical facts are already materialized with the same employee/day key,
-  // so the visibility policy is intentionally uniform here.
+  // Daily reports follow the canonical rotation visibility rule: a rotating
+  // employee is visible while the work block is active and on the local
+  // calendar day containing its actual end. The following day is not a
+  // reportable rotation day.
+  if (
+    dailyReport &&
+    meta &&
+    String(row.scheduleType || "").trim().toUpperCase() === "ROTATION"
+  ) {
+    return isRotationVisibleDay(
+      {
+        scheduleType: meta.scheduleType,
+        workStartTime: meta.workStartTime,
+        rotationStartDate: meta.rotationStartDate,
+        rotationDaysOn: meta.rotationDaysOn,
+        rotationDaysOff: meta.rotationDaysOff,
+      },
+      row.attendanceDay,
+    );
+  }
+
+  // Non-rotation daily rows and historical period reports remain roster
+  // complete; the canonical attendance engine determines their status.
   return true;
 }
 
