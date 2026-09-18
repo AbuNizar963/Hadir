@@ -189,28 +189,38 @@ async function filterReportableRows(
   if (!rows.length) return [];
 
   const employeeIds = [...new Set(rows.map((row) => row.employeeId))];
-  const placeholders = employeeIds.map(() => "?").join(",");
+  const scheduleByEmployee = new Map<
+    string,
+    ScheduleMeta & { id: string }
+  >();
 
-  const result = await env.DB.prepare(
-    `SELECT
-      id,
-      schedule_type AS scheduleType,
-      work_days_json AS workDaysJson,
-      rotation_start_date AS rotationStartDate,
-      rotation_days_on AS rotationDaysOn,
-      rotation_days_off AS rotationDaysOff
-     FROM employees
-     WHERE id IN (${placeholders})`,
-  )
-    .bind(...employeeIds)
-    .all<ScheduleMeta & { id: string }>();
+  // D1/SQLite has a finite bound-variable limit. A large monthly report can
+  // legitimately contain hundreds of employees, so never build one IN (...)
+  // clause containing every employee id.
+  const chunkSize = 80;
 
-  const scheduleByEmployee = new Map(
-    (result.results || []).map((employee) => [
-      String(employee.id),
-      employee as ScheduleMeta & { id: string },
-    ]),
-  );
+  for (let offset = 0; offset < employeeIds.length; offset += chunkSize) {
+    const employeeChunk = employeeIds.slice(offset, offset + chunkSize);
+    const placeholders = employeeChunk.map(() => "?").join(",");
+
+    const result = await env.DB.prepare(
+      `SELECT
+        id,
+        schedule_type AS scheduleType,
+        work_days_json AS workDaysJson,
+        rotation_start_date AS rotationStartDate,
+        rotation_days_on AS rotationDaysOn,
+        rotation_days_off AS rotationDaysOff
+       FROM employees
+       WHERE id IN (${placeholders})`,
+    )
+      .bind(...employeeChunk)
+      .all<ScheduleMeta & { id: string }>();
+
+    for (const employee of result.results || []) {
+      scheduleByEmployee.set(String(employee.id), employee);
+    }
+  }
 
   return rows.filter((row) =>
     shouldIncludeReportRow(
