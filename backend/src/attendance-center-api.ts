@@ -152,8 +152,14 @@ async function assertCurrentDayCompleteness(
   const today = damascusDay();
   if (today < from || today > to) return;
 
+  // The daily-status engine is the canonical current-day roster. The report
+  // intentionally exposes that complete roster, including REST and
+  // NOT_STARTED rows, so completeness must compare employee IDs directly
+  // rather than re-applying schedule-day filters here.
   const response = await handleDailyStatus(
-    new Request(`https://internal/api/manager/daily-status?date=${encodeURIComponent(today)}${employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : ""}`),
+    new Request(
+      `https://internal/api/manager/daily-status?date=${encodeURIComponent(today)}${employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : ""}`,
+    ),
     env,
     actor,
     false,
@@ -162,77 +168,35 @@ async function assertCurrentDayCompleteness(
     throw new Error("تعذر التحقق من اكتمال بيانات اليوم الحالي للتقرير");
   }
 
-  const payload = await response.json().catch(() => null) as { employees?: unknown[] } | null;
-  const expectedEmployees = Array.isArray(payload?.employees) ? payload.employees : [];
-  const actualEmployeeIds = new Set(
-    report.rows
-      .filter((row) => row.attendanceDay === today)
-      .map((row) => String(row.employeeId)),
-  );
-  const expectedIds = expectedEmployees
-    .map((row: any) => String(row?.employeeId || ""))
-    .filter(Boolean);
-
-  if (!expectedIds.length) return;
-
-  const scheduleByEmployee = new Map<
-    string,
-    ScheduleMeta & { id: string }
-  >();
-
-  // D1/SQLite limits the number of bound variables per statement. The daily
-  // status endpoint can legitimately return a large workforce, so resolve
-  // schedules in bounded chunks instead of creating one oversized IN (...) query.
-  const chunkSize = 80;
-
-  for (let offset = 0; offset < expectedIds.length; offset += chunkSize) {
-    const employeeChunk = expectedIds.slice(offset, offset + chunkSize);
-    const placeholders = employeeChunk.map(() => "?").join(",");
-
-    const scheduleResult = await env.DB.prepare(
-      `SELECT
-        id,
-        schedule_type AS scheduleType,
-        work_days_json AS workDaysJson,
-        work_start_time AS workStartTime,
-        work_end_time AS workEndTime,
-        rotation_start_date AS rotationStartDate,
-        rotation_days_on AS rotationDaysOn,
-        rotation_days_off AS rotationDaysOff
-       FROM employees
-       WHERE id IN (${placeholders})`,
-    )
-      .bind(...employeeChunk)
-      .all<ScheduleMeta & { id: string }>();
-
-    for (const employee of scheduleResult.results || []) {
-      scheduleByEmployee.set(String(employee.id), employee);
-    }
-  }
-
-  const expectedEmployeeIds = new Set(
-    expectedEmployees
-      .filter((row: any) =>
-        isReportableEmployeeDay(
-          today,
-          String(row?.status || ""),
-          scheduleByEmployee.get(String(row?.employeeId || "")),
-          true,
-        ),
-      )
+  const payload = (await response.json().catch(() => null)) as {
+    employees?: unknown[];
+  } | null;
+  const expectedIds = new Set(
+    (Array.isArray(payload?.employees) ? payload.employees : [])
       .map((row: any) => String(row?.employeeId || ""))
       .filter(Boolean),
   );
 
-  if (actualEmployeeIds.size !== expectedEmployeeIds.size) {
+  if (!expectedIds.size) return;
+
+  const actualIds = new Set(
+    report.rows
+      .filter((row) => row.attendanceDay === today)
+      .map((row) => String(row.employeeId))
+      .filter(Boolean),
+  );
+
+  if (actualIds.size !== expectedIds.size) {
     throw new Error(
-      `لم يكتمل التقرير الحالي: تم احتساب ${actualEmployeeIds.size} من أصل ${expectedEmployeeIds.size} موظفًا. أعد المحاولة بعد اكتمال مزامنة بيانات الحضور.`,
+      `لم يكتمل التقرير الحالي: تم احتساب ${actualIds.size} من أصل ${expectedIds.size} موظفًا. أعد المحاولة بعد اكتمال مزامنة بيانات الحضور.`,
     );
   }
 
-  for (const employee of expectedEmployeeIds) {
-    if (!actualEmployeeIds.has(employee)) {
-      throw new Error("لم يكتمل التقرير الحالي: توجد سجلات موظفين مفقودة من مصدر الحضور الرسمي.");
+  for (const expectedId of expectedIds) {
+    if (!actualIds.has(expectedId)) {
+      throw new Error(
+        "لم يكتمل التقرير الحالي: توجد سجلات موظفين مفقودة من مصدر الحضور الرسمي.",
+      );
     }
   }
 }
