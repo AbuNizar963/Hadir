@@ -689,22 +689,27 @@ export async function handleDailyStatus(
           String(previous.scheduleType || "") !== row.scheduleType
         );
       });
-      if (changed.length)
-        await env.DB.batch(
-          changed.map((row) =>
-            env.DB.prepare(
-              "INSERT INTO daily_attendance_status(attendance_day,employee_id,status,check_in_at,check_out_at,schedule_type,computed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(attendance_day,employee_id) DO UPDATE SET status=excluded.status,check_in_at=excluded.check_in_at,check_out_at=excluded.check_out_at,schedule_type=excluded.schedule_type,computed_at=excluded.computed_at",
-            ).bind(
-              row.attendanceDay,
-              row.employeeId,
-              row.status,
-              row.checkInAt,
-              row.checkOutAt,
-              row.scheduleType,
-              computedAt,
+      if (changed.length) {
+        const batchSize = 80;
+        for (let offset = 0; offset < changed.length; offset += batchSize) {
+          const chunk = changed.slice(offset, offset + batchSize);
+          await env.DB.batch(
+            chunk.map((row) =>
+              env.DB.prepare(
+                "INSERT INTO daily_attendance_status(attendance_day,employee_id,status,check_in_at,check_out_at,schedule_type,computed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(attendance_day,employee_id) DO UPDATE SET status=excluded.status,check_in_at=excluded.check_in_at,check_out_at=excluded.check_out_at,schedule_type=excluded.schedule_type,computed_at=excluded.computed_at",
+              ).bind(
+                row.attendanceDay,
+                row.employeeId,
+                row.status,
+                row.checkInAt,
+                row.checkOutAt,
+                row.scheduleType,
+                computedAt,
+              ),
             ),
-          ),
-        );
+          );
+        }
+      }
     }
     const counts = result.reduce<Record<string, number>>((acc, row) => {
       acc[row.status] = (acc[row.status] || 0) + 1;
