@@ -276,7 +276,27 @@ function scheduleFor(employee: EmployeeRow, day: string) {
   if (!p)
     return { work: false, status: "INVALID" as const, start: null, end: null };
   const dayAnchor = localDateTimeUtc(day, employee.workStartTime || "09:00");
-  return rotationScheduleAt(employee, dayAnchor);
+  const scheduled = rotationScheduleAt(employee, dayAnchor);
+
+  // The first calendar day after a rotation block is the shift handover day
+  // when the block ended after midnight. Keep that completed shift attached to
+  // this day until local midnight so management can see whether checkout was
+  // recorded. Later rest days remain REST.
+  if (
+    !scheduled.work &&
+    scheduled.status === "REST" &&
+    scheduled.end &&
+    dayKey(scheduled.end) === day
+  ) {
+    return {
+      work: true,
+      status: "WORK" as const,
+      start: scheduled.start,
+      end: scheduled.end,
+    };
+  }
+
+  return scheduled;
 }
 function checkoutCutoff(
   employee: EmployeeRow,
@@ -289,12 +309,11 @@ function checkoutCutoff(
   const kind = String(employee.scheduleType || "ADMIN")
     .trim()
     .toUpperCase();
-  if (kind === "ROTATION") {
-    const p = rotationParams(employee);
-    if (p) {
-      const lastOnDay = addDays(dayKey(shift.start), p.on - 1);
-      return localDateTimeUtc(addDays(lastOnDay, 1), "00:00");
-    }
+  if (kind === "ROTATION" && shift.end) {
+    // Include the complete local calendar day on which the rotation actually
+    // ends. This preserves a late checkout recorded after the scheduled end
+    // without leaking events into the following calendar day.
+    return localDateTimeUtc(addDays(dayKey(shift.end), 1), "00:00");
   }
   return localDateTimeUtc(addDays(dayKey(shift.end), 1), "00:00");
 }
