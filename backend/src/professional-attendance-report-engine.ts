@@ -181,10 +181,11 @@ function shouldIncludeReportRow(
     .toUpperCase();
 
   if (scheduleType === "ROTATION") {
-    // Rotation employees are shown only on the final workday of their active
-    // rotation cycle, where the report can establish whether checkout occurred.
+    // A rotation employee is visible throughout every workday in the active
+    // on-period, including its final workday. The following rest period is
+    // intentionally hidden until the next on-period begins.
     const rotation = rotationWorkDay(row.attendanceDay, meta);
-    return rotation.isWorkDay && rotation.isLastWorkDay;
+    return rotation.isWorkDay;
   }
 
   // ADMIN employees are shown on their configured workdays. This deliberately
