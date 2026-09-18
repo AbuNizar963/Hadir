@@ -133,6 +133,17 @@ function shouldIncludeReportRow(
   meta: ScheduleMeta | undefined,
   dailyReport: boolean,
 ): boolean {
+  if (!dailyReport) {
+    // Historical and period reports preserve every materialized fact status.
+    // Re-reading the employee's current schedule here could rewrite history
+    // after a later schedule change. Daily-only visibility rules must therefore
+    // never erase REST/NOT_STARTED rows from period reports or their analytics.
+    return true;
+  }
+
+  // The official daily report is a work-day exception report, not a roster
+  // view. Rest days and shifts that have not started yet are intentionally
+  // excluded from the daily row set.
   if (row.status === "REST" || row.status === "NOT_STARTED") {
     return false;
   }
@@ -142,13 +153,6 @@ function shouldIncludeReportRow(
   const scheduleType = String(meta.scheduleType || "ADMIN")
     .trim()
     .toUpperCase();
-
-  if (!dailyReport) {
-    // Historical and period reports trust the materialized fact status.
-    // Re-reading the employee's current schedule here could rewrite history
-    // after a later schedule change.
-    return true;
-  }
 
   if (scheduleType === "ROTATION") {
     const rotation = rotationWorkDay(row.attendanceDay, meta);
