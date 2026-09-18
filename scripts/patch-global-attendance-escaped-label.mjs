@@ -67,12 +67,26 @@ if (!source.includes(canonicalStatusClassExpression)) {
   );
 }
 
+const legacyStatusExpression =
+  '<span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{labels[r.status] || r.status}</span>{isRotationShiftFinished(r) && <span className="global-attendance-print-rotation-ended">انتهت المناوبة</span>}';
+const canonicalStatusExpression =
+  '<span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{isRotationShiftFinished(r) ? "انصراف" : labels[r.status] || r.status}</span>';
+
+if (!source.includes(canonicalStatusExpression)) {
+  replaceOnce(
+    legacyStatusExpression,
+    canonicalStatusExpression,
+    "rotation-ended print status",
+  );
+}
+
 const legacyNoteExpressions = [
+  '<td>{r.status === "OPEN" ? "لم يتم تسجيل الانصراف" : r.status === "ESCAPED" ? "هروب من العمل" : (r.status === "LEAVE" || r.status === "PERMISSION") && r.requestReason ? r.requestReason : r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>',
   '<td>{r.status === "OPEN" ? "لم يتم تسجيل الانصراف" : r.status === "ESCAPED" ? "هروب من العمل" : r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>',
   '<td>{r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>',
 ];
 const canonicalNoteExpression =
-  '<td>{r.status === "OPEN" ? "لم يتم تسجيل الانصراف" : r.status === "ESCAPED" ? "هروب من العمل" : (r.status === "LEAVE" || r.status === "PERMISSION") && r.requestReason ? r.requestReason : r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>';
+  '<td>{isRotationShiftFinished(r) ? "انتهت المناوبة" : r.status === "OPEN" ? "لم يتم تسجيل الانصراف" : r.status === "ESCAPED" ? "هروب من العمل" : (r.status === "LEAVE" || r.status === "PERMISSION") && r.requestReason ? r.requestReason : r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : "—"}</td>';
 
 if (!source.includes(canonicalNoteExpression)) {
   const legacyNote = legacyNoteExpressions.find((value) => source.includes(value));
@@ -84,10 +98,17 @@ if (!source.includes(canonicalNoteExpression)) {
   replaceOnce(legacyNote, canonicalNoteExpression, "print status-note");
 }
 
+const rotationEndedCss =
+  '        .global-attendance-print-rotation-ended { display: inline-block !important; margin-inline-start: 1.5mm; border-radius: 9999px; padding: 1mm 2.5mm; background: #ede9fe !important; color: #6d28d9 !important; font-size: 8pt; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n';
+
+if (source.includes(rotationEndedCss)) {
+  replaceOnce(rotationEndedCss, "", "obsolete rotation-ended print badge CSS");
+}
+
 const legacyStatusCss =
   '        .global-attendance-print-status-permission { background: #e0f2fe !important; color: #0369a1 !important; }\n';
 const canonicalStatusCss =
-  `${legacyStatusCss}        .global-attendance-print-status-escaped { background: #7f1d1d !important; color: #fff !important; }\n        .global-attendance-print-status-open { background: #ffedd5 !important; color: #9a3412 !important; }\n        .global-attendance-print-status-rest, .global-attendance-print-status-not-started { background: #e2e8f0 !important; color: #475569 !important; }\n        .global-attendance-print-status-invalid { background: #cbd5e1 !important; color: #334155 !important; }\n        .global-attendance-print-rotation-ended { display: inline-block !important; margin-inline-start: 1.5mm; border-radius: 9999px; padding: 1mm 2.5mm; background: #ede9fe !important; color: #6d28d9 !important; font-size: 8pt; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n`;
+  `${legacyStatusCss}        .global-attendance-print-status-escaped { background: #7f1d1d !important; color: #fff !important; }\n        .global-attendance-print-status-open { background: #ffedd5 !important; color: #9a3412 !important; }\n        .global-attendance-print-status-rest, .global-attendance-print-status-not-started { background: #e2e8f0 !important; color: #475569 !important; }\n        .global-attendance-print-status-invalid { background: #cbd5e1 !important; color: #334155 !important; }\n`;
 
 if (!source.includes(".global-attendance-print-status-escaped")) {
   replaceOnce(
@@ -101,9 +122,11 @@ if (
   !source.includes(escapedCanonical) ||
   !source.includes(openCanonical) ||
   !source.includes(canonicalStatusClassExpression) ||
+  !source.includes(canonicalStatusExpression) ||
+  !source.includes(canonicalNoteExpression) ||
+  source.includes("global-attendance-print-rotation-ended") ||
   !source.includes(".global-attendance-print-status-escaped") ||
-  !source.includes(".global-attendance-print-status-open") ||
-  !source.includes(".global-attendance-print-rotation-ended")
+  !source.includes(".global-attendance-print-status-open")
 ) {
   throw new Error(
     "GlobalAttendanceReports status-label patch: replacement validation failed.",
@@ -119,5 +142,5 @@ if (!changed) {
 
 writeFileSync(file, source, "utf8");
 console.log(
-  "GlobalAttendanceReports status-label patch: semantic status colors, missing-checkout note, dark-red ESCAPED, and rotation-completion badge applied.",
+  "GlobalAttendanceReports status-label patch: semantic status colors, pending-checkout note, dark-red ESCAPED, and ended-rotation checkout/note applied.",
 );
