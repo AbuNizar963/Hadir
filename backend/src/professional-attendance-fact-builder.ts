@@ -231,6 +231,16 @@ export async function materializeDay(
           ts <= shiftEndMs
         );
       }
+      const scheduledStartMs = Date.parse(String(e.scheduledStart || ""));
+      const scheduledEndMs = Date.parse(String(e.scheduledEnd || ""));
+      if (Number.isFinite(scheduledStartMs) && Number.isFinite(scheduledEndMs)) {
+        // Keep source events attached to the actual shift interval. This is
+        // essential for overnight ADMIN shifts whose check-in belongs to the
+        // previous calendar day while the reporting day is the shift's active
+        // continuation after midnight.
+        const checkoutCutoffMs = scheduledEndMs + 86_400_000;
+        return ts >= scheduledStartMs && ts < checkoutCutoffMs;
+      }
       return ts >= dayStartMs && ts < dayEndMs;
     });
     const ins = events.filter((x) => String(x.type) === "check-in");
@@ -263,6 +273,16 @@ export async function materializeDay(
           ts >= shiftStartMs &&
           ts <= shiftEndMs
         );
+      }
+      const scheduledStartMs = Date.parse(String(e.scheduledStart || ""));
+      const scheduledEndMs = Date.parse(String(e.scheduledEnd || ""));
+      if (Number.isFinite(scheduledStartMs) && Number.isFinite(scheduledEndMs)) {
+        // Keep source events attached to the actual shift interval. This is
+        // essential for overnight ADMIN shifts whose check-in belongs to the
+        // previous calendar day while the reporting day is the shift's active
+        // continuation after midnight.
+        const checkoutCutoffMs = scheduledEndMs + 86_400_000;
+        return ts >= scheduledStartMs && ts < checkoutCutoffMs;
       }
       return ts >= dayStartMs && ts < dayEndMs;
     });
