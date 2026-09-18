@@ -194,6 +194,8 @@ async function assertCurrentDayCompleteness(
         id,
         schedule_type AS scheduleType,
         work_days_json AS workDaysJson,
+        work_start_time AS workStartTime,
+        work_end_time AS workEndTime,
         rotation_start_date AS rotationStartDate,
         rotation_days_on AS rotationDaysOn,
         rotation_days_off AS rotationDaysOff
