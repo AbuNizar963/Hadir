@@ -76,11 +76,6 @@ const isRotationShiftFinished = (row: ProfessionalAttendanceReport["rows"][numbe
   return row.attendanceDay < today || (row.attendanceDay === today && end <= Date.now());
 };
 
-const statusText = (row: ProfessionalAttendanceReport["rows"][number]) => {
-  const base = labels[row.status] || row.status;
-  return isRotationShiftFinished(row) ? base : base;
-};
-
 const fmt = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}س ${Math.round(Math.max(0, minutes) % 60)}د`;
 
@@ -538,7 +533,7 @@ export default function GlobalAttendanceReports() {
                           <td className="p-3">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[row.status] || "bg-primary/10 text-primary"}`}>
-                                {statusText(row)}
+                                {labels[row.status] || row.status}
                               </span>
                               {isRotationShiftFinished(row) && (
                                 <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
@@ -730,7 +725,7 @@ export default function GlobalAttendanceReports() {
                       <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[detail.fact.status] || "bg-primary/10 text-primary"}`}>
                         {labels[detail.fact.status] || detail.fact.status}
                       </span>
-                      {String(detail.fact.scheduleType || "").toUpperCase() === "ROTATION" && detail.fact.scheduledEnd && (
+                      {isRotationShiftFinished(detail.fact) && (
                         <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
                           انتهت المناوبة
                         </span>
