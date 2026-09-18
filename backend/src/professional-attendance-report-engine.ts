@@ -128,6 +128,31 @@ function rotationWorkDay(
   };
 }
 
+function parseWorkDays(workDaysJson: string | null): Set<number> {
+  try {
+    const parsed = JSON.parse(workDaysJson || "[]");
+    if (Array.isArray(parsed)) {
+      const values = parsed
+        .filter(
+          (value: unknown) =>
+            Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 6,
+        )
+        .map(Number);
+
+      if (values.length) return new Set(values);
+    }
+  } catch {
+    // Fall back to the attendance engine's documented ADMIN workweek.
+  }
+
+  return new Set([0, 1, 2, 3, 4]);
+}
+
+function adminWorkDay(day: string, meta: ScheduleMeta): boolean {
+  const weekday = new Date(dateNumber(day) * 86400000).getUTCDay();
+  return parseWorkDays(meta.workDaysJson).has(weekday);
+}
+
 function shouldIncludeReportRow(
   row: Pick<FactRow, "attendanceDay" | "status">,
   meta: ScheduleMeta | undefined,
@@ -141,31 +166,32 @@ function shouldIncludeReportRow(
     return true;
   }
 
-  // The official daily report is a work-day exception report, not a roster
-  // view. Rest days and shifts that have not started yet are intentionally
-  // excluded from the daily row set.
-  if (row.status === "REST" || row.status === "NOT_STARTED") {
+  // The daily report is a scheduled-workday report. A valid workday must remain
+  // visible even when attendance has not started yet, so NOT_STARTED is a real
+  // report row rather than a reason to hide the employee.
+  if (!meta) {
+    // A missing employee schedule must not silently turn a known fact into a
+    // visible daily row. The canonical schedule is required to decide whether
+    // the day is a workday or a rest day.
     return false;
   }
-
-  if (!meta) return true;
 
   const scheduleType = String(meta.scheduleType || "ADMIN")
     .trim()
     .toUpperCase();
 
   if (scheduleType === "ROTATION") {
+    // Rotation employees are shown only on the final workday of their active
+    // rotation cycle, where the report can establish whether checkout occurred.
     const rotation = rotationWorkDay(row.attendanceDay, meta);
-
-    if (!rotation.isWorkDay) return false;
-
-    return rotation.isLastWorkDay;
+    return rotation.isWorkDay && rotation.isLastWorkDay;
   }
 
-  // Administrative work-day eligibility is already encoded by the canonical
-  // attendance engine in the fact status. Do not recompute it from the
-  // employee's current work_days_json.
-  return true;
+  // ADMIN employees are shown on their configured workdays. This deliberately
+  // does not inspect row.status: PRESENT, LATE, ABSENT, OPEN, NOT_STARTED,
+  // LEAVE, and PERMISSION are all meaningful outcomes on a scheduled workday.
+  // REST facts remain hidden because the configured weekday is not a workday.
+  return adminWorkDay(row.attendanceDay, meta);
 }
 
 /**
