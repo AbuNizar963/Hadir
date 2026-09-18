@@ -155,27 +155,38 @@ async function assertCurrentDayCompleteness(
 
   if (!expectedIds.length) return;
 
-  const placeholders = expectedIds.map(() => "?").join(",");
-  const scheduleResult = await env.DB.prepare(
-    `SELECT
-      id,
-      schedule_type AS scheduleType,
-      work_days_json AS workDaysJson,
-      rotation_start_date AS rotationStartDate,
-      rotation_days_on AS rotationDaysOn,
-      rotation_days_off AS rotationDaysOff
-     FROM employees
-     WHERE id IN (${placeholders})`,
-  )
-    .bind(...expectedIds)
-    .all<ScheduleMeta & { id: string }>();
+  const scheduleByEmployee = new Map<
+    string,
+    ScheduleMeta & { id: string }
+  >();
 
-  const scheduleByEmployee = new Map(
-    (scheduleResult.results || []).map((employee) => [
-      String(employee.id),
-      employee as ScheduleMeta & { id: string },
-    ]),
-  );
+  // D1/SQLite limits the number of bound variables per statement. The daily
+  // status endpoint can legitimately return a large workforce, so resolve
+  // schedules in bounded chunks instead of creating one oversized IN (...) query.
+  const chunkSize = 80;
+
+  for (let offset = 0; offset < expectedIds.length; offset += chunkSize) {
+    const employeeChunk = expectedIds.slice(offset, offset + chunkSize);
+    const placeholders = employeeChunk.map(() => "?").join(",");
+
+    const scheduleResult = await env.DB.prepare(
+      `SELECT
+        id,
+        schedule_type AS scheduleType,
+        work_days_json AS workDaysJson,
+        rotation_start_date AS rotationStartDate,
+        rotation_days_on AS rotationDaysOn,
+        rotation_days_off AS rotationDaysOff
+       FROM employees
+       WHERE id IN (${placeholders})`,
+    )
+      .bind(...employeeChunk)
+      .all<ScheduleMeta & { id: string }>();
+
+    for (const employee of scheduleResult.results || []) {
+      scheduleByEmployee.set(String(employee.id), employee);
+    }
+  }
 
   const expectedEmployeeIds = new Set(
     expectedEmployees
