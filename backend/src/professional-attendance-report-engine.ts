@@ -183,11 +183,24 @@ function shouldIncludeReportRow(
     .toUpperCase();
 
   if (scheduleType === "ROTATION") {
-    // A rotation employee is visible throughout every workday in the active
-    // on-period, including its final workday. The following rest period is
-    // intentionally hidden until the next on-period begins.
+    // A rotation employee remains visible on every workday. If the rotation
+    // block ends after midnight, the first rest-calendar day is also a
+    // handover day: keep the row visible through local midnight so management
+    // can verify whether checkout was recorded.
     const rotation = rotationWorkDay(row.attendanceDay, meta);
-    return rotation.isWorkDay;
+    if (rotation.isWorkDay) return true;
+
+    const scheduledEndMs = Date.parse(String(row.scheduledEnd || ""));
+    const attendanceStartMs = Date.parse(
+      row.attendanceDay + "T00:00:00+03:00",
+    );
+    const attendanceEndMs = attendanceStartMs + 86400000;
+
+    return (
+      Number.isFinite(scheduledEndMs) &&
+      scheduledEndMs >= attendanceStartMs &&
+      scheduledEndMs < attendanceEndMs
+    );
   }
 
   // ADMIN employees are shown on their configured workdays. Overnight shifts
