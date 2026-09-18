@@ -426,6 +426,32 @@ export async function handleDailyStatus(
         dailyRotationAttendance =
           isRotation && Number(employee.rotationDailyAttendanceEnabled) === 1;
       let schedule = scheduleFor(employee, day);
+
+      // A work period is defined by the employee's configured start/end time,
+      // not by the calendar date boundary. For an overnight ADMIN shift (for
+      // example 20:00 → 04:00), an employee can still be actively working on
+      // the following calendar day. Keep the report anchored to the requested
+      // attendance day while using the actual shift that contains "now".
+      if (
+        !isRotation &&
+        day === today &&
+        !schedule.work &&
+        employee.workStartTime &&
+        employee.workEndTime
+      ) {
+        const previousDay = addDays(day, -1);
+        const previousSchedule = scheduleFor(employee, previousDay);
+        if (
+          previousSchedule.work &&
+          previousSchedule.start &&
+          previousSchedule.end &&
+          now.getTime() >= previousSchedule.start.getTime() &&
+          now.getTime() < previousSchedule.end.getTime()
+        ) {
+          schedule = previousSchedule;
+        }
+      }
+
       const rows = historicalByEmployee.get(id) || [];
       let checkIn = null;
       let checkOut = null;
@@ -474,17 +500,13 @@ export async function handleDailyStatus(
                 return (
                   Number.isFinite(ts) &&
                   ts >= schedule.start!.getTime() &&
-                  ts < localDateTimeUtc(nextDay, "00:00").getTime()
+                  ts < localDateTimeUtc(addDays(day, 1), "00:00").getTime()
                 );
               })
             : [];
         const checkoutCutoffAt =
           schedule.work && schedule.start && schedule.end
-            ? checkoutCutoff(
-                employee,
-                { start: schedule.start, end: schedule.end },
-                day,
-              ).getTime()
+            ? schedule.end.getTime()
             : 0;
         const scopedRows =
           schedule.work && schedule.start && schedule.end
