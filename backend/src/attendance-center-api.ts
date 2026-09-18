@@ -1,4 +1,5 @@
 import { handleDailyStatus } from "./attendance-engine";
+import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
 import {
   buildProfessionalAttendanceReport,
   isReportableEmployeeDay,
@@ -276,6 +277,22 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
     if (!dailyStatus.ok) {
       const payload = await dailyStatus.json().catch(() => ({ error: "تعذر قراءة مركز الحضور" }));
       return json(payload, dailyStatus.status, origin);
+    }
+
+    // A daily report must be a complete roster for the requested day, not
+    // merely the subset already materialized by background refreshes. Build the
+    // canonical facts for the requested day first so employees with no
+    // attendance event yet still receive their scheduled status (for example
+    // NOT_STARTED or ABSENT). The materializer is read-only with respect to
+    // raw attendance events; it only upserts reporting facts.
+    if (from === to) {
+      await ensureProfessionalAttendanceFacts(
+        env,
+        from,
+        to,
+        actor,
+        employeeId,
+      );
     }
 
     const report = await buildProfessionalAttendanceReport(
