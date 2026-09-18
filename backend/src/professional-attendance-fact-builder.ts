@@ -224,12 +224,22 @@ export async function materializeDay(
       ) {
         const shiftStartMs = Date.parse(String(e.scheduledStart));
         const shiftEndMs = Date.parse(String(e.scheduledEnd));
-        return (
-          Number.isFinite(shiftStartMs) &&
-          Number.isFinite(shiftEndMs) &&
-          ts >= shiftStartMs &&
-          ts <= shiftEndMs
-        );
+        if (
+          !Number.isFinite(shiftStartMs) ||
+          !Number.isFinite(shiftEndMs)
+        ) {
+          return false;
+        }
+        const shiftEndDay = new Intl.DateTimeFormat("en-CA", {
+          timeZone: TZ,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date(shiftEndMs));
+        const checkoutCutoffMs = localMidnightUtc(
+          addDays(shiftEndDay, 1),
+        ).getTime();
+        return ts >= shiftStartMs && ts < checkoutCutoffMs;
       }
       const scheduledStartMs = Date.parse(String(e.scheduledStart || ""));
       const scheduledEndMs = Date.parse(String(e.scheduledEnd || ""));
@@ -278,12 +288,22 @@ export async function materializeDay(
       ) {
         const shiftStartMs = Date.parse(String(e.scheduledStart));
         const shiftEndMs = Date.parse(String(e.scheduledEnd));
-        return (
-          Number.isFinite(shiftStartMs) &&
-          Number.isFinite(shiftEndMs) &&
-          ts >= shiftStartMs &&
-          ts <= shiftEndMs
-        );
+        if (
+          !Number.isFinite(shiftStartMs) ||
+          !Number.isFinite(shiftEndMs)
+        ) {
+          return false;
+        }
+        const shiftEndDay = new Intl.DateTimeFormat("en-CA", {
+          timeZone: TZ,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date(shiftEndMs));
+        const checkoutCutoffMs = localMidnightUtc(
+          addDays(shiftEndDay, 1),
+        ).getTime();
+        return ts >= shiftStartMs && ts < checkoutCutoffMs;
       }
       const scheduledStartMs = Date.parse(String(e.scheduledStart || ""));
       const scheduledEndMs = Date.parse(String(e.scheduledEnd || ""));
