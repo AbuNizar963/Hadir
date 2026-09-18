@@ -91,6 +91,8 @@ function validatePeriod(from: string, to: string) {
 export type ScheduleMeta = {
   scheduleType: string;
   workDaysJson: string | null;
+  workStartTime: string | null;
+  workEndTime: string | null;
   rotationStartDate: string | null;
   rotationDaysOn: number | null;
   rotationDaysOff: number | null;
@@ -154,7 +156,7 @@ function adminWorkDay(day: string, meta: ScheduleMeta): boolean {
 }
 
 function shouldIncludeReportRow(
-  row: Pick<FactRow, "attendanceDay" | "status">,
+  row: Pick<FactRow, "attendanceDay" | "status" | "scheduledStart" | "scheduledEnd">,
   meta: ScheduleMeta | undefined,
   dailyReport: boolean,
 ): boolean {
@@ -188,11 +190,20 @@ function shouldIncludeReportRow(
     return rotation.isWorkDay;
   }
 
-  // ADMIN employees are shown on their configured workdays. This deliberately
-  // does not inspect row.status: PRESENT, LATE, ABSENT, OPEN, NOT_STARTED,
-  // LEAVE, and PERMISSION are all meaningful outcomes on a scheduled workday.
-  // REST facts remain hidden because the configured weekday is not a workday.
-  return adminWorkDay(row.attendanceDay, meta);
+  // ADMIN employees are shown on their configured workdays. Overnight shifts
+  // are additionally included when their actual scheduled interval overlaps
+  // the requested attendance day, even if the shift started on the previous day.
+  const scheduledStartMs = Date.parse(String(row.scheduledStart || ""));
+  const scheduledEndMs = Date.parse(String(row.scheduledEnd || ""));
+  const attendanceStartMs = Date.parse(row.attendanceDay + "T00:00:00+03:00");
+  const attendanceEndMs = attendanceStartMs + 86400000;
+  const overlapsAttendanceDay =
+    Number.isFinite(scheduledStartMs) &&
+    Number.isFinite(scheduledEndMs) &&
+    scheduledStartMs < attendanceEndMs &&
+    scheduledEndMs > attendanceStartMs;
+
+  return adminWorkDay(row.attendanceDay, meta) || overlapsAttendanceDay;
 }
 
 /**
@@ -239,6 +250,8 @@ async function filterReportableRows(
         id,
         schedule_type AS scheduleType,
         work_days_json AS workDaysJson,
+        work_start_time AS workStartTime,
+        work_end_time AS workEndTime,
         rotation_start_date AS rotationStartDate,
         rotation_days_on AS rotationDaysOn,
         rotation_days_off AS rotationDaysOff
