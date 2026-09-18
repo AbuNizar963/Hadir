@@ -57,7 +57,7 @@ if (!source.includes(openCanonical)) {
 const legacyStatusClassExpression =
   'const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : "";';
 const canonicalStatusClassExpression =
-  'const statusClass = r.status === "PRESENT" || r.status === "OPEN" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : r.status === "ESCAPED" ? "escaped" : "";';
+  'const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : r.status === "ESCAPED" ? "escaped" : r.status === "OPEN" ? "open" : r.status === "REST" ? "rest" : r.status === "NOT_STARTED" ? "not-started" : "invalid";';
 
 if (!source.includes(canonicalStatusClassExpression)) {
   replaceOnce(
@@ -87,7 +87,7 @@ if (!source.includes(canonicalNoteExpression)) {
 const legacyStatusCss =
   '        .global-attendance-print-status-permission { background: #e0f2fe !important; color: #0369a1 !important; }\n';
 const canonicalStatusCss =
-  `${legacyStatusCss}        .global-attendance-print-status-escaped { background: #fecaca !important; color: #7f1d1d !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important; min-width: 42px !important; min-height: 24px !important; padding: 2px 8px !important; border-radius: 9999px !important; font-size: 11px !important; font-weight: 700 !important; line-height: 1.25 !important; }\n`;
+  `${legacyStatusCss}        .global-attendance-print-status-escaped { background: #7f1d1d !important; color: #fff !important; }\n        .global-attendance-print-status-open { background: #ffedd5 !important; color: #9a3412 !important; }\n        .global-attendance-print-status-rest, .global-attendance-print-status-not-started { background: #e2e8f0 !important; color: #475569 !important; }\n        .global-attendance-print-status-invalid { background: #cbd5e1 !important; color: #334155 !important; }\n        .global-attendance-print-rotation-ended { display: inline-block !important; margin-inline-start: 1.5mm; border-radius: 9999px; padding: 1mm 2.5mm; background: #ede9fe !important; color: #6d28d9 !important; font-size: 8pt; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n`;
 
 if (!source.includes(".global-attendance-print-status-escaped")) {
   replaceOnce(
@@ -108,8 +108,8 @@ if (
   !source.includes(canonicalStatusClassExpression) ||
   !source.includes(canonicalNoteExpression) ||
   !source.includes(".global-attendance-print-status-escaped") ||
-  !source.includes("min-width: 42px") ||
-  !source.includes("min-height: 24px")
+  !source.includes(".global-attendance-print-status-open") ||
+  !source.includes(".global-attendance-print-rotation-ended")
 ) {
   throw new Error(
     "GlobalAttendanceReports status-label patch: replacement validation failed.",
@@ -125,5 +125,5 @@ if (!changed) {
 
 writeFileSync(file, source, "utf8");
 console.log(
-  "GlobalAttendanceReports status-label patch: OPEN=حاضر, missing checkout note=لم يتم تسجيل الانصراف, ESCAPED=هروب with a matching 42x24 status pill and darker red background, leave/permission rows print their request reason.",
+  "GlobalAttendanceReports status-label patch: semantic status colors, missing-checkout note, dark-red ESCAPED, and rotation-completion badge applied.",
 );
