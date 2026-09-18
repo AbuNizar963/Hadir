@@ -168,55 +168,27 @@ function shouldIncludeReportRow(
     return true;
   }
 
-  // The daily report is a scheduled-workday report. A valid workday must remain
-  // visible even when attendance has not started yet, so NOT_STARTED is a real
-  // report row rather than a reason to hide the employee.
-  if (!meta) {
-    // A missing employee schedule must not silently turn a known fact into a
-    // visible daily row. The canonical schedule is required to decide whether
-    // the day is a workday or a rest day.
-    return false;
-  }
+  // The daily report is a complete workforce roster, not a workday-only
+  // exception list. Every employee returned by the canonical daily-status
+  // engine must remain visible so the manager can distinguish PRESENT, LATE,
+  // ABSENT, LEAVE, PERMISSION, REST and NOT_STARTED without the report silently
+  // dropping employees on non-working days.
+  //
+  // This also makes the report resilient to schedule changes: the canonical
+  // daily-status row already contains the schedule/status decision for the
+  // requested day, while the fact layer remains responsible for history.
+  if (!meta) return true;
 
   const scheduleType = String(meta.scheduleType || "ADMIN")
     .trim()
     .toUpperCase();
 
-  if (scheduleType === "ROTATION") {
-    // A rotation employee remains visible on every workday. If the rotation
-    // block ends after midnight, the first rest-calendar day is also a
-    // handover day: keep the row visible through local midnight so management
-    // can verify whether checkout was recorded.
-    const rotation = rotationWorkDay(row.attendanceDay, meta);
-    if (rotation.isWorkDay) return true;
-
-    const scheduledEndMs = Date.parse(String(row.scheduledEnd || ""));
-    const attendanceStartMs = Date.parse(
-      row.attendanceDay + "T00:00:00+03:00",
-    );
-    const attendanceEndMs = attendanceStartMs + 86400000;
-
-    return (
-      Number.isFinite(scheduledEndMs) &&
-      scheduledEndMs >= attendanceStartMs &&
-      scheduledEndMs < attendanceEndMs
-    );
-  }
-
-  // ADMIN employees are shown on their configured workdays. Overnight shifts
-  // are additionally included when their actual scheduled interval overlaps
-  // the requested attendance day, even if the shift started on the previous day.
-  const scheduledStartMs = Date.parse(String(row.scheduledStart || ""));
-  const scheduledEndMs = Date.parse(String(row.scheduledEnd || ""));
-  const attendanceStartMs = Date.parse(row.attendanceDay + "T00:00:00+03:00");
-  const attendanceEndMs = attendanceStartMs + 86400000;
-  const overlapsAttendanceDay =
-    Number.isFinite(scheduledStartMs) &&
-    Number.isFinite(scheduledEndMs) &&
-    scheduledStartMs < attendanceEndMs &&
-    scheduledEndMs > attendanceStartMs;
-
-  return adminWorkDay(row.attendanceDay, meta) || overlapsAttendanceDay;
+  // Keep the schedule fields above available for the type-safe row
+  // contract and for future schedule-specific metadata, but do not use them to
+  // hide a roster row. Visibility is a roster concern; status is the attendance
+  // concern.
+  void scheduleType;
+  return true;
 }
 
 /**
