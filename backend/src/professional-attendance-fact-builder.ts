@@ -224,10 +224,7 @@ export async function materializeDay(
       ) {
         const shiftStartMs = Date.parse(String(e.scheduledStart));
         const shiftEndMs = Date.parse(String(e.scheduledEnd));
-        if (
-          !Number.isFinite(shiftStartMs) ||
-          !Number.isFinite(shiftEndMs)
-        ) {
+        if (!Number.isFinite(shiftStartMs) || !Number.isFinite(shiftEndMs)) {
           return false;
         }
         const shiftEndDay = new Intl.DateTimeFormat("en-CA", {
@@ -288,10 +285,7 @@ export async function materializeDay(
       ) {
         const shiftStartMs = Date.parse(String(e.scheduledStart));
         const shiftEndMs = Date.parse(String(e.scheduledEnd));
-        if (
-          !Number.isFinite(shiftStartMs) ||
-          !Number.isFinite(shiftEndMs)
-        ) {
+        if (!Number.isFinite(shiftStartMs) || !Number.isFinite(shiftEndMs)) {
           return false;
         }
         const shiftEndDay = new Intl.DateTimeFormat("en-CA", {
