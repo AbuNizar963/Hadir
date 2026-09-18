@@ -98,63 +98,6 @@ export type ScheduleMeta = {
   rotationDaysOff: number | null;
 };
 
-function rotationWorkDay(
-  day: string,
-  meta: ScheduleMeta,
-): { isWorkDay: boolean; isLastWorkDay: boolean } {
-  const startDay = String(meta.rotationStartDate || "").slice(0, 10);
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDay)) {
-    return { isWorkDay: false, isLastWorkDay: false };
-  }
-
-  const daysOn = Math.max(1, Math.floor(Number(meta.rotationDaysOn ?? 4)));
-  const daysOff = Math.max(0, Math.floor(Number(meta.rotationDaysOff ?? 4)));
-  const cycleLength = daysOn + daysOff;
-
-  if (cycleLength <= 0) {
-    return { isWorkDay: false, isLastWorkDay: false };
-  }
-
-  const diff = Math.floor(dateNumber(day) - dateNumber(startDay));
-
-  if (diff < 0) {
-    return { isWorkDay: false, isLastWorkDay: false };
-  }
-
-  const cycleDay = diff % cycleLength;
-
-  return {
-    isWorkDay: cycleDay < daysOn,
-    isLastWorkDay: cycleDay === daysOn - 1,
-  };
-}
-
-function parseWorkDays(workDaysJson: string | null): Set<number> {
-  try {
-    const parsed = JSON.parse(workDaysJson || "[]");
-    if (Array.isArray(parsed)) {
-      const values = parsed
-        .filter(
-          (value: unknown) =>
-            Number.isInteger(value) && Number(value) >= 0 && Number(value) <= 6,
-        )
-        .map(Number);
-
-      if (values.length) return new Set(values);
-    }
-  } catch {
-    // Fall back to the attendance engine's documented ADMIN workweek.
-  }
-
-  return new Set([0, 1, 2, 3, 4]);
-}
-
-function adminWorkDay(day: string, meta: ScheduleMeta): boolean {
-  const weekday = new Date(dateNumber(day) * 86400000).getUTCDay();
-  return parseWorkDays(meta.workDaysJson).has(weekday);
-}
-
 function shouldIncludeReportRow(
   _row: Pick<FactRow, "attendanceDay" | "status" | "scheduledStart" | "scheduledEnd">,
   _meta: ScheduleMeta | undefined,
