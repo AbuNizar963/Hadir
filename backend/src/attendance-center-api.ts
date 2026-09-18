@@ -32,13 +32,32 @@ const parseIds = (value: unknown): string[] => {
   return value.map(String).filter(Boolean);
 };
 
-async function fetchByIds(db: D1Database, table: "attendance" | "requests" | "audit", ids: string[]) {
+async function fetchByIds(
+  db: D1Database,
+  table: "attendance" | "requests" | "audit",
+  ids: string[],
+) {
   if (!ids.length) return [];
-  const placeholders = ids.map(() => "?").join(",");
-  const result = await db.prepare(`SELECT * FROM ${table} WHERE id IN (${placeholders})`).bind(...ids).all();
-  const rows = (result.results || []) as Record<string, unknown>[];
+
+  const rows: Record<string, unknown>[] = [];
+  const chunkSize = 80;
+
+  for (let offset = 0; offset < ids.length; offset += chunkSize) {
+    const chunk = ids.slice(offset, offset + chunkSize);
+    const placeholders = chunk.map(() => "?").join(",");
+    const result = await db
+      .prepare(`SELECT * FROM ${table} WHERE id IN (${placeholders})`)
+      .bind(...chunk)
+      .all();
+
+    rows.push(...((result.results || []) as Record<string, unknown>[]));
+  }
+
   const order = new Map(ids.map((id, index) => [id, index]));
-  return rows.sort((a, b) => (order.get(String(a.id)) ?? 0) - (order.get(String(b.id)) ?? 0));
+  return rows.sort(
+    (a, b) =>
+      (order.get(String(a.id)) ?? 0) - (order.get(String(b.id)) ?? 0),
+  );
 }
 
 async function buildAttendanceCenterDrilldown(env: Env, attendanceDay: string, employeeId: string, actor: any) {
