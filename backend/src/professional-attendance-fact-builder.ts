@@ -238,7 +238,15 @@ export async function materializeDay(
         // essential for overnight ADMIN shifts whose check-in belongs to the
         // previous calendar day while the reporting day is the shift's active
         // continuation after midnight.
-        const checkoutCutoffMs = scheduledEndMs + 86_400_000;
+        const endLocalDay = new Intl.DateTimeFormat("en-CA", {
+          timeZone: TZ,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date(scheduledEndMs));
+        const checkoutCutoffMs = localMidnightUtc(
+          addDays(endLocalDay, 1),
+        ).getTime();
         return ts >= scheduledStartMs && ts < checkoutCutoffMs;
       }
       return ts >= dayStartMs && ts < dayEndMs;
