@@ -620,7 +620,10 @@ export async function handleDailyStatus(
         status = "NOT_STARTED";
       else if (!schedule.work) status = "REST";
       else status = "ABSENT";
-      const vipCheckIn = isScheduledVip && !checkIn ? schedule.start?.toISOString() || null : checkIn?.timestamp || null;
+      const vipCheckIn =
+        isScheduledVip && !checkIn
+          ? schedule.start?.toISOString() || null
+          : checkIn?.timestamp || null;
       const vipCheckOut =
         isScheduledVip &&
         Number(employee.autoCheckOut) === 1 &&
