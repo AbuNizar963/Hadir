@@ -107,20 +107,24 @@ export async function materializeDay(
   const ids = filtered
     .map((e: any) => String(e.employeeId || ""))
     .filter(Boolean);
-  const placeholders = ids.map(() => "?").join(",");
-  const createdResult = ids.length
-    ? await env.DB.prepare(
-        `SELECT id,created_at AS createdAt FROM employees WHERE id IN (${placeholders})`,
-      )
-        .bind(...ids)
-        .all<any>()
-    : ({ results: [] } as any);
-  const createdByEmployee = new Map<string, string | null>(
-    (createdResult.results || []).map((row: any) => [
-      String(row.id),
-      employeeCreatedDay(row.createdAt),
-    ]),
-  );
+  const createdByEmployee = new Map<string, string | null>();
+  const chunkSize = 80;
+
+  // D1/SQLite has a finite bound-variable limit. Materialization can cover
+  // the entire workforce, so resolve employee creation dates in bounded chunks.
+  for (let offset = 0; offset < ids.length; offset += chunkSize) {
+    const chunk = ids.slice(offset, offset + chunkSize);
+    const placeholders = chunk.map(() => "?").join(",");
+    const createdResult = await env.DB.prepare(
+      `SELECT id,created_at AS createdAt FROM employees WHERE id IN (${placeholders})`,
+    )
+      .bind(...chunk)
+      .all<any>();
+
+    for (const row of createdResult.results || []) {
+      createdByEmployee.set(String(row.id), employeeCreatedDay(row.createdAt));
+    }
+  }
   const eligible = filtered.filter((e: any) => {
     const createdDay = createdByEmployee.get(String(e.employeeId));
     return !createdDay || day >= createdDay;
