@@ -1,4 +1,5 @@
 import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
+import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
 
 type Env = {
   DB: D1Database;
@@ -278,6 +279,20 @@ export async function handleProfessionalAttendanceReport(
       }
 
       return json(detail, 200, origin);
+    }
+
+    // A single-day report is a roster report, not a read of whatever facts
+    // happened to be materialized by a background refresh. Materialize the
+    // requested day first so scheduled employees without an attendance event
+    // are still represented. Raw attendance events remain read-only.
+    if (from === to) {
+      await ensureProfessionalAttendanceFacts(
+        env,
+        from,
+        to,
+        actor,
+        employeeId,
+      );
     }
 
     const report = await buildProfessionalAttendanceReport(
