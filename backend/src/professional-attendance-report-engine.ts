@@ -96,30 +96,6 @@ export type ScheduleMeta = {
   rotationDaysOff: number | null;
 };
 
-function normalizeWorkDays(value: string | null): number[] {
-  try {
-    const parsed = JSON.parse(value || "[]");
-    if (Array.isArray(parsed)) {
-      const days = parsed
-        .filter(
-          (day): day is number =>
-            Number.isInteger(day) && day >= 0 && day <= 6,
-        )
-        .map(Number);
-
-      if (days.length) return [...new Set(days)].sort((a, b) => a - b);
-    }
-  } catch {
-    // Fall back to the canonical administrative work week.
-  }
-
-  return [0, 1, 2, 3, 4];
-}
-
-function dayWeekday(day: string): number {
-  return new Date(dateNumber(day) * 86400000).getUTCDay();
-}
-
 function rotationWorkDay(
   day: string,
   meta: ScheduleMeta,
@@ -167,17 +143,25 @@ function shouldIncludeReportRow(
     .trim()
     .toUpperCase();
 
+  if (!dailyReport) {
+    // Historical and period reports trust the materialized fact status.
+    // Re-reading the employee's current schedule here could rewrite history
+    // after a later schedule change.
+    return true;
+  }
+
   if (scheduleType === "ROTATION") {
     const rotation = rotationWorkDay(row.attendanceDay, meta);
 
     if (!rotation.isWorkDay) return false;
 
-    return !dailyReport || rotation.isLastWorkDay;
+    return rotation.isLastWorkDay;
   }
 
-  return normalizeWorkDays(meta.workDaysJson).includes(
-    dayWeekday(row.attendanceDay),
-  );
+  // Administrative work-day eligibility is already encoded by the canonical
+  // attendance engine in the fact status. Do not recompute it from the
+  // employee's current work_days_json.
+  return true;
 }
 
 /**
