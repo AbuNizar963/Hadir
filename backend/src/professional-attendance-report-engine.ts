@@ -146,7 +146,11 @@ export function isReportableEmployeeDay(
   dailyReport: boolean,
 ): boolean {
   return shouldIncludeReportRow(
-    { attendanceDay, status },
+    {
+      attendanceDay,
+      status,
+      scheduleType: meta?.scheduleType || "",
+    },
     meta,
     dailyReport,
   );
