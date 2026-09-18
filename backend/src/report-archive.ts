@@ -1,4 +1,5 @@
 import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
+import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
 import * as XLSX from "xlsx-js-style";
 
 type Env = {
@@ -375,6 +376,14 @@ export async function archiveClosedMonth(
       period,
     };
   }
+  // The archive is generated from the same canonical fact layer as live
+  // reports. Materialize the closed period first so missed background refreshes
+  // cannot leave the archive empty while raw attendance data exists.
+  await ensureProfessionalAttendanceFacts(env, period.from, period.to, {
+    id: "system-archive",
+    role: "owner",
+  });
+
   const report = await buildProfessionalAttendanceReport(
     env,
     period.from,
