@@ -39,7 +39,6 @@ type Status =
   | "present"
   | "late"
   | "absent"
-  | "early"
   | "permission"
   | "leave"
   | "off"
@@ -111,7 +110,6 @@ const labels: Record<Status, string> = {
   present: "حاضر",
   late: "متأخر",
   absent: "غياب",
-  early: "انصراف مبكر",
   permission: "استئذان",
   leave: "إجازة",
   off: "راحة/عطلة",
@@ -121,7 +119,6 @@ const cls: Record<Status, string> = {
   present: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   late: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   absent: "bg-red-500/15 text-red-700 dark:text-red-300",
-  early: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
   permission: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   leave: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
   off: "bg-secondary text-muted-foreground",
@@ -321,7 +318,7 @@ function calculateDetails(
         em = w.end
           ? Math.max(0, Math.round((w.end.getTime() - cout.getTime()) / 60000))
           : 0;
-        st = em ? "early" : lm ? "late" : "present";
+        st = lm ? "late" : "present";
       } else {
         st = lm ? "late" : "present";
       }
@@ -335,6 +332,7 @@ function calculateDetails(
     const detailNotes = [
       w.detail || "يوم عمل",
       requestText(requests, employee.id, k),
+      em ? "انصراف مبكر" : "",
       pendingCheckout ? "انصراف معلق" : "",
     ]
       .filter(Boolean)
