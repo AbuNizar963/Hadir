@@ -684,7 +684,7 @@ export async function handleDailyStatus(
       const exceptionCode =
         checkOut && !checkIn
           ? "CHECKOUT_WITHOUT_CHECKIN"
-          : shiftEnded
+          : shiftEnded && (status === "PRESENT" || status === "LATE")
             ? "MISSING_CHECKOUT"
             : status === "ABSENT"
               ? "ABSENT_NO_APPROVED_REASON"
