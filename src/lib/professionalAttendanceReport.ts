@@ -1,4 +1,4 @@
-export type ProfessionalAttendanceStatus = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "ESCAPED" | "NOT_STARTED" | "INVALID" | "OPEN";
+export type ProfessionalAttendanceStatus = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "ESCAPED" | "NOT_STARTED" | "INVALID";
 
 export type ProfessionalAttendanceRow = {
   attendanceDay: string;
