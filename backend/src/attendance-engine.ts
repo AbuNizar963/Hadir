@@ -21,7 +21,7 @@ const statusLabel = (status: Status) =>
     ABSENT: "غياب",
     REST: "راحة",
     LEAVE: "إجازة",
-    PERMISSION: "إذن",
+    PERMISSION: "استئذان",
     ESCAPED: "هارب",
     NOT_STARTED: "لم يبدأ",
     INVALID: "غير صالح",
