@@ -274,7 +274,7 @@ export default function GlobalAttendanceReports() {
           worked: "—",
           late: 0,
           early: 0,
-          detail: getExceptionLabel(row.exceptionCode),
+          detail: getExceptionLabel(row.exceptionCode, row.status),
         })),
     });
   };
@@ -308,7 +308,7 @@ export default function GlobalAttendanceReports() {
         row.lateMinutes,
         row.earlyLeaveMinutes,
         row.overtimeMinutes,
-        getExceptionLabel(row.exceptionCode),
+        getExceptionLabel(row.exceptionCode, row.status),
       ]),
     );
   };
@@ -565,7 +565,7 @@ export default function GlobalAttendanceReports() {
                           <td className="p-3">{row.lateMinutes}د</td>
                           <td className="p-3">{row.earlyLeaveMinutes}د</td>
                           <td className="p-3">{row.overtimeMinutes}د</td>
-                          <td className="p-3">{getExceptionLabel(row.exceptionCode)}</td>
+                          <td className="p-3">{getExceptionLabel(row.exceptionCode, row.status)}</td>
                         </tr>
                       ))}
                     </tbody>
