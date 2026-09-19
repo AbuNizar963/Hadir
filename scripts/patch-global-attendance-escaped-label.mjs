@@ -22,38 +22,6 @@ const replaceOnce = (value, replacement, description) => {
 };
 
 const escapedCanonical = 'ESCAPED: "هروب"';
-const openCanonical = 'OPEN: "حاضر"';
-
-if (!source.includes(escapedCanonical)) {
-  const escapedLegacy = [
-    'ESCAPED: "انصراف دون تسجيل"',
-    'ESCAPED: "هروب من العمل"',
-  ].find((value) => source.includes(value));
-
-  if (!escapedLegacy) {
-    throw new Error(
-      "GlobalAttendanceReports status-label patch: expected ESCAPED label was not found; refusing unsafe replacement.",
-    );
-  }
-
-  replaceOnce(escapedLegacy, escapedCanonical, "ESCAPED label");
-}
-
-if (!source.includes(openCanonical)) {
-  const openLegacy = [
-    'OPEN: "انصراف معلق"',
-    'OPEN: "دوام مفتوح"',
-  ].find((value) => source.includes(value));
-
-  if (!openLegacy) {
-    throw new Error(
-      "GlobalAttendanceReports status-label patch: expected OPEN label was not found; refusing unsafe replacement.",
-    );
-  }
-
-  replaceOnce(openLegacy, openCanonical, "OPEN label");
-}
-
 const legacyStatusClassExpression =
   'const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : "";';
 const canonicalStatusClassExpression =
@@ -113,7 +81,6 @@ if (source.includes(rotationEndedCss)) {
 
 if (
   !source.includes(escapedCanonical) ||
-  !source.includes(openCanonical) ||
   !source.includes(canonicalStatusClassExpression) ||
   !source.includes(canonicalStatusExpression) ||
   !source.includes(canonicalMissingCheckout) ||
