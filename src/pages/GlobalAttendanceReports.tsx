@@ -50,7 +50,7 @@ const labels: Record<string, string> = {
   ESCAPED: "هروب",
   NOT_STARTED: "لم يبدأ",
   INVALID: "غير صالح",
-  OPEN: "انصراف معلق",
+  OPEN: "حاضر",
 };
 
 const statusBadgeClasses: Record<string, string> = {
@@ -60,25 +60,23 @@ const statusBadgeClasses: Record<string, string> = {
   PERMISSION: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200",
   LEAVE: "bg-blue-700 text-white dark:bg-blue-800",
   ESCAPED: "bg-red-900 text-white dark:bg-red-950",
-  OPEN: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200",
+  OPEN: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
   REST: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
   NOT_STARTED: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
   INVALID: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
 };
 
-const isRotationShiftFinished = (row: {
-  attendanceDay: string;
-  scheduleType: string;
-  scheduledEnd: string | null;
-}) => {
-  if (String(row.scheduleType || "").toUpperCase() !== "ROTATION" || !row.scheduledEnd) {
-    return false;
-  }
-  const end = Date.parse(row.scheduledEnd);
-  if (!Number.isFinite(end)) return false;
-  const today = damascusToday();
-  return row.attendanceDay < today || (row.attendanceDay === today && end <= Date.now());
+const exceptionLabels: Record<string, string> = {
+  MISSING_CHECKOUT: "انصراف معلق",
+  CHECKOUT_WITHOUT_CHECKIN: "انصراف دون حضور",
+  ABSENT_NO_APPROVED_REASON: "غياب دون عذر معتمد",
+  LATE_ARRIVAL: "تأخر في الحضور",
+  EARLY_LEAVE: "انصراف مبكر",
+  OVERTIME: "عمل إضافي",
 };
+
+const getExceptionLabel = (code: string | null | undefined) =>
+  code ? exceptionLabels[code] || code : "—";
 
 const fmt = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}س ${Math.round(Math.max(0, minutes) % 60)}د`;
@@ -256,7 +254,7 @@ export default function GlobalAttendanceReports() {
         worked: fmt(row.workedMinutes || 0),
         late: row.lateMinutes,
         early: row.earlyLeaveMinutes,
-        detail: row.exceptionCode || "",
+        detail: getExceptionLabel(row.exceptionCode),
       })),
       chartData: statusData,
       absenceRows: rows
@@ -272,7 +270,7 @@ export default function GlobalAttendanceReports() {
           worked: "—",
           late: 0,
           early: 0,
-          detail: row.exceptionCode || "",
+          detail: getExceptionLabel(row.exceptionCode),
         })),
     });
   };
@@ -306,7 +304,7 @@ export default function GlobalAttendanceReports() {
         row.lateMinutes,
         row.earlyLeaveMinutes,
         row.overtimeMinutes,
-        row.exceptionCode || "",
+        getExceptionLabel(row.exceptionCode),
       ]),
     );
   };
@@ -539,11 +537,6 @@ export default function GlobalAttendanceReports() {
                               <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[row.status] || "bg-primary/10 text-primary"}`}>
                                 {labels[row.status] || row.status}
                               </span>
-                              {isRotationShiftFinished(row) && (
-                                <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
-                                  انتهت المناوبة
-                                </span>
-                              )}
                             </div>
                           </td>
                           <td className="p-3">
@@ -568,7 +561,7 @@ export default function GlobalAttendanceReports() {
                           <td className="p-3">{row.lateMinutes}د</td>
                           <td className="p-3">{row.earlyLeaveMinutes}د</td>
                           <td className="p-3">{row.overtimeMinutes}د</td>
-                          <td className="p-3">{row.exceptionCode || "—"}</td>
+                          <td className="p-3">{getExceptionLabel(row.exceptionCode)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -729,11 +722,6 @@ export default function GlobalAttendanceReports() {
                       <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[detail.fact.status] || "bg-primary/10 text-primary"}`}>
                         {labels[detail.fact.status] || detail.fact.status}
                       </span>
-                      {isRotationShiftFinished(detail.fact) && (
-                        <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
-                          انتهت المناوبة
-                        </span>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -763,7 +751,7 @@ export default function GlobalAttendanceReports() {
                   <div>التأخر: <b>{detail.fact.lateMinutes}د</b></div>
                   <div>الانصراف المبكر: <b>{detail.fact.earlyLeaveMinutes}د</b></div>
                   <div>الإضافي: <b>{detail.fact.overtimeMinutes}د</b></div>
-                  <div>الاستثناء: <b>{detail.fact.exceptionCode || "—"}</b></div>
+                  <div>الملاحظات: <b>{getExceptionLabel(detail.fact.exceptionCode)}</b></div>
                   <div>مصدر الحساب: <b>{detail.fact.calculationSource}</b></div>
                   <div>إصدار الحساب: <b>{detail.fact.calculationVersion}</b></div>
                   <div>جودة التاريخ: <b>{detail.fact.historicalDataQuality}</b></div>
