@@ -40,7 +40,6 @@ type Status =
   | "late"
   | "absent"
   | "early"
-  | "open"
   | "permission"
   | "leave"
   | "off"
@@ -113,7 +112,6 @@ const labels: Record<Status, string> = {
   late: "متأخر",
   absent: "غياب",
   early: "انصراف مبكر",
-  open: "تسجيل ناقص",
   permission: "استئذان",
   leave: "إجازة",
   off: "راحة/عطلة",
@@ -124,7 +122,6 @@ const cls: Record<Status, string> = {
   late: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
   absent: "bg-red-500/15 text-red-700 dark:text-red-300",
   early: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-  open: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
   permission: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   leave: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
   off: "bg-secondary text-muted-foreground",
@@ -230,8 +227,6 @@ function dailyStatusFor(row: DailyStatusRow | undefined): Status | null {
       return "present";
     case "LATE":
       return "late";
-    case "OPEN":
-      return "open";
     case "ABSENT":
       return "absent";
     case "REST":
@@ -327,17 +322,24 @@ function calculateDetails(
           ? Math.max(0, Math.round((w.end.getTime() - cout.getTime()) / 60000))
           : 0;
         st = em ? "early" : lm ? "late" : "present";
-      } else st = "open";
+      } else {
+        st = lm ? "late" : "present";
+      }
     }
-    if (dailyStatus && serverStatus) {
-      if (
-        cin &&
-        !cout &&
-        (serverStatus === "present" || serverStatus === "late")
-      )
-        st = "open";
-      else st = serverStatus === "late" && !cout ? "open" : serverStatus;
-    }
+    if (dailyStatus && serverStatus) st = serverStatus;
+
+    const pendingCheckout =
+      !!cin &&
+      !cout &&
+      isShiftEndedForDailyReport(d, w.end ?? null);
+    const detailNotes = [
+      w.detail || "يوم عمل",
+      requestText(requests, employee.id, k),
+      pendingCheckout ? "انصراف معلق" : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
     detail.push({
       date: k,
       day: days[d.getDay()],
@@ -347,9 +349,7 @@ function calculateDetails(
       worked: wd,
       late: lm,
       early: em,
-      detail: [w.detail || "يوم عمل", requestText(requests, employee.id, k)]
-        .filter(Boolean)
-        .join(" · "),
+      detail: detailNotes,
     });
   }
   return detail;
@@ -428,7 +428,9 @@ function calculateSummary(
       : 0;
     lateMinutes += lm;
     if (!cout) {
-      open++;
+      if (isShiftEndedForDailyReport(d, w.end ?? null)) open++;
+      if (serverStatus === "late" || lm > 0) late++;
+      else present++;
       continue;
     }
     const wd = Math.max(
@@ -508,36 +510,13 @@ function serviceRows(
       };
     }
 
-    if (d.status !== "open" || d.checkIn === "—") {
-      return {
-        employee: s.employee,
-        specialty: specialtyOf(s.employee),
-        status: d.status,
-        checkIn: d.checkIn,
-        checkOut: d.checkOut,
-        note: d.detail,
-      };
-    }
-
-    const reportDate = reportDates[0];
-    const workPeriod = reportDate
-      ? getEmployeeWorkPeriod(s.employee, reportDate)
-      : null;
-    const ended =
-      !!reportDate &&
-      isShiftEndedForDailyReport(reportDate, workPeriod?.end ?? null);
-    const status: Status = d.late > 0 ? "late" : "present";
-    const note = ended
-      ? [d.detail, "انصراف ناقص"].filter(Boolean).join(" · ")
-      : d.detail;
-
     return {
       employee: s.employee,
       specialty: specialtyOf(s.employee),
-      status,
+      status: d.status,
       checkIn: d.checkIn,
       checkOut: d.checkOut,
-      note,
+      note: d.detail,
     };
   });
 }
@@ -804,7 +783,7 @@ export default function ManagerReports() {
       { label: "إجازة", value: total.leave },
       { label: "انصراف مبكر", value: total.early },
       { label: "تأخر", value: total.late },
-      { label: "تسجيل ناقص", value: total.open },
+      { label: "انصراف معلق", value: total.open },
     ],
     max = Math.max(1, ...chartData.map((x) => x.value));
   const dailyServiceRows = useMemo(
@@ -987,7 +966,7 @@ export default function ManagerReports() {
       { label: "إجازة", value: reportTotal.leave },
       { label: "انصراف مبكر", value: reportTotal.early },
       { label: "تأخر", value: reportTotal.late },
-      { label: "تسجيل ناقص", value: reportTotal.open },
+      { label: "انصراف معلق", value: reportTotal.open },
     ];
     downloadProfessionalAttendanceReport({
       mode,
