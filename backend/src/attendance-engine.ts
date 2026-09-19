@@ -22,7 +22,7 @@ const statusLabel = (status: Status) =>
     REST: "راحة",
     LEAVE: "إجازة",
     PERMISSION: "إذن",
-    ESCAPED: "انصراف دون إذن",
+    ESCAPED: "هارب",
     NOT_STARTED: "لم يبدأ",
     INVALID: "غير صالح",
   })[status];
