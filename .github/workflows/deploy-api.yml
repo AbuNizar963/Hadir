@@ -151,8 +151,8 @@ jobs:
               for result in data if isinstance(data,list) else []: rows.extend(result.get("results") or [])
               return rows
           expected={
-              "daily_attendance_status":["PRESENT","LATE","ABSENT","REST","LEAVE","PERMISSION","ESCAPED","NOT_STARTED","INVALID","OPEN"],
-              "attendance_reporting_facts":["PRESENT","LATE","ABSENT","REST","LEAVE","PERMISSION","ESCAPED","NOT_STARTED","INVALID","OPEN"]}
+              "daily_attendance_status":["PRESENT","LATE","ABSENT","REST","LEAVE","PERMISSION","ESCAPED","NOT_STARTED","INVALID"],
+              "attendance_reporting_facts":["PRESENT","LATE","ABSENT","REST","LEAVE","PERMISSION","ESCAPED","NOT_STARTED","INVALID"]}
           for table,statuses in expected.items():
               rows=query(f'SELECT sql FROM sqlite_master WHERE type = "table" AND name = "{table}";')
               if not rows: raise SystemExit(f"ERROR: production table {table} does not exist")
@@ -164,6 +164,10 @@ jobs:
           if not archive: raise SystemExit("ERROR: production report_archives table does not exist")
           print(f"attendance_reporting_facts rows: {fact[0].get('total',0) if fact else 0}")
           print(f"daily_attendance_status rows: {daily[0].get('total',0) if daily else 0}")
+          legacy=query("SELECT (SELECT COUNT(*) FROM daily_attendance_status WHERE status='OPEN') AS daily_open, (SELECT COUNT(*) FROM attendance_reporting_facts WHERE status='OPEN') AS fact_open;")
+          if legacy and ((legacy[0].get('daily_open',0) or 0) or (legacy[0].get('fact_open',0) or 0)):
+              raise SystemExit(f"ERROR: legacy OPEN attendance rows remain: {legacy[0]}")
+          print("No legacy OPEN attendance rows remain.")
           print("report_archives schema: verified.")
           PY
 
