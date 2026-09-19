@@ -47,7 +47,7 @@ const labels: Record<string, string> = {
   LEAVE: "إجازة",
   PERMISSION: "استئذان",
   REST: "راحة",
-  ESCAPED: "هروب",
+  ESCAPED: "هارب",
   NOT_STARTED: "لم يبدأ",
   INVALID: "غير صالح",
 };
@@ -73,8 +73,15 @@ const exceptionLabels: Record<string, string> = {
   OVERTIME: "عمل إضافي",
 };
 
-const getExceptionLabel = (code: string | null | undefined) =>
-  code ? exceptionLabels[code] || code : "—";
+const getExceptionLabel = (
+  code: string | null | undefined,
+  status?: string | null,
+) =>
+  status === "ESCAPED"
+    ? "هرب من العمل"
+    : code
+      ? exceptionLabels[code] || code
+      : "—";
 
 const fmt = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}س ${Math.round(Math.max(0, minutes) % 60)}د`;
@@ -251,7 +258,7 @@ export default function GlobalAttendanceReports() {
         worked: fmt(row.workedMinutes || 0),
         late: row.lateMinutes,
         early: row.earlyLeaveMinutes,
-        detail: getExceptionLabel(row.exceptionCode),
+        detail: getExceptionLabel(row.exceptionCode, row.status),
       })),
       chartData: statusData,
       absenceRows: rows
@@ -748,7 +755,7 @@ export default function GlobalAttendanceReports() {
                   <div>التأخر: <b>{detail.fact.lateMinutes}د</b></div>
                   <div>الانصراف المبكر: <b>{detail.fact.earlyLeaveMinutes}د</b></div>
                   <div>الإضافي: <b>{detail.fact.overtimeMinutes}د</b></div>
-                  <div>الملاحظات: <b>{getExceptionLabel(detail.fact.exceptionCode)}</b></div>
+                  <div>الملاحظات: <b>{getExceptionLabel(detail.fact.exceptionCode, detail.fact.status)}</b></div>
                   <div>مصدر الحساب: <b>{detail.fact.calculationSource}</b></div>
                   <div>إصدار الحساب: <b>{detail.fact.calculationVersion}</b></div>
                   <div>جودة التاريخ: <b>{detail.fact.historicalDataQuality}</b></div>
