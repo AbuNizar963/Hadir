@@ -50,7 +50,6 @@ const labels: Record<string, string> = {
   ESCAPED: "هروب",
   NOT_STARTED: "لم يبدأ",
   INVALID: "غير صالح",
-  OPEN: "حاضر",
 };
 
 const statusBadgeClasses: Record<string, string> = {
@@ -60,7 +59,6 @@ const statusBadgeClasses: Record<string, string> = {
   PERMISSION: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200",
   LEAVE: "bg-blue-700 text-white dark:bg-blue-800",
   ESCAPED: "bg-red-900 text-white dark:bg-red-950",
-  OPEN: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
   REST: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
   NOT_STARTED: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
   INVALID: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
@@ -211,7 +209,7 @@ export default function GlobalAttendanceReports() {
         { name: labels.ESCAPED, value: report.summary.escaped },
         { name: labels.NOT_STARTED, value: report.summary.notStarted },
         { name: labels.INVALID, value: report.summary.invalid },
-        { name: labels.OPEN, value: report.summary.open },
+        { name: exceptionLabels.MISSING_CHECKOUT, value: report.summary.open },
       ].filter((item) => item.value > 0)
     : [];
 
@@ -579,7 +577,7 @@ export default function GlobalAttendanceReports() {
                   <table className="w-full min-w-[900px] text-sm">
                     <thead>
                       <tr className="border-b text-right">
-                        {["الموظف", "الأيام", "حاضر", "متأخر", "غياب", "دوام مفتوح", "العمل", "التأخر", "الإضافي"].map((heading) => (
+                        {["الموظف", "الأيام", "حاضر", "متأخر", "غياب", "انصراف معلق", "العمل", "التأخر", "الإضافي"].map((heading) => (
                           <th key={heading} className="p-3">{heading}</th>
                         ))}
                       </tr>
