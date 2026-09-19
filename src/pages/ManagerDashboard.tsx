@@ -59,7 +59,7 @@ function statusLabel(row: DailyStatusRow) {
     case "INVALID":
       return "جدول غير صالح";
     case "OPEN":
-      return "دوام مفتوح";
+      return "حاضر";
     default:
       return "غير محدد";
   }
