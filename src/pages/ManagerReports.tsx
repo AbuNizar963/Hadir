@@ -1267,7 +1267,7 @@ export default function ManagerReports() {
                   <th className="p-3">أيام العمل</th>
                   <th className="p-3">حاضر</th>
                   <th className="p-3">غياب</th>
-                  <th className="p-3">تسجيل ناقص</th>
+                  <th className="p-3">انصراف معلق</th>
                   <th className="p-3">تأخر</th>
                   <th className="p-3">انصراف مبكر</th>
                   <th className="p-3">إجازة</th>
