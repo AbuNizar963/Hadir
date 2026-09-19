@@ -81,7 +81,7 @@ function statusArabic(status: string) {
     ESCAPED: "انصراف دون إذن",
     NOT_STARTED: "لم يبدأ",
     INVALID: "غير صالح",
-    OPEN: "مفتوح",
+    OPEN: "حاضر",
   };
   return map[status] || status;
 }
