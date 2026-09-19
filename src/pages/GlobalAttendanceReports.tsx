@@ -209,7 +209,6 @@ export default function GlobalAttendanceReports() {
         { name: labels.ESCAPED, value: report.summary.escaped },
         { name: labels.NOT_STARTED, value: report.summary.notStarted },
         { name: labels.INVALID, value: report.summary.invalid },
-        { name: exceptionLabels.MISSING_CHECKOUT, value: report.summary.open },
       ].filter((item) => item.value > 0)
     : [];
 
