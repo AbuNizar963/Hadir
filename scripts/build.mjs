@@ -30,16 +30,6 @@ run("node", ["scripts/patch-company-logo-refresh.mjs"]);
 run("node", ["scripts/patch-company-logo-settings-preview.mjs"]);
 run("node", ["scripts/patch-manager-report-share-filename-safe.mjs"]);
 
-const managerReportsSource = readFileSync(new URL("../src/pages/ManagerReports.tsx", import.meta.url), "utf8");
-const canonicalHistoricalReports = managerReportsSource.includes("const [dailyStatusByDate, setDailyStatusByDate]")
-  || managerReportsSource.includes("dailyStatusByDate?.get(k)?.get(employee.id)")
-  || (managerReportsSource.includes("const dailyStatusMap = useMemo") && managerReportsSource.includes("getDailyStatus"));
-if (canonicalHistoricalReports) {
-  console.log("ManagerReports historical patch: current per-day status model is already canonical; legacy patch skipped safely.");
-} else {
-  run("node", ["scripts/patch-manager-reports-historical-v2.mjs"]);
-}
-
 run("node", ["scripts/patch-manager-reports-damascus-date.mjs"]);
 run("node", ["scripts/patch-manager-settings-ui.mjs"]);
 run("node", ["scripts/patch-manager-settings-telegram-ui.mjs"]);
