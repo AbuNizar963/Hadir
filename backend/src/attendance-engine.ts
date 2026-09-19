@@ -13,8 +13,7 @@ type Status =
   | "PERMISSION"
   | "ESCAPED"
   | "NOT_STARTED"
-  | "INVALID"
-  | "OPEN";
+  | "INVALID";
 const statusLabel = (status: Status) =>
   ({
     PRESENT: "حاضر",
@@ -26,7 +25,6 @@ const statusLabel = (status: Status) =>
     ESCAPED: "انصراف دون إذن",
     NOT_STARTED: "لم يبدأ",
     INVALID: "غير صالح",
-    OPEN: "حاضر",
   })[status];
 type EmployeeRow = {
   id: string;
@@ -675,7 +673,6 @@ export async function handleDailyStatus(
                 0,
             )
           : 0;
-      const open = status === "OPEN";
       const shiftEnded =
         !!checkIn &&
         !checkOut &&
@@ -695,6 +692,9 @@ export async function handleDailyStatus(
                   : overtimeMinutes
                     ? "OVERTIME"
                     : null;
+
+      // Legacy open metric is derived from the exception layer, never from the primary status.
+      const open = exceptionCode === "MISSING_CHECKOUT" ? 1 : 0;
       return {
         attendanceDay: day,
         employeeId: id,
