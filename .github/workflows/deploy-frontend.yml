@@ -17,7 +17,6 @@ on:
       - "vite.config.*"
       - "scripts/build.mjs"
       - "scripts/patch-manager-report-header.mjs"
-      - "scripts/patch-manager-reports-live.mjs"
       - "scripts/patch-manager-report-share.mjs"
       - "scripts/patch-employee-home-shift-info.mjs"
       - "scripts/patch-manager-settings-ui.mjs"
