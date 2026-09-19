@@ -333,7 +333,9 @@ export async function materializeDay(
         String(e.jobNumber || ""),
         String(e.employeeName || ""),
         e.locationId || null,
-        String(e.status || "INVALID") === "OPEN" ? "PRESENT" : String(e.status || "INVALID"),
+        String(e.status || "INVALID") === "OPEN"
+          ? "PRESENT"
+          : String(e.status || "INVALID"),
         String(e.scheduleType || "ADMIN"),
         e.scheduledStart || null,
         e.scheduledEnd || null,
