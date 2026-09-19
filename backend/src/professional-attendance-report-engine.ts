@@ -272,7 +272,7 @@ async function loadFacts(
     f.job_number AS jobNumber,
     f.employee_name AS employeeName,
     f.location_id AS locationId,
-    CASE WHEN f.status = 'OPEN' THEN 'PRESENT' ELSE f.status END AS status,
+    f.status AS status,
     f.schedule_type AS scheduleType,
     f.scheduled_start AS scheduledStart,
     f.scheduled_end AS scheduledEnd,
@@ -284,11 +284,11 @@ async function loadFacts(
     f.early_leave_minutes AS earlyLeaveMinutes,
     f.overtime_minutes AS overtimeMinutes,
     CASE
-      WHEN f.status = 'OPEN' OR f.exception_code = 'MISSING_CHECKOUT' THEN 1
+      WHEN f.exception_code = 'MISSING_CHECKOUT' THEN 1
       ELSE 0
     END AS open,
     CASE
-      WHEN f.status = 'OPEN' AND COALESCE(f.exception_code, '') = '' THEN 'MISSING_CHECKOUT'
+      WHEN f.exception_code IS NULL AND f.check_in_at IS NOT NULL AND f.check_out_at IS NULL THEN 'MISSING_CHECKOUT'
       ELSE f.exception_code
     END AS exceptionCode,
     f.attendance_event_ids_json AS attendanceEventIdsJson,
