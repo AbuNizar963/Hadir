@@ -9,8 +9,7 @@ export type DailyStatusCode =
   | "PERMISSION"
   | "ESCAPED"
   | "NOT_STARTED"
-  | "INVALID"
-  | "OPEN";
+  | "INVALID";
 
 export type DailyStatusRow = {
   attendanceDay: string;
@@ -59,13 +58,6 @@ function normalizeActiveAttendance(
           };
         }
 
-        if (row.status === "OPEN") {
-          return {
-            ...row,
-            status: "PRESENT" as const,
-            statusLabel: "حاضر",
-          };
-        }
 
         return row;
       })
