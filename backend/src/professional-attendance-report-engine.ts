@@ -46,7 +46,6 @@ const VALID_STATUSES = new Set([
   "ESCAPED",
   "NOT_STARTED",
   "INVALID",
-  "OPEN",
 ]);
 
 const jsonArray = (value: string | null | undefined): string[] => {
@@ -273,7 +272,7 @@ async function loadFacts(
     f.job_number AS jobNumber,
     f.employee_name AS employeeName,
     f.location_id AS locationId,
-    f.status,
+    CASE WHEN f.status = 'OPEN' THEN 'PRESENT' ELSE f.status END AS status,
     f.schedule_type AS scheduleType,
     f.scheduled_start AS scheduledStart,
     f.scheduled_end AS scheduledEnd,
@@ -284,8 +283,14 @@ async function loadFacts(
     f.late_minutes AS lateMinutes,
     f.early_leave_minutes AS earlyLeaveMinutes,
     f.overtime_minutes AS overtimeMinutes,
-    f.open,
-    f.exception_code AS exceptionCode,
+    CASE
+      WHEN f.status = 'OPEN' OR f.exception_code = 'MISSING_CHECKOUT' THEN 1
+      ELSE 0
+    END AS open,
+    CASE
+      WHEN f.status = 'OPEN' AND COALESCE(f.exception_code, '') = '' THEN 'MISSING_CHECKOUT'
+      ELSE f.exception_code
+    END AS exceptionCode,
     f.attendance_event_ids_json AS attendanceEventIdsJson,
     f.request_ids_json AS requestIdsJson,
     f.audit_ids_json AS auditIdsJson,
@@ -486,18 +491,25 @@ async function loadLiveTodayFacts(
               ),
             )
           : 0;
+      const shiftEnded =
+        !!checkInAt &&
+        !checkOutAt &&
+        !!expectedEnd &&
+        Date.now() >= Date.parse(expectedEnd);
       const exceptionCode =
         row.status === "ABSENT"
           ? "ABSENT_NO_APPROVED_REASON"
-          : row.status === "OPEN"
-            ? "MISSING_CHECKOUT"
-            : lateMinutes
-              ? "LATE_ARRIVAL"
-              : earlyLeaveMinutes
-                ? "EARLY_LEAVE"
-                : overtimeMinutes
-                  ? "OVERTIME"
-                  : null;
+          : checkOutAt && !checkInAt
+            ? "CHECKOUT_WITHOUT_CHECKIN"
+            : shiftEnded && (row.status === "PRESENT" || row.status === "LATE")
+              ? "MISSING_CHECKOUT"
+              : lateMinutes
+                ? "LATE_ARRIVAL"
+                : earlyLeaveMinutes
+                  ? "EARLY_LEAVE"
+                  : overtimeMinutes
+                    ? "OVERTIME"
+                    : null;
 
       return {
         attendanceDay: day,
@@ -516,7 +528,7 @@ async function loadLiveTodayFacts(
         lateMinutes,
         earlyLeaveMinutes,
         overtimeMinutes,
-        open: row.status === "OPEN" ? 1 : 0,
+        open: exceptionCode === "MISSING_CHECKOUT" ? 1 : 0,
         exceptionCode,
         attendanceEventIdsJson: JSON.stringify(
           events.map((event) => String(event.id)),
