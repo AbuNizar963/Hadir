@@ -21,7 +21,7 @@ const replaceOnce = (value, replacement, description) => {
   changed = true;
 };
 
-const escapedCanonical = 'ESCAPED: "هروب"';
+const escapedCanonical = 'ESCAPED: "هارب"';
 const legacyStatusClassExpression =
   'const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : "";';
 const canonicalStatusClassExpression =
