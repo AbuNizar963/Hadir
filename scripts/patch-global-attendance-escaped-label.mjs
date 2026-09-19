@@ -68,11 +68,11 @@ if (!source.includes(canonicalStatusClassExpression)) {
 }
 
 const legacyStatusExpressions = [
-  '<span className={`global-attendance-print-status global-attendance-print-status-\${statusClass}`}>{labels[r.status] || r.status}</span>{isRotationShiftFinished(r) && <span className="global-attendance-print-rotation-ended">انتهت المناوبة</span>}',
-  '<span className={`global-attendance-print-status global-attendance-print-status-\${statusClass}`}>{isRotationShiftFinished(r) ? "انصراف" : labels[r.status] || r.status}</span>',
+  '<span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{labels[r.status] || r.status}</span>{isRotationShiftFinished(r) && <span className="global-attendance-print-rotation-ended">انتهت المناوبة</span>}',
+  '<span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{isRotationShiftFinished(r) ? "انصراف" : labels[r.status] || r.status}</span>',
 ];
 const canonicalStatusExpression =
-  '<span className={`global-attendance-print-status global-attendance-print-status-\${statusClass}`}>{labels[r.status] || r.status}</span>';
+  '<span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{labels[r.status] || r.status}</span>';
 
 if (!source.includes(canonicalStatusExpression)) {
   const legacyStatus = legacyStatusExpressions.find((value) =>
@@ -101,7 +101,7 @@ if (!source.includes(canonicalMissingCheckout)) {
 }
 
 const rotationEndedCss =
-  '        .global-attendance-print-rotation-ended { display: inline-block !important; margin-inline-start: 1.5mm; border-radius: 9999px; padding: 1mm 2.5mm; background: #ede9fe !important; color: #6d28d9 !important; font-size: 8pt; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\\n';
+  '        .global-attendance-print-rotation-ended { display: inline-block !important; margin-inline-start: 1.5mm; border-radius: 9999px; padding: 1mm 2.5mm; background: #ede9fe !important; color: #6d28d9 !important; font-size: 8pt; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }\n';
 
 if (source.includes(rotationEndedCss)) {
   replaceOnce(
