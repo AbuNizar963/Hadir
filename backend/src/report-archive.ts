@@ -77,11 +77,10 @@ function statusArabic(status: string) {
     ABSENT: "غياب",
     REST: "راحة",
     LEAVE: "إجازة",
-    PERMISSION: "إذن",
-    ESCAPED: "انصراف دون إذن",
+    PERMISSION: "استئذان",
+    ESCAPED: "هارب",
     NOT_STARTED: "لم يبدأ",
     INVALID: "غير صالح",
-    OPEN: "حاضر",
   };
   return map[status] || status;
 }
@@ -126,7 +125,7 @@ function makeWorkbook(report: any) {
       "إذن",
       "راحة",
       "دون إذن",
-      "مفتوح",
+      "انصراف معلق",
       "عمل",
       "متوقع",
       "تأخر",
@@ -162,7 +161,7 @@ function makeWorkbook(report: any) {
       "إذن",
       "راحة",
       "دون إذن",
-      "مفتوح",
+      "انصراف معلق",
       "العمل",
       "المتوقع",
       "التأخر",
