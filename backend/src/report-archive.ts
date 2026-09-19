@@ -106,7 +106,7 @@ function makeWorkbook(report: any) {
     ["انصراف دون إذن", report.summary.escaped],
     ["لم يبدأ", report.summary.notStarted],
     ["غير صالح", report.summary.invalid],
-    ["مفتوح", report.summary.open],
+    ["انصراف معلق", report.summary.open],
     ["ساعات العمل", minutes(report.summary.workedMinutes)],
     ["ساعات العمل المتوقعة", minutes(report.summary.expectedMinutes)],
     ["فرق العمل", minutes(report.summary.workVarianceMinutes)],
