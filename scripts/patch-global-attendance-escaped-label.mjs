@@ -25,7 +25,7 @@ const escapedCanonical = 'ESCAPED: "هروب"';
 const legacyStatusClassExpression =
   'const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : "";';
 const canonicalStatusClassExpression =
-  'const statusClass = r.status === "PRESENT" || r.status === "OPEN" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : r.status === "ESCAPED" ? "escaped" : r.status === "REST" ? "rest" : r.status === "NOT_STARTED" ? "not-started" : "invalid";';
+  'const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : r.status === "ESCAPED" ? "escaped" : r.status === "REST" ? "rest" : r.status === "NOT_STARTED" ? "not-started" : "invalid";';
 
 if (!source.includes(canonicalStatusClassExpression)) {
   replaceOnce(
