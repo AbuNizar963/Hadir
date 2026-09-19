@@ -271,8 +271,10 @@ export async function materializeDay(
     const lateMinutes = Number(e.lateMinutes || 0);
     const earlyLeaveMinutes = Number(e.earlyLeaveMinutes || 0);
     const overtimeMinutes = Number(e.overtimeMinutes || 0);
-    const open = Number(e.open || 0);
     const exceptionCode = e.exceptionCode || null;
+    // Legacy open metric is derived from the exception layer.
+    // The canonical attendance status is never changed for a missing checkout.
+    const open = exceptionCode === "MISSING_CHECKOUT" ? 1 : 0;
     const requests = requestsByEmployee.get(id) || [];
     const audits = (auditsByEmployee.get(id) || []).filter((x) => {
       const ts = Date.parse(String(x.timestamp));
@@ -331,7 +333,7 @@ export async function materializeDay(
         String(e.jobNumber || ""),
         String(e.employeeName || ""),
         e.locationId || null,
-        String(e.status || "INVALID"),
+        String(e.status || "INVALID") === "OPEN" ? "PRESENT" : String(e.status || "INVALID"),
         String(e.scheduleType || "ADMIN"),
         e.scheduledStart || null,
         e.scheduledEnd || null,
