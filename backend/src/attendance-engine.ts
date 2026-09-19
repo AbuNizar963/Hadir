@@ -26,7 +26,7 @@ const statusLabel = (status: Status) =>
     ESCAPED: "انصراف دون إذن",
     NOT_STARTED: "لم يبدأ",
     INVALID: "غير صالح",
-    OPEN: "انصراف معلق",
+    OPEN: "حاضر",
   })[status];
 type EmployeeRow = {
   id: string;
@@ -603,7 +603,11 @@ export async function handleDailyStatus(
                 schedule.start.getTime() + grace * 60000
             ? "LATE"
             : "PRESENT";
-        status = checkOut ? arrivalStatus : "OPEN";
+
+        // A recorded check-in means the employee remains PRESENT/LATE.
+        // Missing checkout is an observation attached to the note column,
+        // not a replacement attendance status.
+        status = arrivalStatus;
       } else if (isScheduledVip) status = "PRESENT";
       else if (
         dailyRotationAttendance &&
@@ -672,10 +676,15 @@ export async function handleDailyStatus(
             )
           : 0;
       const open = status === "OPEN";
+      const shiftEnded =
+        !!checkIn &&
+        !checkOut &&
+        !!schedule.end &&
+        (day < today || (day === today && now.getTime() >= schedule.end.getTime()));
       const exceptionCode =
         checkOut && !checkIn
           ? "CHECKOUT_WITHOUT_CHECKIN"
-          : open
+          : shiftEnded
             ? "MISSING_CHECKOUT"
             : status === "ABSENT"
               ? "ABSENT_NO_APPROVED_REASON"
