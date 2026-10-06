@@ -804,11 +804,8 @@ export async function handleWorkforce(
     }
     let employeeCount = 0;
     employeeCount = Number(
-      (
-        await env.DB.prepare(
-          "SELECT COUNT(*) AS c FROM employees",
-        ).first<any>()
-      )?.c || 0,
+      (await env.DB.prepare("SELECT COUNT(*) AS c FROM employees").first<any>())
+        ?.c || 0,
     );
     await env.DB.prepare("DELETE FROM employees").run();
     deletedCounts.employees = employeeCount;
