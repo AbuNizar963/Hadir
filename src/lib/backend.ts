@@ -229,14 +229,20 @@ async function requestWithRetry<T>(
   roleHint?: RoleHint,
 ): Promise<T> {
   let lastError: unknown;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+  const method = String(init.method || "GET").toUpperCase();
+  const retryableMethod =
+    method === "GET" || method === "HEAD" || method === "OPTIONS";
+  const maxAttempts = retryableMethod ? Math.max(1, attempts) : 1;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       await waitForOnline();
       await waitForVisible();
       return await request<T>(path, init, roleHint);
     } catch (error) {
       lastError = error;
-      if (!isTransientNetworkError(error) || attempt >= attempts) break;
+      if (!isTransientNetworkError(error) || attempt >= maxAttempts) break;
+
       const baseDelay = Math.min(8000, 750 * 2 ** (attempt - 1));
       const jitter = Math.floor(Math.random() * 350);
       await new Promise((resolve) =>
@@ -244,6 +250,7 @@ async function requestWithRetry<T>(
       );
     }
   }
+
   throw lastError instanceof Error
     ? lastError
     : new Error("تعذر الاتصال بخادم حاضر.");

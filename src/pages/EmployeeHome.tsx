@@ -357,11 +357,11 @@ export default function EmployeeHome() {
   const shiftDurationLabel = isRotation
     ? `${rotationOn} أيام عمل + ${rotationOff} أيام راحة`
     : period.start && period.end
-      ? `${formatTime(period.start)} → ${formatTime(period.end)}`
+      ? `${formatTime(period.start.toISOString())} → ${formatTime(period.end.toISOString())}`
       : "حسب الجدول الإداري";
   const shiftHoursLabel =
     period.start && period.end
-      ? `${formatTime(period.start)} → ${formatTime(period.end)}`
+      ? `${formatTime(period.start.toISOString())} → ${formatTime(period.end.toISOString())}`
       : `${rotationStartClock} → ${rotationEndClock}`;
   const todayIso = damascusToday();
   const todayRequests = useMemo(

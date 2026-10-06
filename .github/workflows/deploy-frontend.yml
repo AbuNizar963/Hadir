@@ -12,6 +12,7 @@ on:
       - ".env.production"
       - "index.html"
       - "package.json"
+      - "package-lock.json"
       - "bun.lock"
       - "tsconfig*.json"
       - "vite.config.*"
@@ -60,6 +61,9 @@ jobs:
 
       - name: Typecheck
         run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
 
       - name: Build Cloudflare Pages production bundle
         env:

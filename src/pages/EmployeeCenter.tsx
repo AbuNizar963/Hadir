@@ -50,13 +50,31 @@ export default function EmployeeCenter() {
     let alive = true;
     (async () => {
       try {
-        const [profile, a, r] = await Promise.all([getBackendEmployeeProfile(), getBackendAttendance(2000), getBackendRequests()]);
+        // Load the profile independently: attendance/requests must never hide a valid employee session.
+        const profile = await getBackendEmployeeProfile();
         if (!alive) return;
         setEmployee(profile);
-        setAttendance((a || []).filter((x: any) => x.employeeId === session.employeeId));
-        setRequests((r || []).filter((x: any) => x.employeeId === session.employeeId));
-        setAvatarUrl(await loadAvatarDataUrl(profile.id || session.employeeId || ""));
-      } catch (e) { if (alive) setError(e instanceof Error ? e.message : "تعذر تحميل مركز الموظف"); }
+        setError("");
+        void loadAvatarDataUrl(profile.id || session.employeeId || "").then((url) => { if (alive) setAvatarUrl(url); });
+
+        const [attendanceResult, requestsResult] = await Promise.allSettled([
+          getBackendAttendance(2000),
+          getBackendRequests(),
+        ]);
+        if (!alive) return;
+        if (attendanceResult.status === "fulfilled") {
+          setAttendance((attendanceResult.value || []).filter((x: any) => x.employeeId === session.employeeId));
+        }
+        if (requestsResult.status === "fulfilled") {
+          setRequests((requestsResult.value || []).filter((x: any) => x.employeeId === session.employeeId));
+        }
+        const secondaryErrors = [attendanceResult, requestsResult].filter((result) => result.status === "rejected");
+        if (secondaryErrors.length) {
+          console.warn("HADIR employee secondary data load failed", secondaryErrors);
+        }
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "تعذر تحميل مركز الموظف");
+      }
       finally { if (alive) setLoading(false); }
     })();
     return () => { alive = false; };

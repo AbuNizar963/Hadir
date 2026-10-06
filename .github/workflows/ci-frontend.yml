@@ -9,6 +9,7 @@ on:
       - "public/**"
       - "scripts/**"
       - "package.json"
+      - "package-lock.json"
       - "bun.lock"
       - "tsconfig*.json"
       - "vite.config.*"
@@ -19,6 +20,7 @@ on:
       - "public/**"
       - "scripts/**"
       - "package.json"
+      - "package-lock.json"
       - "bun.lock"
       - "tsconfig*.json"
       - "vite.config.*"
@@ -47,6 +49,8 @@ jobs:
         run: bun install --no-frozen-lockfile
       - name: Typecheck
         run: bun run typecheck
+      - name: Lint
+        run: bun run lint
       - name: Production build
         env:
           VITE_BASE_PATH: /

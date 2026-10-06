@@ -142,8 +142,15 @@ const API_URL = String(import.meta.env.VITE_API_URL || "https://hadir-api.abuniz
 
 const adminHeaders = () => {
   const token = typeof window === "undefined" ? "" : localStorage.getItem("hadir.api.token.admin") || "";
-  return token ? { authorization: `Bearer ${token}` } : {};
+  const headers = new Headers();
+  if (token) headers.set("authorization", `Bearer ${token}`);
+  return headers;
 };
+
+function responseError(data: unknown): string | null {
+  if (!data || typeof data !== "object" || !("error" in data)) return null;
+  return typeof data.error === "string" ? data.error : null;
+}
 
 // The report client deliberately accepts the server's reportable row set as-is.
 // Employee/day eligibility is owned by the authoritative reporting engine;
@@ -156,10 +163,11 @@ export async function getProfessionalAttendanceReport(from: string, to: string, 
     credentials: "include",
     cache: "no-store",
   });
-  const data = await response.json().catch(() => null) as AttendanceCenterResponse | { error?: string } | null;
-  if (!response.ok) throw new Error(String(data && "error" in data ? data.error : `HTTP ${response.status}`));
-  if (!data || "error" in data || !data.report || !Array.isArray(data.report.rows)) throw new Error("استجابة مركز التقرير غير صالحة");
-  const report = data.report;
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(responseError(data) || `HTTP ${response.status}`);
+  if (!data || typeof data !== "object" || !("report" in data)) throw new Error("استجابة مركز التقرير غير صالحة");
+  const report = (data as AttendanceCenterResponse).report;
+  if (!report || !Array.isArray(report.rows)) throw new Error("استجابة مركز التقرير غير صالحة");
   const byStatus: Partial<Record<ProfessionalAttendanceStatus, number>> = {};
   for (const row of report.rows) byStatus[row.status] = (byStatus[row.status] || 0) + 1;
   report.dataQuality = { ...report.dataQuality, byStatus };
@@ -173,8 +181,8 @@ export async function getProfessionalAttendanceDrilldown(attendanceDay: string, 
     credentials: "include",
     cache: "no-store",
   });
-  const data = await response.json().catch(() => null) as ProfessionalAttendanceDrilldown | { error?: string } | null;
-  if (!response.ok) throw new Error(String(data && "error" in data ? data.error : `HTTP ${response.status}`));
-  if (!data || "error" in data) throw new Error("استجابة تفصيل التقرير غير صالحة");
-  return data;
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(responseError(data) || `HTTP ${response.status}`);
+  if (!data || typeof data !== "object" || !("fact" in data) || !("sources" in data)) throw new Error("استجابة تفصيل التقرير غير صالحة");
+  return data as ProfessionalAttendanceDrilldown;
 }

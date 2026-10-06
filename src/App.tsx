@@ -143,11 +143,8 @@ function LaunchGateway() {
       for (const [role, token] of candidates) {
         const result = await validateStoredToken(role, token);
         if (!alive) return;
-        if (result.status === "transient") {
-          transientFailure = true;
-          continue;
-        }
-        if (result.status === "invalid") continue;
+        if (result.status === "transient") transientFailure = true;
+        if (result.status !== "restored") continue;
 
         if (role === "admin") {
           const admin = result.user as AdminAccount;
