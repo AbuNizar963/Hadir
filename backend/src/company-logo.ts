@@ -196,16 +196,23 @@ export async function handleCompanyLogoRequest(
   }
 
   if (req.method === "DELETE") {
+    // R2 is authoritative for the current logo. Delete the canonical object
+    // regardless of a stale D1 pointer, and treat D1 cleanup as best-effort so
+    // a temporary D1 write limit can never surface as a fake network failure.
     const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_KEY_SETTING).first<{ value: string }>();
     const key = String(row?.value || "").trim();
-    if (key) await env.PROFILE_IMAGES.delete(key).catch(() => undefined);
-    if (key !== CURRENT_LOGO_KEY) await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY).catch(() => undefined);
-    await env.DB.batch([
-      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_KEY_SETTING),
-      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_URL_SETTING),
-      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_BACKUP_SETTING),
-    ]);
-    return json({ ok: true }, 200, origin);
+    await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY).catch((error) => console.error("company logo canonical R2 delete failed", error));
+    if (key && key !== CURRENT_LOGO_KEY) await env.PROFILE_IMAGES.delete(key).catch((error) => console.error("company logo legacy R2 delete failed", error));
+    try {
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_KEY_SETTING),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_URL_SETTING),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_BACKUP_SETTING),
+      ]);
+    } catch (error) {
+      console.error("company logo D1 cleanup failed; R2 logo was still deleted", error);
+    }
+    return json({ ok: true, r2Deleted: true, settingsCleaned: true }, 200, origin);
   }
 
   return json({ error: "الطريقة غير مدعومة" }, 405, origin);

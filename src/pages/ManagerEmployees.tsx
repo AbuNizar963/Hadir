@@ -162,7 +162,7 @@ function EmployeeCardBase({ e, location, canManage, escapeStatus, onEdit, onRemo
 const EmployeeCard = memo(EmployeeCardBase, (a, b) => a.canManage === b.canManage && a.escapeStatus === b.escapeStatus && a.location?.name === b.location?.name && a.e.id === b.e.id && a.e.name === b.e.name && a.e.jobNumber === b.e.jobNumber && a.e.status === b.e.status && a.e.scheduleType === b.e.scheduleType && a.e.workStartTime === b.e.workStartTime && a.e.workEndTime === b.e.workEndTime && a.e.rotationDaysOn === b.e.rotationDaysOn && a.e.rotationDaysOff === b.e.rotationDaysOff && a.e.deviceId === b.e.deviceId && a.e.isVip === b.e.isVip && a.e.autoCheckIn === b.e.autoCheckIn && a.e.autoCheckOut === b.e.autoCheckOut && a.e.gracePeriodMinutes === b.e.gracePeriodMinutes && a.e.earlyCheckoutGraceMinutes === b.e.earlyCheckoutGraceMinutes && JSON.stringify(a.e.specialties) === JSON.stringify(b.e.specialties) && a.e.avatar === b.e.avatar);
 export default function ManagerEmployees() {
     const [employees, setEmployees] = useState<Employee[]>([]);
-    const [locations, setLocations] = useState<Location[]>([]);
+    const [locations, setLocations] = useState<Location[]>(() => getSettings().locations || []);
     const [escapeEvents, setEscapeEvents] = useState<EscapeEvent[]>([]);
     const [form, setForm] = useState<FormState>(emptyForm);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -404,10 +404,7 @@ export default function ManagerEmployees() {
                 else {
                     const created = await createBackendEmployee({ ...payload, pin, avatar: null });
                     savedEmployeeId = created.employee?.id || null;
-                    if (savedEmployeeId) {
-                        const updated = await updateBackendEmployee(savedEmployeeId, payload);
-                        savedEmployee = updated.employee || null;
-                    }
+                    savedEmployee = created.employee || null;
                 }
             }
             else if (editingId) {
@@ -449,12 +446,18 @@ export default function ManagerEmployees() {
     const remove = async (e: Employee) => {
         if (!confirm(`حذف الموظف «${e.name}»؟`))
             return;
+        setError(null);
         try {
-            if (backendEnabled)
+            if (backendEnabled) {
                 await deleteBackendEmployee(e.id);
-            else
-                saveEmployees(employees.filter((x) => x.id !== e.id));
-            await load(false);
+                setEmployees((prev) => prev.filter((item) => item.id !== e.id));
+                setEscapeEvents((prev) => prev.filter((item) => item.employeeId !== e.id));
+            }
+            else {
+                const nextEmployees = employees.filter((x) => x.id !== e.id);
+                saveEmployees(nextEmployees);
+                setEmployees(nextEmployees);
+            }
             toast.success("تم حذف الموظف بنجاح");
         }
         catch (err) {
@@ -565,7 +568,7 @@ export default function ManagerEmployees() {
       <div className="space-y-5">
         <section className="hud-card overflow-hidden border-primary/25 bg-primary/[0.025] p-5 sm:p-6"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><div className="mono text-xs font-bold text-primary">EMPLOYEE DIRECTORY</div><h1 className="mt-1 text-2xl font-black">إدارة الموظفين</h1><p className="mt-1 max-w-2xl text-xs leading-6 text-muted-foreground">الواجهة ثابتة أثناء المزامنة؛ يتم تحديث القيم المتغيرة فقط.</p></div><div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary" onClick={() => setShowImport((v) => !v)}>{showImport ? "إغلاق الاستيراد" : "استيراد / تصدير"}</button>{canAdd && <button type="button" className="btn-primary" onClick={() => { setEditingId(null); setForm(emptyForm); setError(null); setShowForm((v) => !v); }}>{showForm ? "إغلاق النموذج" : "+ إضافة موظف"}</button>}</div></div></section>
         {showImport && <section className="hud-card p-5"><div className="mb-4"><div className="mono text-xs font-bold text-primary">SMART IMPORT</div><h2 className="mt-1 font-bold">استيراد وتصدير الموظفين</h2></div><SmartEmployeeImport onImported={() => void load(false)}/></section>}
-        {showForm && (<section className={editingId ? "fixed inset-y-0 right-0 z-[70] w-full max-w-2xl overflow-y-auto rounded-none border-l border-border/80 bg-card p-5 shadow-2xl sm:p-6" : "hud-card p-5 sm:p-6"}>
+        {showForm && (<section className={editingId ? "fixed top-0 bottom-0 right-0 z-[70] w-full max-w-2xl manager-employee-editor overflow-y-auto rounded-none border-l border-border/80 bg-card p-5 shadow-2xl sm:p-6" : "hud-card p-5 sm:p-6"}>
             <div className="sticky top-0 z-10 -mx-5 -mt-5 mb-5 flex items-start justify-between gap-3 border-b border-border/70 bg-card/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:px-6"><div><div className="mono text-xs font-bold text-primary">EMPLOYEE FORM</div><h2 className="mt-1 text-lg font-black">{editingId ? "تعديل بيانات الموظف" : "إضافة موظف جديد"}</h2><p className="mt-1 text-xs text-muted-foreground">الأدوار الإدارية تُدار من الإعدادات، وليس من هذه الصفحة.</p></div>{editingId && <button type="button" className="btn-secondary text-xs" onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(false); }}>إلغاء</button>}</div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"><Field label="اسم الموظف"><input className="input w-full" placeholder="اكتب الاسم" value={form.name} onChange={(e) => setField("name", e.target.value)}/></Field><Field label="الرقم الوظيفي"><input className="input mono w-full" inputMode="text" autoComplete="off" placeholder="مثال: D718075" value={form.jobNumber} onChange={(e) => setField("jobNumber", e.target.value)}/></Field><Field label="رمز PIN" hint={editingId ? "اتركه فارغًا للإبقاء على الحالي." : "4 أحرف/أرقام على الأقل."}><input className="input mono w-full" type="password" placeholder={editingId ? "اختياري" : "أدخل PIN"} value={form.pin} onChange={(e) => setField("pin", e.target.value)}/></Field><Field label="الحالة"><select className="input w-full" value={form.status} onChange={(e) => setField("status", e.target.value as FormState["status"])}><option value="active">فعال</option><option value="suspended">موقوف</option></select></Field></div>
             <div className="mt-4 grid gap-4 md:grid-cols-3"><Field label="نوع الدوام"><select className="input w-full" value={form.scheduleType} onChange={(e) => setField("scheduleType", e.target.value as ScheduleType)}><option value="ADMIN">إداري</option><option value="ROTATION">تناوبي</option></select></Field><Field label="بداية الدوام"><input className="input w-full" type="time" value={form.workStartTime} onChange={(e) => setField("workStartTime", e.target.value)}/></Field><Field label="نهاية الدوام"><input className="input w-full" type="time" value={form.workEndTime} onChange={(e) => setField("workEndTime", e.target.value)}/></Field></div>

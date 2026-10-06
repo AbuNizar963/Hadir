@@ -29,7 +29,7 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
 
   let employee: Employee | null = null;
   if(backendEnabled){try{const session=currentSession();employee=await getBackendEmployeeProfile();if(!session||String(session.employeeId).trim()!==String(employee.id).trim())return{ok:false,reason:"جلسة الموظف لا تطابق الحساب الحالي. يرجى تسجيل الدخول مرة أخرى."};}catch(error){return{ok:false,reason:error instanceof Error?error.message:"تعذر التحقق من جلسة الموظف"};}}
-  else employee=findEmployeeByJobNumber(args.jobNumber);
+  else employee=findEmployeeByJobNumber(args.jobNumber) ?? null;
 
   if(!employee)return{ok:false,reason:"الموظف غير موجود"};
   if(employee.status!=="active")return{ok:false,reason:"الحساب موقوف"};

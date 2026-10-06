@@ -147,7 +147,7 @@ function parseSetting(value: string): unknown {
   try { return JSON.parse(value); } catch { return value; }
 }
 
-async function readCompanySettings(env: Env) {
+async function readCompanySettings(env: Env, request?: Request) {
   await ensureRecoveryTables(env.DB);
   const rows = await env.DB.prepare("SELECT key,value FROM settings").all<{ key: string; value: string }>();
   const settings: Record<string, unknown> = { ...DEFAULT_SETTINGS };
@@ -156,13 +156,35 @@ async function readCompanySettings(env: Env) {
   }
   const admins = await env.DB.prepare("SELECT id,username,name,role,active,created_at AS createdAt FROM admin_accounts ORDER BY name").all<any>();
   const locations = await env.DB.prepare("SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations ORDER BY name").all<any>();
+  // R2 is authoritative for the current company logo. Prefer the canonical
+  // current key even if D1 still points at a legacy key (for example after a
+  // temporary D1 write-limit). This guarantees a reload cannot resurrect an
+  // older logo while the verified current object already exists in R2.
+  if (request && env.PROFILE_IMAGES) {
+    try {
+      const logoKeyRow = await env.DB.prepare("SELECT value FROM settings WHERE key='brandLogoR2Key' LIMIT 1").first<{ value: string }>();
+      const configuredKey = String(logoKeyRow?.value || "").trim();
+      const candidateKeys = Array.from(new Set(["company/logo-current.webp", configuredKey].filter(Boolean)));
+      for (const key of candidateKeys) {
+        const object = await env.PROFILE_IMAGES.head(key);
+        if (!object) continue;
+        const logoUrl = new URL(request.url);
+        logoUrl.pathname = "/api/company/logo";
+        logoUrl.search = "?v=" + encodeURIComponent(object.etag);
+        settings.brandLogo = logoUrl.toString();
+        break;
+      }
+    } catch {
+      // Keep the D1 value if R2 metadata cannot be read during this request.
+    }
+  }
   return { ...settings, adminAccounts: admins.results || [], locations: locations.results || [] };
 }
 
 async function saveCompanySettings(req: Request, env: Env, origin: string) {
   const actor = await actorFromOriginal(req, env);
   if (!actor || !["owner", "manager"].includes(String(actor.role))) return json({ error: "غير مصرح" }, 403, origin);
-  if (req.method === "GET") return json(await readCompanySettings(env), 200, origin);
+  if (req.method === "GET") return json(await readCompanySettings(env, req), 200, origin);
   if (req.method !== "PUT") return json({ error: "الطريقة غير مدعومة" }, 405, origin);
 
   const input = await req.json().catch(() => ({})) as Record<string, unknown>;

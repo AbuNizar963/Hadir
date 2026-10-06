@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
-import { getEmployees, getSettings } from "@/lib/storage";
+import { getEmployees,
+  getSettings } from "@/lib/storage";
 import {
   getBackendAudit,
   getBackendEmployees,
   getBackendRequests,
   getBackendSettings,
-} from "@/lib/backend";
-import { getDailyStatus, type DailyStatusRow } from "@/lib/dailyStatus";
+  } from "@/lib/backend";
+import { generateProfessionalReportPdf } from "@/lib/professionalPdf";
+import { getDailyStatus,
+  type DailyStatusRow } from "@/lib/dailyStatus";
 import { getEmployeeWorkPeriod } from "@/lib/schedule";
 import {
   formatDate,
@@ -15,7 +21,7 @@ import {
   formatTime,
   minutesBetween,
   todayKey,
-} from "@/lib/utils";
+  } from "@/lib/utils";
 import {
   FileSpreadsheet,
   FileText,
@@ -28,6 +34,7 @@ import {
   LogOut,
   BarChart3,
   Printer,
+  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { downloadCSV, type CsvCell } from "@/lib/csv";
@@ -133,9 +140,16 @@ function dateOf(v: string) {
   const [y, m, d] = v.split("-").map(Number);
   return new Date(y, m - 1, d, 12);
 }
+function damascusTodayKey() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Damascus",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
 function todayLocal() {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
+  return dateOf(damascusTodayKey());
 }
 function range(mode: Mode, p: string) {
   const today = todayLocal();
@@ -441,9 +455,8 @@ function calculateSummary(
       : 0;
     earlyMinutes += em;
     if (serverStatus === "late") late++;
-    else if (serverStatus === "early" || em) early++;
-    else if (serverStatus === "present") present++;
     else if (em) early++;
+    else if (serverStatus === "present") present++;
     else if (lm) late++;
     else present++;
   }
@@ -520,10 +533,13 @@ function serviceRows(
 }
 
 export default function ManagerReports() {
+  const damascusToday = damascusTodayKey();
   const [mode, setMode] = useState<Mode>("monthly"),
-    [date, setDate] = useState(new Date().toISOString().slice(0, 10)),
-    [month, setMonth] = useState(new Date().toISOString().slice(0, 7)),
-    [year, setYear] = useState(String(new Date().getFullYear()));
+    [date, setDate] = useState(damascusToday),
+    [month, setMonth] = useState(damascusToday.slice(0, 7)),
+    [year, setYear] = useState(damascusToday.slice(0, 4));
+  const [sharingPdf, setSharingPdf] = useState(false);
+  const [readyPdf, setReadyPdf] = useState<File | null>(null);
   const [employees, setEmployees] = useState<Employee[]>(getEmployees()),
     [audit, setAudit] = useState<Audit[]>([]),
     [requests, setRequests] = useState<RequestRow[]>([]),
@@ -976,6 +992,130 @@ export default function ManagerReports() {
       chartData: reportChartData,
     });
   };
+  const sharePdf = async () => {
+    if (mode !== "daily" || !summaries.length) return;
+
+    // Web Share must be invoked directly from a user gesture. The PDF itself
+    // is generated asynchronously, so the first click prepares it and the
+    // button becomes a second, explicit user gesture for the native share UI.
+    if (readyPdf) {
+      const shareData = { files: [readyPdf], title: readyPdf.name };
+      if (
+        navigator.share &&
+        (!navigator.canShare || navigator.canShare({ files: [readyPdf] }))
+      ) {
+        try {
+          await navigator.share(shareData);
+        } catch (error) {
+          if ((error as DOMException)?.name !== "AbortError") {
+            console.error("تعذر مشاركة PDF:", error);
+            window.alert(
+              error instanceof Error ? error.message : "تعذر مشاركة ملف PDF",
+            );
+          }
+        }
+      } else {
+        const url = URL.createObjectURL(readyPdf);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = readyPdf.name;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      return;
+    }
+
+    const report = document.querySelector<HTMLElement>(".service-report");
+    if (!report) {
+      window.alert("تعذر العثور على محتوى التقرير");
+      return;
+    }
+
+    try {
+      setSharingPdf(true);
+      setReadyPdf(null);
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+
+      const clone = report.cloneNode(true) as HTMLElement;
+      clone
+        .querySelectorAll<HTMLElement>("[data-hadir-pdf-exclude]")
+        .forEach((node) => node.remove());
+
+      const stylesheetLinks = Array.from(
+        document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
+      )
+        .map((link) => link.href)
+        .filter(Boolean)
+        .map(
+          (href) =>
+            '<link rel="stylesheet" href="' +
+            href.replace(/&/g, "&amp;").replace(/"/g, "&quot;") +
+            '">',
+        )
+        .join("");
+      const inlineStyles = Array.from(document.querySelectorAll("style"))
+        .map((style) => style.textContent || "")
+        .join("\n");
+      const printCssUrl = new URL(
+        "/report-print.css",
+        window.location.origin,
+      ).href;
+      const documentHtml =
+        '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>سجل الحضور والغياب</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
+        stylesheetLinks +
+        '<link rel="stylesheet" href="' +
+        printCssUrl +
+        '"><style>' +
+        inlineStyles +
+        '</style></head><body dir="rtl"><main>' +
+        clone.outerHTML +
+        "</main></body></html>";
+
+      let printCss = "";
+      try {
+        printCss = await fetch(printCssUrl, { cache: "no-store" }).then(
+          (response) => (response.ok ? response.text() : ""),
+        );
+      } catch {
+        // The stylesheet is already linked in the generated HTML.
+      }
+
+      const companyName =
+        String(settings.brandName || "الشركة")
+          .trim()
+          .replace(/[\/:*?"<>|]/g, "-") || "الشركة";
+      const reportDate = date;
+      const reportDay = days[dateOf(reportDate).getDay()];
+      const dayNumber = String(dateOf(reportDate).getDate());
+      const monthNumber = String(dateOf(reportDate).getMonth() + 1);
+      const yearNumber = String(dateOf(reportDate).getFullYear());
+      const displayDate = dayNumber + "-" + monthNumber + "-" + yearNumber;
+      const filename =
+        companyName +
+        " - سجل الحضور والغياب - ليوم " +
+        reportDay +
+        " - تاريخ " +
+        displayDate +
+        ".pdf";
+      const blob = await generateProfessionalReportPdf(
+        documentHtml,
+        printCss,
+        filename,
+      );
+      setReadyPdf(new File([blob], filename, { type: "application/pdf" }));
+    } catch (error) {
+      console.error("تعذر إنشاء PDF:", error);
+      window.alert(
+        error instanceof Error ? error.message : "تعذر تجهيز ملف PDF",
+      );
+    } finally {
+      setSharingPdf(false);
+    }
+  };
   const title =
     mode === "daily"
       ? `يومي · ${formatDate(date)}`
@@ -1002,14 +1142,14 @@ export default function ManagerReports() {
             <FileSpreadsheet className="ml-2 h-4 w-4" />
             Excel
           </Button>
-          <Button
+          {mode === "daily" ? <Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf} data-hadir-share="true"><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري إنشاء PDF…" : readyPdf ? "مشاركة PDF الآن" : "تجهيز PDF للمشاركة"}</Button> : <Button
             variant="outline"
             onClick={exportCsv}
             disabled={!summaries.length}
           >
             <FileText className="ml-2 h-4 w-4" />
             CSV
-          </Button>
+          </Button>}
           {mode === "daily" && (
             <Button
               variant="outline"
@@ -1336,7 +1476,7 @@ export default function ManagerReports() {
                           index,
                           settings,
                           requests,
-                          mode === "daily" ? dailyStatusMap : undefined,
+                          undefined,
                         ).map((day) => (
                           <tr key={day.date} className="border-b">
                             <td className="p-2">{day.date}</td>

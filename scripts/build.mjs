@@ -19,51 +19,15 @@ if (!existsSync(vitePackage)) {
   }
 }
 
-run("node", ["scripts/patch-global-attendance-print-report.mjs"]);
-run("node", ["scripts/patch-global-attendance-print-layout.mjs"]);
-run("node", ["scripts/patch-global-attendance-print-qr.mjs"]);
-run("node", ["scripts/patch-global-attendance-escaped-label.mjs"]);
-run("node", ["scripts/patch-report-archive-delete.mjs"]);
-run("node", ["scripts/patch-manager-report-share.mjs"]);
-run("node", ["scripts/patch-professional-report-share.mjs"]);
-run("node", ["scripts/patch-company-logo-refresh.mjs"]);
-run("node", ["scripts/patch-company-logo-settings-preview.mjs"]);
-run("node", ["scripts/patch-manager-report-share-filename-safe.mjs"]);
-
-run("node", ["scripts/patch-manager-reports-damascus-date.mjs"]);
-run("node", ["scripts/patch-manager-settings-ui.mjs"]);
-run("node", ["scripts/patch-manager-settings-telegram-ui.mjs"]);
-run("node", ["scripts/normalize-manager-settings-locations-anchor.mjs"]);
-run("node", ["scripts/patch-manager-settings-locations-dedicated.mjs"]);
-run("node", ["scripts/patch-manager-settings-locations-fixes.mjs"]);
-run("node", ["scripts/patch-manager-settings-reset-placement.mjs"]);
-run("node", ["scripts/patch-manager-settings-telegram-screen.mjs"]);
-run("node", ["scripts/fix-manager-settings-ui-qr.mjs"]);
-run("node", ["scripts/patch-manager-settings-location-accuracy.mjs"]);
-run("node", ["scripts/patch-backend-employee-read-performance.mjs"]);
-run("node", ["scripts/patch-backend-request-retry-safety.mjs"]);
-run("node", ["scripts/patch-workforce-live-attendance-read.mjs"]);
-run("node", ["scripts/patch-manager-employees-create-single-request.mjs"]);
-
-run("node", ["scripts/patch-manager-employee-locations.mjs"]);
-run("node", ["scripts/patch-manager-employees-performance.mjs"]);
-run("node", ["scripts/patch-qibla-page.mjs"]);
-run("node", ["scripts/patch-employee-center-loading.mjs"]);
-run("node", ["scripts/patch-manager-employee-edit-panel.mjs"]);
+// Source compatibility patches are applied to tracked source files once and
+// reviewed in Git. Builds must be deterministic and must never rewrite src/.
 
 const gitSha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || gitSha.stdout?.trim() || "unknown";
 const branch = process.env.CF_PAGES_BRANCH || process.env.GITHUB_REF_NAME || "unknown";
 const deploymentUrl = process.env.CF_PAGES_URL || "";
 
-const bun = spawnSync("bun", ["--version"], { stdio: "ignore" });
-if (bun.status === 0 && !bun.error) {
-  if (!run("bun", ["run", "vite", "build"])) {
-    run("npm", ["run", "build"]);
-  }
-} else {
-  run("npm", ["run", "build"]);
-}
+run("npx", ["vite", "build"]);
 
 const sourceHeaderScan = spawnSync("grep", ["-RIlE", "خدمة الدوام اليومية|settings\\.brandName", "src/pages/ManagerReports.tsx", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (sourceHeaderScan.status !== 0 || !sourceHeaderScan.stdout?.trim()) {

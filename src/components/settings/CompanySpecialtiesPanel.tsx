@@ -9,6 +9,20 @@ import { compressProfileImageDataUrl } from "@/lib/imageCompression";
 const clean = (values: string[]) => Array.from(new Set(values.map(v => v.trim()).filter(Boolean)));
 const COMPANY_LOGO_API = `${String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "")}/api/company/logo`;
 
+function currentCompanyLogoUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.pathname === "/api/company/logo") {
+      url.searchParams.set("v", String(Date.now()));
+      return url.toString();
+    }
+  } catch {
+    // Fall through to the server-provided URL.
+  }
+  return value;
+}
+
 function dataUrlToBlob(dataUrl: string): Blob {
   const comma = dataUrl.indexOf(",");
   if (comma < 0) throw new Error("صيغة الشعار غير صالحة.");
@@ -57,13 +71,13 @@ export default function CompanySpecialtiesPanel() {
     let alive = true;
     (async () => {
       const local = getSettings();
-      if (alive) { setItems(clean(local.specialties || [])); setBrandName(local.brandName || ""); setBrandLogo(local.brandLogo || null); }
+      if (alive) { setItems(clean(local.specialties || [])); setBrandName(local.brandName || ""); setBrandLogo(currentCompanyLogoUrl(local.brandLogo)); }
       try {
         const remote = await getBackendSettings();
         if (!alive) return;
         if (Array.isArray(remote?.specialties)) setItems(clean(remote.specialties));
         if (remote?.brandName !== undefined) setBrandName(String(remote.brandName || ""));
-        if (remote?.brandLogo !== undefined) setBrandLogo(remote.brandLogo || null);
+        if (remote?.brandLogo !== undefined) setBrandLogo(currentCompanyLogoUrl(remote.brandLogo));
         applyRemoteSettings(remote);
       } catch { if (alive) setMessage("تعذر تحميل الهوية المركزية، لم يتم تغيير البيانات المحلية."); }
       finally { if (alive) setHydrated(true); }
@@ -84,7 +98,7 @@ export default function CompanySpecialtiesPanel() {
       applyRemoteSettings(remote);
       setItems(clean(remote.specialties || []));
       setBrandName(remote.brandName || "");
-      setBrandLogo(remote.brandLogo || null);
+      setBrandLogo(currentCompanyLogoUrl(remote.brandLogo));
       setMessage("تم الحفظ مركزيًا بنجاح");
     } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر مزامنة الإعداد مع الخادم"); }
     finally { setSaving(false); }
@@ -106,13 +120,25 @@ export default function CompanySpecialtiesPanel() {
     if (!pendingLogo || saving || !hydrated) return;
     setSaving(true); setMessage(null);
     try {
-      await uploadCompanyLogo(pendingLogo);
-      const remote = await getBackendSettings();
-      applyRemoteSettings(remote);
-      setBrandName(remote.brandName || "");
-      setBrandLogo(remote.brandLogo || null);
+      // The upload response contains the cache-busted URL generated from the
+      // new R2 object's ETag. Use it immediately instead of re-reading the
+      // possibly stale D1 settings row (especially while D1 is rate-limited).
+      const uploadedUrl = await uploadCompanyLogo(pendingLogo);
+      setBrandLogo(uploadedUrl);
       setPendingLogo(null);
-      setMessage("تم حفظ الشعار في R2 وربطه بسجل الهوية في D1.");
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("hadir:settings-changed"));
+
+      try {
+        const remote = await getBackendSettings();
+        const refreshed = { ...remote, brandLogo: uploadedUrl } as Settings;
+        applyRemoteSettings(refreshed);
+        setBrandName(refreshed.brandName || "");
+        setBrandLogo(uploadedUrl);
+      } catch {
+        // R2 upload already succeeded; keep the new URL visible locally even
+        // if D1 is temporarily unavailable or still serving an older setting.
+      }
+      setMessage("تم استبدال الشعار القديم بالشعار الجديد وحفظه في R2.");
     } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر حفظ الشعار"); }
     finally { setSaving(false); }
   }
@@ -121,13 +147,24 @@ export default function CompanySpecialtiesPanel() {
     if (saving || !hydrated) return;
     setSaving(true); setMessage(null);
     try {
+      // R2 deletion is authoritative. Clear the UI immediately after the
+      // successful DELETE and do not let a stale D1 response restore the old logo.
       await deleteCompanyLogo();
-      const remote = await getBackendSettings();
-      applyRemoteSettings(remote);
-      setBrandName(remote.brandName || "");
-      setBrandLogo(remote.brandLogo || null);
+      setBrandLogo(null);
       setPendingLogo(null);
-      setMessage("تم حذف الشعار من R2 وD1.");
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("hadir:settings-changed"));
+
+      try {
+        const remote = await getBackendSettings();
+        const refreshed = { ...remote, brandLogo: null } as Settings;
+        applyRemoteSettings(refreshed);
+        setBrandName(refreshed.brandName || "");
+        setBrandLogo(null);
+      } catch {
+        // R2 deletion already succeeded; keep the logo removed locally even
+        // if D1 is temporarily unavailable or still serving an older setting.
+      }
+      setMessage("تم حذف الشعار نهائيًا من R2 وتحديث الواجهة.");
     } catch (e) { setMessage(e instanceof Error ? e.message : "تعذر إزالة الشعار"); }
     finally { setSaving(false); }
   }

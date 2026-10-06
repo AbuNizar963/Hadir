@@ -803,18 +803,14 @@ export async function handleWorkforce(
       if (!/no such table/i.test(message)) throw error;
     }
     let employeeCount = 0;
-    try {
-      employeeCount = Number(
-        (
-          await env.DB.prepare(
-            "SELECT COUNT(*) AS c FROM employees",
-          ).first<any>()
-        )?.c || 0,
-      );
-      await env.DB.prepare("DELETE FROM employees").run();
-    } catch (error) {
-      throw error;
-    }
+    employeeCount = Number(
+      (
+        await env.DB.prepare(
+          "SELECT COUNT(*) AS c FROM employees",
+        ).first<any>()
+      )?.c || 0,
+    );
+    await env.DB.prepare("DELETE FROM employees").run();
     deletedCounts.employees = employeeCount;
     let deletedImages = 0;
     if (env.PROFILE_IMAGES) {

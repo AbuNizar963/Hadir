@@ -3,12 +3,13 @@ import ManagerLayout from "@/components/layout/ManagerLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getEmployees } from "@/lib/storage";
-import { getBackendEmployees } from "@/lib/backend";
+import { getEmployees, getSettings, getManagerSession } from "@/lib/storage";
+import { getBackendEmployees, getBackendSettings } from "@/lib/backend";
 import {
   getProfessionalAttendanceReport,
   getProfessionalAttendanceDrilldown,
   type ProfessionalAttendanceDrilldown,
+  type ProfessionalAttendanceRow,
   type ProfessionalAttendanceReport,
 } from "@/lib/professionalAttendanceReport";
 import { downloadProfessionalAttendanceReport } from "@/lib/professionalReportExport";
@@ -24,6 +25,7 @@ import {
   TriangleAlert,
   Users,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -140,6 +142,8 @@ export default function GlobalAttendanceReports() {
   const [detail, setDetail] = useState<ProfessionalAttendanceDrilldown | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [printGeneratedAt, setPrintGeneratedAt] = useState(() => new Date().toISOString());
+  const [reportSettings, setReportSettings] = useState(() => getSettings());
 
   const load = async () => {
     if (
@@ -194,6 +198,13 @@ export default function GlobalAttendanceReports() {
     return () => {
       alive = false;
     };
+  }, []);
+  useEffect(() => {
+    let alive = true;
+    getBackendSettings().then((remote) => {
+      if (alive && remote) setReportSettings((current) => ({ ...current, ...remote }));
+    }).catch(() => undefined);
+    return () => { alive = false; };
   }, []);
 
   useEffect(() => {
@@ -260,7 +271,7 @@ export default function GlobalAttendanceReports() {
         early: row.earlyLeaveMinutes,
         detail: getExceptionLabel(row.exceptionCode, row.status),
       })),
-      chartData: statusData,
+      chartData: statusData.map(({ name, value }) => ({ label: name, value })),
       absenceRows: rows
         .filter((row) => row.status === "ABSENT")
         .map((row) => ({
@@ -277,6 +288,15 @@ export default function GlobalAttendanceReports() {
           detail: getExceptionLabel(row.exceptionCode, row.status),
         })),
     });
+  };
+
+  const printDailyReport = () => {
+    if (!report || report.days !== 1) {
+      window.print();
+      return;
+    }
+    setPrintGeneratedAt(new Date().toISOString());
+    window.requestAnimationFrame(() => window.print());
   };
 
   const exportCsv = () => {
@@ -335,6 +355,93 @@ export default function GlobalAttendanceReports() {
       }
     >
       <div dir="rtl" className="space-y-5 pb-10">
+    <style>{`
+      .global-attendance-print { display: none; }
+      @page { size: A4 portrait; margin: 8mm 7mm; }
+      @media print {
+        html, body, #root { margin: 0 !important; padding: 0 !important; min-height: 0 !important; height: auto !important; }
+        body * { visibility: hidden !important; }
+        .manager-topbar, .manager-page-header, .manager-shell > .manager-topbar, .manager-shell > .manager-page-header { display: none !important; }
+        .manager-shell, .manager-content { min-height: 0 !important; height: auto !important; max-width: none !important; width: 100% !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+        .global-attendance-print, .global-attendance-print * { visibility: visible !important; }
+        .manager-content > *:has(.global-attendance-print) { display: block !important; min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; }
+        .manager-content > *:has(.global-attendance-print) > *:not(.global-attendance-print):not(style) { display: none !important; }
+        .global-attendance-print { display: block !important; position: static !important; inset: auto !important; width: 100% !important; max-width: 100% !important; min-height: 0 !important; box-sizing: border-box !important; background: #fff !important; color: #000 !important; padding: 0 !important; margin: 0 !important; }
+        .global-attendance-print-header { text-align: center; margin: 0 0 7mm; break-inside: avoid; page-break-inside: avoid; }
+        .global-attendance-print-header { position: relative; min-height: 30mm; }
+        .global-attendance-print-qr { position: absolute; top: 0; left: 0; width: 30mm; height: 30mm; display: flex; align-items: flex-start; justify-content: flex-start; }
+        .global-attendance-print-qr svg { display: block; width: 30mm !important; height: 30mm !important; }
+        .global-attendance-print-logo { display: block; width: 31mm !important; height: 31mm !important; max-width: 31mm !important; max-height: 31mm !important; object-fit: contain !important; margin: 0 auto 2mm; }
+        .global-attendance-print-company { font-size: 18pt; font-weight: 900; margin-bottom: 2mm; }
+        .global-attendance-print-title { font-size: 13pt; font-weight: 900; padding-bottom: 4mm; border-bottom: 0.5mm solid #111; }
+        .global-attendance-print-table { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; border-collapse: separate !important; border-spacing: 0 !important; table-layout: fixed; font-size: 8pt; border: 0.8mm solid #111 !important; border-radius: 2mm !important; overflow: hidden !important; }
+        .global-attendance-print-table th, .global-attendance-print-table td { border: 0 !important; border-left: 0.25mm solid #111 !important; border-bottom: 0.25mm solid #111 !important; padding: 1.2mm 1mm; vertical-align: middle; overflow-wrap: anywhere; word-break: break-word; box-sizing: border-box; }
+        .global-attendance-print-table th:last-child, .global-attendance-print-table td:last-child { border-left: 0 !important; }
+        .global-attendance-print-table thead tr:first-child th { border-top: 0 !important; }
+        .global-attendance-print-table tbody tr:last-child td { border-bottom: 0 !important; }
+        .global-attendance-print-table th:first-child, .global-attendance-print-table td:first-child { border-right: 0.25mm solid #111 !important; }
+        .global-attendance-print-table th { font-weight: 900; background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .global-attendance-print-table thead { display: table-header-group !important; }
+        .global-attendance-print-table tr { break-inside: avoid !important; page-break-inside: avoid !important; }
+        .global-attendance-print-center { text-align: center; }
+        .global-attendance-print-status { display: inline-block; border-radius: 999px; padding: 1.2mm 3mm; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .global-attendance-print-status-present { background: #d1fae5 !important; color: #047857 !important; }
+        .global-attendance-print-status-late { background: #fef3c7 !important; color: #b45309 !important; }
+        .global-attendance-print-status-absent { background: #fee2e2 !important; color: #b91c1c !important; }
+        .global-attendance-print-status-leave { background: #ede9fe !important; color: #6d28d9 !important; }
+        .global-attendance-print-status-permission { background: #e0f2fe !important; color: #0369a1 !important; }
+        .global-attendance-print-status-escaped { background: #7f1d1d !important; color: #fff !important; }
+        .global-attendance-print-status-rest { background: #f1f5f9 !important; color: #475569 !important; }
+        .global-attendance-print-status-not-started { background: #f1f5f9 !important; color: #64748b !important; }
+        .global-attendance-print-status-invalid { background: #e2e8f0 !important; color: #334155 !important; }
+        .global-attendance-print-summary { display: flex; align-items: center; justify-content: center; gap: 10mm; margin-top: 4mm; padding-top: 3mm; border-top: 0.5mm solid #111; font-size: 11pt; font-weight: 900; break-inside: avoid; page-break-inside: avoid; }
+        .global-attendance-print-summary-item { white-space: nowrap; }
+      }
+    `}</style>
+    {report?.days === 1 && <div className="global-attendance-print" dir="rtl">
+      <header className="global-attendance-print-header">
+        {(() => {
+          const session = getManagerSession();
+          const role = session?.role === "owner" ? "مالك" : session?.role === "manager" ? "مدير" : "غير محدد";
+          const issuerName = session?.name || (session?.role === "owner" ? reportSettings.ownerName : session?.role === "manager" ? reportSettings.managerName : "") || "غير محدد";
+          const qrValue = JSON.stringify({ reportDate: report.from, extractedAt: printGeneratedAt, extractedAtDamascus: new Date(printGeneratedAt).toLocaleString("ar", { timeZone: "Asia/Damascus", dateStyle: "medium", timeStyle: "medium" }), extractedBy: issuerName, role });
+          return <div className="global-attendance-print-qr"><QRCodeSVG value={qrValue} size={128} level="H" includeMargin /></div>;
+        })()}
+        {reportSettings.brandLogo && <img src={reportSettings.brandLogo} alt="شعار الشركة" className="global-attendance-print-logo" />}
+        <div className="global-attendance-print-company">{reportSettings.brandName || "HADIR"}</div>
+        <div className="global-attendance-print-title">سجل الحضور والانصراف ليوم {(() => { const d = new Date(`${report.from}T12:00:00`); return `${["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][d.getDay()]} ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; })()}</div>
+      </header>
+      <table className="global-attendance-print-table">
+        <colgroup><col style={{ width: "6%" }} /><col style={{ width: "17%" }} /><col style={{ width: "22%" }} /><col style={{ width: "13%" }} /><col style={{ width: "10%" }} /><col style={{ width: "10%" }} /><col style={{ width: "22%" }} /></colgroup>
+        <thead><tr><th>ت</th><th>الاختصاص</th><th>اسم الموظف</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ملاحظات</th></tr></thead>
+        <tbody>{[...rows].sort((a, b) => {
+          const order = Array.isArray(reportSettings.specialties) ? reportSettings.specialties : [];
+          const specialtyIndex = (row: ProfessionalAttendanceRow) => {
+            const employee = employees.find((e) => String(e.id) === String(row.employeeId));
+            const employeeSpecialties = Array.isArray(employee?.specialties) ? employee.specialties.map((s) => String(s)) : [];
+            const index = employeeSpecialties.reduce((best, specialty) => { const i = order.indexOf(specialty); return i >= 0 && (best < 0 || i < best) ? i : best; }, -1);
+            return index < 0 ? order.length : index;
+          };
+          const ai = specialtyIndex(a), bi = specialtyIndex(b);
+          return ai - bi || String(a.employeeName || "").localeCompare(String(b.employeeName || ""), "ar");
+        }).map((r, i) => { const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : r.status === "ESCAPED" ? "escaped" : r.status === "REST" ? "rest" : r.status === "NOT_STARTED" ? "not-started" : "invalid"; const noteLabels: Record<string, string> = { CHECKOUT_WITHOUT_CHECKIN: "انصراف دون حضور", ESCAPED: "هرب من العمل", MISSING_CHECKOUT: "انصراف معلق", ABSENT_NO_APPROVED_REASON: "غياب دون عذر معتمد", LATE_ARRIVAL: "تأخر في الحضور", EARLY_LEAVE: "انصراف مبكر", OVERTIME: "عمل إضافي" }; return <tr key={`${r.attendanceDay}-${r.employeeId}`}>
+          <td className="global-attendance-print-center">{i + 1}</td>
+          <td>{employees.find((e) => String(e.id) === String(r.employeeId))?.specialties?.[0] || "غير محدد"}</td>
+          <td><strong>{r.employeeName}</strong></td>
+          <td className="global-attendance-print-center"><span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{labels[r.status] || r.status}</span></td>
+          <td className="global-attendance-print-center">{r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString("ar", { timeZone: "Asia/Damascus", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+          <td className="global-attendance-print-center">{r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString("ar", { timeZone: "Asia/Damascus", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+          <td>{r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : r.status === "ESCAPED" ? "هرب من العمل" : "—"}</td>
+        </tr>; })}</tbody>
+      </table>
+      <div className="global-attendance-print-summary">
+        <span className="global-attendance-print-summary-item">مجموع الموظفين: {[...rows].length}</span>
+        <span className="global-attendance-print-summary-item">الحضور: {[...rows].filter((r) => r.status === "PRESENT" || r.status === "LATE").length}</span>
+        <span className="global-attendance-print-summary-item">الغياب: {[...rows].filter((r) => r.status === "ABSENT").length}</span>
+        <span className="global-attendance-print-summary-item">الإذن: {[...rows].filter((r) => r.status === "PERMISSION").length}</span>
+      </div>
+    </div>}
+
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">

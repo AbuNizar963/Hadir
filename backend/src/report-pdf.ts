@@ -133,12 +133,16 @@ export async function generateDailyReportPdf(req: Request, env: BrowserEnv, resp
       const detail = await rendered.text().catch(() => "");
       return new Response(JSON.stringify({ error: "تعذر إنشاء PDF", detail: detail.slice(0, 1000) }), { status: 502, headers: { ...cors(responseOrigin), "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     }
+    const asciiFilename = filename.replace(/[^\x20-\x7E]/g, "_");
+    const encodedFilename = encodeURIComponent(filename);
     return new Response(rendered.body, {
       status: 200,
       headers: {
         ...cors(responseOrigin),
         "content-type": "application/pdf",
-        "content-disposition": `attachment; filename="${filename.replace(/[^\x20-\x7E]/g, "_")}"`,
+        // Keep an ASCII fallback for older clients and provide the full UTF-8
+        // filename for browsers and share/download targets that support RFC 5987.
+        "content-disposition": `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`,
         "cache-control": "no-store, no-cache, must-revalidate",
       },
     });

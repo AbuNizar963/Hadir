@@ -6,8 +6,9 @@ import { getSettings, getEmployees } from "@/lib/storage";
 import { getBackendEmployees } from "@/lib/backend";
 import { getProfessionalAttendanceReport, type ProfessionalAttendanceReport } from "@/lib/professionalAttendanceReport";
 import { downloadProfessionalAttendanceReport } from "@/lib/professionalReportExport";
+import { generateProfessionalReportPdf, pdfBlobToFile } from "@/lib/professionalPdf";
 import { downloadCSV } from "@/lib/csv";
-import { BarChart3, CalendarDays, Clock3, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users } from "lucide-react";
+import { BarChart3, CalendarDays, Clock3, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users, Share2 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 import type { Employee } from "@/types";
 
@@ -34,6 +35,8 @@ export default function ProfessionalAttendanceReports() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"overview" | "daily" | "employees" | "exceptions">("overview");
   const settings = getSettings();
+  const [sharingPdf, setSharingPdf] = useState(false);
+  const [readyPdf, setReadyPdf] = useState<File | null>(null);
 
   const load = async () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) { setError("حدد فترة زمنية صحيحة."); return; }
@@ -61,7 +64,7 @@ export default function ProfessionalAttendanceReports() {
       generatedAt: report.generatedAt,
       summaries: employeesSummary.map((x) => ({ employee: { name: x.employeeName, jobNumber: x.jobNumber }, workDays: x.days, present: x.present, absent: x.absent, early: 0, late: x.late, open: x.open, off: x.rest, worked: x.workedMinutes })),
       dailyRows: dailyRows.map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, specialty: sourceLabels[x.attendanceSource] || x.attendanceSource, date: x.attendanceDay, day: x.attendanceDay, status: statusLabels[x.status] || x.status, checkIn: x.checkInAt || "—", checkOut: x.checkOutAt || "—", worked: fmtMinutes(x.workedMinutes || 0), late: x.lateMinutes, early: x.earlyLeaveMinutes, detail: (x.status === "ESCAPED" ? "هرب من العمل" : exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || "") })),
-      chartData: statusData,
+      chartData: statusData.map(({ name, value }) => ({ label: String(name), value: Number(value) })),
       absenceRows: dailyRows.filter((x) => x.status === "ABSENT").map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, specialty: sourceLabels[x.attendanceSource] || x.attendanceSource, date: x.attendanceDay, day: x.attendanceDay, status: "غياب", checkIn: "—", checkOut: "—", worked: "—", late: 0, early: 0, detail: exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || "" })),
     });
   };
@@ -69,13 +72,60 @@ export default function ProfessionalAttendanceReports() {
   const exportCsv = () => {
     if (!report) return;
     const rows = report.rows.map((x) => [x.attendanceDay, x.employeeName, x.jobNumber || "", statusLabels[x.status] || x.status, sourceLabels[x.attendanceSource] || x.attendanceSource, x.checkInAt || "", x.checkOutAt || "", fmtMinutes(x.workedMinutes || 0), x.lateMinutes, x.earlyLeaveMinutes, x.overtimeMinutes, exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || ""]);
-    downloadCSV(`HADIR-attendance-${report.from}-${report.to}.csv`, [["التاريخ", "الموظف", "الرقم الوظيفي", "الحالة", "مصدر الحضور", "الحضور", "الانصراف", "العمل", "التأخر", "الانصراف المبكر", "الإضافي", "الاستثناء"], ...rows]);
+    downloadCSV(`HADIR-attendance-${report.from}-${report.to}.csv`, ["التاريخ", "الموظف", "الرقم الوظيفي", "الحالة", "مصدر الحضور", "الحضور", "الانصراف", "العمل", "التأخر", "الانصراف المبكر", "الإضافي", "الاستثناء"], rows);
+  };
+
+  const sharePdf = async () => {
+    if (!report) return;
+
+    if (readyPdf) {
+      const shareData = { files: [readyPdf] };
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [readyPdf] }))) {
+        try { await navigator.share(shareData); } catch (error) {
+          if ((error as DOMException)?.name !== "AbortError") window.alert(error instanceof Error ? error.message : "تعذر مشاركة ملف PDF");
+        }
+      } else {
+        const url = URL.createObjectURL(readyPdf);
+        const anchor = document.createElement("a");
+        anchor.href = url; anchor.download = readyPdf.name;
+        document.body.appendChild(anchor); anchor.click(); anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      return;
+    }
+
+    const reportElement = document.querySelector<HTMLElement>(".professional-attendance-report");
+    if (!reportElement) { window.alert("تعذر العثور على محتوى التقرير"); return; }
+    try {
+      setSharingPdf(true);
+      setReadyPdf(null);
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      const clone = reportElement.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll<HTMLElement>("[data-hadir-pdf-exclude]").forEach(node => node.remove());
+      const stylesheetLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
+        .map(link => link.href).filter(Boolean)
+        .map(href => '<link rel="stylesheet" href="' + href.replace(/&/g, "&amp;").replace(/"/g, "&quot;") + '">').join("");
+      const inlineStyles = Array.from(document.querySelectorAll("style")).map(style => style.textContent || "").join("\n");
+      const printCssUrl = new URL("/report-print.css", window.location.origin).href;
+      const documentHtml = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>تقرير الحضور</title>' + stylesheetLinks + '<link rel="stylesheet" href="' + printCssUrl + '"><style>' + inlineStyles + '</style></head><body dir="rtl"><main>' + clone.outerHTML + '</main></body></html>';
+      let printCss = "";
+      try { printCss = await fetch(printCssUrl, { cache: "no-store" }).then(response => response.ok ? response.text() : ""); } catch { /* linked stylesheet remains available */ }
+      const companyName = String(settings.brandName || "الشركة").trim().replace(/[\/:*?"<>|]/g, "-") || "الشركة";
+      const filename = companyName + " - تقرير الحضور - " + report.from + " إلى " + report.to + ".pdf";
+      const blob = await generateProfessionalReportPdf(documentHtml, printCss, filename);
+      setReadyPdf(pdfBlobToFile(blob, filename));
+    } catch (error) {
+      console.error("تعذر إنشاء PDF:", error);
+      window.alert(error instanceof Error ? error.message : "تعذر تجهيز ملف PDF");
+    } finally {
+      setSharingPdf(false);
+    }
   };
 
   const printReport = () => window.print();
 
-  return <ManagerLayout title="التقارير" subtitle="نظام التقارير العالمي · الحضور والموارد البشرية" actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportExcel} disabled={!report}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel</Button><Button variant="outline" onClick={exportCsv} disabled={!report}><Download className="ml-2 h-4 w-4" />CSV</Button><Button onClick={printReport} disabled={!report}><FileText className="ml-2 h-4 w-4" />PDF / طباعة</Button></div>}>
-    <div dir="rtl" className="space-y-5 pb-10 print:bg-white">
+  return <ManagerLayout title="التقارير" subtitle="نظام التقارير العالمي · الحضور والموارد البشرية" actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportExcel} disabled={!report}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel</Button><Button variant="outline" onClick={exportCsv} disabled={!report}><Download className="ml-2 h-4 w-4" />CSV</Button><Button onClick={sharePdf} disabled={!report || sharingPdf}><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : readyPdf ? "مشاركة PDF الآن" : "مشاركة PDF"}</Button><Button variant="outline" onClick={printReport} disabled={!report}><FileText className="ml-2 h-4 w-4" />طباعة</Button></div>}>
+    <div dir="rtl" className="professional-attendance-report space-y-5 pb-10 print:bg-white">
       <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5"><CardContent className="p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="flex items-center gap-2 text-xs font-bold text-primary"><BarChart3 className="h-4 w-4" />HADIR · Global Workforce Reporting</div><h1 className="mt-2 text-2xl font-black">لوحة الحضور التنفيذية</h1><p className="mt-1 text-sm text-muted-foreground">بيانات يومية موثقة، مؤشرات تشغيلية، واستثناءات قابلة للتتبع.</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><label className="text-xs font-bold">من<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm" /></label><label className="text-xs font-bold">إلى<input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm" /></label><label className="text-xs font-bold">الموظف<select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="mt-1 block h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">كل الموظفين</option>{employees.map((e) => <option key={e.id} value={e.id}>{e.name} · {e.jobNumber}</option>)}</select></label></div><Button onClick={() => void load()} disabled={loading} className="self-start lg:self-end">{loading ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <CalendarDays className="ml-2 h-4 w-4" />}تحديث التقرير</Button></div></CardContent></Card>
 
       {error && <Card className="border-destructive/30"><CardContent className="flex items-center gap-3 p-4 text-sm"><TriangleAlert className="h-5 w-5 text-destructive" /><span>{error}</span></CardContent></Card>}

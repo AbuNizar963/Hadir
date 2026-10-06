@@ -36,6 +36,23 @@ const greeting = () => {
   return hour < 5 ? "ليل سعيد" : hour < 12 ? "صباح الخير" : hour < 18 ? "نهار سعيد" : "مساء الخير";
 };
 
+function formatGregorianDate(value: string, fallback: Date) {
+  const match = /^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/.exec(String(value || "").trim());
+  if (match) {
+    const month = new Date(`${match[2]} 1, ${match[3]} 00:00:00`);
+    if (!Number.isNaN(month.getTime())) {
+      const date = new Date(Number(match[3]), month.getMonth(), Number(match[1]));
+      return new Intl.DateTimeFormat("ar", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date);
+    }
+  }
+  return new Intl.DateTimeFormat("ar", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(fallback);
+}
+
+function formatHijriDate(value: string) {
+  const normalized = String(value || "").trim().replace(/\s+/g, " ");
+  return normalized || "التاريخ الهجري غير متاح";
+}
+
 function hasIOSPermissionApi() {
   if (typeof window === "undefined") return false;
   const ctor = window.DeviceOrientationEvent as unknown as OrientationConstructor;
@@ -149,7 +166,7 @@ export default function PrayerPage() {
       window.addEventListener("deviceorientationabsolute", readOrientation, true);
       window.addEventListener("deviceorientation", readOrientation, true);
       setPermissionNeeded(false);
-      setSensorMessage("حرّك الهاتف ببطء؛ السهم الأحمر يتجه مباشرة نحو القبلة.");
+      setSensorMessage("تم تفعيل الحساس. حرّك الهاتف ببطء حتى يثبت الاتجاه؛ السهم يتجه مباشرة نحو القبلة.");
     } catch { setSensorMessage("تعذر الوصول إلى حساس الاتجاه. تأكد من HTTPS ودعم المتصفح."); }
   }, [readOrientation]);
 
@@ -231,10 +248,10 @@ export default function PrayerPage() {
   return <main dir="rtl" className="min-h-screen bg-[#06101c] p-3 text-white sm:p-6"><div className="mx-auto max-w-5xl space-y-4">
     <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold"><ArrowRight className="h-4 w-4" />العودة</button>
     <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#0d2743] via-[#08192b] to-[#040b14] shadow-2xl"><div className="p-5 sm:p-7">
-      <div className="flex flex-wrap items-center justify-between gap-4"><div><div className="text-sm text-emerald-200/80">{greeting()} 👋</div><h1 className="mt-1 text-2xl font-black sm:text-3xl">الصلاة القادمة: {nextPrayer?.prayer.name || "—"}</h1><p className="mt-1 text-sm text-slate-300"><MapPin className="mr-1 inline h-4 w-4" />{city} • {data?.meta.gregorian || "جارٍ تحديد التاريخ"}{data?.meta.hijri && ` • ${data.meta.hijri}`}</p></div><div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-5 py-3 text-center"><div className="text-xs text-emerald-100/70">المتبقي</div><div className="font-mono text-3xl font-black tracking-wider text-emerald-100">{timer}</div></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-4"><div><div className="text-sm text-emerald-200/80">{greeting()} 👋</div><h1 className="mt-1 text-2xl font-black sm:text-3xl">الصلاة القادمة: {nextPrayer?.prayer.name || "—"}</h1><p className="mt-1 text-sm leading-6 text-slate-300"><MapPin className="mr-1 inline h-4 w-4" />{city} <span className="mx-1 text-slate-500">•</span><span className="whitespace-nowrap">{formatGregorianDate(data?.meta.gregorian || "", now)}</span><span className="mx-1 text-slate-500">•</span><span className="whitespace-nowrap">{formatHijriDate(data?.meta.hijri || "")}</span></p></div><div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-5 py-3 text-center"><div className="text-xs text-emerald-100/70">المتبقي</div><div className="font-mono text-3xl font-black tracking-wider text-emerald-100">{timer}</div></div></div>
       {error && <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-200">{error}</div>}
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.08fr_.92fr]">
-        <div className="rounded-3xl border border-white/10 bg-black/10 p-5"><div className="mb-4 flex items-center justify-between"><div className="font-black">بوصلة القبلة</div><div className={`rounded-full px-3 py-1 text-xs ${sensorEnabled ? "bg-emerald-400/10 text-emerald-300" : "bg-amber-400/10 text-amber-200"}`}>{sensorEnabled ? "● حساس مباشر" : "○ بانتظار الحساس"}</div></div>
+        <div onClick={() => { void locate(); void enableCompass(); }} className="cursor-pointer rounded-3xl border border-white/10 bg-black/10 p-5 transition hover:border-emerald-300/30"><div className="mb-4 flex items-center justify-between"><div className="font-black">بوصلة القبلة</div><div className={`rounded-full px-3 py-1 text-xs ${sensorEnabled ? "bg-emerald-400/10 text-emerald-300" : "bg-amber-400/10 text-amber-200"}`}>{sensorEnabled ? "● حساس مباشر" : "○ بانتظار الحساس"}</div></div>
           <div className="relative mx-auto mt-3 aspect-square w-full max-w-[360px]"><div className="absolute -top-1 left-1/2 z-20 -translate-x-1/2 -translate-y-full text-center"><div className="text-3xl drop-shadow-[0_0_12px_rgba(248,113,113,.75)]">🕋</div><div className="mt-1 rounded-full border border-red-300/30 bg-red-500/10 px-3 py-1 text-xs font-black text-red-200">القبلة • {bearing == null ? "--" : `${Math.round(bearing)}°`}</div></div>
             <div className="absolute inset-0 rounded-full border-[8px] border-emerald-400/45 bg-[radial-gradient(circle_at_center,#102f4d_0,#07182a_55%,#020a12_100%)] shadow-[inset_0_0_55px_rgba(0,0,0,.8),0_0_40px_rgba(52,211,153,.14)]"><div className="absolute inset-4 rounded-full border border-emerald-300/20" /><div className="absolute inset-8 rounded-full border border-dashed border-emerald-300/10" /><div className="absolute inset-0">{Array.from({ length: 72 }, (_, i) => <span key={i} className="absolute left-1/2 top-1/2 block origin-bottom bg-slate-300/35" style={{ height: i % 3 === 0 ? "8%" : "4%", width: i % 3 === 0 ? 2 : 1, transform: `translate(-50%,-100%) rotate(${i * 5}deg)` }} />)}<span className="absolute inset-x-0 top-7 text-center text-sm font-black text-white">شمال</span><span className="absolute inset-x-0 bottom-7 text-center text-sm text-slate-400">جنوب</span><span className="absolute right-7 top-1/2 -translate-y-1/2 text-sm text-slate-400">شرق</span><span className="absolute left-7 top-1/2 -translate-y-1/2 text-sm text-slate-400">غرب</span></div><div className="absolute inset-0 flex items-center justify-center"><div className="absolute h-[43%] w-2 origin-bottom rounded-full bg-gradient-to-t from-red-600 via-red-400 to-red-200 shadow-[0_0_18px_rgba(248,113,113,.9)]" style={{ transform: `translateY(-50%) rotate(${needleRotation}deg)`, willChange: "transform" }}><span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 -translate-y-full border-x-[9px] border-b-[18px] border-x-transparent border-b-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,.9)]" /></div><div className="absolute h-10 w-10 rounded-full border border-white/15 bg-[#071a2c] shadow-xl" /></div></div></div>
           <div className="mt-5 text-center"><div className="font-mono text-3xl font-black text-red-300">{bearing == null ? "--" : `${Math.round(bearing)}°`}</div><div className="mt-1 text-sm text-slate-300">{aligned ? "أنت تواجه القبلة ✓" : bearing == null ? "جارٍ تحديد الاتجاه" : `${bearingLabel(bearing)} نحو مكة`}</div><div className="mt-2 text-xs text-slate-500">اتجاه الجهاز {Math.round(heading)}° • المسافة {distance == null ? "--" : `${distance.toFixed(1)} كم`}</div></div>
