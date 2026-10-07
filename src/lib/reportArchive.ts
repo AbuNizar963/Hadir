@@ -13,7 +13,10 @@ const adminHeaders = (): Record<string, string> => {
   const token =
     typeof window === "undefined"
       ? ""
-      : localStorage.getItem("hadir.api.token.admin") || "";
+      : localStorage.getItem("hadir.api.token.admin") ||
+        localStorage.getItem("hadir.api.token") ||
+        localStorage.getItem("hadir.auth.token") ||
+        "";
 
   return token ? { authorization: `Bearer ${token}` } : {};
 };
@@ -111,11 +114,29 @@ export async function prepareReportArchive(cursor: number, employeeCursor = 0) {
       });
       if (response.ok || ![502, 503, 504].includes(response.status)) break;
     } catch (error) {
+      // Some mobile browsers reject a credentialed cross-origin request even
+      // when the bearer token is sufficient. Retry once without cookies.
+      if (attempt === 0) {
+        try {
+          response = await fetch(`${API_URL}/api/reports/archive/prepare`, {
+            method: "POST",
+            headers: { ...adminHeaders(), "content-type": "application/json" },
+            body: JSON.stringify({ cursor, employeeCursor }),
+            credentials: "omit",
+            cache: "no-store",
+          });
+          if (response.ok || ![502, 503, 504].includes(response.status)) break;
+        } catch {
+          // Continue with the bounded retry below.
+        }
+      }
       if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
     }
   }
   if (!response) {
-    throw new Error("تعذر الاتصال بخادم الأرشيف. أعد المحاولة؛ ستستكمل العملية من آخر دفعة ناجحة.");
+    throw new Error(
+      `تعذر الاتصال بخادم الأرشيف من ${window.location.origin}. تحقق من اتصال الشبكة أو افتح النظام من عنوان HADIR الرسمي، ثم أعد المحاولة؛ ستستكمل العملية من آخر دفعة ناجحة.`,
+    );
   }
   const data = (await response.json().catch(() => null)) as {
     error?: string;
