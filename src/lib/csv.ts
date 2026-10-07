@@ -9,7 +9,7 @@ export type CsvCell = string | number | null | undefined;
 export function downloadCSV(
   filename: string,
   headers: string[],
-  rows: CsvCell[][]
+  rows: CsvCell[][],
 ): void {
   const escape = (val: CsvCell): string => {
     if (val === null || val === undefined) return '""';

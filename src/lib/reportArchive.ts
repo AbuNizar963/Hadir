@@ -1,6 +1,5 @@
 const API_URL = String(
-  import.meta.env.VITE_API_URL ||
-    "https://hadir-api.abunizar963.workers.dev",
+  import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev",
 ).replace(/\/$/, "");
 
 type ArchiveListResponse = {
@@ -55,9 +54,9 @@ export async function listArchivedReports(limit = 25) {
     },
   );
 
-  const data = (await response
-    .json()
-    .catch(() => null)) as ArchiveListResponse | unknown;
+  const data = (await response.json().catch(() => null)) as
+    | ArchiveListResponse
+    | unknown;
 
   if (!response.ok) {
     const message =
@@ -88,14 +87,13 @@ export async function refreshReportArchive() {
     cache: "no-store",
   });
 
-  const data = (await response
-    .json()
-    .catch(() => null)) as { error?: string; archived?: boolean } | null;
+  const data = (await response.json().catch(() => null)) as {
+    error?: string;
+    archived?: boolean;
+  } | null;
 
   if (!response.ok) {
-    throw new Error(
-      String(data?.error || `HTTP ${response.status}`),
-    );
+    throw new Error(String(data?.error || `HTTP ${response.status}`));
   }
 
   return data;
@@ -130,7 +128,10 @@ export async function prepareReportArchive(cursor: number, employeeCursor = 0) {
           // Continue with the bounded retry below.
         }
       }
-      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
+      if (attempt < 2)
+        await new Promise((resolve) =>
+          setTimeout(resolve, 750 * (attempt + 1)),
+        );
     }
   }
   if (!response) {
@@ -149,7 +150,13 @@ export async function prepareReportArchive(cursor: number, employeeCursor = 0) {
   } | null;
   if (!response.ok)
     throw new Error(String(data?.error || `HTTP ${response.status}`));
-  return data || { done: false, nextCursor: cursor, nextEmployeeCursor: employeeCursor + 1 };
+  return (
+    data || {
+      done: false,
+      nextCursor: cursor,
+      nextEmployeeCursor: employeeCursor + 1,
+    }
+  );
 }
 
 export async function downloadArchivedReport(
@@ -166,13 +173,11 @@ export async function downloadArchivedReport(
   );
 
   if (!response.ok) {
-    const data = (await response
-      .json()
-      .catch(() => null)) as { error?: string } | null;
+    const data = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
 
-    throw new Error(
-      String(data?.error || `HTTP ${response.status}`),
-    );
+    throw new Error(String(data?.error || `HTTP ${response.status}`));
   }
 
   const blob = await response.blob();
@@ -201,14 +206,13 @@ export async function deleteArchivedReport(reportId: string) {
     },
   );
 
-  const data = (await response
-    .json()
-    .catch(() => null)) as { error?: string; deleted?: boolean } | null;
+  const data = (await response.json().catch(() => null)) as {
+    error?: string;
+    deleted?: boolean;
+  } | null;
 
   if (!response.ok || !data?.deleted) {
-    throw new Error(
-      String(data?.error || `HTTP ${response.status}`),
-    );
+    throw new Error(String(data?.error || `HTTP ${response.status}`));
   }
 
   return data;

@@ -26,7 +26,9 @@ export default function Brand({ className }: { className?: string }) {
         />
         <div className="leading-tight">
           <div className="text-lg font-extrabold tracking-tight">{name}</div>
-          <div className="text-[10px] text-muted-foreground mono">HADIR · v1.1</div>
+          <div className="text-[10px] text-muted-foreground mono">
+            HADIR · v1.1
+          </div>
         </div>
       </div>
     </div>

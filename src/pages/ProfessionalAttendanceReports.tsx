@@ -4,25 +4,114 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getSettings, getEmployees } from "@/lib/storage";
 import { getBackendEmployees } from "@/lib/backend";
-import { getProfessionalAttendanceReport, type ProfessionalAttendanceReport } from "@/lib/professionalAttendanceReport";
+import {
+  getProfessionalAttendanceReport,
+  type ProfessionalAttendanceReport,
+} from "@/lib/professionalAttendanceReport";
 import { downloadProfessionalAttendanceReport } from "@/lib/professionalReportExport";
-import { generateProfessionalReportPdf, pdfBlobToFile } from "@/lib/professionalPdf";
+import {
+  generateProfessionalReportPdf,
+  pdfBlobToFile,
+} from "@/lib/professionalPdf";
 import { downloadCSV } from "@/lib/csv";
-import { BarChart3, CalendarDays, Clock3, Download, FileSpreadsheet, FileText, RefreshCw, TriangleAlert, Users, Share2 } from "lucide-react";
-import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
+import {
+  BarChart3,
+  CalendarDays,
+  Clock3,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  RefreshCw,
+  TriangleAlert,
+  Users,
+  Share2,
+} from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import type { Employee } from "@/types";
 
 import { getSystemTimeZone } from "@/lib/systemTimezone";
-const statusLabels: Record<string, string> = { PRESENT: "حاضر", LATE: "متأخر", ABSENT: "غياب", LEAVE: "إجازة", PERMISSION: "استئذان", REST: "راحة", ESCAPED: "هارب", NOT_STARTED: "لم يبدأ", INVALID: "غير صالح" };
-const sourceLabels: Record<string, string> = { AUTOMATIC_VIP: "تلقائي VIP", AUTOMATIC: "تلقائي", MANUAL_OWNER: "إداري", MANUAL_EMPLOYEE: "الموظف", MIXED: "مختلط", UNKNOWN: "غير محدد" };
-const exceptionLabels: Record<string, string> = { ESCAPED: "هرب من العمل", MISSING_CHECKOUT: "انصراف معلق", CHECKOUT_WITHOUT_CHECKIN: "انصراف دون حضور", ABSENT_NO_APPROVED_REASON: "غياب دون عذر معتمد", LATE_ARRIVAL: "تأخر في الحضور", EARLY_LEAVE: "انصراف مبكر", OVERTIME: "عمل إضافي" };
-const fmtMinutes = (minutes: number) => `${Math.floor(Math.max(0, minutes) / 60)}س ${Math.round(Math.max(0, minutes) % 60)}د`;
-const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: getSystemTimeZone() }).format(new Date());
+const statusLabels: Record<string, string> = {
+  PRESENT: "حاضر",
+  LATE: "متأخر",
+  ABSENT: "غياب",
+  LEAVE: "إجازة",
+  PERMISSION: "استئذان",
+  REST: "راحة",
+  ESCAPED: "هارب",
+  NOT_STARTED: "لم يبدأ",
+  INVALID: "غير صالح",
+};
+const sourceLabels: Record<string, string> = {
+  AUTOMATIC_VIP: "تلقائي VIP",
+  AUTOMATIC: "تلقائي",
+  MANUAL_OWNER: "إداري",
+  MANUAL_EMPLOYEE: "الموظف",
+  MIXED: "مختلط",
+  UNKNOWN: "غير محدد",
+};
+const exceptionLabels: Record<string, string> = {
+  ESCAPED: "هرب من العمل",
+  MISSING_CHECKOUT: "انصراف معلق",
+  CHECKOUT_WITHOUT_CHECKIN: "انصراف دون حضور",
+  ABSENT_NO_APPROVED_REASON: "غياب دون عذر معتمد",
+  LATE_ARRIVAL: "تأخر في الحضور",
+  EARLY_LEAVE: "انصراف مبكر",
+  OVERTIME: "عمل إضافي",
+};
+const fmtMinutes = (minutes: number) =>
+  `${Math.floor(Math.max(0, minutes) / 60)}س ${Math.round(Math.max(0, minutes) % 60)}د`;
+const today = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: getSystemTimeZone() }).format(
+    new Date(),
+  );
 const monthStart = (day: string) => `${day.slice(0, 7)}-01`;
-const safePercent = (value: number) => `${Math.max(0, Math.min(100, value)).toFixed(1)}%`;
+const safePercent = (value: number) =>
+  `${Math.max(0, Math.min(100, value)).toFixed(1)}%`;
 
-function Kpi({ title, value, detail, icon: Icon }: { title: string; value: string | number; detail?: string; icon: typeof Users }) {
-  return <Card className="overflow-hidden"><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><div className="text-sm text-muted-foreground">{title}</div><div className="mt-2 text-2xl font-black tracking-tight">{value}</div>{detail && <div className="mt-1 text-xs text-muted-foreground">{detail}</div>}</div><div className="rounded-xl bg-primary/10 p-3 text-primary"><Icon className="h-5 w-5" /></div></div></CardContent></Card>;
+function Kpi({
+  title,
+  value,
+  detail,
+  icon: Icon,
+}: {
+  title: string;
+  value: string | number;
+  detail?: string;
+  icon: typeof Users;
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm text-muted-foreground">{title}</div>
+            <div className="mt-2 text-2xl font-black tracking-tight">
+              {value}
+            </div>
+            {detail && (
+              <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
+            )}
+          </div>
+          <div className="rounded-xl bg-primary/10 p-3 text-primary">
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function ProfessionalAttendanceReports() {
@@ -31,49 +120,177 @@ export default function ProfessionalAttendanceReports() {
   const [to, setTo] = useState(initial);
   const [employeeId, setEmployeeId] = useState("");
   const [employees, setEmployees] = useState<Employee[]>(getEmployees());
-  const [report, setReport] = useState<ProfessionalAttendanceReport | null>(null);
+  const [report, setReport] = useState<ProfessionalAttendanceReport | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"overview" | "daily" | "employees" | "exceptions">("overview");
+  const [tab, setTab] = useState<
+    "overview" | "daily" | "employees" | "exceptions"
+  >("overview");
   const settings = getSettings();
   const [sharingPdf, setSharingPdf] = useState(false);
   const [readyPdf, setReadyPdf] = useState<File | null>(null);
 
   const load = async () => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) { setError("حدد فترة زمنية صحيحة."); return; }
-    setLoading(true); setError(null);
-    try { setReport(await getProfessionalAttendanceReport(from, to, employeeId || undefined)); }
-    catch (e) { setError(e instanceof Error ? e.message : "تعذر تحميل التقرير"); }
-    finally { setLoading(false); }
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(to) ||
+      from > to
+    ) {
+      setError("حدد فترة زمنية صحيحة.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      setReport(
+        await getProfessionalAttendanceReport(
+          from,
+          to,
+          employeeId || undefined,
+        ),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر تحميل التقرير");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { let alive = true; getBackendEmployees().then((rows) => { if (alive && Array.isArray(rows)) setEmployees(rows); }).catch(() => undefined); return () => { alive = false; }; }, []);
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let alive = true;
+    getBackendEmployees()
+      .then((rows) => {
+        if (alive && Array.isArray(rows)) setEmployees(rows);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+  useEffect(() => {
+    void load();
+  }, []);
 
   const daily = report?.analytics.dailySeries || [];
   const employeesSummary = report?.analytics.employeeSummaries || [];
   const exceptions = report?.analytics.exceptions || [];
-  const topEmployees = useMemo(() => [...employeesSummary].sort((a, b) => (b.lateMinutes + b.absent * 60) - (a.lateMinutes + a.absent * 60)).slice(0, 10), [employeesSummary]);
-  const statusData = report ? [["حاضر", report.summary.present], ["متأخر", report.summary.late], ["غياب", report.summary.absent], ["إجازة", report.summary.leave], ["استئذان", report.summary.permission], ["راحة", report.summary.rest]].map(([name, value]) => ({ name, value })) : [];
+  const topEmployees = useMemo(
+    () =>
+      [...employeesSummary]
+        .sort(
+          (a, b) =>
+            b.lateMinutes + b.absent * 60 - (a.lateMinutes + a.absent * 60),
+        )
+        .slice(0, 10),
+    [employeesSummary],
+  );
+  const statusData = report
+    ? [
+        ["حاضر", report.summary.present],
+        ["متأخر", report.summary.late],
+        ["غياب", report.summary.absent],
+        ["إجازة", report.summary.leave],
+        ["استئذان", report.summary.permission],
+        ["راحة", report.summary.rest],
+      ].map(([name, value]) => ({ name, value }))
+    : [];
   const dailyRows = report?.rows || [];
 
   const exportExcel = () => {
     if (!report) return;
     downloadProfessionalAttendanceReport({
-      mode: report.days === 1 ? "daily" : report.days <= 31 ? "monthly" : "annual",
+      mode:
+        report.days === 1 ? "daily" : report.days <= 31 ? "monthly" : "annual",
       period: `${report.from} → ${report.to}`,
       generatedAt: report.generatedAt,
-      summaries: employeesSummary.map((x) => ({ employee: { name: x.employeeName, jobNumber: x.jobNumber }, workDays: x.days, present: x.present, absent: x.absent, early: 0, late: x.late, open: x.open, off: x.rest, worked: x.workedMinutes })),
-      dailyRows: dailyRows.map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, specialty: sourceLabels[x.attendanceSource] || x.attendanceSource, date: x.attendanceDay, day: x.attendanceDay, status: statusLabels[x.status] || x.status, checkIn: x.checkInAt || "—", checkOut: x.checkOutAt || "—", worked: fmtMinutes(x.workedMinutes || 0), late: x.lateMinutes, early: x.earlyLeaveMinutes, detail: (x.status === "ESCAPED" ? "هرب من العمل" : exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || "") })),
-      chartData: statusData.map(({ name, value }) => ({ label: String(name), value: Number(value) })),
-      absenceRows: dailyRows.filter((x) => x.status === "ABSENT").map((x) => ({ employee: x.employeeName, jobNumber: x.jobNumber, specialty: sourceLabels[x.attendanceSource] || x.attendanceSource, date: x.attendanceDay, day: x.attendanceDay, status: "غياب", checkIn: "—", checkOut: "—", worked: "—", late: 0, early: 0, detail: exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || "" })),
+      summaries: employeesSummary.map((x) => ({
+        employee: { name: x.employeeName, jobNumber: x.jobNumber },
+        workDays: x.days,
+        present: x.present,
+        absent: x.absent,
+        early: 0,
+        late: x.late,
+        open: x.open,
+        off: x.rest,
+        worked: x.workedMinutes,
+      })),
+      dailyRows: dailyRows.map((x) => ({
+        employee: x.employeeName,
+        jobNumber: x.jobNumber,
+        specialty: sourceLabels[x.attendanceSource] || x.attendanceSource,
+        date: x.attendanceDay,
+        day: x.attendanceDay,
+        status: statusLabels[x.status] || x.status,
+        checkIn: x.checkInAt || "—",
+        checkOut: x.checkOutAt || "—",
+        worked: fmtMinutes(x.workedMinutes || 0),
+        late: x.lateMinutes,
+        early: x.earlyLeaveMinutes,
+        detail:
+          x.status === "ESCAPED"
+            ? "هرب من العمل"
+            : exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || "",
+      })),
+      chartData: statusData.map(({ name, value }) => ({
+        label: String(name),
+        value: Number(value),
+      })),
+      absenceRows: dailyRows
+        .filter((x) => x.status === "ABSENT")
+        .map((x) => ({
+          employee: x.employeeName,
+          jobNumber: x.jobNumber,
+          specialty: sourceLabels[x.attendanceSource] || x.attendanceSource,
+          date: x.attendanceDay,
+          day: x.attendanceDay,
+          status: "غياب",
+          checkIn: "—",
+          checkOut: "—",
+          worked: "—",
+          late: 0,
+          early: 0,
+          detail:
+            exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || "",
+        })),
     });
   };
 
   const exportCsv = () => {
     if (!report) return;
-    const rows = report.rows.map((x) => [x.attendanceDay, x.employeeName, x.jobNumber || "", statusLabels[x.status] || x.status, sourceLabels[x.attendanceSource] || x.attendanceSource, x.checkInAt || "", x.checkOutAt || "", fmtMinutes(x.workedMinutes || 0), x.lateMinutes, x.earlyLeaveMinutes, x.overtimeMinutes, exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || ""]);
-    downloadCSV(`HADIR-attendance-${report.from}-${report.to}.csv`, ["التاريخ", "الموظف", "الرقم الوظيفي", "الحالة", "مصدر الحضور", "الحضور", "الانصراف", "العمل", "التأخر", "الانصراف المبكر", "الإضافي", "الاستثناء"], rows);
+    const rows = report.rows.map((x) => [
+      x.attendanceDay,
+      x.employeeName,
+      x.jobNumber || "",
+      statusLabels[x.status] || x.status,
+      sourceLabels[x.attendanceSource] || x.attendanceSource,
+      x.checkInAt || "",
+      x.checkOutAt || "",
+      fmtMinutes(x.workedMinutes || 0),
+      x.lateMinutes,
+      x.earlyLeaveMinutes,
+      x.overtimeMinutes,
+      exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || "",
+    ]);
+    downloadCSV(
+      `HADIR-attendance-${report.from}-${report.to}.csv`,
+      [
+        "التاريخ",
+        "الموظف",
+        "الرقم الوظيفي",
+        "الحالة",
+        "مصدر الحضور",
+        "الحضور",
+        "الانصراف",
+        "العمل",
+        "التأخر",
+        "الانصراف المبكر",
+        "الإضافي",
+        "الاستثناء",
+      ],
+      rows,
+    );
   };
 
   const sharePdf = async () => {
@@ -81,43 +298,105 @@ export default function ProfessionalAttendanceReports() {
 
     if (readyPdf) {
       const shareData = { files: [readyPdf] };
-      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [readyPdf] }))) {
-        try { await navigator.share(shareData); } catch (error) {
-          if ((error as DOMException)?.name !== "AbortError") window.alert(error instanceof Error ? error.message : "تعذر مشاركة ملف PDF");
+      if (
+        navigator.share &&
+        (!navigator.canShare || navigator.canShare({ files: [readyPdf] }))
+      ) {
+        try {
+          await navigator.share(shareData);
+        } catch (error) {
+          if ((error as DOMException)?.name !== "AbortError")
+            window.alert(
+              error instanceof Error ? error.message : "تعذر مشاركة ملف PDF",
+            );
         }
       } else {
         const url = URL.createObjectURL(readyPdf);
         const anchor = document.createElement("a");
-        anchor.href = url; anchor.download = readyPdf.name;
-        document.body.appendChild(anchor); anchor.click(); anchor.remove();
+        anchor.href = url;
+        anchor.download = readyPdf.name;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
       return;
     }
 
-    const reportElement = document.querySelector<HTMLElement>(".professional-attendance-report");
-    if (!reportElement) { window.alert("تعذر العثور على محتوى التقرير"); return; }
+    const reportElement = document.querySelector<HTMLElement>(
+      ".professional-attendance-report",
+    );
+    if (!reportElement) {
+      window.alert("تعذر العثور على محتوى التقرير");
+      return;
+    }
     try {
       setSharingPdf(true);
       setReadyPdf(null);
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
       const clone = reportElement.cloneNode(true) as HTMLElement;
-      clone.querySelectorAll<HTMLElement>("[data-hadir-pdf-exclude]").forEach(node => node.remove());
-      const stylesheetLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
-        .map(link => link.href).filter(Boolean)
-        .map(href => '<link rel="stylesheet" href="' + href.replace(/&/g, "&amp;").replace(/"/g, "&quot;") + '">').join("");
-      const inlineStyles = Array.from(document.querySelectorAll("style")).map(style => style.textContent || "").join("\n");
-      const printCssUrl = new URL("/report-print.css", window.location.origin).href;
-      const documentHtml = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>تقرير الحضور</title>' + stylesheetLinks + '<link rel="stylesheet" href="' + printCssUrl + '"><style>' + inlineStyles + '</style></head><body dir="rtl"><main>' + clone.outerHTML + '</main></body></html>';
+      clone
+        .querySelectorAll<HTMLElement>("[data-hadir-pdf-exclude]")
+        .forEach((node) => node.remove());
+      const stylesheetLinks = Array.from(
+        document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
+      )
+        .map((link) => link.href)
+        .filter(Boolean)
+        .map(
+          (href) =>
+            '<link rel="stylesheet" href="' +
+            href.replace(/&/g, "&amp;").replace(/"/g, "&quot;") +
+            '">',
+        )
+        .join("");
+      const inlineStyles = Array.from(document.querySelectorAll("style"))
+        .map((style) => style.textContent || "")
+        .join("\n");
+      const printCssUrl = new URL("/report-print.css", window.location.origin)
+        .href;
+      const documentHtml =
+        '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>تقرير الحضور</title>' +
+        stylesheetLinks +
+        '<link rel="stylesheet" href="' +
+        printCssUrl +
+        '"><style>' +
+        inlineStyles +
+        '</style></head><body dir="rtl"><main>' +
+        clone.outerHTML +
+        "</main></body></html>";
       let printCss = "";
-      try { printCss = await fetch(printCssUrl, { cache: "no-store" }).then(response => response.ok ? response.text() : ""); } catch { /* linked stylesheet remains available */ }
-      const companyName = String(settings.brandName || "الشركة").trim().replace(/[\/:*?"<>|]/g, "-") || "الشركة";
-      const filename = companyName + " - تقرير الحضور - " + report.from + " إلى " + report.to + ".pdf";
-      const blob = await generateProfessionalReportPdf(documentHtml, printCss, filename);
+      try {
+        printCss = await fetch(printCssUrl, { cache: "no-store" }).then(
+          (response) => (response.ok ? response.text() : ""),
+        );
+      } catch {
+        /* linked stylesheet remains available */
+      }
+      const companyName =
+        String(settings.brandName || "الشركة")
+          .trim()
+          .replace(/[\/:*?"<>|]/g, "-") || "الشركة";
+      const filename =
+        companyName +
+        " - تقرير الحضور - " +
+        report.from +
+        " إلى " +
+        report.to +
+        ".pdf";
+      const blob = await generateProfessionalReportPdf(
+        documentHtml,
+        printCss,
+        filename,
+      );
       setReadyPdf(pdfBlobToFile(blob, filename));
     } catch (error) {
       console.error("تعذر إنشاء PDF:", error);
-      window.alert(error instanceof Error ? error.message : "تعذر تجهيز ملف PDF");
+      window.alert(
+        error instanceof Error ? error.message : "تعذر تجهيز ملف PDF",
+      );
     } finally {
       setSharingPdf(false);
     }
@@ -125,26 +404,494 @@ export default function ProfessionalAttendanceReports() {
 
   const printReport = () => window.print();
 
-  return <ManagerLayout title="التقارير" subtitle="نظام التقارير العالمي · الحضور والموارد البشرية" actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportExcel} disabled={!report}><FileSpreadsheet className="ml-2 h-4 w-4" />Excel</Button><Button variant="outline" onClick={exportCsv} disabled={!report}><Download className="ml-2 h-4 w-4" />CSV</Button><Button onClick={sharePdf} disabled={!report || sharingPdf}><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري تجهيز PDF…" : readyPdf ? "مشاركة PDF الآن" : "مشاركة PDF"}</Button><Button variant="outline" onClick={printReport} disabled={!report}><FileText className="ml-2 h-4 w-4" />طباعة</Button></div>}>
-    <div dir="rtl" className="professional-attendance-report space-y-5 pb-10 print:bg-white">
-      <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5"><CardContent className="p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="flex items-center gap-2 text-xs font-bold text-primary"><BarChart3 className="h-4 w-4" />HADIR · Global Workforce Reporting</div><h1 className="mt-2 text-2xl font-black">لوحة الحضور التنفيذية</h1><p className="mt-1 text-sm text-muted-foreground">بيانات يومية موثقة، مؤشرات تشغيلية، واستثناءات قابلة للتتبع.</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><label className="text-xs font-bold">من<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm" /></label><label className="text-xs font-bold">إلى<input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm" /></label><label className="text-xs font-bold">الموظف<select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="mt-1 block h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">كل الموظفين</option>{employees.map((e) => <option key={e.id} value={e.id}>{e.name} · {e.jobNumber}</option>)}</select></label></div><Button onClick={() => void load()} disabled={loading} className="self-start lg:self-end">{loading ? <RefreshCw className="ml-2 h-4 w-4 animate-spin" /> : <CalendarDays className="ml-2 h-4 w-4" />}تحديث التقرير</Button></div></CardContent></Card>
+  return (
+    <ManagerLayout
+      title="التقارير"
+      subtitle="نظام التقارير العالمي · الحضور والموارد البشرية"
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={exportExcel} disabled={!report}>
+            <FileSpreadsheet className="ml-2 h-4 w-4" />
+            Excel
+          </Button>
+          <Button variant="outline" onClick={exportCsv} disabled={!report}>
+            <Download className="ml-2 h-4 w-4" />
+            CSV
+          </Button>
+          <Button onClick={sharePdf} disabled={!report || sharingPdf}>
+            <Share2 className="ml-2 h-4 w-4" />
+            {sharingPdf
+              ? "جاري تجهيز PDF…"
+              : readyPdf
+                ? "مشاركة PDF الآن"
+                : "مشاركة PDF"}
+          </Button>
+          <Button variant="outline" onClick={printReport} disabled={!report}>
+            <FileText className="ml-2 h-4 w-4" />
+            طباعة
+          </Button>
+        </div>
+      }
+    >
+      <div
+        dir="rtl"
+        className="professional-attendance-report space-y-5 pb-10 print:bg-white"
+      >
+        <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
+          <CardContent className="p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold text-primary">
+                  <BarChart3 className="h-4 w-4" />
+                  HADIR · Global Workforce Reporting
+                </div>
+                <h1 className="mt-2 text-2xl font-black">
+                  لوحة الحضور التنفيذية
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  بيانات يومية موثقة، مؤشرات تشغيلية، واستثناءات قابلة للتتبع.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <label className="text-xs font-bold">
+                  من
+                  <input
+                    type="date"
+                    value={from}
+                    onChange={(e) => setFrom(e.target.value)}
+                    className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm"
+                  />
+                </label>
+                <label className="text-xs font-bold">
+                  إلى
+                  <input
+                    type="date"
+                    value={to}
+                    onChange={(e) => setTo(e.target.value)}
+                    className="mt-1 block h-10 rounded-md border bg-background px-3 text-sm"
+                  />
+                </label>
+                <label className="text-xs font-bold">
+                  الموظف
+                  <select
+                    value={employeeId}
+                    onChange={(e) => setEmployeeId(e.target.value)}
+                    className="mt-1 block h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">كل الموظفين</option>
+                    {employees.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name} · {e.jobNumber}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <Button
+                onClick={() => void load()}
+                disabled={loading}
+                className="self-start lg:self-end"
+              >
+                {loading ? (
+                  <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CalendarDays className="ml-2 h-4 w-4" />
+                )}
+                تحديث التقرير
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-      {error && <Card className="border-destructive/30"><CardContent className="flex items-center gap-3 p-4 text-sm"><TriangleAlert className="h-5 w-5 text-destructive" /><span>{error}</span></CardContent></Card>}
-      {loading && !report ? <Card><CardContent className="p-10 text-center text-muted-foreground">جاري بناء التقرير من طبقة البيانات الرسمية…</CardContent></Card> : report && <>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Kpi title="الموظفون" value={report.summary.employees} detail={`${report.summary.employeeDays} سجل موظف/يوم`} icon={Users} /><Kpi title="نسبة الحضور" value={safePercent(report.summary.attendanceRate)} detail={`الانضباط ${safePercent(report.summary.punctualityRate)}`} icon={BarChart3} /><Kpi title="ساعات العمل" value={fmtMinutes(report.summary.workedMinutes)} detail={`المتوقع ${fmtMinutes(report.summary.expectedMinutes)}`} icon={Clock3} /><Kpi title="الاستثناءات" value={exceptions.length} detail={`تأخر ${report.summary.lateMinutes}د · إضافي ${report.summary.overtimeMinutes}د`} icon={TriangleAlert} /></div>
-        <div className="flex flex-wrap gap-2 border-b pb-2"><Button variant={tab === "overview" ? "default" : "outline"} onClick={() => setTab("overview")}>نظرة تنفيذية</Button><Button variant={tab === "daily" ? "default" : "outline"} onClick={() => setTab("daily")}>السجل اليومي</Button><Button variant={tab === "employees" ? "default" : "outline"} onClick={() => setTab("employees")}>الموظفون</Button><Button variant={tab === "exceptions" ? "default" : "outline"} onClick={() => setTab("exceptions")}>الاستثناءات</Button></div>
+        {error && (
+          <Card className="border-destructive/30">
+            <CardContent className="flex items-center gap-3 p-4 text-sm">
+              <TriangleAlert className="h-5 w-5 text-destructive" />
+              <span>{error}</span>
+            </CardContent>
+          </Card>
+        )}
+        {loading && !report ? (
+          <Card>
+            <CardContent className="p-10 text-center text-muted-foreground">
+              جاري بناء التقرير من طبقة البيانات الرسمية…
+            </CardContent>
+          </Card>
+        ) : (
+          report && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Kpi
+                  title="الموظفون"
+                  value={report.summary.employees}
+                  detail={`${report.summary.employeeDays} سجل موظف/يوم`}
+                  icon={Users}
+                />
+                <Kpi
+                  title="نسبة الحضور"
+                  value={safePercent(report.summary.attendanceRate)}
+                  detail={`الانضباط ${safePercent(report.summary.punctualityRate)}`}
+                  icon={BarChart3}
+                />
+                <Kpi
+                  title="ساعات العمل"
+                  value={fmtMinutes(report.summary.workedMinutes)}
+                  detail={`المتوقع ${fmtMinutes(report.summary.expectedMinutes)}`}
+                  icon={Clock3}
+                />
+                <Kpi
+                  title="الاستثناءات"
+                  value={exceptions.length}
+                  detail={`تأخر ${report.summary.lateMinutes}د · إضافي ${report.summary.overtimeMinutes}د`}
+                  icon={TriangleAlert}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2 border-b pb-2">
+                <Button
+                  variant={tab === "overview" ? "default" : "outline"}
+                  onClick={() => setTab("overview")}
+                >
+                  نظرة تنفيذية
+                </Button>
+                <Button
+                  variant={tab === "daily" ? "default" : "outline"}
+                  onClick={() => setTab("daily")}
+                >
+                  السجل اليومي
+                </Button>
+                <Button
+                  variant={tab === "employees" ? "default" : "outline"}
+                  onClick={() => setTab("employees")}
+                >
+                  الموظفون
+                </Button>
+                <Button
+                  variant={tab === "exceptions" ? "default" : "outline"}
+                  onClick={() => setTab("exceptions")}
+                >
+                  الاستثناءات
+                </Button>
+              </div>
 
-        {tab === "overview" && <div className="grid gap-5 lg:grid-cols-3"><Card className="lg:col-span-2"><CardHeader><CardTitle className="text-lg">اتجاه الحضور اليومي</CardTitle></CardHeader><CardContent className="h-80"><ResponsiveContainer width="100%" height="100%"><AreaChart data={daily}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="attendanceDay" tick={{ fontSize: 11 }} /><YAxis allowDecimals={false} /><Tooltip /><Area type="monotone" dataKey="present" name="حاضر" fillOpacity={0.18} strokeWidth={2} /><Area type="monotone" dataKey="late" name="متأخر" fillOpacity={0.10} strokeWidth={2} /><Area type="monotone" dataKey="absent" name="غياب" fillOpacity={0.10} strokeWidth={2} /></AreaChart></ResponsiveContainer></CardContent></Card><Card><CardHeader><CardTitle className="text-lg">توزيع الحالات</CardTitle></CardHeader><CardContent className="h-80"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} label>{statusData.map((_, i) => <Cell key={i} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></CardContent></Card></div>}
-        {tab === "overview" && <Card><CardHeader><CardTitle className="text-lg">الساعات الفعلية مقابل المتوقعة</CardTitle></CardHeader><CardContent className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={daily}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="attendanceDay" tick={{ fontSize: 11 }} /><YAxis /><Tooltip formatter={(v) => fmtMinutes(Number(v))} /><Bar dataKey="expectedMinutes" name="المتوقع" fill="currentColor" fillOpacity={0.25} /><Bar dataKey="workedMinutes" name="الفعلي" fill="currentColor" /></BarChart></ResponsiveContainer></CardContent></Card>}
+              {tab === "overview" && (
+                <div className="grid gap-5 lg:grid-cols-3">
+                  <Card className="lg:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="text-lg">
+                        اتجاه الحضور اليومي
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={daily}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="attendanceDay"
+                            tick={{ fontSize: 11 }}
+                          />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip />
+                          <Area
+                            type="monotone"
+                            dataKey="present"
+                            name="حاضر"
+                            fillOpacity={0.18}
+                            strokeWidth={2}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="late"
+                            name="متأخر"
+                            fillOpacity={0.1}
+                            strokeWidth={2}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="absent"
+                            name="غياب"
+                            fillOpacity={0.1}
+                            strokeWidth={2}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">توزيع الحالات</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={statusData}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={55}
+                            outerRadius={90}
+                            label
+                          >
+                            {statusData.map((_, i) => (
+                              <Cell key={i} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+              {tab === "overview" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      الساعات الفعلية مقابل المتوقعة
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={daily}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="attendanceDay"
+                          tick={{ fontSize: 11 }}
+                        />
+                        <YAxis />
+                        <Tooltip formatter={(v) => fmtMinutes(Number(v))} />
+                        <Bar
+                          dataKey="expectedMinutes"
+                          name="المتوقع"
+                          fill="currentColor"
+                          fillOpacity={0.25}
+                        />
+                        <Bar
+                          dataKey="workedMinutes"
+                          name="الفعلي"
+                          fill="currentColor"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
 
-        {tab === "daily" && <Card><CardHeader><CardTitle className="text-lg">السجل اليومي الرسمي</CardTitle></CardHeader><CardContent className="overflow-x-auto"><table className="w-full min-w-[1120px] text-sm"><thead><tr className="border-b text-right"><th className="p-3">التاريخ</th><th className="p-3">الموظف</th><th className="p-3">الحالة</th><th className="p-3">مصدر الحضور</th><th className="p-3">الحضور</th><th className="p-3">الانصراف</th><th className="p-3">العمل</th><th className="p-3">تأخر</th><th className="p-3">مبكر</th><th className="p-3">إضافي</th><th className="p-3">استثناء</th></tr></thead><tbody>{dailyRows.map((r) => <tr key={`${r.attendanceDay}-${r.employeeId}`} className="border-b last:border-0"><td className="p-3">{r.attendanceDay}</td><td className="p-3 font-semibold">{r.employeeName}<div className="text-xs text-muted-foreground">{r.jobNumber || "—"}</div></td><td className="p-3"><span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-bold">{statusLabels[r.status] || r.status}</span></td><td className="p-3"><span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold">{sourceLabels[r.attendanceSource] || r.attendanceSource}</span></td><td className="p-3">{r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString("ar", { timeZone: getSystemTimeZone(), hour: "2-digit", minute: "2-digit" }) : "—"}</td><td className="p-3">{r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString("ar", { timeZone: getSystemTimeZone(), hour: "2-digit", minute: "2-digit" }) : "—"}</td><td className="p-3">{fmtMinutes(r.workedMinutes || 0)}</td><td className="p-3">{r.lateMinutes}د</td><td className="p-3">{r.earlyLeaveMinutes}د</td><td className="p-3">{r.overtimeMinutes}د</td><td className="p-3">{(r.status === "ESCAPED" ? "هرب من العمل" : exceptionLabels[r.exceptionCode || ""] || r.exceptionCode || "—")}</td></tr>)}</tbody></table></CardContent></Card>}
+              {tab === "daily" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      السجل اليومي الرسمي
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="overflow-x-auto">
+                    <table className="w-full min-w-[1120px] text-sm">
+                      <thead>
+                        <tr className="border-b text-right">
+                          <th className="p-3">التاريخ</th>
+                          <th className="p-3">الموظف</th>
+                          <th className="p-3">الحالة</th>
+                          <th className="p-3">مصدر الحضور</th>
+                          <th className="p-3">الحضور</th>
+                          <th className="p-3">الانصراف</th>
+                          <th className="p-3">العمل</th>
+                          <th className="p-3">تأخر</th>
+                          <th className="p-3">مبكر</th>
+                          <th className="p-3">إضافي</th>
+                          <th className="p-3">استثناء</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dailyRows.map((r) => (
+                          <tr
+                            key={`${r.attendanceDay}-${r.employeeId}`}
+                            className="border-b last:border-0"
+                          >
+                            <td className="p-3">{r.attendanceDay}</td>
+                            <td className="p-3 font-semibold">
+                              {r.employeeName}
+                              <div className="text-xs text-muted-foreground">
+                                {r.jobNumber || "—"}
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-bold">
+                                {statusLabels[r.status] || r.status}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold">
+                                {sourceLabels[r.attendanceSource] ||
+                                  r.attendanceSource}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              {r.checkInAt
+                                ? new Date(r.checkInAt).toLocaleTimeString(
+                                    "ar",
+                                    {
+                                      timeZone: getSystemTimeZone(),
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    },
+                                  )
+                                : "—"}
+                            </td>
+                            <td className="p-3">
+                              {r.checkOutAt
+                                ? new Date(r.checkOutAt).toLocaleTimeString(
+                                    "ar",
+                                    {
+                                      timeZone: getSystemTimeZone(),
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    },
+                                  )
+                                : "—"}
+                            </td>
+                            <td className="p-3">
+                              {fmtMinutes(r.workedMinutes || 0)}
+                            </td>
+                            <td className="p-3">{r.lateMinutes}د</td>
+                            <td className="p-3">{r.earlyLeaveMinutes}د</td>
+                            <td className="p-3">{r.overtimeMinutes}د</td>
+                            <td className="p-3">
+                              {r.status === "ESCAPED"
+                                ? "هرب من العمل"
+                                : exceptionLabels[r.exceptionCode || ""] ||
+                                  r.exceptionCode ||
+                                  "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              )}
 
-        {tab === "employees" && <Card><CardHeader><CardTitle className="text-lg">تحليل الموظفين</CardTitle></CardHeader><CardContent className="overflow-x-auto"><table className="w-full min-w-[900px] text-sm"><thead><tr className="border-b text-right"><th className="p-3">الموظف</th><th className="p-3">أيام</th><th className="p-3">حاضر</th><th className="p-3">متأخر</th><th className="p-3">غياب</th><th className="p-3">انصراف معلق</th><th className="p-3">العمل</th><th className="p-3">التأخر</th><th className="p-3">الإضافي</th></tr></thead><tbody>{topEmployees.map((r) => <tr key={r.employeeId} className="border-b"><td className="p-3 font-semibold">{r.employeeName}<div className="text-xs text-muted-foreground">{r.jobNumber || "—"}</div></td><td className="p-3">{r.days}</td><td className="p-3">{r.present}</td><td className="p-3">{r.late}</td><td className="p-3">{r.absent}</td><td className="p-3">{r.open}</td><td className="p-3">{fmtMinutes(r.workedMinutes)}</td><td className="p-3">{r.lateMinutes}د</td><td className="p-3">{r.overtimeMinutes}د</td></tr>)}</tbody></table></CardContent></Card>}
+              {tab === "employees" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">تحليل الموظفين</CardTitle>
+                  </CardHeader>
+                  <CardContent className="overflow-x-auto">
+                    <table className="w-full min-w-[900px] text-sm">
+                      <thead>
+                        <tr className="border-b text-right">
+                          <th className="p-3">الموظف</th>
+                          <th className="p-3">أيام</th>
+                          <th className="p-3">حاضر</th>
+                          <th className="p-3">متأخر</th>
+                          <th className="p-3">غياب</th>
+                          <th className="p-3">انصراف معلق</th>
+                          <th className="p-3">العمل</th>
+                          <th className="p-3">التأخر</th>
+                          <th className="p-3">الإضافي</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {topEmployees.map((r) => (
+                          <tr key={r.employeeId} className="border-b">
+                            <td className="p-3 font-semibold">
+                              {r.employeeName}
+                              <div className="text-xs text-muted-foreground">
+                                {r.jobNumber || "—"}
+                              </div>
+                            </td>
+                            <td className="p-3">{r.days}</td>
+                            <td className="p-3">{r.present}</td>
+                            <td className="p-3">{r.late}</td>
+                            <td className="p-3">{r.absent}</td>
+                            <td className="p-3">{r.open}</td>
+                            <td className="p-3">
+                              {fmtMinutes(r.workedMinutes)}
+                            </td>
+                            <td className="p-3">{r.lateMinutes}د</td>
+                            <td className="p-3">{r.overtimeMinutes}د</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              )}
 
-        {tab === "exceptions" && <Card><CardHeader><CardTitle className="text-lg">مركز الاستثناءات والتتبع</CardTitle></CardHeader><CardContent className="overflow-x-auto"><table className="w-full min-w-[900px] text-sm"><thead><tr className="border-b text-right"><th className="p-3">التاريخ</th><th className="p-3">الموظف</th><th className="p-3">الكود</th><th className="p-3">الحالة</th><th className="p-3">مصدر الحضور</th><th className="p-3">الدقائق</th><th className="p-3">مصادر</th></tr></thead><tbody>{exceptions.map((x, i) => <tr key={`${x.employeeId}-${x.attendanceDay}-${i}`} className="border-b"><td className="p-3">{x.attendanceDay}</td><td className="p-3 font-semibold">{x.employeeName}</td><td className="p-3">{x.code}</td><td className="p-3">{statusLabels[x.status] || x.status}</td><td className="p-3"><span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold">{sourceLabels[x.attendanceSource] || x.attendanceSource}</span></td><td className="p-3">{x.minutes}د</td><td className="p-3 text-xs text-muted-foreground">حضور: {x.attendanceEventIds.length} · طلبات: {x.requestIds.length} · تدقيق: {x.auditIds.length}</td></tr>)}</tbody></table>{!exceptions.length && <div className="p-8 text-center text-muted-foreground">لا توجد استثناءات مسجلة في الفترة.</div>}</CardContent></Card>}
+              {tab === "exceptions" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      مركز الاستثناءات والتتبع
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="overflow-x-auto">
+                    <table className="w-full min-w-[900px] text-sm">
+                      <thead>
+                        <tr className="border-b text-right">
+                          <th className="p-3">التاريخ</th>
+                          <th className="p-3">الموظف</th>
+                          <th className="p-3">الكود</th>
+                          <th className="p-3">الحالة</th>
+                          <th className="p-3">مصدر الحضور</th>
+                          <th className="p-3">الدقائق</th>
+                          <th className="p-3">مصادر</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {exceptions.map((x, i) => (
+                          <tr
+                            key={`${x.employeeId}-${x.attendanceDay}-${i}`}
+                            className="border-b"
+                          >
+                            <td className="p-3">{x.attendanceDay}</td>
+                            <td className="p-3 font-semibold">
+                              {x.employeeName}
+                            </td>
+                            <td className="p-3">{x.code}</td>
+                            <td className="p-3">
+                              {statusLabels[x.status] || x.status}
+                            </td>
+                            <td className="p-3">
+                              <span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold">
+                                {sourceLabels[x.attendanceSource] ||
+                                  x.attendanceSource}
+                              </span>
+                            </td>
+                            <td className="p-3">{x.minutes}د</td>
+                            <td className="p-3 text-xs text-muted-foreground">
+                              حضور: {x.attendanceEventIds.length} · طلبات:{" "}
+                              {x.requestIds.length} · تدقيق: {x.auditIds.length}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {!exceptions.length && (
+                      <div className="p-8 text-center text-muted-foreground">
+                        لا توجد استثناءات مسجلة في الفترة.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
-        <Card className="bg-muted/30"><CardContent className="flex flex-col gap-2 p-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>المصدر: {report.integrity.sourceOfTruth} ← {report.integrity.rawSource}</span><span>الإصدار {report.reportVersion} · {report.timezone} · {report.dataQuality.complete ? "جودة مكتملة" : "توجد بيانات تحتاج مراجعة"}</span></CardContent></Card>
-      </>}
-    </div>
-  </ManagerLayout>;
+              <Card className="bg-muted/30">
+                <CardContent className="flex flex-col gap-2 p-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                  <span>
+                    المصدر: {report.integrity.sourceOfTruth} ←{" "}
+                    {report.integrity.rawSource}
+                  </span>
+                  <span>
+                    الإصدار {report.reportVersion} · {report.timezone} ·{" "}
+                    {report.dataQuality.complete
+                      ? "جودة مكتملة"
+                      : "توجد بيانات تحتاج مراجعة"}
+                  </span>
+                </CardContent>
+              </Card>
+            </>
+          )
+        )}
+      </div>
+    </ManagerLayout>
+  );
 }

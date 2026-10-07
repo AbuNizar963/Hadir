@@ -5,7 +5,9 @@ import { setSession } from "@/lib/storage";
 import type { Employee } from "@/types";
 
 const EMPLOYEE_TOKEN_KEY = "hadir.api.token.employee";
-const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+const API_URL = (
+  import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev"
+).replace(/\/$/, "");
 
 type Props = { children: React.ReactNode };
 type RestoreResult = "restored" | "unauthorized" | "offline" | "missing";
@@ -27,8 +29,12 @@ async function restoreEmployeeSession(): Promise<RestoreResult> {
           headers: { authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
-        const data = (await response.json().catch(() => ({}))) as { user?: Employee; error?: string };
-        if (response.status === 401 || response.status === 403) return "unauthorized";
+        const data = (await response.json().catch(() => ({}))) as {
+          user?: Employee;
+          error?: string;
+        };
+        if (response.status === 401 || response.status === 403)
+          return "unauthorized";
         if (!response.ok || !data.user || typeof data.user.id !== "string") {
           networkFailure = true;
         } else {
@@ -48,7 +54,8 @@ async function restoreEmployeeSession(): Promise<RestoreResult> {
     } catch {
       networkFailure = true;
     }
-    if (attempt < 3) await new Promise((resolve) => window.setTimeout(resolve, 500 * attempt));
+    if (attempt < 3)
+      await new Promise((resolve) => window.setTimeout(resolve, 500 * attempt));
   }
 
   return networkFailure ? "offline" : "missing";
@@ -79,16 +86,33 @@ export default function ProtectedEmployee({ children }: Props) {
       setChecking(false);
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (checking) {
-    return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6">جاري التحقق من جلسة الموظف…</div>;
+    return (
+      <div
+        dir="rtl"
+        className="min-h-screen flex items-center justify-center p-6"
+      >
+        جاري التحقق من جلسة الموظف…
+      </div>
+    );
   }
 
   if (!session) {
     if (offline && localStorage.getItem(EMPLOYEE_TOKEN_KEY)) {
-      return <div dir="rtl" className="min-h-screen flex items-center justify-center p-6 text-center">تعذر الاتصال بالخادم مؤقتًا. جلسة الموظف محفوظة، حاول فتح الصفحة مرة أخرى.</div>;
+      return (
+        <div
+          dir="rtl"
+          className="min-h-screen flex items-center justify-center p-6 text-center"
+        >
+          تعذر الاتصال بالخادم مؤقتًا. جلسة الموظف محفوظة، حاول فتح الصفحة مرة
+          أخرى.
+        </div>
+      );
     }
     return <Navigate to="/login" replace />;
   }

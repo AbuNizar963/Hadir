@@ -17,7 +17,8 @@ function json(data: unknown, status: number, origin: string): Response {
       "content-type": "application/json; charset=utf-8",
       "access-control-allow-origin": origin,
       "access-control-allow-credentials": "true",
-      "access-control-allow-headers": "content-type, authorization, x-device-id",
+      "access-control-allow-headers":
+        "content-type, authorization, x-device-id",
       "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
       "cache-control": "no-store",
     },
@@ -48,26 +49,33 @@ function requestToken(req: Request): string {
   return item ? decodeURIComponent(item.slice(SESSION_COOKIE.length + 1)) : "";
 }
 
-async function authenticatedActor(req: Request, env: Env): Promise<Actor | null> {
+async function authenticatedActor(
+  req: Request,
+  env: Env,
+): Promise<Actor | null> {
   const raw = requestToken(req);
   if (!raw) return null;
   try {
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(raw),
+    );
     let binary = "";
-    for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
+    for (const byte of new Uint8Array(digest))
+      binary += String.fromCharCode(byte);
     const tokenHash = btoa(binary)
       .replace(/\+/g, "-")
       .replace(/\//g, "_")
       .replace(/=+$/g, "");
-    const session = await env.DB
-      .prepare(
-        "SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1",
-      )
+    const session = await env.DB.prepare(
+      "SELECT user_id AS userId,user_type AS userType FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1",
+    )
       .bind(tokenHash)
       .first<{ userId: string; userType: string }>();
     if (!session || session.userType !== "admin") return null;
-    const row = await env.DB
-      .prepare("SELECT id,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1")
+    const row = await env.DB.prepare(
+      "SELECT id,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1",
+    )
       .bind(session.userId)
       .first<{ id: string; role: Role; active: number }>();
     return row ? { id: String(row.id), role: row.role } : null;
@@ -90,11 +98,13 @@ export async function handleCompanyLogoRequest(
       headers: {
         "access-control-allow-origin": origin,
         "access-control-allow-credentials": "true",
-        "access-control-allow-headers": "content-type, authorization, x-device-id",
+        "access-control-allow-headers":
+          "content-type, authorization, x-device-id",
         "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
       },
     });
-  if (!env.PROFILE_IMAGES) return json({ error: "R2 binding PROFILE_IMAGES غير موجود" }, 503, origin);
+  if (!env.PROFILE_IMAGES)
+    return json({ error: "R2 binding PROFILE_IMAGES غير موجود" }, 503, origin);
 
   if (req.method === "GET") {
     // R2 is authoritative. Never use the D1 pointer to choose the current logo,
@@ -113,23 +123,39 @@ export async function handleCompanyLogoRequest(
     }
     return new Response(null, {
       status: 404,
-      headers: { "access-control-allow-origin": origin, "cache-control": "no-store" },
+      headers: {
+        "access-control-allow-origin": origin,
+        "cache-control": "no-store",
+      },
     });
   }
 
   const resolvedActor = actor || (await authenticatedActor(req, env));
-  if (!canManage(resolvedActor)) return json({ error: "غير مصرح" }, 403, origin);
+  if (!canManage(resolvedActor))
+    return json({ error: "غير مصرح" }, 403, origin);
 
   if (req.method === "POST") {
-    const contentType = (req.headers.get("content-type") || "").split(";", 1)[0].toLowerCase();
+    const contentType = (req.headers.get("content-type") || "")
+      .split(";", 1)[0]
+      .toLowerCase();
     if (contentType !== "multipart/form-data")
-      return json({ error: "يجب إرسال الشعار بصيغة multipart/form-data" }, 415, origin);
+      return json(
+        { error: "يجب إرسال الشعار بصيغة multipart/form-data" },
+        415,
+        origin,
+      );
     const form = await req.formData().catch(() => null);
     const file = form?.get("file");
-    if (!(file instanceof File)) return json({ error: "ملف الشعار مطلوب" }, 400, origin);
-    if (file.type !== LOGO_CONTENT_TYPE) return json({ error: "يجب أن يكون الشعار بصيغة WebP" }, 415, origin);
+    if (!(file instanceof File))
+      return json({ error: "ملف الشعار مطلوب" }, 400, origin);
+    if (file.type !== LOGO_CONTENT_TYPE)
+      return json({ error: "يجب أن يكون الشعار بصيغة WebP" }, 415, origin);
     if (file.size <= 0 || file.size > MAX_LOGO_BYTES)
-      return json({ error: "حجم الشعار يجب أن يكون أقل من 100 كيلوبايت" }, 413, origin);
+      return json(
+        { error: "حجم الشعار يجب أن يكون أقل من 100 كيلوبايت" },
+        413,
+        origin,
+      );
 
     // One durable canonical R2 object is used for the current company logo.
     // This prevents a D1 write-limit from orphaning the image after upload.
@@ -138,14 +164,24 @@ export async function handleCompanyLogoRequest(
     const bytes = new Uint8Array(await file.arrayBuffer());
 
     await env.PROFILE_IMAGES.put(key, bytes, {
-      httpMetadata: { contentType: LOGO_CONTENT_TYPE, cacheControl: "public, max-age=31536000" },
-      customMetadata: { purpose: "company-logo", uploadedBy: resolvedActor?.id || "unknown" },
+      httpMetadata: {
+        contentType: LOGO_CONTENT_TYPE,
+        cacheControl: "public, max-age=31536000",
+      },
+      customMetadata: {
+        purpose: "company-logo",
+        uploadedBy: resolvedActor?.id || "unknown",
+      },
     });
 
     const storedObject = await env.PROFILE_IMAGES.head(key);
     if (!storedObject) {
       console.error("company logo R2 persistence verification failed", key);
-      return json({ error: "تعذر التحقق من حفظ شعار الشركة في R2" }, 502, origin);
+      return json(
+        { error: "تعذر التحقق من حفظ شعار الشركة في R2" },
+        502,
+        origin,
+      );
     }
 
     const encodedVersion = encodeURIComponent(storedObject.httpEtag);
@@ -153,17 +189,21 @@ export async function handleCompanyLogoRequest(
 
     try {
       await env.DB.batch([
-        env.DB
-          .prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-          .bind(LOGO_KEY_SETTING, key),
-        env.DB
-          .prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-          .bind(LOGO_URL_SETTING, versionedPublicUrl),
+        env.DB.prepare(
+          "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        ).bind(LOGO_KEY_SETTING, key),
+        env.DB.prepare(
+          "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        ).bind(LOGO_URL_SETTING, versionedPublicUrl),
       ]);
     } catch (error) {
       // R2 is already the authoritative store and the object was verified.
       // Never delete it because D1 may be temporarily read-only after its limit.
-      console.error("company logo settings update failed; preserving R2 object", key, error);
+      console.error(
+        "company logo settings update failed; preserving R2 object",
+        key,
+        error,
+      );
       return json(
         {
           ok: true,
@@ -173,7 +213,8 @@ export async function handleCompanyLogoRequest(
           key,
           size: file.size,
           contentType: LOGO_CONTENT_TYPE,
-          warning: "تم حفظ ملف الشعار نفسه في R2، لكن تعذر تحديث إعدادات D1 مؤقتًا",
+          warning:
+            "تم حفظ ملف الشعار نفسه في R2، لكن تعذر تحديث إعدادات D1 مؤقتًا",
         },
         200,
         origin,
@@ -199,20 +240,42 @@ export async function handleCompanyLogoRequest(
     // R2 is authoritative for the current logo. Delete the canonical object
     // regardless of a stale D1 pointer, and treat D1 cleanup as best-effort so
     // a temporary D1 write limit can never surface as a fake network failure.
-    const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_KEY_SETTING).first<{ value: string }>();
+    const row = await env.DB.prepare(
+      "SELECT value FROM settings WHERE key=? LIMIT 1",
+    )
+      .bind(LOGO_KEY_SETTING)
+      .first<{ value: string }>();
     const key = String(row?.value || "").trim();
-    await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY).catch((error) => console.error("company logo canonical R2 delete failed", error));
-    if (key && key !== CURRENT_LOGO_KEY) await env.PROFILE_IMAGES.delete(key).catch((error) => console.error("company logo legacy R2 delete failed", error));
+    await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY).catch((error) =>
+      console.error("company logo canonical R2 delete failed", error),
+    );
+    if (key && key !== CURRENT_LOGO_KEY)
+      await env.PROFILE_IMAGES.delete(key).catch((error) =>
+        console.error("company logo legacy R2 delete failed", error),
+      );
     try {
       await env.DB.batch([
-        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_KEY_SETTING),
-        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_URL_SETTING),
-        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_BACKUP_SETTING),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_KEY_SETTING,
+        ),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_URL_SETTING,
+        ),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_BACKUP_SETTING,
+        ),
       ]);
     } catch (error) {
-      console.error("company logo D1 cleanup failed; R2 logo was still deleted", error);
+      console.error(
+        "company logo D1 cleanup failed; R2 logo was still deleted",
+        error,
+      );
     }
-    return json({ ok: true, r2Deleted: true, settingsCleaned: true }, 200, origin);
+    return json(
+      { ok: true, r2Deleted: true, settingsCleaned: true },
+      200,
+      origin,
+    );
   }
 
   return json({ error: "الطريقة غير مدعومة" }, 405, origin);

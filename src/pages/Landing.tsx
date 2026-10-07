@@ -22,7 +22,9 @@ export default function Landing() {
               <h1 className="text-3xl md:text-4xl font-extrabold leading-tight">
                 حضور وانصراف موثّق
                 <br />
-                <span className="text-primary">من الجهاز الصحيح، وفي المكان الصحيح.</span>
+                <span className="text-primary">
+                  من الجهاز الصحيح، وفي المكان الصحيح.
+                </span>
               </h1>
               <p className="mt-4 text-muted-foreground text-base leading-7 max-w-xl">
                 نظام إلكتروني يمنع الغش عبر ربط كل حساب بجهاز واحد، والتحقق من
@@ -43,22 +45,54 @@ export default function Landing() {
           </div>
 
           <div className="hud-card p-6 lg:col-span-2 flex flex-col gap-4">
-            <div className="text-xs text-muted-foreground mono">STATUS · طبقات التحقق</div>
-            <Layer index="01" title="ربط الحساب بالجهاز" desc="لا يمكن تسجيل حضور موظف من هاتف زميله." />
-            <Layer index="02" title="التحقق من الموقع (GPS)" desc="داخل النطاق المسموح حول مقر العمل فقط." />
-            <Layer index="03" title="رمز QR ثابت داخل الموقع" desc="لا يعمل QR وحده — يُستخدم مع باقي الطبقات." />
-            <Layer index="04" title="سجل تدقيق دائم" desc="كل عملية ناجحة أو مرفوضة تُسجَّل." />
+            <div className="text-xs text-muted-foreground mono">
+              STATUS · طبقات التحقق
+            </div>
+            <Layer
+              index="01"
+              title="ربط الحساب بالجهاز"
+              desc="لا يمكن تسجيل حضور موظف من هاتف زميله."
+            />
+            <Layer
+              index="02"
+              title="التحقق من الموقع (GPS)"
+              desc="داخل النطاق المسموح حول مقر العمل فقط."
+            />
+            <Layer
+              index="03"
+              title="رمز QR ثابت داخل الموقع"
+              desc="لا يعمل QR وحده — يُستخدم مع باقي الطبقات."
+            />
+            <Layer
+              index="04"
+              title="سجل تدقيق دائم"
+              desc="كل عملية ناجحة أو مرفوضة تُسجَّل."
+            />
           </div>
         </section>
 
         <section className="grid md:grid-cols-3 gap-4 mt-6">
-          <Metric label="سرعة العملية" value="< 5 ث" hint="من فتح الرابط حتى تأكيد الحضور" />
-          <Metric label="دقة الموقع" value="~10 م" hint="عبر GPS عالي الدقة في المتصفح" />
-          <Metric label="طبقات الحماية" value="4" hint="جهاز · موقع · QR · سجل" />
+          <Metric
+            label="سرعة العملية"
+            value="< 5 ث"
+            hint="من فتح الرابط حتى تأكيد الحضور"
+          />
+          <Metric
+            label="دقة الموقع"
+            value="~10 م"
+            hint="عبر GPS عالي الدقة في المتصفح"
+          />
+          <Metric
+            label="طبقات الحماية"
+            value="4"
+            hint="جهاز · موقع · QR · سجل"
+          />
         </section>
 
         <section className="hud-card mt-6 p-6">
-          <div className="text-xs text-muted-foreground mono mb-3">FLOW · تسلسل التحقق</div>
+          <div className="text-xs text-muted-foreground mono mb-3">
+            FLOW · تسلسل التحقق
+          </div>
           <ol className="grid md:grid-cols-6 gap-3 text-sm">
             {[
               "تسجيل الدخول",
@@ -68,8 +102,13 @@ export default function Landing() {
               "مسح QR الثابت",
               "تسجيل العملية",
             ].map((t, i) => (
-              <li key={t} className="rounded-xl border border-border/60 p-3 bg-secondary/30">
-                <div className="mono text-[10px] text-primary">STEP {String(i + 1).padStart(2, "0")}</div>
+              <li
+                key={t}
+                className="rounded-xl border border-border/60 p-3 bg-secondary/30"
+              >
+                <div className="mono text-[10px] text-primary">
+                  STEP {String(i + 1).padStart(2, "0")}
+                </div>
                 <div className="font-semibold mt-1">{t}</div>
               </li>
             ))}
@@ -86,13 +125,29 @@ export default function Landing() {
 
 function Arrow() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M15 6l-6 6 6 6" />
     </svg>
   );
 }
 
-function Layer({ index, title, desc }: { index: string; title: string; desc: string }) {
+function Layer({
+  index,
+  title,
+  desc,
+}: {
+  index: string;
+  title: string;
+  desc: string;
+}) {
   return (
     <div className="flex gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3">
       <div className="mono text-xs text-primary shrink-0 pt-0.5">{index}</div>
@@ -104,7 +159,15 @@ function Layer({ index, title, desc }: { index: string; title: string; desc: str
   );
 }
 
-function Metric({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Metric({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
   return (
     <div className="hud-card p-5">
       <div className="text-xs text-muted-foreground mono">{label}</div>

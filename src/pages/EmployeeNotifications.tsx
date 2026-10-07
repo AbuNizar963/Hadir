@@ -95,9 +95,7 @@ export default function EmployeeNotifications() {
     markAsRead(id);
     setItems((current) =>
       current.map((notification) =>
-        notification.id === id
-          ? { ...notification, read: true }
-          : notification,
+        notification.id === id ? { ...notification, read: true } : notification,
       ),
     );
   };
@@ -118,7 +116,9 @@ export default function EmployeeNotifications() {
               <Bell className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">HADIR · EMPLOYEE</div>
+              <div className="text-xs text-muted-foreground">
+                HADIR · EMPLOYEE
+              </div>
               <h2 className="text-2xl font-black">مركز الإشعارات</h2>
             </div>
           </div>
@@ -138,10 +138,7 @@ export default function EmployeeNotifications() {
               : "لا توجد إشعارات غير مقروءة"}
           </span>
           {unread > 0 && (
-            <button
-              onClick={readAll}
-              className="font-semibold text-primary"
-            >
+            <button onClick={readAll} className="font-semibold text-primary">
               <CheckCheck className="ml-1 inline h-4 w-4" />
               تحديد الكل كمقروء
             </button>

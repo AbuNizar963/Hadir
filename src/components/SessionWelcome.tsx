@@ -17,7 +17,8 @@ type WelcomeSession = {
 export default function SessionWelcome() {
   const employeeSession = currentSession();
   const managerSession = getManagerSession();
-  const session: WelcomeSession | null = employeeSession || managerSession || null;
+  const session: WelcomeSession | null =
+    employeeSession || managerSession || null;
   const sessionLoginAt = session?.loginAt || null;
   const [show, setShow] = useState(false);
   const [now, setNow] = useState(() => new Date());

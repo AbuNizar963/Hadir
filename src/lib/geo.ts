@@ -15,7 +15,9 @@ const LOCATION_STABILITY_DISTANCE_METERS = 20;
 const LOCATION_STABLE_SAMPLES_REQUIRED = 2;
 
 export function roundCoordinate(value: number): number {
-  return Number.isFinite(value) ? Number(value.toFixed(COORDINATE_DECIMALS)) : value;
+  return Number.isFinite(value)
+    ? Number(value.toFixed(COORDINATE_DECIMALS))
+    : value;
 }
 
 export function roundDistanceMeters(value: number): number {
@@ -27,13 +29,16 @@ export function normalizeCoordinates(value: Coordinates): Coordinates {
 }
 
 export function isValidGeoPosition(position: GeoPosition): boolean {
-  return Number.isFinite(position.lat)
-    && Number.isFinite(position.lng)
-    && position.lat >= -90
-    && position.lat <= 90
-    && position.lng >= -180
-    && position.lng <= 180
-    && (position.accuracy === undefined || (Number.isFinite(position.accuracy) && position.accuracy >= 0));
+  return (
+    Number.isFinite(position.lat) &&
+    Number.isFinite(position.lng) &&
+    position.lat >= -90 &&
+    position.lat <= 90 &&
+    position.lng >= -180 &&
+    position.lng <= 180 &&
+    (position.accuracy === undefined ||
+      (Number.isFinite(position.accuracy) && position.accuracy >= 0))
+  );
 }
 
 export function haversineMeters(p1: Coordinates, p2: Coordinates): number {
@@ -43,11 +48,13 @@ export function haversineMeters(p1: Coordinates, p2: Coordinates): number {
   const lat2 = (b.lat * Math.PI) / 180;
   const deltaLat = ((b.lat - a.lat) * Math.PI) / 180;
   const deltaLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const haversineA = Math.sin(deltaLat / 2) ** 2
-    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
+  const haversineA =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
   const safeA = Math.min(1, Math.max(0, haversineA));
   return roundDistanceMeters(
-    EARTH_RADIUS_METERS * (2 * Math.atan2(Math.sqrt(safeA), Math.sqrt(1 - safeA))),
+    EARTH_RADIUS_METERS *
+      (2 * Math.atan2(Math.sqrt(safeA), Math.sqrt(1 - safeA))),
   );
 }
 
@@ -60,24 +67,39 @@ export function isInsideGeofence(
     throw new Error("نطاق موقع العمل غير صالح.");
   }
   const distanceMeters = haversineMeters(employee, workplace);
-  return { allowed: distanceMeters <= roundDistanceMeters(radiusMeters), distanceMeters };
+  return {
+    allowed: distanceMeters <= roundDistanceMeters(radiusMeters),
+    distanceMeters,
+  };
 }
 
-export async function isLikelyMockedPosition(_pos: GeoPosition): Promise<{ mocked: boolean; reasons: string[] }> {
+export async function isLikelyMockedPosition(
+  _pos: GeoPosition,
+): Promise<{ mocked: boolean; reasons: string[] }> {
   return { mocked: false, reasons: [] };
 }
 
-async function loadFreshEmployeeWorkplace(): Promise<Coordinates & { radiusMeters: number }> {
-  if (typeof window === "undefined") throw new Error("تحديد الموقع متاح من المتصفح فقط.");
-  const employeeToken = localStorage.getItem("hadir.api.token.employee")
-    || localStorage.getItem("hadir.auth.token.employee");
-  if (!employeeToken) throw new Error("جلسة الموظف غير موجودة. يرجى تسجيل الدخول مرة أخرى.");
+async function loadFreshEmployeeWorkplace(): Promise<
+  Coordinates & { radiusMeters: number }
+> {
+  if (typeof window === "undefined")
+    throw new Error("تحديد الموقع متاح من المتصفح فقط.");
+  const employeeToken =
+    localStorage.getItem("hadir.api.token.employee") ||
+    localStorage.getItem("hadir.auth.token.employee");
+  if (!employeeToken)
+    throw new Error("جلسة الموظف غير موجودة. يرجى تسجيل الدخول مرة أخرى.");
   const { getBackendEmployeeLocation } = await import("@/lib/backend");
   const { location } = await getBackendEmployeeLocation();
   const lat = roundCoordinate(Number(location.lat));
   const lng = roundCoordinate(Number(location.lng));
   const radiusMeters = roundDistanceMeters(Number(location.radiusMeters));
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    !Number.isFinite(radiusMeters) ||
+    radiusMeters <= 0
+  ) {
     throw new Error("بيانات موقع العمل في قاعدة بيانات D1 غير صالحة.");
   }
   return { lat, lng, radiusMeters };
@@ -88,7 +110,8 @@ function permissionHint(): string {
 }
 
 async function queryLocationPermission(): Promise<PermissionState | null> {
-  if (typeof navigator === "undefined" || !navigator.permissions?.query) return null;
+  if (typeof navigator === "undefined" || !navigator.permissions?.query)
+    return null;
   try {
     const status = await navigator.permissions.query({ name: "geolocation" });
     return status.state;
@@ -120,7 +143,8 @@ function readPosition(position: GeolocationPosition): GeoPosition {
     lng: roundCoordinate(position.coords.longitude),
     accuracy,
   };
-  if (!isValidGeoPosition(result)) throw new Error("تعذر الحصول على إحداثيات GPS صالحة.");
+  if (!isValidGeoPosition(result))
+    throw new Error("تعذر الحصول على إحداثيات GPS صالحة.");
   return result;
 }
 
@@ -134,7 +158,11 @@ function requestWatchedPosition(): Promise<GeoPosition> {
 
     const timer = window.setTimeout(() => {
       if (settled) return;
-      if (best && (best.accuracy ?? Number.POSITIVE_INFINITY) <= LOCATION_MAX_ACCEPTED_ACCURACY_METERS) {
+      if (
+        best &&
+        (best.accuracy ?? Number.POSITIVE_INFINITY) <=
+          LOCATION_MAX_ACCEPTED_ACCURACY_METERS
+      ) {
         finish(best);
         return;
       }
@@ -161,18 +189,26 @@ function requestWatchedPosition(): Promise<GeoPosition> {
             const candidate = readPosition(position);
             const accuracy = candidate.accuracy ?? Number.POSITIVE_INFINITY;
 
-            if (!best || accuracy < (best.accuracy ?? Number.POSITIVE_INFINITY)) {
+            if (
+              !best ||
+              accuracy < (best.accuracy ?? Number.POSITIVE_INFINITY)
+            ) {
               best = candidate;
             }
 
             if (accuracy <= LOCATION_MAX_ACCEPTED_ACCURACY_METERS) {
-              const isStable = previousAccepted !== null
-                && haversineMeters(previousAccepted, candidate) <= LOCATION_STABILITY_DISTANCE_METERS;
+              const isStable =
+                previousAccepted !== null &&
+                haversineMeters(previousAccepted, candidate) <=
+                  LOCATION_STABILITY_DISTANCE_METERS;
               stableSamples = isStable ? stableSamples + 1 : 1;
               previousAccepted = candidate;
             }
 
-            if (accuracy <= LOCATION_TARGET_ACCURACY_METERS && stableSamples >= LOCATION_STABLE_SAMPLES_REQUIRED) {
+            if (
+              accuracy <= LOCATION_TARGET_ACCURACY_METERS &&
+              stableSamples >= LOCATION_STABLE_SAMPLES_REQUIRED
+            ) {
               finish(candidate);
             }
           } catch {
@@ -187,17 +223,24 @@ function requestWatchedPosition(): Promise<GeoPosition> {
         },
       );
     } catch (error) {
-      finish(undefined, error instanceof Error ? error : new Error("تعذر تشغيل GPS."));
+      finish(
+        undefined,
+        error instanceof Error ? error : new Error("تعذر تشغيل GPS."),
+      );
     }
   });
 }
 
-export async function getCurrentPosition(_options: PositionOptions = {}): Promise<GeoPosition> {
+export async function getCurrentPosition(
+  _options: PositionOptions = {},
+): Promise<GeoPosition> {
   if (typeof window === "undefined" || typeof navigator === "undefined") {
     throw new Error("تحديد الموقع متاح من المتصفح فقط.");
   }
   if (!window.isSecureContext) {
-    throw new Error("تحديد الموقع يتطلب اتصال HTTPS آمنًا. افتح الموقع من الرابط الرسمي الآمن ثم حاول مرة أخرى.");
+    throw new Error(
+      "تحديد الموقع يتطلب اتصال HTTPS آمنًا. افتح الموقع من الرابط الرسمي الآمن ثم حاول مرة أخرى.",
+    );
   }
   if (!navigator.geolocation) {
     throw new Error("هذا المتصفح لا يدعم تحديد الموقع الجغرافي.");

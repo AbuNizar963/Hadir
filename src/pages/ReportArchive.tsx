@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Archive,
@@ -89,9 +84,7 @@ export default function ReportArchive() {
       setArchives(Array.isArray(rows) ? (rows as ArchiveRow[]) : []);
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "تعذر تحميل أرشيف التقارير",
+        cause instanceof Error ? cause.message : "تعذر تحميل أرشيف التقارير",
       );
     } finally {
       setLoading(false);
@@ -112,8 +105,13 @@ export default function ReportArchive() {
       let cursor = 0;
       let employeeCursor = 0;
       try {
-        const saved = JSON.parse(sessionStorage.getItem(archiveCursorKey) || "null");
-        if (Number.isInteger(saved?.cursor) && Number.isInteger(saved?.employeeCursor)) {
+        const saved = JSON.parse(
+          sessionStorage.getItem(archiveCursorKey) || "null",
+        );
+        if (
+          Number.isInteger(saved?.cursor) &&
+          Number.isInteger(saved?.employeeCursor)
+        ) {
           cursor = Math.max(0, saved.cursor);
           employeeCursor = Math.max(0, saved.employeeCursor);
         }
@@ -134,9 +132,14 @@ export default function ReportArchive() {
           cursor = Number(batch.nextCursor ?? cursor + 1);
           employeeCursor = 0;
         } else {
-          employeeCursor = Number(batch.nextEmployeeCursor ?? employeeCursor + 1);
+          employeeCursor = Number(
+            batch.nextEmployeeCursor ?? employeeCursor + 1,
+          );
         }
-        sessionStorage.setItem(archiveCursorKey, JSON.stringify({ cursor, employeeCursor }));
+        sessionStorage.setItem(
+          archiveCursorKey,
+          JSON.stringify({ cursor, employeeCursor }),
+        );
       }
       await refreshReportArchive();
       await refresh();
@@ -164,11 +167,7 @@ export default function ReportArchive() {
         [archive.report_id]: true,
       }));
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "تعذر تنزيل ملف Excel",
-      );
+      setError(cause instanceof Error ? cause.message : "تعذر تنزيل ملف Excel");
     } finally {
       setBusyId(null);
     }
@@ -192,9 +191,7 @@ export default function ReportArchive() {
         current.filter((item) => item.report_id !== archive.report_id),
       );
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "تعذر حذف الأرشيف",
-      );
+      setError(cause instanceof Error ? cause.message : "تعذر حذف الأرشيف");
     } finally {
       setBusyId(null);
     }
@@ -243,9 +240,8 @@ export default function ReportArchive() {
                   HADIR · REPORT ARCHIVE
                 </div>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  الأرشيف يعتمد على نفس محرك التقارير الرسمي المستخدم في
-                  التقرير اليومي والشهري، ثم يقفل نسخة Excel في R2 للتحقق
-                  والتنزيل.
+                  الأرشيف يعتمد على نفس محرك التقارير الرسمي المستخدم في التقرير
+                  اليومي والشهري، ثم يقفل نسخة Excel في R2 للتحقق والتنزيل.
                 </p>
               </div>
 
@@ -408,8 +404,8 @@ export default function ReportArchive() {
                   لا توجد تقارير مقفلة في الأرشيف حتى الآن.
                 </p>
                 <p className="mt-1 text-xs">
-                  استخدم «إنشاء/تحديث أرشيف الشهر المغلق» لحفظ نسخة الشهر
-                  السابق بعد اكتمال التحقق.
+                  استخدم «إنشاء/تحديث أرشيف الشهر المغلق» لحفظ نسخة الشهر السابق
+                  بعد اكتمال التحقق.
                 </p>
               </div>
             )}

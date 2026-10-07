@@ -249,8 +249,12 @@ export default function EmployeeScan() {
 
       <div className="employee-scan-content w-full pb-10">
         <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3">
-          <div className="text-xs font-bold tracking-widest text-muted-foreground">{action === "check-in" ? "CHECK IN" : "CHECK OUT"}</div>
-          <div className="text-xs text-muted-foreground">{session?.name ?? "الموظف"} · {session?.jobNumber ?? "-"}</div>
+          <div className="text-xs font-bold tracking-widest text-muted-foreground">
+            {action === "check-in" ? "CHECK IN" : "CHECK OUT"}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {session?.name ?? "الموظف"} · {session?.jobNumber ?? "-"}
+          </div>
         </div>
 
         {step === "camera" && (
@@ -264,7 +268,10 @@ export default function EmployeeScan() {
                 autoPlay
               />
 
-              <div className="absolute inset-0 bg-black/25" aria-hidden="true" />
+              <div
+                className="absolute inset-0 bg-black/25"
+                aria-hidden="true"
+              />
 
               <div className="absolute inset-x-0 top-0 z-10 px-5 pt-5 text-center text-white">
                 <div className="text-lg font-extrabold">امسح رمز QR</div>
@@ -287,7 +294,9 @@ export default function EmployeeScan() {
                 <div className="mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/60 p-4 text-center text-white backdrop-blur-md">
                   <div className="flex items-center justify-center gap-2 text-sm font-bold">
                     <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary" />
-                    {cameraReady ? "جارٍ البحث عن رمز QR..." : "جارٍ تشغيل الكاميرا..."}
+                    {cameraReady
+                      ? "جارٍ البحث عن رمز QR..."
+                      : "جارٍ تشغيل الكاميرا..."}
                   </div>
                   <p className="mt-1 text-[11px] leading-5 text-white/70">
                     لن يتم طلب الموقع إلا بعد قراءة رمز QR بنجاح.
@@ -335,11 +344,12 @@ export default function EmployeeScan() {
             <div className="mt-3 text-sm text-muted-foreground">
               الساعة {formatTime(result.timestamp)}
             </div>
-            {result.distance !== undefined && Number.isFinite(result.distance) && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                المسافة عن مقر العمل: {Math.round(result.distance)} م
-              </div>
-            )}
+            {result.distance !== undefined &&
+              Number.isFinite(result.distance) && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  المسافة عن مقر العمل: {Math.round(result.distance)} م
+                </div>
+              )}
             {result.timeNote && (
               <div className="mt-4 rounded-2xl border border-border/60 bg-background/60 p-3 text-xs font-semibold">
                 {result.timeNote}

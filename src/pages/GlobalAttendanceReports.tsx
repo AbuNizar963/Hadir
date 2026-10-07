@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { getEmployees, getSettings, getManagerSession } from "@/lib/storage";
 import { getBackendEmployees, getBackendSettings } from "@/lib/backend";
 import {
@@ -57,15 +63,18 @@ const labels: Record<string, string> = {
 };
 
 const statusBadgeClasses: Record<string, string> = {
-  PRESENT: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  PRESENT:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
   ABSENT: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200",
   LATE: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
   PERMISSION: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200",
   LEAVE: "bg-blue-700 text-white dark:bg-blue-800",
   ESCAPED: "bg-red-900 text-white dark:bg-red-950",
   REST: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
-  NOT_STARTED: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  HOLIDAY: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200",
+  NOT_STARTED:
+    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  HOLIDAY:
+    "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200",
   INVALID: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
 };
 
@@ -92,7 +101,9 @@ const fmt = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}س ${Math.round(Math.max(0, minutes) % 60)}د`;
 
 const damascusToday = () =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: getSystemTimeZone() }).format(new Date());
+  new Intl.DateTimeFormat("en-CA", { timeZone: getSystemTimeZone() }).format(
+    new Date(),
+  );
 
 const formatDateTime = (value: unknown) =>
   value
@@ -138,14 +149,22 @@ export default function GlobalAttendanceReports() {
   const [to, setTo] = useState(today);
   const [employeeId, setEmployeeId] = useState("");
   const [employees, setEmployees] = useState<Employee[]>(getEmployees());
-  const [report, setReport] = useState<ProfessionalAttendanceReport | null>(null);
+  const [report, setReport] = useState<ProfessionalAttendanceReport | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"overview" | "daily" | "employees" | "exceptions">("overview");
-  const [detail, setDetail] = useState<ProfessionalAttendanceDrilldown | null>(null);
+  const [tab, setTab] = useState<
+    "overview" | "daily" | "employees" | "exceptions"
+  >("overview");
+  const [detail, setDetail] = useState<ProfessionalAttendanceDrilldown | null>(
+    null,
+  );
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [printGeneratedAt, setPrintGeneratedAt] = useState(() => new Date().toISOString());
+  const [printGeneratedAt, setPrintGeneratedAt] = useState(() =>
+    new Date().toISOString(),
+  );
   const [reportSettings, setReportSettings] = useState(() => getSettings());
 
   const load = async () => {
@@ -183,7 +202,9 @@ export default function GlobalAttendanceReports() {
     try {
       setDetail(await getProfessionalAttendanceDrilldown(attendanceDay, id));
     } catch (cause) {
-      setDetailError(cause instanceof Error ? cause.message : "تعذر تحميل التفصيل");
+      setDetailError(
+        cause instanceof Error ? cause.message : "تعذر تحميل التفصيل",
+      );
     } finally {
       setDetailLoading(false);
     }
@@ -204,10 +225,15 @@ export default function GlobalAttendanceReports() {
   }, []);
   useEffect(() => {
     let alive = true;
-    getBackendSettings().then((remote) => {
-      if (alive && remote) setReportSettings((current) => ({ ...current, ...remote }));
-    }).catch(() => undefined);
-    return () => { alive = false; };
+    getBackendSettings()
+      .then((remote) => {
+        if (alive && remote)
+          setReportSettings((current) => ({ ...current, ...remote }));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -237,7 +263,9 @@ export default function GlobalAttendanceReports() {
     () =>
       [...employeeSummary].sort(
         (a, b) =>
-          b.absent * 1000 + b.lateMinutes + b.overtimeMinutes -
+          b.absent * 1000 +
+          b.lateMinutes +
+          b.overtimeMinutes -
           (a.absent * 1000 + a.lateMinutes + a.overtimeMinutes),
       ),
     [employeeSummary],
@@ -247,7 +275,8 @@ export default function GlobalAttendanceReports() {
     if (!report) return;
 
     downloadProfessionalAttendanceReport({
-      mode: report.days === 1 ? "daily" : report.days <= 31 ? "monthly" : "annual",
+      mode:
+        report.days === 1 ? "daily" : report.days <= 31 ? "monthly" : "annual",
       period: `${report.from} → ${report.to}`,
       generatedAt: report.generatedAt,
       summaries: employeeSummary.map((item) => ({
@@ -358,7 +387,7 @@ export default function GlobalAttendanceReports() {
       }
     >
       <div dir="rtl" className="space-y-5 pb-10">
-    <style>{`
+        <style>{`
       .global-attendance-print { display: none; }
       @page { size: A4 portrait; margin: 8mm 7mm; }
       @media print {
@@ -402,56 +431,244 @@ export default function GlobalAttendanceReports() {
         .global-attendance-print-summary-item { white-space: nowrap; }
       }
     `}</style>
-    {report?.days === 1 && <div className="global-attendance-print" dir="rtl">
-      <header className="global-attendance-print-header">
-        {(() => {
-          const session = getManagerSession();
-          const role = session?.role === "owner" ? "مالك" : session?.role === "manager" ? "مدير" : "غير محدد";
-          const issuerName = session?.name || (session?.role === "owner" ? reportSettings.ownerName : session?.role === "manager" ? reportSettings.managerName : "") || "غير محدد";
-          const qrValue = JSON.stringify({ reportDate: report.from, extractedAt: printGeneratedAt, extractedAtDamascus: new Date(printGeneratedAt).toLocaleString("ar", { timeZone: getSystemTimeZone(), dateStyle: "medium", timeStyle: "medium" }), extractedAtSystemTimeZone: new Date(printGeneratedAt).toLocaleString("ar", { timeZone: getSystemTimeZone(), dateStyle: "medium", timeStyle: "medium" }), timezone: getSystemTimeZone(), extractedBy: issuerName, role });
-          return <div className="global-attendance-print-qr"><QRCodeSVG value={qrValue} size={128} level="H" includeMargin /></div>;
-        })()}
-        {reportSettings.brandLogo && <img src={reportSettings.brandLogo} alt="شعار الشركة" className="global-attendance-print-logo" />}
-        <div className="global-attendance-print-company">{reportSettings.brandName || "HADIR"}</div>
-        <div className="global-attendance-print-title">سجل الحضور والانصراف ليوم {(() => { const d = new Date(`${report.from}T12:00:00`); return `${["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][d.getDay()]} ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; })()}</div>
-      </header>
-      <table className="global-attendance-print-table">
-        <colgroup><col style={{ width: "6%" }} /><col style={{ width: "17%" }} /><col style={{ width: "22%" }} /><col style={{ width: "13%" }} /><col style={{ width: "10%" }} /><col style={{ width: "10%" }} /><col style={{ width: "22%" }} /></colgroup>
-        <thead><tr><th>ت</th><th>الاختصاص</th><th>اسم الموظف</th><th>الحالة</th><th>الحضور</th><th>الانصراف</th><th>ملاحظات</th></tr></thead>
-        <tbody>{[...rows].sort((a, b) => {
-          const order = Array.isArray(reportSettings.specialties) ? reportSettings.specialties : [];
-          const specialtyIndex = (row: ProfessionalAttendanceRow) => {
-            const employee = employees.find((e) => String(e.id) === String(row.employeeId));
-            const employeeSpecialties = Array.isArray(employee?.specialties) ? employee.specialties.map((s) => String(s)) : [];
-            const index = employeeSpecialties.reduce((best, specialty) => { const i = order.indexOf(specialty); return i >= 0 && (best < 0 || i < best) ? i : best; }, -1);
-            return index < 0 ? order.length : index;
-          };
-          const ai = specialtyIndex(a), bi = specialtyIndex(b);
-          return ai - bi || String(a.employeeName || "").localeCompare(String(b.employeeName || ""), "ar");
-        }).map((r, i) => { const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : r.status === "ESCAPED" ? "escaped" : r.status === "REST" ? "rest" : r.status === "HOLIDAY" ? "holiday" : r.status === "NOT_STARTED" ? "not-started" : "invalid"; const noteLabels: Record<string, string> = { CHECKOUT_WITHOUT_CHECKIN: "انصراف دون حضور", ESCAPED: "هرب من العمل", MISSING_CHECKOUT: "انصراف معلق", ABSENT_NO_APPROVED_REASON: "غياب دون عذر معتمد", LATE_ARRIVAL: "تأخر في الحضور", EARLY_LEAVE: "انصراف مبكر", OVERTIME: "عمل إضافي" }; return <tr key={`${r.attendanceDay}-${r.employeeId}`}>
-          <td className="global-attendance-print-center">{i + 1}</td>
-          <td>{employees.find((e) => String(e.id) === String(r.employeeId))?.specialties?.[0] || "غير محدد"}</td>
-          <td><strong>{r.employeeName}</strong></td>
-          <td className="global-attendance-print-center"><span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{labels[r.status] || r.status}</span></td>
-          <td className="global-attendance-print-center">{r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString("ar", { timeZone: getSystemTimeZone(), hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-          <td className="global-attendance-print-center">{r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString("ar", { timeZone: getSystemTimeZone(), hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-          <td>{r.notes || (r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : r.status === "ESCAPED" ? "هرب من العمل" : "—")}</td>
-        </tr>; })}</tbody>
-      </table>
-      <div className="global-attendance-print-summary">
-        <span className="global-attendance-print-summary-item">مجموع الموظفين: {[...rows].length}</span>
-        <span className="global-attendance-print-summary-item">الحضور: {[...rows].filter((r) => r.status === "PRESENT" || r.status === "LATE").length}</span>
-        <span className="global-attendance-print-summary-item">الغياب: {[...rows].filter((r) => r.status === "ABSENT").length}</span>
-        <span className="global-attendance-print-summary-item">الإذن: {[...rows].filter((r) => r.status === "PERMISSION").length}</span>
-      </div>
-    </div>}
+        {report?.days === 1 && (
+          <div className="global-attendance-print" dir="rtl">
+            <header className="global-attendance-print-header">
+              {(() => {
+                const session = getManagerSession();
+                const role =
+                  session?.role === "owner"
+                    ? "مالك"
+                    : session?.role === "manager"
+                      ? "مدير"
+                      : "غير محدد";
+                const issuerName =
+                  session?.name ||
+                  (session?.role === "owner"
+                    ? reportSettings.ownerName
+                    : session?.role === "manager"
+                      ? reportSettings.managerName
+                      : "") ||
+                  "غير محدد";
+                const qrValue = JSON.stringify({
+                  reportDate: report.from,
+                  extractedAt: printGeneratedAt,
+                  extractedAtDamascus: new Date(
+                    printGeneratedAt,
+                  ).toLocaleString("ar", {
+                    timeZone: getSystemTimeZone(),
+                    dateStyle: "medium",
+                    timeStyle: "medium",
+                  }),
+                  extractedAtSystemTimeZone: new Date(
+                    printGeneratedAt,
+                  ).toLocaleString("ar", {
+                    timeZone: getSystemTimeZone(),
+                    dateStyle: "medium",
+                    timeStyle: "medium",
+                  }),
+                  timezone: getSystemTimeZone(),
+                  extractedBy: issuerName,
+                  role,
+                });
+                return (
+                  <div className="global-attendance-print-qr">
+                    <QRCodeSVG
+                      value={qrValue}
+                      size={128}
+                      level="H"
+                      includeMargin
+                    />
+                  </div>
+                );
+              })()}
+              {reportSettings.brandLogo && (
+                <img
+                  src={reportSettings.brandLogo}
+                  alt="شعار الشركة"
+                  className="global-attendance-print-logo"
+                />
+              )}
+              <div className="global-attendance-print-company">
+                {reportSettings.brandName || "HADIR"}
+              </div>
+              <div className="global-attendance-print-title">
+                سجل الحضور والانصراف ليوم{" "}
+                {(() => {
+                  const d = new Date(`${report.from}T12:00:00`);
+                  return `${["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][d.getDay()]} ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+                })()}
+              </div>
+            </header>
+            <table className="global-attendance-print-table">
+              <colgroup>
+                <col style={{ width: "6%" }} />
+                <col style={{ width: "17%" }} />
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "22%" }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>ت</th>
+                  <th>الاختصاص</th>
+                  <th>اسم الموظف</th>
+                  <th>الحالة</th>
+                  <th>الحضور</th>
+                  <th>الانصراف</th>
+                  <th>ملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...rows]
+                  .sort((a, b) => {
+                    const order = Array.isArray(reportSettings.specialties)
+                      ? reportSettings.specialties
+                      : [];
+                    const specialtyIndex = (row: ProfessionalAttendanceRow) => {
+                      const employee = employees.find(
+                        (e) => String(e.id) === String(row.employeeId),
+                      );
+                      const employeeSpecialties = Array.isArray(
+                        employee?.specialties,
+                      )
+                        ? employee.specialties.map((s) => String(s))
+                        : [];
+                      const index = employeeSpecialties.reduce(
+                        (best, specialty) => {
+                          const i = order.indexOf(specialty);
+                          return i >= 0 && (best < 0 || i < best) ? i : best;
+                        },
+                        -1,
+                      );
+                      return index < 0 ? order.length : index;
+                    };
+                    const ai = specialtyIndex(a),
+                      bi = specialtyIndex(b);
+                    return (
+                      ai - bi ||
+                      String(a.employeeName || "").localeCompare(
+                        String(b.employeeName || ""),
+                        "ar",
+                      )
+                    );
+                  })
+                  .map((r, i) => {
+                    const statusClass =
+                      r.status === "PRESENT"
+                        ? "present"
+                        : r.status === "LATE"
+                          ? "late"
+                          : r.status === "ABSENT"
+                            ? "absent"
+                            : r.status === "LEAVE"
+                              ? "leave"
+                              : r.status === "PERMISSION"
+                                ? "permission"
+                                : r.status === "ESCAPED"
+                                  ? "escaped"
+                                  : r.status === "REST"
+                                    ? "rest"
+                                    : r.status === "HOLIDAY"
+                                      ? "holiday"
+                                      : r.status === "NOT_STARTED"
+                                        ? "not-started"
+                                        : "invalid";
+                    const noteLabels: Record<string, string> = {
+                      CHECKOUT_WITHOUT_CHECKIN: "انصراف دون حضور",
+                      ESCAPED: "هرب من العمل",
+                      MISSING_CHECKOUT: "انصراف معلق",
+                      ABSENT_NO_APPROVED_REASON: "غياب دون عذر معتمد",
+                      LATE_ARRIVAL: "تأخر في الحضور",
+                      EARLY_LEAVE: "انصراف مبكر",
+                      OVERTIME: "عمل إضافي",
+                    };
+                    return (
+                      <tr key={`${r.attendanceDay}-${r.employeeId}`}>
+                        <td className="global-attendance-print-center">
+                          {i + 1}
+                        </td>
+                        <td>
+                          {employees.find(
+                            (e) => String(e.id) === String(r.employeeId),
+                          )?.specialties?.[0] || "غير محدد"}
+                        </td>
+                        <td>
+                          <strong>{r.employeeName}</strong>
+                        </td>
+                        <td className="global-attendance-print-center">
+                          <span
+                            className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}
+                          >
+                            {labels[r.status] || r.status}
+                          </span>
+                        </td>
+                        <td className="global-attendance-print-center">
+                          {r.checkInAt
+                            ? new Date(r.checkInAt).toLocaleTimeString("ar", {
+                                timeZone: getSystemTimeZone(),
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "—"}
+                        </td>
+                        <td className="global-attendance-print-center">
+                          {r.checkOutAt
+                            ? new Date(r.checkOutAt).toLocaleTimeString("ar", {
+                                timeZone: getSystemTimeZone(),
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "—"}
+                        </td>
+                        <td>
+                          {r.notes ||
+                            (r.exceptionCode
+                              ? noteLabels[r.exceptionCode] || r.exceptionCode
+                              : r.status === "ESCAPED"
+                                ? "هرب من العمل"
+                                : "—")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+            <div className="global-attendance-print-summary">
+              <span className="global-attendance-print-summary-item">
+                مجموع الموظفين: {[...rows].length}
+              </span>
+              <span className="global-attendance-print-summary-item">
+                الحضور:{" "}
+                {
+                  [...rows].filter(
+                    (r) => r.status === "PRESENT" || r.status === "LATE",
+                  ).length
+                }
+              </span>
+              <span className="global-attendance-print-summary-item">
+                الغياب: {[...rows].filter((r) => r.status === "ABSENT").length}
+              </span>
+              <span className="global-attendance-print-summary-item">
+                الإذن:{" "}
+                {[...rows].filter((r) => r.status === "PERMISSION").length}
+              </span>
+            </div>
+          </div>
+        )}
 
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
-                <div className="text-xs font-bold text-primary">HADIR · GLOBAL WORKFORCE REPORTING</div>
-                <h1 className="mt-2 text-2xl font-black">لوحة الحضور التنفيذية</h1>
+                <div className="text-xs font-bold text-primary">
+                  HADIR · GLOBAL WORKFORCE REPORTING
+                </div>
+                <h1 className="mt-2 text-2xl font-black">
+                  لوحة الحضور التنفيذية
+                </h1>
                 <p className="mt-1 text-sm text-muted-foreground">
                   مصدر موحد للسجل اليومي، المؤشرات، الساعات، والاستثناءات.
                 </p>
@@ -505,7 +722,9 @@ export default function GlobalAttendanceReports() {
 
         {error && (
           <Card className="border-destructive/30">
-            <CardContent className="p-4 text-sm text-destructive">{error}</CardContent>
+            <CardContent className="p-4 text-sm text-destructive">
+              {error}
+            </CardContent>
           </Card>
         )}
 
@@ -547,16 +766,28 @@ export default function GlobalAttendanceReports() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button variant={tab === "overview" ? "default" : "outline"} onClick={() => setTab("overview")}>
+              <Button
+                variant={tab === "overview" ? "default" : "outline"}
+                onClick={() => setTab("overview")}
+              >
                 النظرة التنفيذية
               </Button>
-              <Button variant={tab === "daily" ? "default" : "outline"} onClick={() => setTab("daily")}>
+              <Button
+                variant={tab === "daily" ? "default" : "outline"}
+                onClick={() => setTab("daily")}
+              >
                 السجل اليومي
               </Button>
-              <Button variant={tab === "employees" ? "default" : "outline"} onClick={() => setTab("employees")}>
+              <Button
+                variant={tab === "employees" ? "default" : "outline"}
+                onClick={() => setTab("employees")}
+              >
                 الموظفون
               </Button>
-              <Button variant={tab === "exceptions" ? "default" : "outline"} onClick={() => setTab("exceptions")}>
+              <Button
+                variant={tab === "exceptions" ? "default" : "outline"}
+                onClick={() => setTab("exceptions")}
+              >
                 الاستثناءات
               </Button>
             </div>
@@ -566,18 +797,41 @@ export default function GlobalAttendanceReports() {
                 <div className="grid gap-5 lg:grid-cols-3">
                   <Card className="lg:col-span-2">
                     <CardHeader>
-                      <CardTitle className="text-lg">اتجاه الحضور والغياب</CardTitle>
+                      <CardTitle className="text-lg">
+                        اتجاه الحضور والغياب
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={daily}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="attendanceDay" tick={{ fontSize: 11 }} />
+                          <XAxis
+                            dataKey="attendanceDay"
+                            tick={{ fontSize: 11 }}
+                          />
                           <YAxis allowDecimals={false} />
                           <Tooltip />
-                          <Area type="monotone" dataKey="present" name="حاضر" fillOpacity={0.15} strokeWidth={2} />
-                          <Area type="monotone" dataKey="late" name="متأخر" fillOpacity={0.12} strokeWidth={2} />
-                          <Area type="monotone" dataKey="absent" name="غياب" fillOpacity={0.12} strokeWidth={2} />
+                          <Area
+                            type="monotone"
+                            dataKey="present"
+                            name="حاضر"
+                            fillOpacity={0.15}
+                            strokeWidth={2}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="late"
+                            name="متأخر"
+                            fillOpacity={0.12}
+                            strokeWidth={2}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="absent"
+                            name="غياب"
+                            fillOpacity={0.12}
+                            strokeWidth={2}
+                          />
                         </AreaChart>
                       </ResponsiveContainer>
                     </CardContent>
@@ -589,8 +843,17 @@ export default function GlobalAttendanceReports() {
                     <CardContent className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={statusData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} label>
-                            {statusData.map((_, index) => <Cell key={index} />)}
+                          <Pie
+                            data={statusData}
+                            dataKey="value"
+                            nameKey="name"
+                            innerRadius={55}
+                            outerRadius={90}
+                            label
+                          >
+                            {statusData.map((_, index) => (
+                              <Cell key={index} />
+                            ))}
                           </Pie>
                           <Tooltip />
                         </PieChart>
@@ -601,17 +864,31 @@ export default function GlobalAttendanceReports() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">الساعات الفعلية مقابل المتوقعة</CardTitle>
+                    <CardTitle className="text-lg">
+                      الساعات الفعلية مقابل المتوقعة
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={daily}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="attendanceDay" tick={{ fontSize: 11 }} />
+                        <XAxis
+                          dataKey="attendanceDay"
+                          tick={{ fontSize: 11 }}
+                        />
                         <YAxis />
                         <Tooltip formatter={(value) => fmt(Number(value))} />
-                        <Bar dataKey="expectedMinutes" name="المتوقع" fill="currentColor" fillOpacity={0.25} />
-                        <Bar dataKey="workedMinutes" name="الفعلي" fill="currentColor" />
+                        <Bar
+                          dataKey="expectedMinutes"
+                          name="المتوقع"
+                          fill="currentColor"
+                          fillOpacity={0.25}
+                        />
+                        <Bar
+                          dataKey="workedMinutes"
+                          name="الفعلي"
+                          fill="currentColor"
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -630,8 +907,21 @@ export default function GlobalAttendanceReports() {
                   <table className="w-full min-w-[1050px] text-sm">
                     <thead>
                       <tr className="border-b text-right">
-                        {["التاريخ", "الموظف", "الحالة", "الحضور", "الانصراف", "العمل", "التأخر", "المبكر", "الإضافي", "الاستثناء"].map((heading) => (
-                          <th key={heading} className="p-3">{heading}</th>
+                        {[
+                          "التاريخ",
+                          "الموظف",
+                          "الحالة",
+                          "الحضور",
+                          "الانصراف",
+                          "العمل",
+                          "التأخر",
+                          "المبكر",
+                          "الإضافي",
+                          "الاستثناء",
+                        ].map((heading) => (
+                          <th key={heading} className="p-3">
+                            {heading}
+                          </th>
                         ))}
                       </tr>
                     </thead>
@@ -640,43 +930,58 @@ export default function GlobalAttendanceReports() {
                         <tr
                           key={`${row.attendanceDay}-${row.employeeId}`}
                           className="cursor-pointer border-b hover:bg-muted/50"
-                          onClick={() => void openDetail(row.attendanceDay, row.employeeId)}
+                          onClick={() =>
+                            void openDetail(row.attendanceDay, row.employeeId)
+                          }
                         >
                           <td className="p-3">{row.attendanceDay}</td>
                           <td className="p-3 font-semibold">
                             {row.employeeName}
-                            <div className="text-xs text-muted-foreground">{row.jobNumber || "—"}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {row.jobNumber || "—"}
+                            </div>
                           </td>
                           <td className="p-3">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[row.status] || "bg-primary/10 text-primary"}`}>
+                              <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[row.status] || "bg-primary/10 text-primary"}`}
+                              >
                                 {labels[row.status] || row.status}
                               </span>
                             </div>
                           </td>
                           <td className="p-3">
                             {row.checkInAt
-                              ? new Date(row.checkInAt).toLocaleTimeString("ar", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  timeZone: getSystemTimeZone(),
-                                })
+                              ? new Date(row.checkInAt).toLocaleTimeString(
+                                  "ar",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    timeZone: getSystemTimeZone(),
+                                  },
+                                )
                               : "—"}
                           </td>
                           <td className="p-3">
                             {row.checkOutAt
-                              ? new Date(row.checkOutAt).toLocaleTimeString("ar", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  timeZone: getSystemTimeZone(),
-                                })
+                              ? new Date(row.checkOutAt).toLocaleTimeString(
+                                  "ar",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    timeZone: getSystemTimeZone(),
+                                  },
+                                )
                               : "—"}
                           </td>
                           <td className="p-3">{fmt(row.workedMinutes || 0)}</td>
                           <td className="p-3">{row.lateMinutes}د</td>
                           <td className="p-3">{row.earlyLeaveMinutes}د</td>
                           <td className="p-3">{row.overtimeMinutes}د</td>
-                          <td className="p-3">{row.notes || getExceptionLabel(row.exceptionCode, row.status)}</td>
+                          <td className="p-3">
+                            {row.notes ||
+                              getExceptionLabel(row.exceptionCode, row.status)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -694,8 +999,20 @@ export default function GlobalAttendanceReports() {
                   <table className="w-full min-w-[900px] text-sm">
                     <thead>
                       <tr className="border-b text-right">
-                        {["الموظف", "الأيام", "حاضر", "متأخر", "غياب", "انصراف معلق", "العمل", "التأخر", "الإضافي"].map((heading) => (
-                          <th key={heading} className="p-3">{heading}</th>
+                        {[
+                          "الموظف",
+                          "الأيام",
+                          "حاضر",
+                          "متأخر",
+                          "غياب",
+                          "انصراف معلق",
+                          "العمل",
+                          "التأخر",
+                          "الإضافي",
+                        ].map((heading) => (
+                          <th key={heading} className="p-3">
+                            {heading}
+                          </th>
                         ))}
                       </tr>
                     </thead>
@@ -711,7 +1028,9 @@ export default function GlobalAttendanceReports() {
                         >
                           <td className="p-3 font-semibold">
                             {row.employeeName}
-                            <div className="text-xs text-muted-foreground">{row.jobNumber || "—"}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {row.jobNumber || "—"}
+                            </div>
                           </td>
                           <td className="p-3">{row.days}</td>
                           <td className="p-3">{row.present}</td>
@@ -732,7 +1051,9 @@ export default function GlobalAttendanceReports() {
             {tab === "exceptions" && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">مركز الاستثناءات والتتبع</CardTitle>
+                  <CardTitle className="text-lg">
+                    مركز الاستثناءات والتتبع
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <table className="w-full min-w-[900px] text-sm">
@@ -753,14 +1074,22 @@ export default function GlobalAttendanceReports() {
                         <tr
                           key={`${item.employeeId}-${item.attendanceDay}-${index}`}
                           className="cursor-pointer border-b hover:bg-muted/50"
-                          onClick={() => void openDetail(item.attendanceDay, item.employeeId)}
+                          onClick={() =>
+                            void openDetail(item.attendanceDay, item.employeeId)
+                          }
                         >
                           <td className="p-3">{item.attendanceDay}</td>
-                          <td className="p-3 font-semibold">{item.employeeName}</td>
+                          <td className="p-3 font-semibold">
+                            {item.employeeName}
+                          </td>
                           <td className="p-3">{item.code}</td>
-                          <td className="p-3">{labels[item.status] || item.status}</td>
+                          <td className="p-3">
+                            {labels[item.status] || item.status}
+                          </td>
                           <td className="p-3">{item.minutes}د</td>
-                          <td className="p-3">{item.attendanceEventIds.length}</td>
+                          <td className="p-3">
+                            {item.attendanceEventIds.length}
+                          </td>
                           <td className="p-3">{item.requestIds.length}</td>
                           <td className="p-3">{item.auditIds.length}</td>
                         </tr>
@@ -779,10 +1108,14 @@ export default function GlobalAttendanceReports() {
             <Card className="bg-muted/30">
               <CardContent className="flex flex-wrap justify-between gap-2 p-4 text-xs text-muted-foreground">
                 <span>
-                  المصدر: {report.integrity.sourceOfTruth} ← {report.integrity.rawSource}
+                  المصدر: {report.integrity.sourceOfTruth} ←{" "}
+                  {report.integrity.rawSource}
                 </span>
                 <span>
-                  الإصدار {report.reportVersion} · {report.timezone} · {report.dataQuality.complete ? "جودة مكتملة" : "توجد بيانات تحتاج مراجعة"}
+                  الإصدار {report.reportVersion} · {report.timezone} ·{" "}
+                  {report.dataQuality.complete
+                    ? "جودة مكتملة"
+                    : "توجد بيانات تحتاج مراجعة"}
                 </span>
               </CardContent>
             </Card>
@@ -799,7 +1132,10 @@ export default function GlobalAttendanceReports() {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto" dir="rtl">
+        <DialogContent
+          className="max-h-[90vh] max-w-4xl overflow-y-auto"
+          dir="rtl"
+        >
           <DialogHeader>
             <DialogTitle>تفصيل سجل الحضور</DialogTitle>
             <DialogDescription>
@@ -825,16 +1161,26 @@ export default function GlobalAttendanceReports() {
                 <Card>
                   <CardContent className="p-4">
                     <div className="text-xs text-muted-foreground">الموظف</div>
-                    <div className="mt-1 font-bold">{detail.fact.employeeName}</div>
-                    <div className="text-xs text-muted-foreground">{detail.fact.jobNumber || "—"}</div>
+                    <div className="mt-1 font-bold">
+                      {detail.fact.employeeName}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {detail.fact.jobNumber || "—"}
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">اليوم / الحالة</div>
-                    <div className="mt-1 font-bold">{detail.fact.attendanceDay}</div>
+                    <div className="text-xs text-muted-foreground">
+                      اليوم / الحالة
+                    </div>
+                    <div className="mt-1 font-bold">
+                      {detail.fact.attendanceDay}
+                    </div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[detail.fact.status] || "bg-primary/10 text-primary"}`}>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[detail.fact.status] || "bg-primary/10 text-primary"}`}
+                      >
                         {labels[detail.fact.status] || detail.fact.status}
                       </span>
                     </div>
@@ -842,16 +1188,26 @@ export default function GlobalAttendanceReports() {
                 </Card>
                 <Card>
                   <CardContent className="p-4">
-                    <div className="text-xs text-muted-foreground">الحضور / الانصراف</div>
-                    <div className="mt-1 text-sm">{formatDateTime(detail.fact.checkInAt)}</div>
-                    <div className="text-sm">{formatDateTime(detail.fact.checkOutAt)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      الحضور / الانصراف
+                    </div>
+                    <div className="mt-1 text-sm">
+                      {formatDateTime(detail.fact.checkInAt)}
+                    </div>
+                    <div className="text-sm">
+                      {formatDateTime(detail.fact.checkOutAt)}
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4">
                     <div className="text-xs text-muted-foreground">الساعات</div>
-                    <div className="mt-1 font-bold">{fmt(Number(detail.fact.workedMinutes || 0))}</div>
-                    <div className="text-xs text-muted-foreground">متوقع {fmt(Number(detail.fact.expectedMinutes || 0))}</div>
+                    <div className="mt-1 font-bold">
+                      {fmt(Number(detail.fact.workedMinutes || 0))}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      متوقع {fmt(Number(detail.fact.expectedMinutes || 0))}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -861,94 +1217,166 @@ export default function GlobalAttendanceReports() {
                   <CardTitle className="text-base">الجدول والحساب</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-                  <div>بداية الدوام: <b>{detail.fact.scheduledStart || "—"}</b></div>
-                  <div>نهاية الدوام: <b>{detail.fact.scheduledEnd || "—"}</b></div>
-                  <div>التأخر: <b>{detail.fact.lateMinutes}د</b></div>
-                  <div>الانصراف المبكر: <b>{detail.fact.earlyLeaveMinutes}د</b></div>
-                  <div>الإضافي: <b>{detail.fact.overtimeMinutes}د</b></div>
-                  <div>الملاحظات: <b>{getExceptionLabel(detail.fact.exceptionCode, detail.fact.status)}</b></div>
-                  <div>مصدر الحساب: <b>{detail.fact.calculationSource}</b></div>
-                  <div>إصدار الحساب: <b>{detail.fact.calculationVersion}</b></div>
-                  <div>جودة التاريخ: <b>{detail.fact.historicalDataQuality}</b></div>
-                  <div>سبب الجودة: <b>{detail.fact.dataQualityReason || "—"}</b></div>
+                  <div>
+                    بداية الدوام: <b>{detail.fact.scheduledStart || "—"}</b>
+                  </div>
+                  <div>
+                    نهاية الدوام: <b>{detail.fact.scheduledEnd || "—"}</b>
+                  </div>
+                  <div>
+                    التأخر: <b>{detail.fact.lateMinutes}د</b>
+                  </div>
+                  <div>
+                    الانصراف المبكر: <b>{detail.fact.earlyLeaveMinutes}د</b>
+                  </div>
+                  <div>
+                    الإضافي: <b>{detail.fact.overtimeMinutes}د</b>
+                  </div>
+                  <div>
+                    الملاحظات:{" "}
+                    <b>
+                      {getExceptionLabel(
+                        detail.fact.exceptionCode,
+                        detail.fact.status,
+                      )}
+                    </b>
+                  </div>
+                  <div>
+                    مصدر الحساب: <b>{detail.fact.calculationSource}</b>
+                  </div>
+                  <div>
+                    إصدار الحساب: <b>{detail.fact.calculationVersion}</b>
+                  </div>
+                  <div>
+                    جودة التاريخ: <b>{detail.fact.historicalDataQuality}</b>
+                  </div>
+                  <div>
+                    سبب الجودة: <b>{detail.fact.dataQualityReason || "—"}</b>
+                  </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">سجل الحضور الخام المرتبط ({detail.sources.attendance.length})</CardTitle>
+                  <CardTitle className="text-base">
+                    سجل الحضور الخام المرتبط ({detail.sources.attendance.length}
+                    )
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {detail.sources.attendance.map((item) => (
-                    <div key={String(item.id)} className="rounded-md border p-3 text-xs">
+                    <div
+                      key={String(item.id)}
+                      className="rounded-md border p-3 text-xs"
+                    >
                       <div className="font-bold">ID: {String(item.id)}</div>
                       <div className="mt-1 grid gap-1 sm:grid-cols-2">
                         <div>النوع: {String(item.type || "—")}</div>
                         <div>الوقت: {formatDateTime(item.timestamp)}</div>
                         <div>الموقع: {String(item.location_id || "—")}</div>
                         <div>الجهاز: {String(item.device_id || "—")}</div>
-                        <div>المسافة: {String(item.distance_meters ?? "—")}</div>
-                        <div>الإحداثيات: {String(item.lat ?? "—")}, {String(item.lng ?? "—")}</div>
+                        <div>
+                          المسافة: {String(item.distance_meters ?? "—")}
+                        </div>
+                        <div>
+                          الإحداثيات: {String(item.lat ?? "—")},{" "}
+                          {String(item.lng ?? "—")}
+                        </div>
                       </div>
                     </div>
                   ))}
                   {!detail.sources.attendance.length && (
-                    <div className="text-sm text-muted-foreground">لا توجد سجلات حضور مرتبطة بهذا الاستنتاج.</div>
+                    <div className="text-sm text-muted-foreground">
+                      لا توجد سجلات حضور مرتبطة بهذا الاستنتاج.
+                    </div>
                   )}
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">الطلبات المرتبطة ({detail.sources.requests.length})</CardTitle>
+                  <CardTitle className="text-base">
+                    الطلبات المرتبطة ({detail.sources.requests.length})
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {detail.sources.requests.map((item) => (
-                    <div key={String(item.id)} className="rounded-md border p-3 text-xs">
+                    <div
+                      key={String(item.id)}
+                      className="rounded-md border p-3 text-xs"
+                    >
                       <div className="font-bold">ID: {String(item.id)}</div>
                       <div className="mt-1 grid gap-1 sm:grid-cols-2">
                         <div>النوع: {String(item.type || "—")}</div>
                         <div>الحالة: {String(item.status || "—")}</div>
                         <div>من: {String(item.start_date || "—")}</div>
                         <div>إلى: {String(item.end_date || "—")}</div>
-                        <div className="sm:col-span-2">السبب: {String(item.reason || "—")}</div>
+                        <div className="sm:col-span-2">
+                          السبب: {String(item.reason || "—")}
+                        </div>
                       </div>
                     </div>
                   ))}
                   {!detail.sources.requests.length && (
-                    <div className="text-sm text-muted-foreground">لا توجد طلبات مرتبطة.</div>
+                    <div className="text-sm text-muted-foreground">
+                      لا توجد طلبات مرتبطة.
+                    </div>
                   )}
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">سجل التدقيق المرتبط ({detail.sources.audit.length})</CardTitle>
+                  <CardTitle className="text-base">
+                    سجل التدقيق المرتبط ({detail.sources.audit.length})
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {detail.sources.audit.map((item) => (
-                    <div key={String(item.id)} className="rounded-md border p-3 text-xs">
+                    <div
+                      key={String(item.id)}
+                      className="rounded-md border p-3 text-xs"
+                    >
                       <div className="font-bold">ID: {String(item.id)}</div>
                       <div className="mt-1 grid gap-1 sm:grid-cols-2">
                         <div>الإجراء: {String(item.action || "—")}</div>
                         <div>النتيجة: {String(item.result || "—")}</div>
                         <div>الوقت: {formatDateTime(item.timestamp)}</div>
                         <div>الفاعل: {String(item.actor_name || "—")}</div>
-                        <div className="sm:col-span-2">السبب: {String(item.reason || "—")}</div>
+                        <div className="sm:col-span-2">
+                          السبب: {String(item.reason || "—")}
+                        </div>
                       </div>
                     </div>
                   ))}
                   {!detail.sources.audit.length && (
-                    <div className="text-sm text-muted-foreground">لا توجد سجلات تدقيق مرتبطة.</div>
+                    <div className="text-sm text-muted-foreground">
+                      لا توجد سجلات تدقيق مرتبطة.
+                    </div>
                   )}
                 </CardContent>
               </Card>
 
               <Card className="bg-muted/30">
                 <CardContent className="space-y-2 p-4 text-xs text-muted-foreground">
-                  <div>لقطة الجدول: <code className="break-all">{JSON.stringify(detail.fact.scheduleSnapshot)}</code></div>
-                  <div>معرّفات المصدر: حضور {detail.trace.attendanceEventIds.length} · طلبات {detail.trace.requestIds.length} · تدقيق {detail.trace.auditIds.length}</div>
-                  <div>وضع القراءة: {detail.trace.readOnly ? "قراءة فقط" : "غير معروف"} · لا تعديل على الحضور الخام: {detail.trace.noRawAttendanceMutation ? "نعم" : "غير معروف"}</div>
+                  <div>
+                    لقطة الجدول:{" "}
+                    <code className="break-all">
+                      {JSON.stringify(detail.fact.scheduleSnapshot)}
+                    </code>
+                  </div>
+                  <div>
+                    معرّفات المصدر: حضور{" "}
+                    {detail.trace.attendanceEventIds.length} · طلبات{" "}
+                    {detail.trace.requestIds.length} · تدقيق{" "}
+                    {detail.trace.auditIds.length}
+                  </div>
+                  <div>
+                    وضع القراءة:{" "}
+                    {detail.trace.readOnly ? "قراءة فقط" : "غير معروف"} · لا
+                    تعديل على الحضور الخام:{" "}
+                    {detail.trace.noRawAttendanceMutation ? "نعم" : "غير معروف"}
+                  </div>
                 </CardContent>
               </Card>
             </div>

@@ -1,4 +1,6 @@
-const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+const API_URL = (
+  import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev"
+).replace(/\/$/, "");
 
 export async function revokeServerSession(token = ""): Promise<void> {
   const value = token.trim();

@@ -26,9 +26,14 @@ export function setSystemTimeZone(value: string): void {
   }
   runtimeTimeZone = value;
   const currentSettings = getD1View().settings;
-  if (currentSettings) setD1View({ settings: { ...currentSettings, timezone: value } });
+  if (currentSettings)
+    setD1View({ settings: { ...currentSettings, timezone: value } });
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("hadir:timezone-changed", { detail: { timezone: value } }));
+    window.dispatchEvent(
+      new CustomEvent("hadir:timezone-changed", {
+        detail: { timezone: value },
+      }),
+    );
   }
 }
 
@@ -461,22 +466,35 @@ type IntlWithTimeZones = typeof Intl & {
 
 function buildTimeZoneList(): string[] {
   const supportedValuesOf = (Intl as IntlWithTimeZones).supportedValuesOf;
-  const supported = typeof supportedValuesOf === "function"
-    ? supportedValuesOf.call(Intl, "timeZone")
-    : FALLBACK_TIME_ZONES;
-  return [...new Set([...supported, ...FALLBACK_TIME_ZONES, DEFAULT_SYSTEM_TIME_ZONE, "UTC"])].sort((a, b) => a.localeCompare(b));
+  const supported =
+    typeof supportedValuesOf === "function"
+      ? supportedValuesOf.call(Intl, "timeZone")
+      : FALLBACK_TIME_ZONES;
+  return [
+    ...new Set([
+      ...supported,
+      ...FALLBACK_TIME_ZONES,
+      DEFAULT_SYSTEM_TIME_ZONE,
+      "UTC",
+    ]),
+  ].sort((a, b) => a.localeCompare(b));
 }
 
 /** Canonical IANA zones supported by this runtime, plus Damascus and UTC explicitly. */
 export const SYSTEM_TIME_ZONES = buildTimeZoneList();
 
-export function getTimeZoneOffsetLabel(timeZone: string, date = new Date()): string {
+export function getTimeZoneOffsetLabel(
+  timeZone: string,
+  date = new Date(),
+): string {
   try {
     const part = new Intl.DateTimeFormat("en-US", {
       timeZone,
       timeZoneName: "longOffset",
       hour: "2-digit",
-    }).formatToParts(date).find((item) => item.type === "timeZoneName")?.value;
+    })
+      .formatToParts(date)
+      .find((item) => item.type === "timeZoneName")?.value;
     return (part || "GMT").replace(/^GMT/, "UTC");
   } catch {
     return "UTC";

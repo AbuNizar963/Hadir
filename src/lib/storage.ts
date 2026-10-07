@@ -15,10 +15,7 @@ import {
   updateBackendRequest,
   saveBackendSettings,
 } from "@/lib/backend";
-import {
-  syncEmployeesToCloud,
-  removeEmployeeFromCloud,
-} from "@/lib/cloudSync";
+import { syncEmployeesToCloud, removeEmployeeFromCloud } from "@/lib/cloudSync";
 import { getD1View } from "@/lib/d1View";
 import { hydrateLocalData } from "@/lib/cloudDataSync";
 
@@ -71,9 +68,7 @@ export function getSettings(): Settings {
 
   return {
     ...base,
-    locations: view.locations.length
-      ? view.locations
-      : base.locations || [],
+    locations: view.locations.length ? view.locations : base.locations || [],
   };
 }
 
@@ -244,9 +239,7 @@ export function findEmployeeByJobNumber(
   );
 }
 
-function parseTime(
-  value: string,
-): { hours: number; minutes: number } | null {
+function parseTime(value: string): { hours: number; minutes: number } | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value);
   if (!match) return null;
 
@@ -283,11 +276,7 @@ export function forceCheckInByManager(
   if (!employee) return null;
 
   const normalizedType =
-    type === "checkIn"
-      ? "check-in"
-      : type === "checkOut"
-        ? "check-out"
-        : type;
+    type === "checkIn" ? "check-in" : type === "checkOut" ? "check-out" : type;
 
   const record: AttendanceRecord = {
     id: generateId(),

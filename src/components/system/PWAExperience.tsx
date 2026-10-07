@@ -19,9 +19,7 @@ function isStandalone() {
   return (
     window.matchMedia?.("(display-mode: standalone)").matches ||
     ("standalone" in navigator &&
-      Boolean(
-        (navigator as Navigator & { standalone?: boolean }).standalone,
-      ))
+      Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
   );
 }
 
@@ -178,7 +176,10 @@ export default function PWAExperience() {
 
       const onStateChange = () => {
         if (cancelled) return;
-        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+        if (
+          worker.state === "installed" &&
+          navigator.serviceWorker.controller
+        ) {
           shouldShowUpdate();
         }
       };
@@ -466,8 +467,7 @@ export default function PWAExperience() {
             onStateChange();
           };
 
-          const onUpdateFound = () =>
-            watchWorker(registration.installing);
+          const onUpdateFound = () => watchWorker(registration.installing);
 
           registration.addEventListener("updatefound", onUpdateFound);
           watchWorker(registration.installing);
@@ -643,9 +643,9 @@ export default function PWAExperience() {
           <div className="min-w-0 flex-1">
             <p className="font-bold">تثبيت حاضر كتطبيق</p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              إذا لم يظهر زر التثبيت التلقائي، افتح قائمة Chrome ⋮ ثم اختر «تثبيت
-              التطبيق» أو «Install app». لا تستخدم «إضافة إلى الشاشة الرئيسية»
-              لأنها قد تنشئ اختصارًا فقط.
+              إذا لم يظهر زر التثبيت التلقائي، افتح قائمة Chrome ⋮ ثم اختر
+              «تثبيت التطبيق» أو «Install app». لا تستخدم «إضافة إلى الشاشة
+              الرئيسية» لأنها قد تنشئ اختصارًا فقط.
             </p>
             <button
               type="button"

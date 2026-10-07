@@ -1,9 +1,9 @@
-import {
-  handleDailyStatus,
-  isRotationVisibleDay,
-} from "./attendance-engine";
+import { handleDailyStatus, isRotationVisibleDay } from "./attendance-engine";
 import { localDateTime } from "./attendance-period";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 
 type Env = { DB: D1Database; APP_TIMEZONE?: string };
 
@@ -72,16 +72,19 @@ const daysBetween = (from: string, to: string) =>
 const addDays = (day: string, amount: number) =>
   new Date((dateNumber(day) + amount) * 86400000).toISOString().slice(0, 10);
 const systemDay = (date: Date, timeZone: string) => {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "00";
   return `${get("year")}-${get("month")}-${get("day")}`;
 };
 
 function validatePeriod(from: string, to: string) {
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(to)
-  ) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
     throw new Error("الفترة الزمنية غير صالحة");
   }
 
@@ -93,7 +96,6 @@ function validatePeriod(from: string, to: string) {
 
   return days;
 }
-
 
 export type ScheduleMeta = {
   scheduleType: string;
@@ -108,7 +110,11 @@ export type ScheduleMeta = {
 function shouldIncludeReportRow(
   row: Pick<
     FactRow,
-    "attendanceDay" | "status" | "scheduledStart" | "scheduledEnd" | "scheduleType"
+    | "attendanceDay"
+    | "status"
+    | "scheduledStart"
+    | "scheduledEnd"
+    | "scheduleType"
   >,
   meta: ScheduleMeta | undefined,
   dailyReport: boolean,
@@ -120,7 +126,9 @@ function shouldIncludeReportRow(
   if (
     dailyReport &&
     meta &&
-    String(row.scheduleType || "").trim().toUpperCase() === "ROTATION"
+    String(row.scheduleType || "")
+      .trim()
+      .toUpperCase() === "ROTATION"
   ) {
     return isRotationVisibleDay(
       {
@@ -168,10 +176,7 @@ async function filterReportableRows(
   if (!rows.length) return [];
 
   const employeeIds = [...new Set(rows.map((row) => row.employeeId))];
-  const scheduleByEmployee = new Map<
-    string,
-    ScheduleMeta & { id: string }
-  >();
+  const scheduleByEmployee = new Map<string, ScheduleMeta & { id: string }>();
 
   // D1/SQLite has a finite bound-variable limit. A large monthly report can
   // legitimately contain hundreds of employees, so never build one IN (...)
@@ -310,25 +315,39 @@ async function loadFacts(
     AND f.attendance_day <= ?`;
 
   const query = employeeId
-    ? env.DB
-        .prepare(`${select} AND f.employee_id = ? ORDER BY f.attendance_day ASC, f.employee_name ASC`)
-        .bind(from, to, employeeId)
-    : env.DB
-        .prepare(`${select} ORDER BY f.attendance_day ASC, f.employee_name ASC`)
-        .bind(from, to);
+    ? env.DB.prepare(
+        `${select} AND f.employee_id = ? ORDER BY f.attendance_day ASC, f.employee_name ASC`,
+      ).bind(from, to, employeeId)
+    : env.DB.prepare(
+        `${select} ORDER BY f.attendance_day ASC, f.employee_name ASC`,
+      ).bind(from, to);
 
   const result = await query.all<FactRow>();
   return result.results || [];
 }
 
-function deriveNotes(row: Pick<FactRow, "status" | "scheduleType" | "checkInAt" | "checkOutAt" | "scheduledEnd" | "exceptionCode">) {
+function deriveNotes(
+  row: Pick<
+    FactRow,
+    | "status"
+    | "scheduleType"
+    | "checkInAt"
+    | "checkOutAt"
+    | "scheduledEnd"
+    | "exceptionCode"
+  >,
+) {
   if (row.status === "HOLIDAY") return "عطلة رسمية";
   if (row.scheduleType === "ROTATION" && row.checkInAt && row.scheduledEnd) {
     const ended = Date.now() >= Date.parse(row.scheduledEnd);
-    if (ended) return row.checkOutAt ? "انتهت المناوبة · سُجل الانصراف" : "انتهت المناوبة · لم يُسجل الانصراف";
+    if (ended)
+      return row.checkOutAt
+        ? "انتهت المناوبة · سُجل الانصراف"
+        : "انتهت المناوبة · لم يُسجل الانصراف";
     return "حضور مستمر حتى نهاية المناوبة";
   }
-  if (row.exceptionCode === "MISSING_CHECKOUT") return "حضر ولم يسجل الانصراف بعد";
+  if (row.exceptionCode === "MISSING_CHECKOUT")
+    return "حضر ولم يسجل الانصراف بعد";
   return "";
 }
 
@@ -406,22 +425,19 @@ async function loadLiveTodayFacts(
     const dayStart = localDateTime(day, "00:00", timezone);
     const dayEnd = localDateTime(addDays(day, 1), "00:00", timezone);
     const attendanceQuery = employeeId
-      ? env.DB
-          .prepare(
-            "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
-          )
-          .bind(employeeId, dayStart.toISOString(), dayEnd.toISOString())
-      : env.DB
-          .prepare(
-            "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
-          )
-          .bind(dayStart.toISOString(), dayEnd.toISOString());
+      ? env.DB.prepare(
+          "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
+        ).bind(employeeId, dayStart.toISOString(), dayEnd.toISOString())
+      : env.DB.prepare(
+          "SELECT id,employee_id AS employeeId,type,timestamp,device_id AS deviceId,qr_code AS qrCode FROM attendance WHERE timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
+        ).bind(dayStart.toISOString(), dayEnd.toISOString());
 
     const attendanceRows = await attendanceQuery.all<any>();
     const eventsByEmployee = new Map<string, any[]>();
 
     for (const event of attendanceRows.results || []) {
-      if (systemDay(new Date(String(event.timestamp)), timezone) !== day) continue;
+      if (systemDay(new Date(String(event.timestamp)), timezone) !== day)
+        continue;
       const id = String(event.employeeId || "");
       if (!id) continue;
       const list = eventsByEmployee.get(id) || [];
@@ -549,7 +565,14 @@ async function loadLiveTodayFacts(
         overtimeMinutes,
         open: exceptionCode === "MISSING_CHECKOUT" ? 1 : 0,
         exceptionCode,
-        notes: deriveNotes({ status: String(row.status || "INVALID"), scheduleType: String(row.scheduleType || "ADMIN"), checkInAt, checkOutAt, scheduledEnd: expectedEnd, exceptionCode }),
+        notes: deriveNotes({
+          status: String(row.status || "INVALID"),
+          scheduleType: String(row.scheduleType || "ADMIN"),
+          checkInAt,
+          checkOutAt,
+          scheduledEnd: expectedEnd,
+          exceptionCode,
+        }),
         attendanceEventIdsJson: JSON.stringify(
           events.map((event) => String(event.id)),
         ),
@@ -557,7 +580,7 @@ async function loadLiveTodayFacts(
         auditIdsJson: "[]",
         attendanceSource: classifySource(events),
         calculationSource: "attendance-engine-live",
-            calculationVersion: "central-engine-timezone-v3-holidays-notes",
+        calculationVersion: "central-engine-timezone-v3-holidays-notes",
         historicalDataQuality: "exact",
         timezone,
         computedAt: String(payload.computedAt || new Date().toISOString()),
@@ -577,7 +600,10 @@ export async function buildProfessionalAttendanceReport(
   actor?: any,
 ) {
   const dayCount = validatePeriod(from, to);
-  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  const timezone = await getConfiguredSystemTimeZone(
+    env.DB,
+    env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+  );
   let sourceRows = await loadFacts(env, from, to, employeeId);
   const employeeFilter = employeeId ? " AND employee_id=?" : "";
   const staleQuery = env.DB.prepare(
@@ -590,9 +616,17 @@ export async function buildProfessionalAttendanceReport(
     const deleteQuery = env.DB.prepare(
       `DELETE FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>'central-engine-timezone-v3-holidays-notes')${employeeFilter}`,
     );
-    if (employeeId) await deleteQuery.bind(from, to, timezone, employeeId).run();
+    if (employeeId)
+      await deleteQuery.bind(from, to, timezone, employeeId).run();
     else await deleteQuery.bind(from, to, timezone).run();
-    await ensureProfessionalAttendanceFacts(env, from, to, actor, employeeId, timezone);
+    await ensureProfessionalAttendanceFacts(
+      env,
+      from,
+      to,
+      actor,
+      employeeId,
+      timezone,
+    );
     sourceRows = await loadFacts(env, from, to, employeeId);
   }
   const reportRows = await filterReportableRows(
@@ -786,7 +820,9 @@ export async function buildProfessionalAttendanceReport(
     reportVersion: "2.0",
     generatedAt: new Date().toISOString(),
     timezone,
-    calculationTimezones: [...new Set(rows.map((row) => row.timezone).filter(Boolean))].sort(),
+    calculationTimezones: [
+      ...new Set(rows.map((row) => row.timezone).filter(Boolean)),
+    ].sort(),
     from,
     to,
     days: dayCount,

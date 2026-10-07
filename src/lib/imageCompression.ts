@@ -51,7 +51,10 @@ export async function compressProfileImageDataUrl(
     }
     context.drawImage(image, 0, 0, width, height);
 
-    let quality = Math.min(0.95, Math.max(settings.minQuality, settings.quality));
+    let quality = Math.min(
+      0.95,
+      Math.max(settings.minQuality, settings.quality),
+    );
     for (let qualityPass = 0; qualityPass < 8; qualityPass += 1) {
       const blob = await canvasToBlob(canvas, settings.type, quality);
       if (blob.size <= settings.maxBytes) return blobToDataUrl(blob);
@@ -63,13 +66,20 @@ export async function compressProfileImageDataUrl(
     height = Math.max(128, Math.floor(height * 0.82));
   }
 
-  throw new Error("تعذر ضغط صورة الموظف إلى أقل من 100 كيلوبايت. اختر صورة أصغر.");
+  throw new Error(
+    "تعذر ضغط صورة الموظف إلى أقل من 100 كيلوبايت. اختر صورة أصغر.",
+  );
 }
 
-async function canvasToBlob(canvas: HTMLCanvasElement, type: "image/webp" | "image/jpeg", quality: number): Promise<Blob> {
+async function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: "image/webp" | "image/jpeg",
+  quality: number,
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => blob ? resolve(blob) : reject(new Error("تعذر ضغط صورة الموظف.")),
+      (blob) =>
+        blob ? resolve(blob) : reject(new Error("تعذر ضغط صورة الموظف.")),
       type,
       quality,
     );

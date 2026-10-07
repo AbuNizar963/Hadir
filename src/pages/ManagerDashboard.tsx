@@ -1,10 +1,4 @@
-import {
-  memo,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CalendarDays,
   Coffee,
@@ -147,9 +141,7 @@ export default function ManagerDashboard() {
         if (!active) return;
 
         setError(
-          err instanceof Error
-            ? err.message
-            : "تعذر مزامنة حالة الدوام من D1",
+          err instanceof Error ? err.message : "تعذر مزامنة حالة الدوام من D1",
         );
         setLoading(false);
       } finally {
@@ -191,10 +183,7 @@ export default function ManagerDashboard() {
   );
 
   const presentIds = useMemo(
-    () =>
-      new Set(
-        currentRows.filter(isPresent).map((row) => row.employeeId),
-      ),
+    () => new Set(currentRows.filter(isPresent).map((row) => row.employeeId)),
     [currentRows],
   );
 
@@ -219,10 +208,7 @@ export default function ManagerDashboard() {
   );
 
   const restIds = useMemo(
-    () =>
-      new Set(
-        currentRows.filter(isRest).map((row) => row.employeeId),
-      ),
+    () => new Set(currentRows.filter(isRest).map((row) => row.employeeId)),
     [currentRows],
   );
 
@@ -305,15 +291,12 @@ export default function ManagerDashboard() {
   return (
     <ManagerLayout
       title="لوحة القيادة"
-      subtitle={displayDate.toLocaleDateString(
-        "ar-EG",
-        {
-          weekday: "long",
-          day: "2-digit",
-          month: "long",
-          timeZone: getSystemTimeZone(),
-        },
-      )}
+      subtitle={displayDate.toLocaleDateString("ar-EG", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+        timeZone: getSystemTimeZone(),
+      })}
     >
       {error ? (
         <section className="hud-card mb-6 border border-destructive/30 bg-destructive/5 p-4">
@@ -482,10 +465,7 @@ const EmployeeRow = memo(function EmployeeRow({
       className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${cls}`}
     >
       <div className="min-w-0">
-        <span
-          className="block truncate font-semibold"
-          title={row.employeeName}
-        >
+        <span className="block truncate font-semibold" title={row.employeeName}>
           {row.employeeName}
         </span>
         <span className="mt-0.5 block text-[10px] opacity-70">

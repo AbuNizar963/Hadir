@@ -108,10 +108,7 @@ export default {
           "cache-control": "no-store",
         },
       });
-    if (
-      path === "/api/reports/archive/refresh" &&
-      request.method === "POST"
-    ) {
+    if (path === "/api/reports/archive/refresh" && request.method === "POST") {
       const a = await archiveActor(request, env);
 
       if (!archiveDeleteAllowed(a)) {
@@ -119,11 +116,7 @@ export default {
       }
 
       if (!env.REPORT_ARCHIVES) {
-        return json(
-          { error: "R2 binding REPORT_ARCHIVES غير موجود" },
-          503,
-          o,
-        );
+        return json({ error: "R2 binding REPORT_ARCHIVES غير موجود" }, 503, o);
       }
 
       try {
@@ -149,13 +142,16 @@ export default {
       if (!archiveDeleteAllowed(a))
         return json({ error: "إصلاح الأرشيف متاح للمالك فقط" }, 403, o);
       try {
-        const body = await request.json().catch(() => ({} as any));
+        const body = await request.json().catch(() => ({}) as any);
         const id = String(body?.reportId || "attendance_period_2026-09-01");
         return json(await repairArchiveManifest(env, id), 200, o);
       } catch (error) {
         console.error("[report-archive] safe manifest repair failed", error);
         return json(
-          { error: error instanceof Error ? error.message : "تعذر التحقق من الأرشيف" },
+          {
+            error:
+              error instanceof Error ? error.message : "تعذر التحقق من الأرشيف",
+          },
           500,
           o,
         );
@@ -167,33 +163,103 @@ export default {
       if (!archiveDeleteAllowed(a))
         return json({ error: "تجهيز الأرشيف متاح للمالك فقط" }, 403, o);
       try {
-        const body = await request.json().catch(() => ({} as any));
+        const body = await request.json().catch(() => ({}) as any);
         const cursor = Math.max(0, Math.floor(Number(body?.cursor || 0)));
-        const employeeCursor = Math.max(0, Math.floor(Number(body?.employeeCursor || 0)));
+        const employeeCursor = Math.max(
+          0,
+          Math.floor(Number(body?.employeeCursor || 0)),
+        );
         const timezone = String(env.APP_TIMEZONE || "Asia/Damascus");
         const now = new Date();
-        const current = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit" }).formatToParts(now);
-        const year = Number(current.find((part) => part.type === "year")?.value);
-        const month = Number(current.find((part) => part.type === "month")?.value);
+        const current = new Intl.DateTimeFormat("en-CA", {
+          timeZone: timezone,
+          year: "numeric",
+          month: "2-digit",
+        }).formatToParts(now);
+        const year = Number(
+          current.find((part) => part.type === "year")?.value,
+        );
+        const month = Number(
+          current.find((part) => part.type === "month")?.value,
+        );
         const previous = new Date(Date.UTC(year, month - 2, 1));
         const from = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}-01`;
-        const lastDay = new Date(Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth() + 1, 0)).getUTCDate();
+        const lastDay = new Date(
+          Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth() + 1, 0),
+        ).getUTCDate();
         const to = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-        const day = new Date(Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth(), 1 + cursor)).toISOString().slice(0, 10);
-        if (day > to) return json({ ok: true, done: true, cursor, from, to }, 200, o);
+        const day = new Date(
+          Date.UTC(
+            previous.getUTCFullYear(),
+            previous.getUTCMonth(),
+            1 + cursor,
+          ),
+        )
+          .toISOString()
+          .slice(0, 10);
+        if (day > to)
+          return json({ ok: true, done: true, cursor, from, to }, 200, o);
         // Keep each Worker invocation bounded: one employee/day is safer than
         // pairing two large attendance histories in the same CPU budget.
-        const employees = await env.DB.prepare("SELECT id FROM employees ORDER BY id LIMIT 1 OFFSET ?").bind(employeeCursor).all<{ id: string }>();
+        const employees = await env.DB.prepare(
+          "SELECT id FROM employees ORDER BY id LIMIT 1 OFFSET ?",
+        )
+          .bind(employeeCursor)
+          .all<{ id: string }>();
         const ids = (employees.results || []).map((row) => String(row.id));
         if (!ids.length)
-          return json({ ok: true, done: false, dayDone: true, cursor, nextCursor: cursor + 1, employeeCursor: 0, day, from, to }, 200, o);
+          return json(
+            {
+              ok: true,
+              done: false,
+              dayDone: true,
+              cursor,
+              nextCursor: cursor + 1,
+              employeeCursor: 0,
+              day,
+              from,
+              to,
+            },
+            200,
+            o,
+          );
         let written = 0;
         for (const employeeId of ids)
-          written += await materializeDay(env, day, { id: a.id, role: a.role }, employeeId, timezone);
-        return json({ ok: true, done: false, dayDone: false, cursor, nextCursor: cursor, nextEmployeeCursor: employeeCursor + ids.length, day, written, from, to }, 200, o);
+          written += await materializeDay(
+            env,
+            day,
+            { id: a.id, role: a.role },
+            employeeId,
+            timezone,
+          );
+        return json(
+          {
+            ok: true,
+            done: false,
+            dayDone: false,
+            cursor,
+            nextCursor: cursor,
+            nextEmployeeCursor: employeeCursor + ids.length,
+            day,
+            written,
+            from,
+            to,
+          },
+          200,
+          o,
+        );
       } catch (error) {
         console.error("[report-archive] batch preparation failed", error);
-        return json({ error: error instanceof Error ? error.message : "تعذر تجهيز دفعة الأرشيف" }, 500, o);
+        return json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "تعذر تجهيز دفعة الأرشيف",
+          },
+          500,
+          o,
+        );
       }
     }
 
@@ -276,13 +342,31 @@ export default {
       await (base as any).scheduled(controller, env, ctx);
     if (controller.cron === "0 2 1 * *") {
       try {
-        const setting = await env.DB.prepare("SELECT value FROM settings WHERE key='holidayCountry' LIMIT 1").first<{ value: string }>();
+        const setting = await env.DB.prepare(
+          "SELECT value FROM settings WHERE key='holidayCountry' LIMIT 1",
+        ).first<{ value: string }>();
         let country = "";
-        try { country = String(JSON.parse(String(setting?.value || '\"\"')) || "").trim().toUpperCase(); } catch { country = String(setting?.value || "").trim().toUpperCase(); }
+        try {
+          country = String(JSON.parse(String(setting?.value || '\"\"')) || "")
+            .trim()
+            .toUpperCase();
+        } catch {
+          country = String(setting?.value || "")
+            .trim()
+            .toUpperCase();
+        }
         if (country) {
           const timezone = String(env.APP_TIMEZONE || "Asia/Damascus");
-          const year = Number(new Intl.DateTimeFormat("en-US", { timeZone: timezone, year: "numeric" }).format(new Date()));
-          console.log("[holiday-calendar] monthly refresh", JSON.stringify(await refreshHolidayCalendar(env.DB, country, year)));
+          const year = Number(
+            new Intl.DateTimeFormat("en-US", {
+              timeZone: timezone,
+              year: "numeric",
+            }).format(new Date()),
+          );
+          console.log(
+            "[holiday-calendar] monthly refresh",
+            JSON.stringify(await refreshHolidayCalendar(env.DB, country, year)),
+          );
         }
       } catch (error) {
         console.error("[holiday-calendar] monthly refresh failed", error);

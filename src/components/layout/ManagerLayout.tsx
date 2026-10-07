@@ -175,9 +175,7 @@ export default function ManagerLayout({
   const [showNotifications, setShowNotifications] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark" | "system">(
-    readTheme(),
-  );
+  const [theme, setTheme] = useState<"light" | "dark" | "system">(readTheme());
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
 
@@ -185,9 +183,15 @@ export default function ManagerLayout({
     if (!currentUserId) return;
     let active = true;
     void getBackendSystemTimeZone()
-      .then(({ timezone }) => { if (active) setSystemTimeZone(timezone); })
-      .catch((error) => console.warn("تعذر تحميل المنطقة الزمنية للنظام:", error));
-    return () => { active = false; };
+      .then(({ timezone }) => {
+        if (active) setSystemTimeZone(timezone);
+      })
+      .catch((error) =>
+        console.warn("تعذر تحميل المنطقة الزمنية للنظام:", error),
+      );
+    return () => {
+      active = false;
+    };
   }, [currentUserId]);
 
   useEffect(() => {
@@ -498,7 +502,9 @@ export default function ManagerLayout({
       await markServerNotificationRead(id);
       window.dispatchEvent(
         new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
-          detail: { notificationIds: [id] } satisfies NotificationsChangedDetail,
+          detail: {
+            notificationIds: [id],
+          } satisfies NotificationsChangedDetail,
         }),
       );
     } catch {
@@ -520,11 +526,7 @@ export default function ManagerLayout({
     }
   };
 
-  const utilityButton = (
-    to: string,
-    label: string,
-    Icon: typeof CloudSun,
-  ) => (
+  const utilityButton = (to: string, label: string, Icon: typeof CloudSun) => (
     <Link
       to={to}
       onClick={closeTransient}
@@ -638,7 +640,11 @@ export default function ManagerLayout({
                     )
                   }
                 >
-                  <Icon className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
+                  <Icon
+                    className="h-5 w-5"
+                    strokeWidth={1.9}
+                    aria-hidden="true"
+                  />
                   <span className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-none">
                     {item.label}
                   </span>
@@ -668,7 +674,11 @@ export default function ManagerLayout({
               >
                 <Wrench className="mr-1 inline h-4 w-4" />
                 سجل الأخطاء (
-                {getDiagnostics().filter((entry) => entry.level === "error").length})
+                {
+                  getDiagnostics().filter((entry) => entry.level === "error")
+                    .length
+                }
+                )
               </button>
             )}
 
@@ -731,7 +741,10 @@ export default function ManagerLayout({
         </div>
       )}
 
-      <header className="manager-page-header mx-auto max-w-7xl border-b border-border/40 px-4 pb-4 pt-5 sm:px-6 lg:px-10" aria-label={title}>
+      <header
+        className="manager-page-header mx-auto max-w-7xl border-b border-border/40 px-4 pb-4 pt-5 sm:px-6 lg:px-10"
+        aria-label={title}
+      >
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="manager-page-header-copy" aria-hidden="true">
             <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">
@@ -746,11 +759,16 @@ export default function ManagerLayout({
               </div>
             )}
           </div>
-          {actions && <div className="manager-page-header-actions">{actions}</div>}
+          {actions && (
+            <div className="manager-page-header-actions">{actions}</div>
+          )}
         </div>
       </header>
 
-      <main className="manager-content mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10" aria-label={title}>
+      <main
+        className="manager-content mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10"
+        aria-label={title}
+      >
         {children}
       </main>
 
@@ -846,7 +864,9 @@ export default function ManagerLayout({
                         {notification.body}
                       </div>
                       <div className="mt-1 text-[10px] text-muted-foreground">
-                        {new Date(notification.createdAt).toLocaleString("ar-SA")}
+                        {new Date(notification.createdAt).toLocaleString(
+                          "ar-SA",
+                        )}
                       </div>
                     </button>
                     <button
@@ -901,7 +921,8 @@ export default function ManagerLayout({
 
             <div className="mb-4 flex gap-2">
               <span className="rounded-lg border px-2 py-1 text-xs">
-                الأخطاء: {diagnostics.filter((entry) => entry.level === "error").length}
+                الأخطاء:{" "}
+                {diagnostics.filter((entry) => entry.level === "error").length}
               </span>
               <span className="rounded-lg border px-2 py-1 text-xs">
                 الإجمالي: {diagnostics.length}
@@ -930,7 +951,9 @@ export default function ManagerLayout({
                     className="rounded-xl border bg-secondary/20 p-3"
                   >
                     <summary className="cursor-pointer text-sm">
-                      <b className="mono">{diagnostic.code}</b> · {new Date(diagnostic.timestamp).toLocaleString("ar-SA")} · {diagnostic.message}
+                      <b className="mono">{diagnostic.code}</b> ·{" "}
+                      {new Date(diagnostic.timestamp).toLocaleString("ar-SA")} ·{" "}
+                      {diagnostic.message}
                     </summary>
                     <pre
                       dir="ltr"

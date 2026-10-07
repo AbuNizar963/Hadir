@@ -10,7 +10,12 @@ export function installApiCredentials(): void {
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     let url = "";
     try {
-      url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
     } catch {
       return nativeFetch(input, init);
     }

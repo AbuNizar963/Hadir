@@ -67,8 +67,7 @@ async function fetchByIds(
   const order = new Map(ids.map((id, index) => [id, index]));
 
   return rows.sort(
-    (a, b) =>
-      (order.get(String(a.id)) ?? 0) - (order.get(String(b.id)) ?? 0),
+    (a, b) => (order.get(String(a.id)) ?? 0) - (order.get(String(b.id)) ?? 0),
   );
 }
 
@@ -113,13 +112,12 @@ async function buildProfessionalAttendanceDrilldown(
   attendanceDay: string,
   employeeId: string,
 ) {
-  const fact = await env.DB
-    .prepare(
-      `SELECT *
+  const fact = await env.DB.prepare(
+    `SELECT *
        FROM attendance_reporting_facts
        WHERE attendance_day = ? AND employee_id = ?
        LIMIT 1`,
-    )
+  )
     .bind(attendanceDay, employeeId)
     .first<Record<string, unknown>>();
 
@@ -133,7 +131,9 @@ async function buildProfessionalAttendanceDrilldown(
       ? (() => {
           try {
             const parsed = JSON.parse(fact.schedule_snapshot_json);
-            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            return parsed &&
+              typeof parsed === "object" &&
+              !Array.isArray(parsed)
               ? parsed
               : {};
           } catch {
@@ -246,7 +246,10 @@ export async function handleProfessionalAttendanceReport(
     return json({ error: "الطريقة غير مدعومة" }, 405, origin);
   }
 
-  if (!actor || !["owner", "manager", "supervisor"].includes(String(actor.role))) {
+  if (
+    !actor ||
+    !["owner", "manager", "supervisor"].includes(String(actor.role))
+  ) {
     return json({ error: "غير مصرح" }, 403, origin);
   }
 
@@ -286,13 +289,7 @@ export async function handleProfessionalAttendanceReport(
     // requested day first so scheduled employees without an attendance event
     // are still represented. Raw attendance events remain read-only.
     if (from === to) {
-      await ensureProfessionalAttendanceFacts(
-        env,
-        from,
-        to,
-        actor,
-        employeeId,
-      );
+      await ensureProfessionalAttendanceFacts(env, from, to, actor, employeeId);
     }
 
     const report = await buildProfessionalAttendanceReport(

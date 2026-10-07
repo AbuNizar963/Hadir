@@ -1,5 +1,11 @@
-import { insertAutomaticAttendance, operationalShift } from "./attendance-engine-automatic-commands";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  insertAutomaticAttendance,
+  operationalShift,
+} from "./attendance-engine-automatic-commands";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 
 export { runAutomaticAttendance } from "./attendance-engine-automatic-commands";
 
@@ -47,7 +53,10 @@ export async function directAttendance(
 
   if (!supportedPaths.includes(path) || req.method !== "POST") return null;
 
-  if (!actor || !["owner", "manager"].includes(String(actor.role).toLowerCase())) {
+  if (
+    !actor ||
+    !["owner", "manager"].includes(String(actor.role).toLowerCase())
+  ) {
     return json({ error: OWNER }, 403, origin);
   }
 
@@ -55,10 +64,9 @@ export async function directAttendance(
   const employeeId = String(body.employeeId || "").trim();
   if (!employeeId) return json({ error: "الموظف مطلوب" }, 400, origin);
 
-  const employee = await env.DB
-    .prepare(
-      "SELECT id,job_number AS jobNumber,name,status,location_id AS locationId,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson FROM employees WHERE id=? LIMIT 1",
-    )
+  const employee = await env.DB.prepare(
+    "SELECT id,job_number AS jobNumber,name,status,location_id AS locationId,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson FROM employees WHERE id=? LIMIT 1",
+  )
     .bind(employeeId)
     .first<any>();
 
@@ -75,17 +83,19 @@ export async function directAttendance(
         : "check-in";
 
   const current = new Date();
-  const tz = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  const tz = await getConfiguredSystemTimeZone(
+    env.DB,
+    env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+  );
   const shift = operationalShift(employee, current, tz);
 
   if (!shift.isWorkDay) {
     return json({ error: "لا يوجد دوام للموظف الآن" }, 403, origin);
   }
 
-  const rows = await env.DB
-    .prepare(
-      "SELECT type,timestamp FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<=? ORDER BY timestamp ASC",
-    )
+  const rows = await env.DB.prepare(
+    "SELECT type,timestamp FROM attendance WHERE employee_id=? AND timestamp>=? AND timestamp<=? ORDER BY timestamp ASC",
+  )
     .bind(
       employeeId,
       shift.start.toISOString(),
@@ -134,11 +144,7 @@ export async function directAttendance(
   );
 
   if (!record) {
-    return json(
-      { error: "تعذر تسجيل الحضور عبر المحرك المركزي" },
-      409,
-      origin,
-    );
+    return json({ error: "تعذر تسجيل الحضور عبر المحرك المركزي" }, 409, origin);
   }
 
   // The canonical attendance engine already refreshes the derived daily-status
@@ -167,11 +173,9 @@ export async function workforceControls(
   }
 
   if (req.method === "GET") {
-    const rows = await env.DB
-      .prepare(
-        "SELECT id,job_number AS jobNumber,name,status,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees ORDER BY name",
-      )
-      .all<any>();
+    const rows = await env.DB.prepare(
+      "SELECT id,job_number AS jobNumber,name,status,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees ORDER BY name",
+    ).all<any>();
 
     return json(
       (rows.results || []).map((employee: any) => ({
@@ -205,8 +209,9 @@ export async function workforceControls(
   }
 
   const employeeId = decodeURIComponent(match[1]);
-  const employee = await env.DB
-    .prepare("SELECT id FROM employees WHERE id=? LIMIT 1")
+  const employee = await env.DB.prepare(
+    "SELECT id FROM employees WHERE id=? LIMIT 1",
+  )
     .bind(employeeId)
     .first();
 
@@ -240,8 +245,7 @@ export async function workforceControls(
   }
 
   values.push(employeeId);
-  await env.DB
-    .prepare(`UPDATE employees SET ${fields.join(",")} WHERE id=?`)
+  await env.DB.prepare(`UPDATE employees SET ${fields.join(",")} WHERE id=?`)
     .bind(...values)
     .run();
 

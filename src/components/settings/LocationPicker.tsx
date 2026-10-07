@@ -18,15 +18,23 @@ const SATELLITE_ATTRIBUTION = "© Esri, Maxar, Earthstar Geographics";
 function validCoordinate(lat: unknown, lng: unknown): boolean {
   const latitude = Number(lat);
   const longitude = Number(lng);
-  return Number.isFinite(latitude)
-    && Number.isFinite(longitude)
-    && latitude >= -90
-    && latitude <= 90
-    && longitude >= -180
-    && longitude <= 180;
+  return (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180
+  );
 }
 
-export default function LocationPicker({ lat, lng, radiusMeters, onChange, className = "" }: LocationPickerProps) {
+export default function LocationPicker({
+  lat,
+  lng,
+  radiusMeters,
+  onChange,
+  className = "",
+}: LocationPickerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.CircleMarker | null>(null);
@@ -55,7 +63,7 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
         button.type = "button";
         button.title = "تحديد موقعي بدقة";
         button.setAttribute("aria-label", "تحديد موقعي بدقة");
-        button.innerHTML = "<span aria-hidden=\"true\">⌾</span>";
+        button.innerHTML = '<span aria-hidden="true">⌾</span>';
         L.DomEvent.disableClickPropagation(button);
         L.DomEvent.on(button, "click", (event) => {
           L.DomEvent.stop(event);
@@ -97,7 +105,9 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
         const initialRadius = Number(radiusMetersRef.current);
 
         if (!validCoordinate(initialLat, initialLng)) {
-          console.warn("إحداثيات الموقع المحدد غير صالحة؛ لن يتم فتح الخريطة على موقع افتراضي.");
+          console.warn(
+            "إحداثيات الموقع المحدد غير صالحة؛ لن يتم فتح الخريطة على موقع افتراضي.",
+          );
           started = false;
           return;
         }
@@ -126,7 +136,10 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
           fillOpacity: 0.9,
         }).addTo(map);
         const radius = L.circle([initialLat, initialLng], {
-          radius: Math.max(1, Number.isFinite(initialRadius) ? initialRadius : 100),
+          radius: Math.max(
+            1,
+            Number.isFinite(initialRadius) ? initialRadius : 100,
+          ),
           weight: 2,
           fillOpacity: 0.12,
         }).addTo(map);
@@ -157,7 +170,9 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
           markerRef.current = null;
           radiusRef.current = null;
         };
-        (host as HTMLDivElement & { __leafletCleanup?: () => void }).__leafletCleanup = cleanup;
+        (
+          host as HTMLDivElement & { __leafletCleanup?: () => void }
+        ).__leafletCleanup = cleanup;
       } catch (error) {
         console.warn("تعذر تحميل خريطة القمر الصناعي لتحديد الموقع:", error);
         started = false;
@@ -165,9 +180,12 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
     };
 
     if ("IntersectionObserver" in window) {
-      observer = new IntersectionObserver((entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) void initMap();
-      }, { rootMargin: "160px" });
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) void initMap();
+        },
+        { rootMargin: "160px" },
+      );
       observer.observe(host);
     } else {
       void initMap();
@@ -176,7 +194,9 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
     return () => {
       disposed = true;
       observer?.disconnect();
-      const cleanupHost = host as HTMLDivElement & { __leafletCleanup?: () => void };
+      const cleanupHost = host as HTMLDivElement & {
+        __leafletCleanup?: () => void;
+      };
       cleanupHost.__leafletCleanup?.();
       delete cleanupHost.__leafletCleanup;
     };
@@ -195,7 +215,9 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
   }, [lat, lng, radiusMeters]);
 
   return (
-    <div className={`overflow-hidden rounded-2xl border border-border/70 bg-muted/20 ${className}`}>
+    <div
+      className={`overflow-hidden rounded-2xl border border-border/70 bg-muted/20 ${className}`}
+    >
       <style>{`
         .hadir-map-location-control {
           width: 38px;
@@ -214,10 +236,20 @@ export default function LocationPicker({ lat, lng, radiusMeters, onChange, class
         .hadir-map-location-control:hover { background: #fff; transform: scale(1.04); }
         .hadir-map-location-control:disabled { opacity: .6; cursor: wait; }
       `}</style>
-      <div ref={hostRef} className="h-64 w-full sm:h-80" aria-label="خريطة القمر الصناعي لتحديد الموقع" />
+      <div
+        ref={hostRef}
+        className="h-64 w-full sm:h-80"
+        aria-label="خريطة القمر الصناعي لتحديد الموقع"
+      />
       <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-card/90 px-3 py-2 text-[10px] text-muted-foreground">
-        <span>اضغط زر ⌾ للحصول على GPS دقيق، أو اضغط على الخريطة لاختيار النقطة</span>
-        <span className="mono">{validCoordinate(lat, lng) ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}` : "—"}</span>
+        <span>
+          اضغط زر ⌾ للحصول على GPS دقيق، أو اضغط على الخريطة لاختيار النقطة
+        </span>
+        <span className="mono">
+          {validCoordinate(lat, lng)
+            ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
+            : "—"}
+        </span>
       </div>
     </div>
   );

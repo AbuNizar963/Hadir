@@ -58,15 +58,17 @@ function normalizeActiveAttendance(
           };
         }
 
-
         return row;
       })
     : [];
 
-  const counts = employees.reduce<Record<string, number>>((accumulator, row) => {
-    accumulator[row.status] = (accumulator[row.status] || 0) + 1;
-    return accumulator;
-  }, {});
+  const counts = employees.reduce<Record<string, number>>(
+    (accumulator, row) => {
+      accumulator[row.status] = (accumulator[row.status] || 0) + 1;
+      return accumulator;
+    },
+    {},
+  );
 
   return {
     ...data,
@@ -79,13 +81,21 @@ function normalizeActiveAttendance(
 // Escape is a current employee state, so the latest event takes precedence over the daily snapshot.
 async function getCurrentEscapedEmployeeIds(): Promise<Set<string>> {
   try {
-    const events = (await getBackendEscapeEvents(undefined, 2000)) as EscapeState[];
+    const events = (await getBackendEscapeEvents(
+      undefined,
+      2000,
+    )) as EscapeState[];
     const latestByEmployee = new Map<string, string>();
 
     for (const event of events) {
       const employeeId = String(event.employeeId || "").trim();
       if (!employeeId || latestByEmployee.has(employeeId)) continue;
-      latestByEmployee.set(employeeId, String(event.status || "").trim().toLowerCase());
+      latestByEmployee.set(
+        employeeId,
+        String(event.status || "")
+          .trim()
+          .toLowerCase(),
+      );
     }
 
     return new Set(
@@ -99,7 +109,9 @@ async function getCurrentEscapedEmployeeIds(): Promise<Set<string>> {
   }
 }
 
-export async function getDailyStatus(day: string): Promise<DailyStatusResponse> {
+export async function getDailyStatus(
+  day: string,
+): Promise<DailyStatusResponse> {
   const token =
     typeof window === "undefined"
       ? ""

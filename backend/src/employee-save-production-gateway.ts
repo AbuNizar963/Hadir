@@ -1,7 +1,10 @@
 import base, { HadirRealtime } from "./device-rebind-gateway";
 import { generateDailyReportPdf } from "./report-pdf";
 import { refreshProfessionalAttendanceFact } from "./professional-attendance-fact-builder";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 
 type Env = {
   DB: D1Database;
@@ -394,9 +397,18 @@ async function saveEmployee(
     .bind(id)
     .first<any>();
   const result = employeeOut(updated, Number(policy?.minutes || 0));
-  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-  const dayPart = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  const timezone = await getConfiguredSystemTimeZone(
+    env.DB,
+    env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+  );
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const dayPart = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "00";
   const systemDay = `${dayPart("year")}-${dayPart("month")}-${dayPart("day")}`;
   try {
     await refreshProfessionalAttendanceFact(env, systemDay, a, id, timezone);

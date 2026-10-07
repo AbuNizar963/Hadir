@@ -1,4 +1,7 @@
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 import { publicHolidayForDay } from "./public-holidays";
 import { holidayNameFromLocalCalendar } from "./holiday-calendar";
 type Env = {
@@ -84,7 +87,13 @@ function tzParts(date: Date, timeZone = TZ) {
     hour12: false,
   }).formatToParts(date);
   const get = (t: string) => p.find((x) => x.type === t)?.value || "";
-  return { year: Number(get("year")), month: Number(get("month")), day: Number(get("day")), hour: Number(get("hour")) % 24, minute: Number(get("minute")) };
+  return {
+    year: Number(get("year")),
+    month: Number(get("month")),
+    day: Number(get("day")),
+    hour: Number(get("hour")) % 24,
+    minute: Number(get("minute")),
+  };
 }
 function wallClockAsUtc(date: Date, timeZone: string) {
   const p = tzParts(date, timeZone);
@@ -94,32 +103,75 @@ const dayKey = (date: Date, timeZone = TZ) => {
   const p = tzParts(date, timeZone);
   return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
 };
-const dayNumber = (day: string) => Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10))) / DAY_MS;
-const addDays = (day: string, n: number) => new Date((dayNumber(day) + n) * DAY_MS).toISOString().slice(0, 10);
+const dayNumber = (day: string) =>
+  Date.UTC(
+    Number(day.slice(0, 4)),
+    Number(day.slice(5, 7)) - 1,
+    Number(day.slice(8, 10)),
+  ) / DAY_MS;
+const addDays = (day: string, n: number) =>
+  new Date((dayNumber(day) + n) * DAY_MS).toISOString().slice(0, 10);
 function parseTime(value: string | null | undefined, fallback: string) {
   const f = /(\d{1,2}):(\d{2})/.exec(fallback);
   const m = /(\d{1,2}):(\d{2})/.exec(String(value || ""));
-  const h = Number(m?.[1] ?? f?.[1] ?? 9), min = Number(m?.[2] ?? f?.[2] ?? 0);
-  return { h: Number.isFinite(h) ? Math.min(23, Math.max(0, h)) : 9, m: Number.isFinite(min) ? Math.min(59, Math.max(0, min)) : 0 };
+  const h = Number(m?.[1] ?? f?.[1] ?? 9),
+    min = Number(m?.[2] ?? f?.[2] ?? 0);
+  return {
+    h: Number.isFinite(h) ? Math.min(23, Math.max(0, h)) : 9,
+    m: Number.isFinite(min) ? Math.min(59, Math.max(0, min)) : 0,
+  };
 }
-const minutesBetween = (from: string | null | undefined, to: string | null | undefined) => {
+const minutesBetween = (
+  from: string | null | undefined,
+  to: string | null | undefined,
+) => {
   if (!from || !to) return null;
-  const a = Date.parse(from), b = Date.parse(to);
+  const a = Date.parse(from),
+    b = Date.parse(to);
   if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null;
   return Math.round((b - a) / 60000);
 };
-function localDateTimeUtc(day: string, time: string | null | undefined, timeZone = TZ) {
+function localDateTimeUtc(
+  day: string,
+  time: string | null | undefined,
+  timeZone = TZ,
+) {
   const t = parseTime(time, "09:00");
-  const wallTime = Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), t.h, t.m);
+  const wallTime = Date.UTC(
+    Number(day.slice(0, 4)),
+    Number(day.slice(5, 7)) - 1,
+    Number(day.slice(8, 10)),
+    t.h,
+    t.m,
+  );
   const offsets = new Set<number>();
   for (const delta of [-36, -12, 0, 12, 36]) {
     const probe = new Date(wallTime + delta * 60 * 60 * 1000);
-    offsets.add(Math.round((wallClockAsUtc(probe, timeZone) - Math.floor(probe.getTime() / 60000) * 60000) / 60000));
+    offsets.add(
+      Math.round(
+        (wallClockAsUtc(probe, timeZone) -
+          Math.floor(probe.getTime() / 60000) * 60000) /
+          60000,
+      ),
+    );
   }
-  const candidates = [...offsets].map((offset) => new Date(wallTime - offset * 60000));
-  const exact = candidates.filter((candidate) => wallClockAsUtc(candidate, timeZone) === wallTime);
+  const candidates = [...offsets].map(
+    (offset) => new Date(wallTime - offset * 60000),
+  );
+  const exact = candidates.filter(
+    (candidate) => wallClockAsUtc(candidate, timeZone) === wallTime,
+  );
   if (exact.length) return exact.sort((a, b) => a.getTime() - b.getTime())[0];
-  const after = candidates.map((candidate) => ({ candidate, wall: wallClockAsUtc(candidate, timeZone) })).filter((item) => item.wall > wallTime).sort((a, b) => (a.wall - b.wall) || (a.candidate.getTime() - b.candidate.getTime()));
+  const after = candidates
+    .map((candidate) => ({
+      candidate,
+      wall: wallClockAsUtc(candidate, timeZone),
+    }))
+    .filter((item) => item.wall > wallTime)
+    .sort(
+      (a, b) =>
+        a.wall - b.wall || a.candidate.getTime() - b.candidate.getTime(),
+    );
   return after[0]?.candidate || candidates[0] || new Date(wallTime);
 }
 function workDays(employee: EmployeeRow) {
@@ -146,63 +198,184 @@ function rotationParams(employee: EmployeeRow, timeZone = TZ) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDay)) return null;
   const startTime = employee.workStartTime || "09:00";
   const firstStart = localDateTimeUtc(startDay, startTime, timeZone);
-  const on = Math.max(1, Math.floor(Number(employee.rotationDaysOn ?? 4))), off = Math.max(0, Math.floor(Number(employee.rotationDaysOff ?? 4))), cycle = on + off;
+  const on = Math.max(1, Math.floor(Number(employee.rotationDaysOn ?? 4))),
+    off = Math.max(0, Math.floor(Number(employee.rotationDaysOff ?? 4))),
+    cycle = on + off;
   if (cycle <= 0) return null;
   return { startDay, startTime, firstStart, on, cycle };
 }
-function rotationScheduleAt(employee: EmployeeRow, instant: Date, timeZone = TZ) {
+function rotationScheduleAt(
+  employee: EmployeeRow,
+  instant: Date,
+  timeZone = TZ,
+) {
   const p = rotationParams(employee, timeZone);
-  if (!p) return { work: false, status: "INVALID" as const, start: null, end: null };
-  if (instant.getTime() < p.firstStart.getTime()) return { work: false, status: "NOT_STARTED" as const, start: null, end: null };
-  const targetDay = dayKey(instant, timeZone), elapsedDays = dayNumber(targetDay) - dayNumber(p.startDay);
-  if (elapsedDays < 0) return { work: false, status: "NOT_STARTED" as const, start: null, end: null };
-  const cycleIndex = Math.floor(elapsedDays / p.cycle), cycleDay = elapsedDays - cycleIndex * p.cycle;
+  if (!p)
+    return { work: false, status: "INVALID" as const, start: null, end: null };
+  if (instant.getTime() < p.firstStart.getTime())
+    return {
+      work: false,
+      status: "NOT_STARTED" as const,
+      start: null,
+      end: null,
+    };
+  const targetDay = dayKey(instant, timeZone),
+    elapsedDays = dayNumber(targetDay) - dayNumber(p.startDay);
+  if (elapsedDays < 0)
+    return {
+      work: false,
+      status: "NOT_STARTED" as const,
+      start: null,
+      end: null,
+    };
+  const cycleIndex = Math.floor(elapsedDays / p.cycle),
+    cycleDay = elapsedDays - cycleIndex * p.cycle;
   const periodStartDay = addDays(p.startDay, cycleIndex * p.cycle);
   const periodStart = localDateTimeUtc(periodStartDay, p.startTime, timeZone);
-  const periodEnd = localDateTimeUtc(addDays(periodStartDay, p.on), p.startTime, timeZone);
-  if (cycleDay < p.on || (cycleDay === p.on && instant.getTime() < periodEnd.getTime()))
-    return { work: true, status: "WORK" as const, start: periodStart, end: periodEnd };
-  return { work: false, status: "REST" as const, start: periodStart, end: periodEnd };
+  const periodEnd = localDateTimeUtc(
+    addDays(periodStartDay, p.on),
+    p.startTime,
+    timeZone,
+  );
+  if (
+    cycleDay < p.on ||
+    (cycleDay === p.on && instant.getTime() < periodEnd.getTime())
+  )
+    return {
+      work: true,
+      status: "WORK" as const,
+      start: periodStart,
+      end: periodEnd,
+    };
+  return {
+    work: false,
+    status: "REST" as const,
+    start: periodStart,
+    end: periodEnd,
+  };
 }
 export function isRotationVisibleDay(
-  employee: Pick<EmployeeRow, "scheduleType" | "workStartTime" | "rotationStartDate" | "rotationDaysOn" | "rotationDaysOff">,
+  employee: Pick<
+    EmployeeRow,
+    | "scheduleType"
+    | "workStartTime"
+    | "rotationStartDate"
+    | "rotationDaysOn"
+    | "rotationDaysOff"
+  >,
   day: string,
   timeZone = TZ,
 ) {
-  const kind = String(employee.scheduleType || "").trim().toUpperCase();
+  const kind = String(employee.scheduleType || "")
+    .trim()
+    .toUpperCase();
   if (kind !== "ROTATION") return true;
-  const schedule = rotationScheduleAt(employee as EmployeeRow, localDateTimeUtc(day, employee.workStartTime || "09:00", timeZone), timeZone);
+  const schedule = rotationScheduleAt(
+    employee as EmployeeRow,
+    localDateTimeUtc(day, employee.workStartTime || "09:00", timeZone),
+    timeZone,
+  );
   if (schedule.work) return true;
-  return schedule.status === "REST" && !!schedule.end && dayKey(schedule.end, timeZone) === day;
+  return (
+    schedule.status === "REST" &&
+    !!schedule.end &&
+    dayKey(schedule.end, timeZone) === day
+  );
 }
-function rotationDailyScheduleFor(employee: EmployeeRow, day: string, timeZone = TZ) {
+function rotationDailyScheduleFor(
+  employee: EmployeeRow,
+  day: string,
+  timeZone = TZ,
+) {
   const p = rotationParams(employee, timeZone);
-  if (!p) return { work: false, status: "INVALID" as const, start: null, end: null };
-  const checkpoint = localDateTimeUtc(day, employee.rotationDailyAttendanceTime || "12:00", timeZone);
+  if (!p)
+    return { work: false, status: "INVALID" as const, start: null, end: null };
+  const checkpoint = localDateTimeUtc(
+    day,
+    employee.rotationDailyAttendanceTime || "12:00",
+    timeZone,
+  );
   const active = rotationScheduleAt(employee, checkpoint, timeZone);
-  if (!active.work || !active.start || !active.end || checkpoint.getTime() < active.start.getTime() || checkpoint.getTime() >= active.end.getTime())
-    return { work: false, status: active.status, start: checkpoint, end: new Date(checkpoint.getTime() + Math.max(0, Math.floor(Number(employee.rotationDailyAttendanceGraceMinutes ?? 0))) * 60000) };
-  const grace = Math.min(180, Math.max(0, Math.floor(Number(employee.rotationDailyAttendanceGraceMinutes ?? 0))));
-  return { work: true, status: "WORK" as const, start: checkpoint, end: new Date(checkpoint.getTime() + grace * 60000) };
+  if (
+    !active.work ||
+    !active.start ||
+    !active.end ||
+    checkpoint.getTime() < active.start.getTime() ||
+    checkpoint.getTime() >= active.end.getTime()
+  )
+    return {
+      work: false,
+      status: active.status,
+      start: checkpoint,
+      end: new Date(
+        checkpoint.getTime() +
+          Math.max(
+            0,
+            Math.floor(
+              Number(employee.rotationDailyAttendanceGraceMinutes ?? 0),
+            ),
+          ) *
+            60000,
+      ),
+    };
+  const grace = Math.min(
+    180,
+    Math.max(
+      0,
+      Math.floor(Number(employee.rotationDailyAttendanceGraceMinutes ?? 0)),
+    ),
+  );
+  return {
+    work: true,
+    status: "WORK" as const,
+    start: checkpoint,
+    end: new Date(checkpoint.getTime() + grace * 60000),
+  };
 }
 function scheduleFor(employee: EmployeeRow, day: string, timeZone = TZ) {
-  const kind = String(employee.scheduleType || "ADMIN").trim().toUpperCase();
+  const kind = String(employee.scheduleType || "ADMIN")
+    .trim()
+    .toUpperCase();
   if (kind !== "ROTATION") {
     const weekday = new Date(dayNumber(day) * DAY_MS).getUTCDay();
-    if (!workDays(employee).includes(weekday)) return { work: false, status: "REST" as const, start: null, end: null };
-    const start = localDateTimeUtc(day, employee.workStartTime || "09:00", timeZone);
+    if (!workDays(employee).includes(weekday))
+      return { work: false, status: "REST" as const, start: null, end: null };
+    const start = localDateTimeUtc(
+      day,
+      employee.workStartTime || "09:00",
+      timeZone,
+    );
     const endTime = employee.workEndTime || "16:00";
     const rawEnd = localDateTimeUtc(day, endTime, timeZone);
-    const end = rawEnd.getTime() <= start.getTime() ? localDateTimeUtc(addDays(day, 1), endTime, timeZone) : rawEnd;
+    const end =
+      rawEnd.getTime() <= start.getTime()
+        ? localDateTimeUtc(addDays(day, 1), endTime, timeZone)
+        : rawEnd;
     return { work: true, status: "WORK" as const, start, end };
   }
-  if (Number(employee.rotationDailyAttendanceEnabled) === 1) return rotationDailyScheduleFor(employee, day, timeZone);
+  if (Number(employee.rotationDailyAttendanceEnabled) === 1)
+    return rotationDailyScheduleFor(employee, day, timeZone);
   const p = rotationParams(employee, timeZone);
-  if (!p) return { work: false, status: "INVALID" as const, start: null, end: null };
-  const dayAnchor = localDateTimeUtc(day, employee.workStartTime || "09:00", timeZone);
+  if (!p)
+    return { work: false, status: "INVALID" as const, start: null, end: null };
+  const dayAnchor = localDateTimeUtc(
+    day,
+    employee.workStartTime || "09:00",
+    timeZone,
+  );
   const scheduled = rotationScheduleAt(employee, dayAnchor, timeZone);
-  if (!scheduled.work && scheduled.status === "REST" && scheduled.end && dayKey(scheduled.end, timeZone) === day)
-    return { work: true, status: "WORK" as const, start: scheduled.start, end: scheduled.end };
+  if (
+    !scheduled.work &&
+    scheduled.status === "REST" &&
+    scheduled.end &&
+    dayKey(scheduled.end, timeZone) === day
+  )
+    return {
+      work: true,
+      status: "WORK" as const,
+      start: scheduled.start,
+      end: scheduled.end,
+    };
   return scheduled;
 }
 function checkoutCutoff(
@@ -211,9 +384,20 @@ function checkoutCutoff(
   day: string,
   timeZone = TZ,
 ) {
-  const kind = String(employee.scheduleType || "").trim().toUpperCase();
-  if (kind === "ROTATION" && shift.end) return localDateTimeUtc(addDays(dayKey(shift.end, timeZone), 1), "00:00", timeZone);
-  return localDateTimeUtc(addDays(dayKey(shift.end, timeZone), 1), "00:00", timeZone);
+  const kind = String(employee.scheduleType || "")
+    .trim()
+    .toUpperCase();
+  if (kind === "ROTATION" && shift.end)
+    return localDateTimeUtc(
+      addDays(dayKey(shift.end, timeZone), 1),
+      "00:00",
+      timeZone,
+    );
+  return localDateTimeUtc(
+    addDays(dayKey(shift.end, timeZone), 1),
+    "00:00",
+    timeZone,
+  );
 }
 export async function handleDailyStatus(
   req: Request,
@@ -230,7 +414,12 @@ export async function handleDailyStatus(
     !["owner", "manager", "supervisor", "staff"].includes(String(actor.role))
   )
     return json({ error: "غير مصرح" }, 403);
-  const timezone = timezoneOverride || await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  const timezone =
+    timezoneOverride ||
+    (await getConfiguredSystemTimeZone(
+      env.DB,
+      env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+    ));
   const url = new URL(req.url),
     requestedDay = String(url.searchParams.get("date") || "").trim(),
     day = /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
@@ -259,7 +448,8 @@ export async function handleDailyStatus(
       .all<any>();
     const now = new Date(),
       today = dayKey(now, timezone),
-      escapeCutoff = day === today ? now : localDateTimeUtc(nextDay, "00:00", timezone);
+      escapeCutoff =
+        day === today ? now : localDateTimeUtc(nextDay, "00:00", timezone);
     const escapeQuery = requestedEmployeeId
       ? await env.DB.prepare(
           "SELECT employee_id AS employeeId,status,timestamp FROM escape_events WHERE employee_id=? AND timestamp<? ORDER BY timestamp DESC LIMIT 1",
@@ -279,12 +469,24 @@ export async function handleDailyStatus(
     }
     const employees = employeeQuery.results || [];
     const requests = requestQuery.results || [];
-    const holidaySettings = await env.DB.prepare("SELECT key,value FROM settings WHERE key='holidayCountry'").all<{ key: string; value: string }>();
-    const holidayCountry = holidaySettings.results?.[0]?.value ? (() => { try { return JSON.parse(holidaySettings.results[0].value); } catch { return holidaySettings.results[0].value; } })() : "";
+    const holidaySettings = await env.DB.prepare(
+      "SELECT key,value FROM settings WHERE key='holidayCountry'",
+    ).all<{ key: string; value: string }>();
+    const holidayCountry = holidaySettings.results?.[0]?.value
+      ? (() => {
+          try {
+            return JSON.parse(holidaySettings.results[0].value);
+          } catch {
+            return holidaySettings.results[0].value;
+          }
+        })()
+      : "";
     const localHolidayName = holidayCountry
       ? await holidayNameFromLocalCalendar(env.DB, day, String(holidayCountry))
       : null;
-    const publicHolidayName = localHolidayName || publicHolidayForDay(day, String(holidayCountry || ""));
+    const publicHolidayName =
+      localHolidayName ||
+      publicHolidayForDay(day, String(holidayCountry || ""));
     const scopedEmployees = employees.filter((employee) =>
       isRotationVisibleDay(employee, day, timezone),
     );
@@ -423,7 +625,12 @@ export async function handleDailyStatus(
                 return (
                   Number.isFinite(ts) &&
                   ts >= schedule.start!.getTime() &&
-                  ts < localDateTimeUtc(addDays(day, 1), "00:00", timezone).getTime()
+                  ts <
+                    localDateTimeUtc(
+                      addDays(day, 1),
+                      "00:00",
+                      timezone,
+                    ).getTime()
                 );
               })
             : [];
@@ -462,7 +669,8 @@ export async function handleDailyStatus(
         !permissionIds.has(id);
       // Official holidays apply only to administrative schedules. Rotation employees
       // keep their planned on/off cycle even when a date is a public holiday.
-      const isAdminHoliday = !isRotation && schedule.work && Boolean(publicHolidayName);
+      const isAdminHoliday =
+        !isRotation && schedule.work && Boolean(publicHolidayName);
       const latestEscape = latestEscapeByEmployee.get(id);
       let status: Status;
       if (
@@ -565,13 +773,14 @@ export async function handleDailyStatus(
         !!checkIn &&
         !checkOut &&
         !!schedule.end &&
-        (day < today || (day === today && now.getTime() >= schedule.end.getTime()));
+        (day < today ||
+          (day === today && now.getTime() >= schedule.end.getTime()));
       const exceptionCode =
         checkOut && !checkIn
           ? "CHECKOUT_WITHOUT_CHECKIN"
           : shiftEnded && (status === "PRESENT" || status === "LATE")
             ? "MISSING_CHECKOUT"
-              : status === "ABSENT"
+            : status === "ABSENT"
               ? "ABSENT_NO_APPROVED_REASON"
               : lateMinutes
                 ? "LATE_ARRIVAL"
@@ -583,15 +792,21 @@ export async function handleDailyStatus(
 
       // Legacy open metric is derived from the exception layer, never from the primary status.
       const open = exceptionCode === "MISSING_CHECKOUT" ? 1 : 0;
-      const notes = publicHolidayName && status === "HOLIDAY"
-        ? publicHolidayName
-        : isRotation && checkIn && schedule.end && now.getTime() >= schedule.end.getTime()
-          ? checkOut ? "انتهت المناوبة · سُجل الانصراف" : "انتهت المناوبة · لم يُسجل الانصراف"
-          : isRotation && checkIn
-            ? "حضور مستمر حتى نهاية المناوبة"
-            : exceptionCode === "MISSING_CHECKOUT"
-              ? "حضر ولم يسجل الانصراف بعد"
-              : "";
+      const notes =
+        publicHolidayName && status === "HOLIDAY"
+          ? publicHolidayName
+          : isRotation &&
+              checkIn &&
+              schedule.end &&
+              now.getTime() >= schedule.end.getTime()
+            ? checkOut
+              ? "انتهت المناوبة · سُجل الانصراف"
+              : "انتهت المناوبة · لم يُسجل الانصراف"
+            : isRotation && checkIn
+              ? "حضور مستمر حتى نهاية المناوبة"
+              : exceptionCode === "MISSING_CHECKOUT"
+                ? "حضر ولم يسجل الانصراف بعد"
+                : "";
       return {
         attendanceDay: day,
         employeeId: id,

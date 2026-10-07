@@ -14,7 +14,9 @@ const K_NOTIFICATIONS = "hadir.notifications";
 const EVT_CHANGED = "hadir:notifications-changed";
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const FALLBACK_REFRESH_MS = 120000;
-const API_URL = (import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "");
+const API_URL = (
+  import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev"
+).replace(/\/$/, "");
 const APP_BASE = String(import.meta.env.BASE_URL || "/").replace(/\/$/, "");
 const NOTIFICATION_ICON = `${APP_BASE}/pwa-192x192.png`;
 const ADMIN_TOKEN_KEY = "hadir.api.token.admin";
@@ -67,11 +69,10 @@ function writeAll(list: AppNotification[]): void {
   }
 }
 
-export async function requestNotificationPermission(): Promise<NotificationPermission | "unsupported"> {
-  if (
-    typeof window === "undefined" ||
-    !("Notification" in window)
-  ) {
+export async function requestNotificationPermission(): Promise<
+  NotificationPermission | "unsupported"
+> {
+  if (typeof window === "undefined" || !("Notification" in window)) {
     return "unsupported";
   }
 
@@ -134,9 +135,7 @@ async function fetchDeletedIds(): Promise<Set<string>> {
 
     const rows = (await response.json()) as any[];
     return new Set(
-      rows
-        .map((row) => String(row.notificationId || ""))
-        .filter(Boolean),
+      rows.map((row) => String(row.notificationId || "")).filter(Boolean),
     );
   } catch {
     return new Set();
@@ -159,7 +158,9 @@ export async function syncNotificationsFromD1(): Promise<void> {
     }
 
     const rows = (await response.json()) as any[];
-    const previous = new Map(readAll().map((notification) => [notification.id, notification]));
+    const previous = new Map(
+      readAll().map((notification) => [notification.id, notification]),
+    );
     const mapped = prune(
       rows
         .filter((row) => !deletedIds.has(String(row.id)))
@@ -176,7 +177,7 @@ export async function syncNotificationsFromD1(): Promise<void> {
                   ? "warning"
                   : row.severity === "success"
                     ? "success"
-                    : row.type ?? "info") as NotificationType,
+                    : (row.type ?? "info")) as NotificationType,
               read: Boolean(row.readAt),
               createdAt: String(row.createdAt),
             }) satisfies AppNotification,
@@ -264,12 +265,16 @@ export function addNotification(
 export function getNotifications(userId?: string): AppNotification[] {
   const list = readAll();
   return userId
-    ? list.filter((notification) => notification.userId === userId || !notification.userId)
+    ? list.filter(
+        (notification) =>
+          notification.userId === userId || !notification.userId,
+      )
     : list;
 }
 
 export function getUnreadCount(userId?: string): number {
-  return getNotifications(userId).filter((notification) => !notification.read).length;
+  return getNotifications(userId).filter((notification) => !notification.read)
+    .length;
 }
 
 export function markAsRead(id: string): void {

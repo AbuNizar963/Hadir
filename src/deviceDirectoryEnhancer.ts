@@ -1,12 +1,10 @@
-import {
-  backendEnabled,
-  backendMe,
-  getBackendEmployees,
-} from "@/lib/backend";
+import { backendEnabled, backendMe, getBackendEmployees } from "@/lib/backend";
 
 const EMPLOYEE_DATA_TTL_MS = 30_000;
 
-type EmployeeDirectoryRow = Awaited<ReturnType<typeof getBackendEmployees>>[number];
+type EmployeeDirectoryRow = Awaited<
+  ReturnType<typeof getBackendEmployees>
+>[number];
 
 let cachedRows: EmployeeDirectoryRow[] | null = null;
 let cachedRowsAt = 0;
@@ -18,7 +16,11 @@ let lastPathname = "";
 function deviceType(label: string): string {
   const value = label.toLowerCase();
 
-  if (/iphone|android|pixel|samsung|redmi|xiaomi|oneplus|oppo|vivo|realme|huawei|honor|motorola|nokia|tecno|infinix/.test(value)) {
+  if (
+    /iphone|android|pixel|samsung|redmi|xiaomi|oneplus|oppo|vivo|realme|huawei|honor|motorola|nokia|tecno|infinix/.test(
+      value,
+    )
+  ) {
     return "📱 هاتف";
   }
 
@@ -38,9 +40,10 @@ function makeBadge(
   tone: "primary" | "muted" = "muted",
 ): HTMLSpanElement {
   const badge = document.createElement("span");
-  badge.className = tone === "primary"
-    ? "inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"
-    : "inline-flex items-center rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground";
+  badge.className =
+    tone === "primary"
+      ? "inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"
+      : "inline-flex items-center rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground";
   badge.textContent = text;
   return badge;
 }
@@ -96,10 +99,14 @@ function findEmployeeForCard(
   card: HTMLElement,
   rows: EmployeeDirectoryRow[],
 ): EmployeeDirectoryRow | undefined {
-  const job = Array.from(card.querySelectorAll<HTMLElement>(".mono")).find((element) => {
-    const value = element.textContent?.trim();
-    return Boolean(value && rows.some((employee) => String(employee.jobNumber) === value));
-  });
+  const job = Array.from(card.querySelectorAll<HTMLElement>(".mono")).find(
+    (element) => {
+      const value = element.textContent?.trim();
+      return Boolean(
+        value && rows.some((employee) => String(employee.jobNumber) === value),
+      );
+    },
+  );
 
   if (!job) {
     return undefined;
@@ -115,19 +122,23 @@ function enhanceEmployeeCard(
   owner: boolean,
 ): void {
   const job = Array.from(card.querySelectorAll<HTMLElement>(".mono")).find(
-    (element) => String(element.textContent?.trim() || "") === String(employee.jobNumber),
+    (element) =>
+      String(element.textContent?.trim() || "") === String(employee.jobNumber),
   );
 
   if (!job) {
     return;
   }
 
-  card.querySelectorAll<HTMLElement>("[data-hadir-trusted-device]").forEach((element) => {
-    element.remove();
-  });
+  card
+    .querySelectorAll<HTMLElement>("[data-hadir-trusted-device]")
+    .forEach((element) => {
+      element.remove();
+    });
 
-  const oldTrusted = Array.from(card.querySelectorAll<HTMLElement>("*"))
-    .find((element) => element.textContent?.trim() === "جهاز موثق");
+  const oldTrusted = Array.from(card.querySelectorAll<HTMLElement>("*")).find(
+    (element) => element.textContent?.trim() === "جهاز موثق",
+  );
 
   if (oldTrusted && oldTrusted !== card) {
     oldTrusted.remove();
@@ -136,7 +147,8 @@ function enhanceEmployeeCard(
   if (!card.querySelector("[data-hadir-device-details]")) {
     const details = document.createElement("div");
     details.dataset.hadirDeviceDetails = "true";
-    details.className = "mt-1 flex max-w-full items-center gap-1 text-[10px] text-primary/90";
+    details.className =
+      "mt-1 flex max-w-full items-center gap-1 text-[10px] text-primary/90";
 
     const label = String(employee.deviceLabel || "غير مرتبط").trim();
     details.title = label;
@@ -192,11 +204,15 @@ function enhanceEmployeeHome(): void {
   }
 
   document.querySelectorAll<HTMLElement>("div").forEach((row) => {
-    if (row.dataset.hadirDeviceDetails || row.textContent?.trim() !== "الجهاز") {
+    if (
+      row.dataset.hadirDeviceDetails ||
+      row.textContent?.trim() !== "الجهاز"
+    ) {
       return;
     }
 
-    const value = row.parentElement?.querySelector<HTMLElement>("div.font-semibold");
+    const value =
+      row.parentElement?.querySelector<HTMLElement>("div.font-semibold");
 
     if (!value || value.dataset.hadirDeviceDetails) {
       return;

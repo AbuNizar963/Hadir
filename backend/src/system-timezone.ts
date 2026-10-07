@@ -10,7 +10,10 @@ export function isValidSystemTimeZone(value: unknown): value is string {
   }
 }
 
-export function parseSystemTimeZoneSetting(value: unknown, fallback = DEFAULT_SYSTEM_TIME_ZONE): string {
+export function parseSystemTimeZoneSetting(
+  value: unknown,
+  fallback = DEFAULT_SYSTEM_TIME_ZONE,
+): string {
   let candidate = value;
   if (typeof candidate === "string") {
     try {
@@ -22,9 +25,14 @@ export function parseSystemTimeZoneSetting(value: unknown, fallback = DEFAULT_SY
   return isValidSystemTimeZone(candidate) ? candidate : fallback;
 }
 
-export async function getConfiguredSystemTimeZone(db: D1Database, fallback = DEFAULT_SYSTEM_TIME_ZONE): Promise<string> {
+export async function getConfiguredSystemTimeZone(
+  db: D1Database,
+  fallback = DEFAULT_SYSTEM_TIME_ZONE,
+): Promise<string> {
   try {
-    const row = await db.prepare("SELECT value FROM settings WHERE key='timezone' LIMIT 1").first<{ value: string }>();
+    const row = await db
+      .prepare("SELECT value FROM settings WHERE key='timezone' LIMIT 1")
+      .first<{ value: string }>();
     return parseSystemTimeZoneSetting(row?.value, fallback);
   } catch {
     return fallback;

@@ -27,7 +27,7 @@ function safeTableName(value: unknown): string | null {
 
 export async function resetTestData(env: Env): Promise<ResetResult> {
   const tables = await env.DB.prepare(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
   ).all<{ name: string }>();
 
   const allTables = (tables.results || [])
@@ -38,10 +38,11 @@ export async function resetTestData(env: Env): Promise<ResetResult> {
   // Cloudflare/internal tables (for example _cf_KV) are not application data
   // and must never be touched by this reset.
   const targets = allTables.filter(
-    (name) => !PROTECTED_TABLES.has(name) && !name.startsWith("_cf_")
+    (name) => !PROTECTED_TABLES.has(name) && !name.startsWith("_cf_"),
   );
   const statements = [env.DB.prepare("PRAGMA defer_foreign_keys = ON")];
-  for (const table of targets) statements.push(env.DB.prepare(`DELETE FROM "${table}"`));
+  for (const table of targets)
+    statements.push(env.DB.prepare(`DELETE FROM "${table}"`));
   statements.push(env.DB.prepare("PRAGMA defer_foreign_keys = OFF"));
 
   const results = await env.DB.batch(statements);

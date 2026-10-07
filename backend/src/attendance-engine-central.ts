@@ -17,7 +17,14 @@ function executeCentralAttendance(
   trustedTimestamp?: string,
   internal = false,
 ) {
-  return executeCanonicalAttendance(req, env, actor, origin, trustedTimestamp, internal);
+  return executeCanonicalAttendance(
+    req,
+    env,
+    actor,
+    origin,
+    trustedTimestamp,
+    internal,
+  );
 }
 
 export async function handleAttendanceThroughCentralEngine(
@@ -45,14 +52,19 @@ export async function submitAttendanceThroughCentralEngine(
   timestamp?: string,
 ) {
   const employee = await env.DB.prepare(
-    "SELECT id,location_id AS locationId FROM employees WHERE id=? AND status='active' LIMIT 1"
-  ).bind(employeeId).first<any>();
+    "SELECT id,location_id AS locationId FROM employees WHERE id=? AND status='active' LIMIT 1",
+  )
+    .bind(employeeId)
+    .first<any>();
   if (!employee) return { response: null, error: "الموظف غير موجود أو موقوف" };
 
-  const location = await env.DB.prepare(
-    "SELECT id,lat,lng FROM locations WHERE id=? LIMIT 1"
-  ).bind(employee.locationId || "main").first<any>()
-    || await env.DB.prepare("SELECT id,lat,lng FROM locations ORDER BY name LIMIT 1").first<any>();
+  const location =
+    (await env.DB.prepare("SELECT id,lat,lng FROM locations WHERE id=? LIMIT 1")
+      .bind(employee.locationId || "main")
+      .first<any>()) ||
+    (await env.DB.prepare(
+      "SELECT id,lat,lng FROM locations ORDER BY name LIMIT 1",
+    ).first<any>());
   if (!location) return { response: null, error: "لا يوجد موقع عمل محفوظ" };
 
   const request = new Request("https://hadir.local/api/attendance", {

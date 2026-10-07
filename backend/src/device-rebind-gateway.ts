@@ -5,7 +5,10 @@ import { handleAttendanceCenter } from "./attendance-center-api";
 import { handleProfessionalAttendanceReport } from "./professional-attendance-report-api";
 import { handleCompanyLogoRequest } from "./company-logo";
 import { runAutomaticVip } from "./automatic-vip";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 
 type Env = {
   DB: D1Database;
@@ -26,41 +29,67 @@ function configuredOrigins(env: Env) {
 }
 
 function isAllowedOrigin(request: Request, env: Env) {
-  const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
+  const requestOrigin = String(request.headers.get("origin") || "")
+    .trim()
+    .replace(/\/$/, "");
   if (!requestOrigin) return true;
   const configured = configuredOrigins(env);
   if (configured.includes(requestOrigin)) return true;
-  return !configured.length && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin);
+  return (
+    !configured.length &&
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin)
+  );
 }
 
 function origin(request: Request, env: Env) {
-  const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
+  const requestOrigin = String(request.headers.get("origin") || "")
+    .trim()
+    .replace(/\/$/, "");
   const configured = configuredOrigins(env);
   if (requestOrigin && configured.includes(requestOrigin)) return requestOrigin;
-  if (!configured.length && requestOrigin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin)) return requestOrigin;
+  if (
+    !configured.length &&
+    requestOrigin &&
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestOrigin)
+  )
+    return requestOrigin;
   return configured[0] || "*";
 }
 
 function dailyCors(request: Request, env: Env) {
-  const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
-  const allowOrigin = requestOrigin ? origin(request, env) : origin(request, env);
+  const requestOrigin = String(request.headers.get("origin") || "")
+    .trim()
+    .replace(/\/$/, "");
+  const allowOrigin = requestOrigin
+    ? origin(request, env)
+    : origin(request, env);
   return {
     "access-control-allow-origin": allowOrigin,
     "access-control-allow-credentials": "true",
     "access-control-allow-headers": "authorization, content-type",
     "access-control-allow-methods": "GET, OPTIONS",
-    "vary": "Origin",
+    vary: "Origin",
     "cache-control": "no-store",
   };
 }
 
 function systemDayNow(timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-  const value = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "00";
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
-function employeeDailyStatusRequest(request: Request, actor: any, timeZone: string) {
+function employeeDailyStatusRequest(
+  request: Request,
+  actor: any,
+  timeZone: string,
+) {
   if (String(actor?.role || "").toLowerCase() !== "staff") return request;
   const url = new URL(request.url);
   url.searchParams.set("date", systemDayNow(timeZone));
@@ -70,7 +99,10 @@ function employeeDailyStatusRequest(request: Request, actor: any, timeZone: stri
 function dailyError(message: string, request: Request, env: Env, status = 500) {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", ...dailyCors(request, env) },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...dailyCors(request, env),
+    },
   });
 }
 
@@ -78,15 +110,26 @@ export { HadirRealtime };
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    const requestOrigin = String(request.headers.get("origin") || "").trim().replace(/\/$/, "");
+    const requestOrigin = String(request.headers.get("origin") || "")
+      .trim()
+      .replace(/\/$/, "");
     if (requestOrigin && !isAllowedOrigin(request, env)) {
       return dailyError("مصدر الطلب غير مسموح به.", request, env, 403);
     }
 
-    const response = await handleDeviceRebind(request, env, origin(request, env));
+    const response = await handleDeviceRebind(
+      request,
+      env,
+      origin(request, env),
+    );
     if (response) return response;
 
-    const logoResponse = await handleCompanyLogoRequest(request, env, null, origin(request, env));
+    const logoResponse = await handleCompanyLogoRequest(
+      request,
+      env,
+      null,
+      origin(request, env),
+    );
     if (logoResponse) return logoResponse;
 
     const url = new URL(request.url);
@@ -94,45 +137,92 @@ export default {
 
     if (normalizedPath === "/api/manager/attendance-center") {
       const cors = dailyCors(request, env);
-      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+      if (request.method === "OPTIONS")
+        return new Response(null, { status: 204, headers: cors });
       try {
         const actorProbe = new URL(request.url);
         actorProbe.pathname = "/api/me";
         actorProbe.search = "";
-        const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
-        const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
+        const probe = await base.fetch(
+          new Request(actorProbe, { method: "GET", headers: request.headers }),
+          env,
+          ctx,
+        );
+        const actor = probe.ok
+          ? ((await probe.json().catch(() => ({}))) as any).user || null
+          : null;
         const result = await handleAttendanceCenter(request, env, actor);
         const headers = new Headers(result.headers);
-        for (const [key, value] of Object.entries(cors)) headers.set(key, value);
-        return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
+        for (const [key, value] of Object.entries(cors))
+          headers.set(key, value);
+        return new Response(result.body, {
+          status: result.status,
+          statusText: result.statusText,
+          headers,
+        });
       } catch (error) {
         console.error("/api/manager/attendance-center failed", error);
         return dailyError("تعذر قراءة مركز الحضور والتقارير.", request, env);
       }
     }
 
-    if (normalizedPath === "/api/manager/daily-status" || normalizedPath === "/api/reports/attendance" || normalizedPath === "/api/reports/professional-attendance") {
+    if (
+      normalizedPath === "/api/manager/daily-status" ||
+      normalizedPath === "/api/reports/attendance" ||
+      normalizedPath === "/api/reports/professional-attendance"
+    ) {
       const cors = dailyCors(request, env);
-      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+      if (request.method === "OPTIONS")
+        return new Response(null, { status: 204, headers: cors });
 
       try {
         const actorProbe = new URL(request.url);
         actorProbe.pathname = "/api/me";
         actorProbe.search = "";
-        const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
-        const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
-        const timezone = normalizedPath === "/api/manager/daily-status"
-          ? await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE)
-          : undefined;
-        const result = normalizedPath === "/api/manager/daily-status"
-          ? await handleDailyStatus(employeeDailyStatusRequest(request, actor, timezone || DEFAULT_SYSTEM_TIME_ZONE), env, actor, false, timezone)
-          : await handleProfessionalAttendanceReport(request, env, actor);
+        const probe = await base.fetch(
+          new Request(actorProbe, { method: "GET", headers: request.headers }),
+          env,
+          ctx,
+        );
+        const actor = probe.ok
+          ? ((await probe.json().catch(() => ({}))) as any).user || null
+          : null;
+        const timezone =
+          normalizedPath === "/api/manager/daily-status"
+            ? await getConfiguredSystemTimeZone(
+                env.DB,
+                env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+              )
+            : undefined;
+        const result =
+          normalizedPath === "/api/manager/daily-status"
+            ? await handleDailyStatus(
+                employeeDailyStatusRequest(
+                  request,
+                  actor,
+                  timezone || DEFAULT_SYSTEM_TIME_ZONE,
+                ),
+                env,
+                actor,
+                false,
+                timezone,
+              )
+            : await handleProfessionalAttendanceReport(request, env, actor);
         const headers = new Headers(result.headers);
-        for (const [key, value] of Object.entries(cors)) headers.set(key, value);
-        return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
+        for (const [key, value] of Object.entries(cors))
+          headers.set(key, value);
+        return new Response(result.body, {
+          status: result.status,
+          statusText: result.statusText,
+          headers,
+        });
       } catch (error) {
         console.error(`${normalizedPath} failed`, error);
-        return dailyError("تعذر قراءة بيانات التقرير من D1. تم تسجيل الخطأ في Worker Logs.", request, env);
+        return dailyError(
+          "تعذر قراءة بيانات التقرير من D1. تم تسجيل الخطأ في Worker Logs.",
+          request,
+          env,
+        );
       }
     }
 

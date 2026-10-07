@@ -1,10 +1,113 @@
 import production, { HadirRealtime } from "./attendance-production-gateway";
 import { handleAdministrativeAttendancePreparation } from "./attendance-engine-admin-commands";
 export { HadirRealtime };
-type Env={DB:D1Database;REALTIME:DurableObjectNamespace;APP_ORIGIN?:string;APP_ORIGINS?:string;APP_TIMEZONE?:string;JWT_SECRET?:string;OWNER_RECOVERY_CODE?:string;PROFILE_IMAGES?:R2Bucket;REPORT_ARCHIVE?:R2Bucket;BROWSER?:BrowserRun};
-function origin(request:Request,env:Env){const incoming=String(request.headers.get("origin")||"").trim().replace(/\/$/,"");const configured=String(env.APP_ORIGIN||env.APP_ORIGINS||"").split(",").map(v=>v.trim().replace(/\/$/,"")).filter(Boolean);return incoming&&configured.includes(incoming)?incoming:configured[0]||"*";}
-async function currentUser(request:Request,env:Env,ctx:ExecutionContext){const u=new URL(request.url);u.pathname="/api/me";u.search="";const r=await production.fetch(new Request(u,{method:"GET",headers:request.headers}),env,ctx);if(!r.ok)return null;const d=await r.json().catch(()=>({})) as any;return d?.user||null;}
-async function isStaff(request:Request,env:Env,ctx:ExecutionContext){const user=await currentUser(request,env,ctx);return user?.role==="staff";}
-async function prepareEmployee(request:Request,env:Env,ctx:ExecutionContext){const actor=await currentUser(request,env,ctx);const response=await handleAdministrativeAttendancePreparation(request,env,actor);const headers=new Headers(response.headers);const responseOrigin=origin(request,env);headers.set("access-control-allow-origin",responseOrigin);headers.set("access-control-allow-credentials","true");headers.set("access-control-allow-headers","content-type, authorization, x-device-id");headers.set("access-control-allow-methods","GET,POST,PATCH,PUT,DELETE,OPTIONS");return new Response(response.body,{status:response.status,statusText:response.statusText,headers});}
-function sanitizeAttendanceResponse(response:Response){return response.clone().json().then((data:any)=>{if(!Array.isArray(data))return response;const now=Date.now(),safe=data.filter((row:any)=>{const t=Date.parse(String(row?.timestamp||""));return Number.isFinite(t)&&t<=now+5000;});return new Response(JSON.stringify(safe),{status:response.status,headers:response.headers});}).catch(()=>response);}
-export default {async fetch(request:Request,env:Env,ctx:ExecutionContext){const url=new URL(request.url),attendanceGet=(url.pathname==="/api/attendance"||url.pathname==="/api/attendance/")&&request.method==="GET",managerPrepare=(url.pathname==="/api/manager/attendance"||url.pathname==="/api/manager/attendance/")&&request.method==="POST";if(managerPrepare)return prepareEmployee(request,env,ctx);const response=await production.fetch(request,env,ctx);if(!attendanceGet||!response.ok)return response;if(!(await isStaff(request,env,ctx)))return response;return sanitizeAttendanceResponse(response);},async scheduled(controller:ScheduledEvent,env:Env,ctx:ExecutionContext){const scheduled=(production as any).scheduled;if(typeof scheduled==="function")return scheduled(controller,env,ctx);}};
+type Env = {
+  DB: D1Database;
+  REALTIME: DurableObjectNamespace;
+  APP_ORIGIN?: string;
+  APP_ORIGINS?: string;
+  APP_TIMEZONE?: string;
+  JWT_SECRET?: string;
+  OWNER_RECOVERY_CODE?: string;
+  PROFILE_IMAGES?: R2Bucket;
+  REPORT_ARCHIVE?: R2Bucket;
+  BROWSER?: BrowserRun;
+};
+function origin(request: Request, env: Env) {
+  const incoming = String(request.headers.get("origin") || "")
+    .trim()
+    .replace(/\/$/, "");
+  const configured = String(env.APP_ORIGIN || env.APP_ORIGINS || "")
+    .split(",")
+    .map((v) => v.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  return incoming && configured.includes(incoming)
+    ? incoming
+    : configured[0] || "*";
+}
+async function currentUser(request: Request, env: Env, ctx: ExecutionContext) {
+  const u = new URL(request.url);
+  u.pathname = "/api/me";
+  u.search = "";
+  const r = await production.fetch(
+    new Request(u, { method: "GET", headers: request.headers }),
+    env,
+    ctx,
+  );
+  if (!r.ok) return null;
+  const d = (await r.json().catch(() => ({}))) as any;
+  return d?.user || null;
+}
+async function isStaff(request: Request, env: Env, ctx: ExecutionContext) {
+  const user = await currentUser(request, env, ctx);
+  return user?.role === "staff";
+}
+async function prepareEmployee(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+) {
+  const actor = await currentUser(request, env, ctx);
+  const response = await handleAdministrativeAttendancePreparation(
+    request,
+    env,
+    actor,
+  );
+  const headers = new Headers(response.headers);
+  const responseOrigin = origin(request, env);
+  headers.set("access-control-allow-origin", responseOrigin);
+  headers.set("access-control-allow-credentials", "true");
+  headers.set(
+    "access-control-allow-headers",
+    "content-type, authorization, x-device-id",
+  );
+  headers.set(
+    "access-control-allow-methods",
+    "GET,POST,PATCH,PUT,DELETE,OPTIONS",
+  );
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+function sanitizeAttendanceResponse(response: Response) {
+  return response
+    .clone()
+    .json()
+    .then((data: any) => {
+      if (!Array.isArray(data)) return response;
+      const now = Date.now(),
+        safe = data.filter((row: any) => {
+          const t = Date.parse(String(row?.timestamp || ""));
+          return Number.isFinite(t) && t <= now + 5000;
+        });
+      return new Response(JSON.stringify(safe), {
+        status: response.status,
+        headers: response.headers,
+      });
+    })
+    .catch(() => response);
+}
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(request.url),
+      attendanceGet =
+        (url.pathname === "/api/attendance" ||
+          url.pathname === "/api/attendance/") &&
+        request.method === "GET",
+      managerPrepare =
+        (url.pathname === "/api/manager/attendance" ||
+          url.pathname === "/api/manager/attendance/") &&
+        request.method === "POST";
+    if (managerPrepare) return prepareEmployee(request, env, ctx);
+    const response = await production.fetch(request, env, ctx);
+    if (!attendanceGet || !response.ok) return response;
+    if (!(await isStaff(request, env, ctx))) return response;
+    return sanitizeAttendanceResponse(response);
+  },
+  async scheduled(controller: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    const scheduled = (production as any).scheduled;
+    if (typeof scheduled === "function") return scheduled(controller, env, ctx);
+  },
+};

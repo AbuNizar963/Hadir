@@ -1,19 +1,14 @@
-import {
-  useEffect,
-  useMemo,
-  useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
-import { getEmployees,
-  getSettings } from "@/lib/storage";
+import { getEmployees, getSettings } from "@/lib/storage";
 import {
   getBackendAudit,
   getBackendEmployees,
   getBackendRequests,
   getBackendSettings,
-  } from "@/lib/backend";
+} from "@/lib/backend";
 import { generateProfessionalReportPdf } from "@/lib/professionalPdf";
-import { getDailyStatus,
-  type DailyStatusRow } from "@/lib/dailyStatus";
+import { getDailyStatus, type DailyStatusRow } from "@/lib/dailyStatus";
 import { getEmployeeWorkPeriod } from "@/lib/schedule";
 import {
   formatDate,
@@ -21,7 +16,7 @@ import {
   formatTime,
   minutesBetween,
   todayKey,
-  } from "@/lib/utils";
+} from "@/lib/utils";
 import {
   FileSpreadsheet,
   FileText,
@@ -341,9 +336,7 @@ function calculateDetails(
     if (dailyStatus && serverStatus) st = serverStatus;
 
     const pendingCheckout =
-      !!cin &&
-      !cout &&
-      isShiftEndedForDailyReport(d, w.end ?? null);
+      !!cin && !cout && isShiftEndedForDailyReport(d, w.end ?? null);
     const detailNotes = [
       w.detail || "يوم عمل",
       requestText(requests, employee.id, k),
@@ -1061,10 +1054,8 @@ export default function ManagerReports() {
       const inlineStyles = Array.from(document.querySelectorAll("style"))
         .map((style) => style.textContent || "")
         .join("\n");
-      const printCssUrl = new URL(
-        "/report-print.css",
-        window.location.origin,
-      ).href;
+      const printCssUrl = new URL("/report-print.css", window.location.origin)
+        .href;
       const documentHtml =
         '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>سجل الحضور والغياب</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
         stylesheetLinks +
@@ -1143,14 +1134,30 @@ export default function ManagerReports() {
             <FileSpreadsheet className="ml-2 h-4 w-4" />
             Excel
           </Button>
-          {mode === "daily" ? <Button variant="outline" onClick={sharePdf} disabled={!summaries.length || sharingPdf} data-hadir-share="true"><Share2 className="ml-2 h-4 w-4" />{sharingPdf ? "جاري إنشاء PDF…" : readyPdf ? "مشاركة PDF الآن" : "تجهيز PDF للمشاركة"}</Button> : <Button
-            variant="outline"
-            onClick={exportCsv}
-            disabled={!summaries.length}
-          >
-            <FileText className="ml-2 h-4 w-4" />
-            CSV
-          </Button>}
+          {mode === "daily" ? (
+            <Button
+              variant="outline"
+              onClick={sharePdf}
+              disabled={!summaries.length || sharingPdf}
+              data-hadir-share="true"
+            >
+              <Share2 className="ml-2 h-4 w-4" />
+              {sharingPdf
+                ? "جاري إنشاء PDF…"
+                : readyPdf
+                  ? "مشاركة PDF الآن"
+                  : "تجهيز PDF للمشاركة"}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={exportCsv}
+              disabled={!summaries.length}
+            >
+              <FileText className="ml-2 h-4 w-4" />
+              CSV
+            </Button>
+          )}
           {mode === "daily" && (
             <Button
               variant="outline"

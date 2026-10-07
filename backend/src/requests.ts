@@ -1,7 +1,10 @@
 import { sendUserPush } from "./push";
 import { handleDailyStatus } from "./attendance-engine";
 import { refreshProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 
 type Env = {
   DB: D1Database;
@@ -46,8 +49,14 @@ const dateValue = (value: unknown) => {
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
 };
 const today = (timeZone = DEFAULT_SYSTEM_TIME_ZONE) => {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "00";
   return `${get("year")}-${get("month")}-${get("day")}`;
 };
 const typeLabel = (type: RequestRow["type"]) =>
@@ -94,7 +103,11 @@ async function notify(
     } catch {}
   }
 }
-async function refreshEmployeeDailyStatus(env: Env, employeeId: string, timezone: string) {
+async function refreshEmployeeDailyStatus(
+  env: Env,
+  employeeId: string,
+  timezone: string,
+) {
   const id = String(employeeId || "").trim();
   if (!id) return;
   try {
@@ -135,7 +148,10 @@ export async function handleRequests(
   actor: Actor | null,
   origin: string,
 ) {
-  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  const timezone = await getConfiguredSystemTimeZone(
+    env.DB,
+    env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+  );
   const url = new URL(req.url);
   const path = url.pathname.replace(/\/$/, "") || "/";
   const method = req.method;

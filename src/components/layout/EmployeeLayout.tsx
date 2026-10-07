@@ -22,10 +22,7 @@ import { cn } from "@/lib/utils";
 import { currentSession } from "@/lib/auth";
 import { backendLogout, getBackendSystemTimeZone } from "@/lib/backend";
 import { setSystemTimeZone } from "@/lib/systemTimezone";
-import {
-  getNotifications,
-  syncNotificationsFromD1,
-} from "@/lib/notifications";
+import { getNotifications, syncNotificationsFromD1 } from "@/lib/notifications";
 import "./EmployeeLayout.css";
 
 const NAV = [
@@ -122,9 +119,15 @@ export default function EmployeeLayout({
     if (!employeeId) return;
     let active = true;
     void getBackendSystemTimeZone()
-      .then(({ timezone }) => { if (active) setSystemTimeZone(timezone); })
-      .catch((error) => console.warn("تعذر تحميل المنطقة الزمنية للنظام:", error));
-    return () => { active = false; };
+      .then(({ timezone }) => {
+        if (active) setSystemTimeZone(timezone);
+      })
+      .catch((error) =>
+        console.warn("تعذر تحميل المنطقة الزمنية للنظام:", error),
+      );
+    return () => {
+      active = false;
+    };
   }, [employeeId]);
 
   useEffect(() => {
@@ -194,7 +197,10 @@ export default function EmployeeLayout({
       }
     };
 
-    window.addEventListener("hadir:notifications-changed", onNotificationsChanged);
+    window.addEventListener(
+      "hadir:notifications-changed",
+      onNotificationsChanged,
+    );
     window.addEventListener("storage", refresh);
     window.addEventListener("online", refresh);
 
@@ -217,7 +223,10 @@ export default function EmployeeLayout({
 
       window.removeEventListener("hadir:cloud-data-changed", refresh);
       window.removeEventListener("hadir:d1-view-changed", refresh);
-      window.removeEventListener("hadir:notifications-changed", onNotificationsChanged);
+      window.removeEventListener(
+        "hadir:notifications-changed",
+        onNotificationsChanged,
+      );
       window.removeEventListener("storage", refresh);
       window.removeEventListener("online", refresh);
       document.removeEventListener("visibilitychange", onVisibility);
@@ -247,7 +256,10 @@ export default function EmployeeLayout({
   };
 
   return (
-    <div className="employee-shell min-h-screen bg-background text-foreground" dir="rtl">
+    <div
+      className="employee-shell min-h-screen bg-background text-foreground"
+      dir="rtl"
+    >
       <div className="sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex min-h-[76px] max-w-7xl items-center justify-between gap-3 px-2 sm:px-4">
           <Link

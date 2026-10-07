@@ -119,10 +119,7 @@ export function logoutEmployee() {
   void revokeServerSession(token);
 }
 
-export function loginManager(
-  password: string,
-  username: string,
-): LoginResult {
+export function loginManager(password: string, username: string): LoginResult {
   const settings = getSettings();
   const inputUser = normalize(username);
   const inputPassword = password;

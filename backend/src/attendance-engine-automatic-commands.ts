@@ -1,6 +1,13 @@
-import { dateKey, getAttendanceShift, getAttendanceShiftForDay } from "./attendance-period";
+import {
+  dateKey,
+  getAttendanceShift,
+  getAttendanceShiftForDay,
+} from "./attendance-period";
 import { submitAttendanceThroughCentralEngine } from "./attendance-engine-central";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 
 type Env = {
   DB: D1Database;
@@ -10,8 +17,14 @@ type Env = {
 const MAX_BINDINGS_PER_QUERY = 90;
 
 export function dateKeyLocal(date: Date, tz: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "00";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
@@ -57,18 +70,15 @@ export async function insertAutomaticAttendance(
 }
 
 async function loadActiveAutomaticEmployees(env: Env) {
-  return env.DB
-    .prepare(
-      "SELECT id,job_number AS jobNumber,name,status,location_id AS locationId,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees WHERE status='active' AND (is_vip=1 OR auto_check_in=1 OR auto_check_out=1) ORDER BY name",
-    )
-    .all<any>();
+  return env.DB.prepare(
+    "SELECT id,job_number AS jobNumber,name,status,location_id AS locationId,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees WHERE status='active' AND (is_vip=1 OR auto_check_in=1 OR auto_check_out=1) ORDER BY name",
+  ).all<any>();
 }
 
 async function loadActiveRequests(env: Env, day: string) {
-  const result = await env.DB
-    .prepare(
-      "SELECT employee_id AS employeeId,type,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND COALESCE(start_date,substr(created_at,1,10))<=? AND COALESCE(end_date,COALESCE(start_date,substr(created_at,1,10)))>=?",
-    )
+  const result = await env.DB.prepare(
+    "SELECT employee_id AS employeeId,type,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM requests WHERE status IN ('approved','confirmed') AND type IN ('leave','permission') AND COALESCE(start_date,substr(created_at,1,10))<=? AND COALESCE(end_date,COALESCE(start_date,substr(created_at,1,10)))>=?",
+  )
     .bind(day, day)
     .all<any>();
 
@@ -89,13 +99,16 @@ async function loadAttendanceForEmployees(
 ) {
   const byEmployee = new Map<string, any[]>();
 
-  for (let offset = 0; offset < employeeIds.length; offset += MAX_BINDINGS_PER_QUERY) {
+  for (
+    let offset = 0;
+    offset < employeeIds.length;
+    offset += MAX_BINDINGS_PER_QUERY
+  ) {
     const ids = employeeIds.slice(offset, offset + MAX_BINDINGS_PER_QUERY);
     const placeholders = ids.map(() => "?").join(",");
-    const result = await env.DB
-      .prepare(
-        `SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE employee_id IN (${placeholders}) AND timestamp>=? AND timestamp<? ORDER BY employee_id,timestamp ASC`,
-      )
+    const result = await env.DB.prepare(
+      `SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE employee_id IN (${placeholders}) AND timestamp>=? AND timestamp<? ORDER BY employee_id,timestamp ASC`,
+    )
       .bind(...ids, from, to)
       .all<any>();
 
@@ -124,7 +137,10 @@ function maxRotationDaysOn(employees: any[]) {
 }
 
 export async function runAutomaticAttendance(env: Env) {
-  const tz = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  const tz = await getConfiguredSystemTimeZone(
+    env.DB,
+    env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+  );
 
   const current = new Date();
   const currentDay = dateKeyLocal(current, tz);
@@ -143,9 +159,7 @@ export async function runAutomaticAttendance(env: Env) {
   )
     .toISOString()
     .slice(0, 10);
-  const toDay = new Date(
-    Date.parse(`${currentDay}T00:00:00Z`) + 2 * 86_400_000,
-  )
+  const toDay = new Date(Date.parse(`${currentDay}T00:00:00Z`) + 2 * 86_400_000)
     .toISOString()
     .slice(0, 10);
   const from = new Date(`${fromDay}T00:00:00Z`).toISOString();

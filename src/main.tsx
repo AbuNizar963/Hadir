@@ -15,7 +15,10 @@ import "./styles/settings-compact.css";
 import "./styles/workforce-card-polish.css";
 import "./styles/attendance-actions.css";
 import { seedIfEmpty } from "@/lib/storage";
-import { installGlobalDiagnostics, recordDiagnostic } from "@/lib/systemDiagnostics";
+import {
+  installGlobalDiagnostics,
+  recordDiagnostic,
+} from "@/lib/systemDiagnostics";
 import { startRealtimeSync } from "@/lib/realtime";
 import { installApiCredentials } from "@/lib/apiCredentials";
 import { installDeviceDirectoryEnhancer } from "./deviceDirectoryEnhancer";
@@ -50,28 +53,40 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
       // cached worker response.
       let registration: ServiceWorkerRegistration;
       try {
-        registration = await navigator.serviceWorker.register(swUrl.toString(), { scope, updateViaCache: "none" });
+        registration = await navigator.serviceWorker.register(
+          swUrl.toString(),
+          { scope, updateViaCache: "none" },
+        );
       } catch (error) {
         // Recover from a previously registered, invalid Service Worker without
         // touching localStorage, IndexedDB, cookies, or the authenticated session.
-        const existing = await navigator.serviceWorker.getRegistration(scope).catch(() => undefined);
+        const existing = await navigator.serviceWorker
+          .getRegistration(scope)
+          .catch(() => undefined);
         if (!existing) throw error;
         const removed = await existing.unregister();
         if (!removed) throw error;
-        registration = await navigator.serviceWorker.register(swUrl.toString(), { scope, updateViaCache: "none" });
+        registration = await navigator.serviceWorker.register(
+          swUrl.toString(),
+          { scope, updateViaCache: "none" },
+        );
       }
       const notifyUpdateAvailable = () => {
         window.dispatchEvent(new CustomEvent("hadir:sw-update-available"));
       };
 
-      if (registration.waiting && navigator.serviceWorker.controller) notifyUpdateAvailable();
+      if (registration.waiting && navigator.serviceWorker.controller)
+        notifyUpdateAvailable();
 
       void registration.update();
       registration.addEventListener("updatefound", () => {
         const worker = registration.installing;
         if (!worker) return;
         worker.addEventListener("statechange", () => {
-          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          if (
+            worker.state === "installed" &&
+            navigator.serviceWorker.controller
+          ) {
             notifyUpdateAvailable();
           }
         });
@@ -83,7 +98,12 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
 }
 
 window.addEventListener("unhandledrejection", (event) => {
-  recordDiagnostic("error", "APP_UNHANDLED_REJECTION", "حدث خطأ غير معالج في التطبيق.", event.reason);
+  recordDiagnostic(
+    "error",
+    "APP_UNHANDLED_REJECTION",
+    "حدث خطأ غير معالج في التطبيق.",
+    event.reason,
+  );
 });
 
 createRoot(document.getElementById("root")!).render(
@@ -91,5 +111,5 @@ createRoot(document.getElementById("root")!).render(
     <AppErrorBoundary>
       <App />
     </AppErrorBoundary>
-  </StrictMode>
+  </StrictMode>,
 );

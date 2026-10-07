@@ -1,4 +1,7 @@
-import { handleAttendanceThroughCentralEngine, submitAttendanceThroughCentralEngine } from "./attendance-engine-central";
+import {
+  handleAttendanceThroughCentralEngine,
+  submitAttendanceThroughCentralEngine,
+} from "./attendance-engine-central";
 
 type Env = { DB: D1Database };
 
@@ -9,7 +12,12 @@ type Env = { DB: D1Database };
  * reaching the canonical D1 writer. This keeps the route stable for existing
  * callers while preventing a second application-level attendance path.
  */
-export async function handleEmployeeAttendance(req: Request, env: Env, actor: any, origin: string) {
+export async function handleEmployeeAttendance(
+  req: Request,
+  env: Env,
+  actor: any,
+  origin: string,
+) {
   return handleAttendanceThroughCentralEngine(req, env, actor, origin);
 }
 

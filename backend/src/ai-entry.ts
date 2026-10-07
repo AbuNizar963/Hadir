@@ -1,7 +1,10 @@
 import entry, { HadirRealtime } from "./entry";
 import { handleAI } from "./ai";
 import { employeeFactAnswer } from "./employee-ai-facts";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 import { handleRequests } from "./requests";
 import { handleNotificationApi } from "./notification-api";
 import { handleDeviceRebind } from "./device-rebind-api";
@@ -65,28 +68,25 @@ async function getActor(request: Request, env: Env) {
 
   try {
     const tokenHash = await hashToken(token);
-    const session = await env.DB
-      .prepare(
-        "SELECT user_id AS userId,user_type AS userType,role FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1",
-      )
+    const session = await env.DB.prepare(
+      "SELECT user_id AS userId,user_type AS userType,role FROM auth_sessions WHERE token_hash=? AND revoked_at IS NULL LIMIT 1",
+    )
       .bind(tokenHash)
       .first<any>();
 
     if (!session) return null;
 
     if (session.userType === "employee") {
-      return await env.DB
-        .prepare(
-          "SELECT id,job_number AS jobNumber,name,status,role FROM employees WHERE id=? AND status='active' LIMIT 1",
-        )
+      return await env.DB.prepare(
+        "SELECT id,job_number AS jobNumber,name,status,role FROM employees WHERE id=? AND status='active' LIMIT 1",
+      )
         .bind(session.userId)
         .first<any>();
     }
 
-    return await env.DB
-      .prepare(
-        "SELECT id,username,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1",
-      )
+    return await env.DB.prepare(
+      "SELECT id,username,name,role,active FROM admin_accounts WHERE id=? AND active=1 LIMIT 1",
+    )
       .bind(session.userId)
       .first<any>();
   } catch {
@@ -110,53 +110,46 @@ function json(data: unknown, status = 200, origin = "*") {
 
 async function buildAIContext(actor: any, env: Env) {
   if (actor?.role === "staff") {
-    const employee = await env.DB
-      .prepare(
-        "SELECT id,job_number AS jobNumber,name,status,role,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,specialties_json AS specialtiesJson,work_days_json AS workDaysJson,location_id AS locationId,avatar,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees WHERE id=? LIMIT 1",
-      )
+    const employee = await env.DB.prepare(
+      "SELECT id,job_number AS jobNumber,name,status,role,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,specialties_json AS specialtiesJson,work_days_json AS workDaysJson,location_id AS locationId,avatar,is_vip AS isVip,auto_check_in AS autoCheckIn,auto_check_out AS autoCheckOut FROM employees WHERE id=? LIMIT 1",
+    )
       .bind(actor.id)
       .first<any>();
 
-    const attendance = await env.DB
-      .prepare(
-        "SELECT type,timestamp FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1000",
-      )
+    const attendance = await env.DB.prepare(
+      "SELECT type,timestamp FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 1000",
+    )
       .bind(actor.id)
       .all<any>();
 
-    const requests = await env.DB
-      .prepare(
-        "SELECT type,reason,status,created_at AS createdAt FROM requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 100",
-      )
+    const requests = await env.DB.prepare(
+      "SELECT type,reason,status,created_at AS createdAt FROM requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 100",
+    )
       .bind(actor.id)
       .all<any>();
 
-    const leaveRequests = await env.DB
-      .prepare(
-        "SELECT type,reason,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM leave_requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 100",
-      )
+    const leaveRequests = await env.DB.prepare(
+      "SELECT type,reason,status,start_date AS startDate,end_date AS endDate,created_at AS createdAt FROM leave_requests WHERE employee_id=? ORDER BY created_at DESC LIMIT 100",
+    )
       .bind(actor.id)
       .all<any>();
 
-    const escapes = await env.DB
-      .prepare(
-        "SELECT status,timestamp,reason FROM escape_events WHERE employee_id=? ORDER BY timestamp DESC LIMIT 100",
-      )
+    const escapes = await env.DB.prepare(
+      "SELECT status,timestamp,reason FROM escape_events WHERE employee_id=? ORDER BY timestamp DESC LIMIT 100",
+    )
       .bind(actor.id)
       .all<any>();
 
-    const notifications = await env.DB
-      .prepare(
-        "SELECT n.id,n.title,COALESCE(NULLIF(n.body,''),n.message,'') AS body,n.severity,n.type,n.read_at AS readAt,n.created_at AS createdAt FROM notifications n LEFT JOIN notification_user_state s ON s.notification_id=n.id AND s.user_id=? WHERE n.recipient_id=? AND s.notification_id IS NULL ORDER BY n.created_at DESC LIMIT 100",
-      )
+    const notifications = await env.DB.prepare(
+      "SELECT n.id,n.title,COALESCE(NULLIF(n.body,''),n.message,'') AS body,n.severity,n.type,n.read_at AS readAt,n.created_at AS createdAt FROM notifications n LEFT JOIN notification_user_state s ON s.notification_id=n.id AND s.user_id=? WHERE n.recipient_id=? AND s.notification_id IS NULL ORDER BY n.created_at DESC LIMIT 100",
+    )
       .bind(actor.id, actor.id)
       .all<any>();
 
     const location = employee?.locationId
-      ? await env.DB
-          .prepare(
-            "SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id=? LIMIT 1",
-          )
+      ? await env.DB.prepare(
+          "SELECT id,name,lat,lng,radius_meters AS radiusMeters FROM locations WHERE id=? LIMIT 1",
+        )
           .bind(employee.locationId)
           .first<any>()
       : null;
@@ -176,35 +169,25 @@ async function buildAIContext(actor: any, env: Env) {
     return null;
   }
 
-  const employees = await env.DB
-    .prepare(
-      "SELECT id,job_number AS jobNumber,name,status,schedule_type AS scheduleType,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_days_json AS workDaysJson FROM employees ORDER BY name LIMIT 5000",
-    )
-    .all<any>();
+  const employees = await env.DB.prepare(
+    "SELECT id,job_number AS jobNumber,name,status,schedule_type AS scheduleType,work_start_time AS workStartTime,work_end_time AS workEndTime,grace_period_minutes AS gracePeriodMinutes,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_days_json AS workDaysJson FROM employees ORDER BY name LIMIT 5000",
+  ).all<any>();
 
-  const attendance = await env.DB
-    .prepare(
-      "SELECT employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,type,timestamp FROM attendance ORDER BY timestamp DESC LIMIT 5000",
-    )
-    .all<any>();
+  const attendance = await env.DB.prepare(
+    "SELECT employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,type,timestamp FROM attendance ORDER BY timestamp DESC LIMIT 5000",
+  ).all<any>();
 
-  const escapes = await env.DB
-    .prepare(
-      "SELECT employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,status,timestamp,reason FROM escape_events ORDER BY timestamp DESC LIMIT 2000",
-    )
-    .all<any>();
+  const escapes = await env.DB.prepare(
+    "SELECT employee_id AS employeeId,job_number AS jobNumber,employee_name AS employeeName,status,timestamp,reason FROM escape_events ORDER BY timestamp DESC LIMIT 2000",
+  ).all<any>();
 
-  const requests = await env.DB
-    .prepare(
-      "SELECT employee_id AS employeeId,employee_name AS employeeName,type,reason,status,created_at AS createdAt FROM requests ORDER BY created_at DESC LIMIT 1000",
-    )
-    .all<any>();
+  const requests = await env.DB.prepare(
+    "SELECT employee_id AS employeeId,employee_name AS employeeName,type,reason,status,created_at AS createdAt FROM requests ORDER BY created_at DESC LIMIT 1000",
+  ).all<any>();
 
-  const leaveRequests = await env.DB
-    .prepare(
-      "SELECT l.employee_id AS employeeId,e.job_number AS jobNumber,e.name AS employeeName,l.type,l.reason,l.status,l.start_date AS startDate,l.end_date AS endDate,l.created_at AS createdAt FROM leave_requests l LEFT JOIN employees e ON e.id=l.employee_id ORDER BY l.created_at DESC LIMIT 2000",
-    )
-    .all<any>();
+  const leaveRequests = await env.DB.prepare(
+    "SELECT l.employee_id AS employeeId,e.job_number AS jobNumber,e.name AS employeeName,l.type,l.reason,l.status,l.start_date AS startDate,l.end_date AS endDate,l.created_at AS createdAt FROM leave_requests l LEFT JOIN employees e ON e.id=l.employee_id ORDER BY l.created_at DESC LIMIT 2000",
+  ).all<any>();
 
   return {
     employees: employees.results || [],
@@ -224,21 +207,17 @@ async function buildAIContext(actor: any, env: Env) {
 async function cleanupNotifications(env: Env) {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  await env.DB
-    .batch([
-      env.DB
-        .prepare("DELETE FROM notifications WHERE created_at < ?")
-        .bind(cutoff),
-      env.DB
-        .prepare(
-          "DELETE FROM notification_user_state WHERE deleted_at IS NOT NULL AND deleted_at < ?",
-        )
-        .bind(cutoff),
-      env.DB.prepare(
-        "DELETE FROM notification_user_state WHERE notification_id NOT IN (SELECT id FROM notifications)",
-      ),
-    ])
-    .catch(() => undefined);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM notifications WHERE created_at < ?").bind(
+      cutoff,
+    ),
+    env.DB.prepare(
+      "DELETE FROM notification_user_state WHERE deleted_at IS NOT NULL AND deleted_at < ?",
+    ).bind(cutoff),
+    env.DB.prepare(
+      "DELETE FROM notification_user_state WHERE notification_id NOT IN (SELECT id FROM notifications)",
+    ),
+  ]).catch(() => undefined);
 }
 
 export default {
@@ -299,7 +278,10 @@ export default {
       }
 
       if (role === "employee") {
-        const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+        const timezone = await getConfiguredSystemTimeZone(
+          env.DB,
+          env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+        );
         const fact = employeeFactAnswer(question, data, timezone);
         if (fact) {
           return json(

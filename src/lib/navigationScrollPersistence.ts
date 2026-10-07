@@ -7,12 +7,17 @@ function keepActiveNavigationVisible(root: ParentNode = document) {
   const active = nav.querySelector<HTMLElement>(ACTIVE_SELECTOR);
   if (!active) return;
 
-  const route = active.getAttribute("href") || active.getAttribute("aria-label") || "";
+  const route =
+    active.getAttribute("href") || active.getAttribute("aria-label") || "";
   if (nav.dataset.hadirActiveRoute === route) return;
   nav.dataset.hadirActiveRoute = route;
 
   requestAnimationFrame(() => {
-    active.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+    active.scrollIntoView({
+      behavior: "auto",
+      block: "nearest",
+      inline: "center",
+    });
   });
 }
 
@@ -23,7 +28,12 @@ export function installNavigationScrollPersistence() {
   const observer = new MutationObserver(() => run());
 
   const start = () => {
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-current"] });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-current"],
+    });
     run();
   };
 

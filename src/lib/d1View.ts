@@ -1,4 +1,12 @@
-import type { AttendanceRecord, Employee, EmployeeRequest, Settings, Location, AuditEntry, AdminAccount } from "@/types";
+import type {
+  AttendanceRecord,
+  Employee,
+  EmployeeRequest,
+  Settings,
+  Location,
+  AuditEntry,
+  AdminAccount,
+} from "@/types";
 
 export type D1View = {
   employees: Employee[];
@@ -11,10 +19,23 @@ export type D1View = {
   loadedAt: string | null;
 };
 
-const state: D1View = { employees: [], attendance: [], requests: [], audit: [], settings: null, locations: [], admins: [], loadedAt: null };
+const state: D1View = {
+  employees: [],
+  attendance: [],
+  requests: [],
+  audit: [],
+  settings: null,
+  locations: [],
+  admins: [],
+  loadedAt: null,
+};
 
 function stableValue(value: unknown): string {
-  try { return JSON.stringify(value); } catch { return String(value); }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 export function setD1View(patch: Partial<D1View>) {
@@ -28,12 +49,30 @@ export function setD1View(patch: Partial<D1View>) {
   }
   if (!changed) return;
   Object.assign(state, patch, { loadedAt: new Date().toISOString() });
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("hadir:d1-view-changed"));
+  if (typeof window !== "undefined")
+    window.dispatchEvent(new Event("hadir:d1-view-changed"));
 }
 
-export function getD1View() { return state; }
+export function getD1View() {
+  return state;
+}
 export function clearD1View() {
-  const hadData = state.employees.length || state.attendance.length || state.requests.length || state.audit.length || state.settings !== null || state.locations.length || state.admins.length;
-  state.employees=[]; state.attendance=[]; state.requests=[]; state.audit=[]; state.settings=null; state.locations=[]; state.admins=[]; state.loadedAt=null;
-  if (hadData && typeof window !== "undefined") window.dispatchEvent(new Event("hadir:d1-view-changed"));
+  const hadData =
+    state.employees.length ||
+    state.attendance.length ||
+    state.requests.length ||
+    state.audit.length ||
+    state.settings !== null ||
+    state.locations.length ||
+    state.admins.length;
+  state.employees = [];
+  state.attendance = [];
+  state.requests = [];
+  state.audit = [];
+  state.settings = null;
+  state.locations = [];
+  state.admins = [];
+  state.loadedAt = null;
+  if (hadData && typeof window !== "undefined")
+    window.dispatchEvent(new Event("hadir:d1-view-changed"));
 }

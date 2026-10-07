@@ -8,8 +8,7 @@ import {
 } from "@/lib/notifications";
 
 const API_URL = String(
-  import.meta.env.VITE_API_URL ||
-    "https://hadir-api.abunizar963.workers.dev",
+  import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev",
 ).replace(/\/$/, "");
 
 const typeLabel = (type: string) => {
@@ -76,10 +75,7 @@ async function getDeviceRebindRequests() {
   }));
 }
 
-async function reviewDeviceRebind(
-  id: string,
-  status: "approved" | "rejected",
-) {
+async function reviewDeviceRebind(id: string, status: "approved" | "rejected") {
   const token = localStorage.getItem("hadir.api.token.admin") || "";
   const response = await fetch(`${API_URL}/api/device-rebind-requests`, {
     method: "PATCH",
@@ -96,8 +92,7 @@ async function reviewDeviceRebind(
   if (!response.ok) {
     throw new Error(
       String(
-        (data as { error?: unknown })?.error ||
-          "تعذر تحديث طلب فك ربط الهاتف",
+        (data as { error?: unknown })?.error || "تعذر تحديث طلب فك ربط الهاتف",
       ),
     );
   }
@@ -161,8 +156,7 @@ export default function ManagerRequests() {
 
       next.sort(
         (a, b) =>
-          new Date(b.createdAt).getTime() -
-          new Date(a.createdAt).getTime(),
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
 
       setRequests((previous) =>
@@ -219,7 +213,10 @@ export default function ManagerRequests() {
 
       window.removeEventListener("hadir:cloud-data-changed", scheduleRefresh);
       window.removeEventListener("hadir:d1-view-changed", scheduleRefresh);
-      window.removeEventListener("hadir:notifications-changed", scheduleRefresh);
+      window.removeEventListener(
+        "hadir:notifications-changed",
+        scheduleRefresh,
+      );
       window.removeEventListener("focus", scheduleRefresh);
       window.removeEventListener("online", scheduleRefresh);
       document.removeEventListener("visibilitychange", onVisibility);
@@ -301,9 +298,7 @@ export default function ManagerRequests() {
       )}
 
       {loading ? (
-        <div className="hud-card p-5 text-center mt-4">
-          جارٍ تحميل الطلبات…
-        </div>
+        <div className="hud-card p-5 text-center mt-4">جارٍ تحميل الطلبات…</div>
       ) : (
         <>
           {pending.length === 0 ? (
@@ -350,11 +345,7 @@ export default function ManagerRequests() {
   );
 }
 
-const HistoryCard = memo(function HistoryCard({
-  request,
-}: {
-  request: any;
-}) {
+const HistoryCard = memo(function HistoryCard({ request }: { request: any }) {
   return (
     <section className="hud-card p-4">
       <div className="flex items-center justify-between gap-3">
@@ -403,9 +394,7 @@ const RequestCard = memo(function RequestCard({
           </div>
           <div
             className={`text-sm font-semibold mt-1 ${
-              isRebind
-                ? "text-[hsl(var(--warning))]"
-                : "text-primary"
+              isRebind ? "text-[hsl(var(--warning))]" : "text-primary"
             }`}
           >
             طلب {typeLabel(request.type)}

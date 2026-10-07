@@ -7,8 +7,7 @@ import { setSession } from "@/lib/storage";
 import type { Employee } from "@/types";
 
 const API_URL = String(
-  import.meta.env.VITE_API_URL ||
-    "https://hadir-api.abunizar963.workers.dev",
+  import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev",
 ).replace(/\/$/, "");
 
 const EMPLOYEE_PASSWORD_MIN_LENGTH = 4;
@@ -25,9 +24,7 @@ function getDeviceId() {
   const key = "hadir.device.id";
   const existing = localStorage.getItem(key)?.trim();
   const id =
-    existing && existing.length >= 8
-      ? existing
-      : `dev-${crypto.randomUUID()}`;
+    existing && existing.length >= 8 ? existing : `dev-${crypto.randomUUID()}`;
 
   localStorage.setItem(key, id);
   return id;
@@ -56,9 +53,7 @@ async function requestRebind(username: string, password: string) {
 
   if (!response.ok) {
     throw new Error(
-      typeof data.error === "string"
-        ? data.error
-        : "تعذر إرسال الطلب",
+      typeof data.error === "string" ? data.error : "تعذر إرسال الطلب",
     );
   }
 

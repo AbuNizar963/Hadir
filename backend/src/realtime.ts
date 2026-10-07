@@ -27,7 +27,13 @@ export class HadirRealtime {
         if (this.sessions.get(userId) === server) this.sessions.delete(userId);
       });
 
-      server.send(JSON.stringify({ type: "connected", userId, timestamp: new Date().toISOString() }));
+      server.send(
+        JSON.stringify({
+          type: "connected",
+          userId,
+          timestamp: new Date().toISOString(),
+        }),
+      );
       return new Response(null, { status: 101, webSocket: client });
     }
 
