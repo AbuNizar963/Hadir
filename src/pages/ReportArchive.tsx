@@ -14,8 +14,8 @@ import {
 import {
   deleteArchivedReport,
   downloadArchivedReport,
+  getReportArchiveJob,
   listArchivedReports,
-  prepareReportArchive,
   refreshReportArchive,
 } from "@/lib/reportArchive";
 import { currentManager } from "@/lib/auth";
@@ -73,8 +73,6 @@ export default function ReportArchive() {
   const [archiveProgress, setArchiveProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const archiveCursorKey = "hadir.archive.cursor.attendance-period";
-
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -95,6 +93,42 @@ export default function ReportArchive() {
     void refresh();
   }, [refresh]);
 
+  const syncArchiveJob = useCallback(async () => {
+    const job = await getReportArchiveJob();
+    if (!job) return null;
+    if (job.status === "COMPLETED") {
+      setRefreshingArchive(false);
+      setArchiveProgress("تم إنشاء أرشيف الشهر وإقفاله بنجاح.");
+    } else if (job.status === "RUNNING" || job.status === "QUEUED") {
+      setRefreshingArchive(true);
+      setArchiveProgress(
+        job.status === "RUNNING"
+          ? `جارٍ إنشاء الأرشيف في الخلفية… اليوم ${Number(job.day_cursor || 0) + 1}`
+          : "الأرشيف في قائمة الانتظار وسيبدأ تلقائياً…",
+      );
+    } else if (job.error_message) {
+      setRefreshingArchive(false);
+      setError(job.error_message);
+    }
+    return job;
+  }, []);
+
+  useEffect(() => {
+    void syncArchiveJob().catch(() => undefined);
+  }, [syncArchiveJob]);
+
+  useEffect(() => {
+    if (!refreshingArchive) return;
+    const timer = window.setInterval(() => {
+      void syncArchiveJob()
+        .then((job) => {
+          if (job?.status === "COMPLETED") void refresh();
+        })
+        .catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [refresh, refreshingArchive, syncArchiveJob]);
+
   const handleArchiveRefresh = async () => {
     if (!isOwner) return;
 
@@ -102,57 +136,15 @@ export default function ReportArchive() {
     setError(null);
 
     try {
-      let cursor = 0;
-      let employeeCursor = 0;
-      try {
-        const saved = JSON.parse(
-          sessionStorage.getItem(archiveCursorKey) || "null",
-        );
-        if (
-          Number.isInteger(saved?.cursor) &&
-          Number.isInteger(saved?.employeeCursor)
-        ) {
-          cursor = Math.max(0, saved.cursor);
-          employeeCursor = Math.max(0, saved.employeeCursor);
-        }
-      } catch {
-        // Ignore malformed local progress and safely start from the beginning.
-      }
-      for (;;) {
-        const batch = await prepareReportArchive(cursor, employeeCursor);
-        if (batch.done) {
-          sessionStorage.removeItem(archiveCursorKey);
-          setArchiveProgress("اكتملت جميع دفعات الشهر، جارٍ تثبيت الأرشيف…");
-          break;
-        }
-        setArchiveProgress(
-          `جارٍ تجهيز يوم ${batch.day || "…"} · تمت معالجة ${Number(batch.nextEmployeeCursor ?? employeeCursor)} موظفًا في هذا اليوم`,
-        );
-        if (batch.dayDone) {
-          cursor = Number(batch.nextCursor ?? cursor + 1);
-          employeeCursor = 0;
-        } else {
-          employeeCursor = Number(
-            batch.nextEmployeeCursor ?? employeeCursor + 1,
-          );
-        }
-        sessionStorage.setItem(
-          archiveCursorKey,
-          JSON.stringify({ cursor, employeeCursor }),
-        );
-      }
       await refreshReportArchive();
-      await refresh();
-      sessionStorage.removeItem(archiveCursorKey);
-      setArchiveProgress("تم إنشاء أرشيف الشهر وإقفاله بنجاح.");
+      setRefreshingArchive(true);
+      setArchiveProgress("تم إرسال الأرشيف إلى المعالجة الخلفية…");
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
           : "تعذر إنشاء أرشيف الشهر المغلق",
       );
-    } finally {
-      setRefreshingArchive(false);
     }
   };
 

@@ -8,6 +8,15 @@ type ArchiveListResponse = {
   reports?: unknown[];
 };
 
+export type ArchiveJob = {
+  status?: string;
+  day_cursor?: number;
+  employee_cursor?: number;
+  period_from?: string;
+  period_to?: string;
+  error_message?: string | null;
+};
+
 const adminHeaders = (): Record<string, string> => {
   const token =
     typeof window === "undefined"
@@ -80,7 +89,7 @@ export async function listArchivedReports(limit = 25) {
 }
 
 export async function refreshReportArchive() {
-  const response = await fetch(`${API_URL}/api/reports/archive/refresh`, {
+  const response = await fetch(`${API_URL}/api/reports/archive/start`, {
     method: "POST",
     headers: adminHeaders(),
     credentials: "include",
@@ -89,7 +98,8 @@ export async function refreshReportArchive() {
 
   const data = (await response.json().catch(() => null)) as {
     error?: string;
-    archived?: boolean;
+    queued?: boolean;
+    job?: ArchiveJob | null;
   } | null;
 
   if (!response.ok) {
@@ -97,6 +107,21 @@ export async function refreshReportArchive() {
   }
 
   return data;
+}
+
+export async function getReportArchiveJob() {
+  const response = await fetch(`${API_URL}/api/reports/archive/job`, {
+    headers: adminHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => null)) as {
+    error?: string;
+    job?: ArchiveJob | null;
+  } | null;
+  if (!response.ok)
+    throw new Error(String(data?.error || `HTTP ${response.status}`));
+  return data?.job || null;
 }
 
 export async function prepareReportArchive(cursor: number, employeeCursor = 0) {

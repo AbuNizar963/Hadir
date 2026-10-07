@@ -47,7 +47,7 @@ function localYearMonth(now: Date, timezone: string) {
     month: Number(parts.find((p) => p.type === "month")?.value),
   };
 }
-function previousMonthPeriod(now: Date, timezone: string) {
+export function previousMonthPeriod(now: Date, timezone: string) {
   const current = localYearMonth(now, timezone);
   const previous = new Date(Date.UTC(current.year, current.month - 2, 1));
   const year = previous.getUTCFullYear(),

@@ -1,7 +1,6 @@
 import base from "./attendance-safety-gateway";
 import { HadirRealtime } from "./realtime";
 import {
-  archiveClosedMonth,
   deleteReportArchive,
   getReportArchive,
   listReportArchives,
@@ -9,6 +8,11 @@ import {
 } from "./report-archive";
 import { materializeDay } from "./professional-attendance-fact-builder";
 import { refreshHolidayCalendar } from "./holiday-calendar";
+import {
+  getArchiveJob,
+  processArchiveJob,
+  startArchiveJob,
+} from "./report-archive-job";
 export { HadirRealtime };
 
 type Env = {
@@ -108,6 +112,25 @@ export default {
           "cache-control": "no-store",
         },
       });
+    if (path === "/api/reports/archive/job" && request.method === "GET") {
+      const a = await archiveActor(request, env);
+      if (!archiveAllowed(a)) return json({ error: "غير مصرح" }, 403, o);
+      return json({ ok: true, job: await getArchiveJob(env) }, 200, o);
+    }
+    if (path === "/api/reports/archive/start" && request.method === "POST") {
+      const a = await archiveActor(request, env);
+      if (!archiveDeleteAllowed(a))
+        return json({ error: "إنشاء الأرشيف متاح للمالك فقط" }, 403, o);
+      try {
+        return json(await startArchiveJob(env), 202, o);
+      } catch (error) {
+        return json(
+          { error: error instanceof Error ? error.message : "تعذر بدء مهمة الأرشيف" },
+          500,
+          o,
+        );
+      }
+    }
     if (path === "/api/reports/archive/refresh" && request.method === "POST") {
       const a = await archiveActor(request, env);
 
@@ -120,8 +143,7 @@ export default {
       }
 
       try {
-        const result = await archiveClosedMonth(env, new Date(), true);
-        return json(result, 200, o);
+        return json(await startArchiveJob(env), 202, o);
       } catch (error) {
         console.error("[report-archive] manual refresh failed", error);
         return json(
@@ -372,13 +394,18 @@ export default {
         console.error("[holiday-calendar] monthly refresh failed", error);
       }
     }
-    try {
-      console.log(
-        "[report-archive]",
-        JSON.stringify(await archiveClosedMonth(env)),
-      );
-    } catch (error) {
-      console.error("[report-archive] monthly archive failed", error);
-    }
+    ctx.waitUntil(
+      (async () => {
+        try {
+          await startArchiveJob(env);
+          console.log(
+            "[report-archive-job]",
+            JSON.stringify(await processArchiveJob(env)),
+          );
+        } catch (error) {
+          console.error("[report-archive-job] scheduled run failed", error);
+        }
+      })(),
+    );
   },
 };
