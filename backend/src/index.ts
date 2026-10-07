@@ -2,6 +2,9 @@ type Role = "owner" | "manager" | "supervisor" | "staff";
 type Actor = { id: string; username: string; name: string; role: Role };
 type Env = { DB: D1Database; JWT_SECRET?: string; APP_ORIGIN?: string };
 const SESSION_COOKIE = "hadir_session";
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_LOCK_MS = 15 * 60 * 1000;
+const LOGIN_MAX_FAILURES = 5;
 const SESSION_IDLE_TIMEOUT_MS = 6 * 30 * 24 * 60 * 60 * 1000;
 const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 const SESSION_TOUCH_INTERVAL_SECONDS = 15 * 60;
@@ -104,6 +107,80 @@ function getCookie(req: Request, name: string) {
 async function hashSessionToken(token: string) {
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(token));
   return b64(digest);
+}
+function requestClientAddress(req: Request) {
+  return (
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",", 1)[0] ||
+    "unknown"
+  ).trim();
+}
+async function loginSubjectHash(req: Request, username: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    encoder.encode(`${username.toLowerCase()}|${requestClientAddress(req)}`),
+  );
+  return b64(digest);
+}
+async function loginRateLimit(env: Env, subjectHash: string) {
+  const row = await env.DB.prepare(
+    "SELECT failed_attempts,first_failed_at,locked_until FROM login_rate_limits WHERE subject_hash=? LIMIT 1",
+  )
+    .bind(subjectHash)
+    .first<any>();
+  if (!row) return { allowed: true, retryAfterSeconds: 0 };
+  const current = Date.now();
+  const lockedUntil = Date.parse(String(row.locked_until || ""));
+  if (Number.isFinite(lockedUntil) && lockedUntil > current) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((lockedUntil - current) / 1000)),
+    };
+  }
+  const firstFailedAt = Date.parse(String(row.first_failed_at || ""));
+  if (
+    !Number.isFinite(firstFailedAt) ||
+    current - firstFailedAt >= LOGIN_WINDOW_MS
+  ) {
+    await env.DB.prepare("DELETE FROM login_rate_limits WHERE subject_hash=?")
+      .bind(subjectHash)
+      .run();
+  }
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+async function recordLoginFailure(env: Env, subjectHash: string) {
+  const current = new Date();
+  const currentIso = current.toISOString();
+  const row = await env.DB.prepare(
+    "SELECT failed_attempts,first_failed_at FROM login_rate_limits WHERE subject_hash=? LIMIT 1",
+  )
+    .bind(subjectHash)
+    .first<any>();
+  const firstFailedAt = Date.parse(String(row?.first_failed_at || ""));
+  const withinWindow =
+    Number.isFinite(firstFailedAt) &&
+    current.getTime() - firstFailedAt < LOGIN_WINDOW_MS;
+  const failures = withinWindow ? Number(row?.failed_attempts || 0) + 1 : 1;
+  const lockedUntil =
+    failures >= LOGIN_MAX_FAILURES
+      ? new Date(current.getTime() + LOGIN_LOCK_MS).toISOString()
+      : null;
+  await env.DB.prepare(
+    "INSERT INTO login_rate_limits(subject_hash,failed_attempts,first_failed_at,locked_until,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(subject_hash) DO UPDATE SET failed_attempts=excluded.failed_attempts,first_failed_at=excluded.first_failed_at,locked_until=excluded.locked_until,updated_at=excluded.updated_at",
+  )
+    .bind(
+      subjectHash,
+      failures,
+      withinWindow ? String(row.first_failed_at) : currentIso,
+      lockedUntil,
+      currentIso,
+    )
+    .run();
+}
+async function clearLoginFailures(env: Env, subjectHash: string) {
+  await env.DB.prepare("DELETE FROM login_rate_limits WHERE subject_hash=?")
+    .bind(subjectHash)
+    .run();
 }
 async function createSession(env: Env, actor: Actor) {
   const token = `hs_${uid().replace(/-/g, "")}_${uid().replace(/-/g, "")}`;
@@ -499,6 +576,23 @@ export default {
             400,
             origin,
           );
+        const rateSubject = await loginSubjectHash(req, username);
+        const rateState = await loginRateLimit(env, rateSubject);
+        if (!rateState.allowed)
+          return new Response(
+            JSON.stringify({
+              error: "تم تجاوز عدد محاولات الدخول. حاول مرة أخرى لاحقًا.",
+              retryAfterSeconds: rateState.retryAfterSeconds,
+            }),
+            {
+              status: 429,
+              headers: {
+                ...cors(origin),
+                "retry-after": String(rateState.retryAfterSeconds),
+                "content-type": "application/json; charset=utf-8",
+              },
+            },
+          );
         const admin = await env.DB.prepare(
           "SELECT * FROM admin_accounts WHERE username=? LIMIT 1",
         )
@@ -508,6 +602,7 @@ export default {
           admin?.active &&
           (await verifyPassword(password, admin.password_hash))
         ) {
+          await clearLoginFailures(env, rateSubject);
           const actor: Actor = {
             id: admin.id,
             username: admin.username,
@@ -543,6 +638,7 @@ export default {
           employee.status !== "active" ||
           !(await verifyPassword(password, employee.pin_hash))
         ) {
+          await recordLoginFailure(env, rateSubject);
           await audit(
             env,
             req,
@@ -555,6 +651,7 @@ export default {
           );
           return json({ error: "رقم الموظف أو رمز PIN غير صحيح" }, 401, origin);
         }
+        await clearLoginFailures(env, rateSubject);
         const incomingDeviceId = String(
           b.deviceId || req.headers.get("x-device-id") || "",
         ).trim();
@@ -1040,8 +1137,7 @@ export default {
           .bind(employeeId)
           .first<any>();
 
-        if (!employee)
-          return json({ error: "الموظف غير موجود" }, 404, origin);
+        if (!employee) return json({ error: "الموظف غير موجود" }, 404, origin);
 
         try {
           /*
@@ -1113,7 +1209,8 @@ export default {
 
           await env.DB.batch(cleanupStatements);
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error || "");
+          const message =
+            error instanceof Error ? error.message : String(error || "");
           console.error("employee-delete-failed", { employeeId, message });
           return json(
             {

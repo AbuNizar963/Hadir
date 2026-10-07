@@ -321,7 +321,7 @@ async function claimArchive(
   const now = new Date().toISOString(),
     fileName = key.split("/").pop() || key;
   await env.DB.prepare(
-    `INSERT OR IGNORE INTO report_archives (report_id,report_type,period_from,period_to,employee_id,generated_at,generated_by,generated_by_name,report_version,data_snapshot_hash,status,file_key,file_name,file_size,mime_type,file_sha256,created_at,revision) VALUES (?,?,?,?,NULL,?,?,?,?,?,'CALCULATED',?,?,0,?,'pending',?,1)`,
+    `INSERT OR IGNORE INTO report_archives (report_id,report_type,period_from,period_to,employee_id,generated_at,generated_by,generated_by_name,report_version,data_snapshot_hash,status,file_key,file_name,file_size,mime_type,file_sha256,created_at,revision) VALUES (?,?,?,?,NULL,?,?,?,?,?,'DRAFT',?,?,0,?,'pending',?,1)`,
   )
     .bind(
       id,
@@ -338,6 +338,14 @@ async function claimArchive(
       CONTENT_TYPE,
       now,
     )
+    .run();
+  // Older deployments used CALCULATED as a reservation state. Normalize that
+  // incomplete state so a failed attempt remains visibly retryable rather than
+  // pretending that a report was calculated successfully.
+  await env.DB.prepare(
+    "UPDATE report_archives SET status='DRAFT',locked_at=NULL,locked_by=NULL WHERE report_id=? AND status='CALCULATED'",
+  )
+    .bind(id)
     .run();
   return await env.DB.prepare(
     "SELECT * FROM report_archives WHERE report_id=? LIMIT 1",
@@ -382,81 +390,93 @@ export async function archiveClosedMonth(
       period,
     };
   }
-  // The archive is generated from the same canonical fact layer as live
-  // reports. Materialize the closed period first so missed background refreshes
-  // cannot leave the archive empty while raw attendance data exists.
-  await ensureProfessionalAttendanceFacts(env, period.from, period.to, {
-    id: "system-archive",
-    role: "owner",
-  });
+  try {
+    // The archive is generated from the same canonical fact layer as live
+    // reports. Materialize the closed period first so missed background refreshes
+    // cannot leave the archive empty while raw attendance data exists.
+    await ensureProfessionalAttendanceFacts(env, period.from, period.to, {
+      id: "system-archive",
+      role: "owner",
+    });
 
-  const report = await buildProfessionalAttendanceReport(
-    env,
-    period.from,
-    period.to,
-    undefined,
-    { id: "system-archive", role: "owner" },
-  );
-  const snapshotHash = await sha256Hex(
-    jsonBytes({
-      from: report.from,
-      to: report.to,
-      rows: report.rows,
-      reportVersion: report.reportVersion,
-    }),
-  );
-  const bytes = new Uint8Array(makeWorkbook(report)),
-    hash = await sha256Hex(bytes),
-    fileName = key.split("/").pop() || key;
-  await env.REPORT_ARCHIVES.put(key, bytes, {
-    httpMetadata: {
-      contentType: CONTENT_TYPE,
-      cacheControl: "private, max-age=31536000, immutable",
-    },
-    customMetadata: {
-      reportId: id,
-      reportType: "attendance_period",
-      periodFrom: period.from,
-      periodTo: period.to,
-      reportVersion: report.reportVersion,
-      archiveVersion: ARCHIVE_VERSION,
-      sha256: hash,
-      dataSnapshotHash: snapshotHash,
-    },
-  });
-  const head = await env.REPORT_ARCHIVES.head(key);
-  if (
-    !head ||
-    head.size !== bytes.byteLength ||
-    head.customMetadata?.sha256 !== hash
-  )
-    throw new Error("فشل التحقق من ملف الأرشيف في R2");
-  const verifiedAt = new Date().toISOString();
-  await env.DB.prepare(
-    "UPDATE report_archives SET generated_at=?,report_version=?,data_snapshot_hash=?,status='LOCKED',file_key=?,file_name=?,file_size=?,mime_type=?,file_sha256=?,locked_at=?,locked_by='system' WHERE report_id=?",
-  )
-    .bind(
-      report.generatedAt,
-      report.reportVersion,
-      snapshotHash,
-      key,
-      fileName,
-      bytes.byteLength,
-      CONTENT_TYPE,
-      hash,
-      verifiedAt,
-      id,
+    const report = await buildProfessionalAttendanceReport(
+      env,
+      period.from,
+      period.to,
+      undefined,
+      { id: "system-archive", role: "owner" },
+    );
+    const snapshotHash = await sha256Hex(
+      jsonBytes({
+        from: report.from,
+        to: report.to,
+        rows: report.rows,
+        reportVersion: report.reportVersion,
+      }),
+    );
+    const bytes = new Uint8Array(makeWorkbook(report)),
+      hash = await sha256Hex(bytes),
+      fileName = key.split("/").pop() || key;
+    await env.REPORT_ARCHIVES.put(key, bytes, {
+      httpMetadata: {
+        contentType: CONTENT_TYPE,
+        cacheControl: "private, max-age=31536000, immutable",
+      },
+      customMetadata: {
+        reportId: id,
+        reportType: "attendance_period",
+        periodFrom: period.from,
+        periodTo: period.to,
+        reportVersion: report.reportVersion,
+        archiveVersion: ARCHIVE_VERSION,
+        sha256: hash,
+        dataSnapshotHash: snapshotHash,
+      },
+    });
+    const head = await env.REPORT_ARCHIVES.head(key);
+    if (
+      !head ||
+      head.size !== bytes.byteLength ||
+      head.customMetadata?.sha256 !== hash
     )
-    .run();
-  return {
-    ok: true,
-    archived: true,
-    id,
-    key,
-    size: bytes.byteLength,
-    sha256: hash,
-    period,
-  };
+      throw new Error("فشل التحقق من ملف الأرشيف في R2");
+    const verifiedAt = new Date().toISOString();
+    await env.DB.prepare(
+      "UPDATE report_archives SET generated_at=?,report_version=?,data_snapshot_hash=?,status='LOCKED',file_key=?,file_name=?,file_size=?,mime_type=?,file_sha256=?,locked_at=?,locked_by='system' WHERE report_id=?",
+    )
+      .bind(
+        report.generatedAt,
+        report.reportVersion,
+        snapshotHash,
+        key,
+        fileName,
+        bytes.byteLength,
+        CONTENT_TYPE,
+        hash,
+        verifiedAt,
+        id,
+      )
+      .run();
+    return {
+      ok: true,
+      archived: true,
+      id,
+      key,
+      size: bytes.byteLength,
+      sha256: hash,
+      period,
+    };
+  } catch (error) {
+    // Keep the reservation retryable. Do not delete an existing R2 object or
+    // hide the original error; the caller/observability logs still receive it.
+    await env.DB.prepare(
+      "UPDATE report_archives SET status='DRAFT',locked_at=NULL,locked_by=NULL WHERE report_id=? AND status<>'LOCKED'",
+    )
+      .bind(id)
+      .run()
+      .catch(() => undefined);
+    throw error;
+  }
 }
 export async function listReportArchives(env: Env, limit = 25) {
   const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
