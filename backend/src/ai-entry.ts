@@ -1,6 +1,7 @@
 import entry, { HadirRealtime } from "./entry";
 import { handleAI } from "./ai";
 import { employeeFactAnswer } from "./employee-ai-facts";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 import { handleRequests } from "./requests";
 import { handleNotificationApi } from "./notification-api";
 import { handleDeviceRebind } from "./device-rebind-api";
@@ -10,6 +11,7 @@ export { HadirRealtime };
 type Env = {
   REALTIME: DurableObjectNamespace;
   DB: D1Database;
+  APP_TIMEZONE?: string;
   AI?: { run(model: string, input: Record<string, unknown>): Promise<any> };
   JWT_SECRET?: string;
   APP_ORIGIN?: string;
@@ -297,7 +299,8 @@ export default {
       }
 
       if (role === "employee") {
-        const fact = employeeFactAnswer(question, data);
+        const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+        const fact = employeeFactAnswer(question, data, timezone);
         if (fact) {
           return json(
             { ok: true, provider: "hadir-data", text: fact },

@@ -38,6 +38,7 @@ const K = {
  */
 export const defaultSettings: Settings = {
   qrCode: "HADIR-SITE-01-STATIC",
+  timezone: "Asia/Damascus",
   workSiteLat: 24.7136,
   workSiteLng: 46.6753,
   radiusMeters: 100,

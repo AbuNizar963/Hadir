@@ -41,6 +41,7 @@ import { downloadCSV, type CsvCell } from "@/lib/csv";
 import { downloadProfessionalAttendanceReport } from "@/lib/professionalReportExport";
 import type { Employee } from "@/types";
 
+import { getSystemTimeZone } from "@/lib/systemTimezone";
 type Mode = "daily" | "monthly" | "annual";
 type Status =
   | "present"
@@ -142,7 +143,7 @@ function dateOf(v: string) {
 }
 function damascusTodayKey() {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Damascus",
+    timeZone: getSystemTimeZone(),
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

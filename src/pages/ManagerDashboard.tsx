@@ -19,6 +19,7 @@ import ManagerLayout from "@/components/layout/ManagerLayout";
 import { getDailyStatus, type DailyStatusRow } from "@/lib/dailyStatus";
 import { todayKey } from "@/lib/utils";
 
+import { getSystemTimeZone } from "@/lib/systemTimezone";
 type Filter =
   | "all"
   | "present"
@@ -310,7 +311,7 @@ export default function ManagerDashboard() {
           weekday: "long",
           day: "2-digit",
           month: "long",
-          timeZone: "Asia/Damascus",
+          timeZone: getSystemTimeZone(),
         },
       )}`}
     >
@@ -407,7 +408,7 @@ export default function ManagerDashboard() {
           <div>
             <div className="text-sm font-bold">حالة الموظفين الحالية</div>
             <div className="mt-1 text-xs text-muted-foreground">
-              المصدر: محرك الحضور المركزي · daily-status · Asia/Damascus
+              المصدر: محرك الحضور المركزي · daily-status · {getSystemTimeZone()}
             </div>
           </div>
         </div>

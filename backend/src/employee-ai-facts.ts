@@ -1,3 +1,6 @@
+import { dateKey, getAttendanceShift, localDateTime } from "./attendance-period";
+import { DEFAULT_SYSTEM_TIME_ZONE } from "./system-timezone";
+
 type FactData = {
   employee?: any;
   attendance?: any[];
@@ -9,50 +12,39 @@ type FactData = {
 };
 
 function n(v:any){return String(v??"").trim().toLowerCase();}
-function day(v:any){const s=String(v??"");return s.length>=10?s.slice(0,10):"";}
+function localDay(v:any,timeZone=DEFAULT_SYSTEM_TIME_ZONE){const s=String(v??"");if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const date=new Date(s);if(!Number.isFinite(date.getTime()))return s.length>=10?s.slice(0,10):"";const parts=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(date);const get=(type:string)=>parts.find((part)=>part.type===type)?.value||"00";return `${get("year")}-${get("month")}-${get("day")}`;}
 function inEvent(type:any){const t=n(type);return t.includes("check-in")||t.includes("check in")||t==="in"||t.includes("حضور")||t.includes("دخول")||t.includes("تسجيل دخول");}
 function outEvent(type:any){const t=n(type);return t.includes("check-out")||t.includes("check out")||t==="out"||t.includes("انصراف")||t.includes("خروج")||t.includes("تسجيل خروج");}
 function approved(status:any){return /(approved|accept|موافق|معتمد|مقبول)/iu.test(String(status??""));}
-function zoneToday(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Damascus",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());}
+function zoneToday(timeZone=DEFAULT_SYSTEM_TIME_ZONE){return dateKey(new Date(),timeZone);}
 function workDays(e:any){try{const a=JSON.parse(String(e?.workDaysJson||"[]"));return Array.isArray(a)?a.map(Number).filter((x:number)=>Number.isInteger(x)&&x>=0&&x<=6):[];}catch{return[];}}
 function utcDate(s:string){const [y,m,d]=s.split("-").map(Number);return new Date(Date.UTC(y,m-1,d));}
 function iso(d:Date){return d.toISOString().slice(0,10);}
 function dateLabel(s:string){if(!s)return "";const [y,m,d]=s.split("-");return `${d}/${m}/${y}`;}
-function parseTime(value:any,fallback="08:00"){const m=/^(\d{1,2}):(\d{2})$/.exec(String(value||fallback).trim());return {h:m?Math.min(23,Math.max(0,Number(m[1]))):Number(fallback.slice(0,2)),m:m?Math.min(59,Math.max(0,Number(m[2]))):Number(fallback.slice(3,5))};}
-function withTime(d:Date,t:{h:number,m:number}){const x=new Date(d);x.setHours(t.h,t.m,0,0);return x;}
 function isRotation(e:any){return String(e?.scheduleType||"").toUpperCase()==="ROTATION"||n(e?.scheduleType).includes("تناوب");}
-function activeWorkPeriod(e:any,target:Date){
+function dayNumber(value:string){return Date.UTC(Number(value.slice(0,4)),Number(value.slice(5,7))-1,Number(value.slice(8,10)))/86400000;}
+function activeWorkPeriod(e:any,target:Date,timeZone:string){
   if(!e)return {isWorkDay:false,start:null as Date|null,end:null as Date|null,label:"غير محدد"};
-  if(!isRotation(e)){
-    const wd=workDays(e); const d=target.getDay();
-    if(!wd.includes(d))return {isWorkDay:false,start:null as Date|null,end:null as Date|null,label:"إجازة أسبوعية"};
-    const start=withTime(target,parseTime(e.workStartTime,"09:00"));
-    let end=withTime(target,parseTime(e.workEndTime,"16:00"));
-    if(end<=start)end=new Date(end.getTime()+86400000);
-    return {isWorkDay:true,start,end,label:"دوام إداري"};
-  }
-  const raw=String(e.rotationStartDate||"").trim();
-  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(raw); if(!m)return {isWorkDay:false,start:null as Date|null,end:null as Date|null,label:"جدول تناوبي غير مكتمل"};
-  const base=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
-  const t=parseTime(e.rotationStartTime||e.workStartTime,"09:00"); const first=withTime(base,t);
-  const on=Math.max(1,Math.floor(Number(e.rotationDaysOn??4))); const off=Math.max(0,Math.floor(Number(e.rotationDaysOff??4))); const cycle=(on+off)*86400000;
-  const elapsed=target.getTime()-first.getTime(); if(elapsed<0)return {isWorkDay:false,start:null as Date|null,end:null as Date|null,label:"لم تبدأ المناوبة بعد"};
-  const idx=Math.floor(elapsed/cycle); const within=elapsed-idx*cycle; const cycleDay=Math.floor(within/86400000); const start=new Date(first.getTime()+idx*cycle);
-  if(cycleDay>=on)return {isWorkDay:false,start:null as Date|null,end:null as Date|null,label:"فترة راحة",cycleDay:cycleDay+1,on,off};
-  return {isWorkDay:true,start,end:new Date(start.getTime()+on*86400000),label:"مناوبة تناوبية",cycleDay:cycleDay+1,on,off};
+  const scheduleEmployee=isRotation(e)&&e.rotationStartTime?{...e,workStartTime:e.rotationStartTime}:e;
+  const period=getAttendanceShift(scheduleEmployee,target,timeZone);
+  const on=Math.max(1,Math.floor(Number(e.rotationDaysOn??4))),off=Math.max(0,Math.floor(Number(e.rotationDaysOff??4)));
+  const startDay=String(e.rotationStartDate||"").slice(0,10),diff=/^\d{4}-\d{2}-\d{2}$/.test(startDay)?dayNumber(dateKey(target,timeZone))-dayNumber(startDay):-1;
+  const cycle=on+off,cycleDay=diff>=0&&cycle>0?diff%cycle:0;
+  return {isWorkDay:period.isWorkDay,start:period.start,end:period.end,label:period.kind==="ROTATION"?"مناوبة تناوبية":"دوام إداري",cycleDay:cycleDay+1,on,off};
 }
-function isCurrentlyWorking(e:any,events:any[],now=new Date()){
-  const p=activeWorkPeriod(e,now); if(!p.isWorkDay||!p.start||!p.end||now<p.start||now>=p.end)return false;
+function isCurrentlyWorking(e:any,events:any[],now=new Date(),timeZone=DEFAULT_SYSTEM_TIME_ZONE){
+  const p=activeWorkPeriod(e,now,timeZone); if(!p.isWorkDay||!p.start||!p.end||now<p.start||now>=p.end)return false;
   const relevant=events.filter((x:any)=>String(x.timestamp)&&new Date(x.timestamp).getTime()<=now.getTime()).sort((x:any,y:any)=>new Date(y.timestamp).getTime()-new Date(x.timestamp).getTime());
   const last=relevant[0]; if(!last)return false; return inEvent(last.type)&&!outEvent(last.type);
 }
 function containsAny(q:string,words:string[]){return words.some(w=>q.includes(w));}
 function statusLabel(v:any){const s=String(v??"").toLowerCase();if(s.includes("pending")||s.includes("معلق")||s.includes("قيد"))return "قيد الانتظار";if(s.includes("approved")||s.includes("موافق")||s.includes("معتمد"))return "مقبول/معتمد";if(s.includes("rejected")||s.includes("مرفوض"))return "مرفوض";if(s.includes("cancel"))return "ملغى";if(s.includes("confirmed"))return "مؤكد";return String(v??"غير محدد");}
 
-export function employeeFactAnswer(question:string,data:FactData):string|null{
+export function employeeFactAnswer(question:string,data:FactData,timeZone=DEFAULT_SYSTEM_TIME_ZONE):string|null{
+ const day=(value:any)=>localDay(value,timeZone);
  const q=n(question);const e=data?.employee||{};const a=Array.isArray(data?.attendance)?data.attendance:[];const requests=Array.isArray(data?.requests)?data.requests:[];const escapes=Array.isArray(data?.escapes)?data.escapes:[];const notifications=Array.isArray(data?.notifications)?data.notifications:[];const leaves=(Array.isArray(data?.leaveRequests)?data.leaveRequests:[]);
  const approvedLeaves=leaves.filter((r:any)=>approved(r.status));
- const today=zoneToday(),year=today.slice(0,4),month=today.slice(0,7);
+ const today=zoneToday(timeZone),year=today.slice(0,4),month=today.slice(0,7);
  const events=a.filter((x:any)=>String(x.timestamp)).sort((x:any,y:any)=>String(y.timestamp).localeCompare(String(x.timestamp)));
  const ins=events.filter((x:any)=>inEvent(x.type));
  const outs=events.filter((x:any)=>outEvent(x.type));
@@ -60,12 +52,12 @@ export function employeeFactAnswer(question:string,data:FactData):string|null{
  const monthIns=ins.filter((x:any)=>day(x.timestamp).startsWith(month));
  const yearOuts=outs.filter((x:any)=>day(x.timestamp).startsWith(year));
  const monthOuts=outs.filter((x:any)=>day(x.timestamp).startsWith(month));
- const late=yearIns.filter((x:any)=>{const ts=new Date(x.timestamp);const m=/^(\d{1,2}):(\d{2})/.exec(String(e.workStartTime||"08:00"));if(Number.isNaN(ts.getTime())||!m)return false;const scheduled=new Date(ts);scheduled.setHours(Number(m[1]),Number(m[2]),0,0);return ts.getTime()>scheduled.getTime()+Number(e.gracePeriodMinutes||0)*60000;});
+ const late=yearIns.filter((x:any)=>{const ts=new Date(x.timestamp);const m=/^(\d{1,2}):(\d{2})/.exec(String(e.workStartTime||"08:00"));if(Number.isNaN(ts.getTime())||!m)return false;const scheduled=localDateTime(day(x.timestamp),`${m[1]}:${m[2]}`,timeZone);return ts.getTime()>scheduled.getTime()+Number(e.gracePeriodMinutes||0)*60000;});
  const ranges=approvedLeaves.map((r:any)=>({s:day(r.startDate||r.start_date),e:day(r.endDate||r.end_date||r.startDate||r.start_date)})).filter((r:any)=>r.s);
  const isLeave=(d:string)=>ranges.some((r:any)=>d>=r.s&&d<=r.e);
  const wd=workDays(e);const workedDays=new Set(yearIns.map((x:any)=>day(x.timestamp)));const absence:string[]=[];
  if(wd.length){const start=utcDate(`${year}-01-01`),end=utcDate(today);for(let d=new Date(start);d<=end;d.setUTCDate(d.getUTCDate()+1)){const ds=iso(d);if(wd.includes(d.getUTCDay())&&!isLeave(ds)&&!workedDays.has(ds))absence.push(ds);}}
- const now=new Date();const period=activeWorkPeriod(e,now);const currentlyWorking=isCurrentlyWorking(e,a,now);
+ const now=new Date();const period=activeWorkPeriod(e,now,timeZone);const currentlyWorking=isCurrentlyWorking(e,a,now,timeZone);
  const lastIn=ins[0];const lastOut=outs[0];
  const todayIns=ins.filter((x:any)=>day(x.timestamp)===today);const todayOuts=outs.filter((x:any)=>day(x.timestamp)===today);
  if(/(كم|عدد).*(موظف|موظفين)|كم موظف لدي|عدد الموظفين/.test(q))return "كمساعد موظف، لا أملك صلاحية الاطلاع على عدد الموظفين أو بيانات الموظفين الآخرين. يمكنني فقط مساعدتك في بيانات حضورك وبيانات حسابك.";
@@ -76,16 +68,16 @@ export function employeeFactAnswer(question:string,data:FactData):string|null{
  if(/متى.*(غبت|غيبت|غياب)|أيام.*(غبت|غياب)|تاريخ.*(غياب)/.test(q)&&/(هذا العام|السنة|عام)/.test(q))return wd.length?(absence.length?`أيام غيابك هذا العام (${absence.length}): ${absence.map(dateLabel).join("، ")}.`:`لا توجد أيام غياب محسوبة لك هذا العام وفق جدول دوامك والإجازات المعتمدة.`):"لا أستطيع حساب أيام الغياب بدقة لأن جدول أيام العمل الخاص بك غير متوفر بشكل كافٍ.";
  if(/(كم يوم.*(حضرت|حضور))|(عدد.*أيام.*الحضور)/.test(q)&&/(هذا الشهر|الشهر)/.test(q))return `حضرت ${new Set(monthIns.map((x:any)=>day(x.timestamp))).size} يومًا هذا الشهر.`;
  if(/(كم يوم.*(حضرت|حضور))|(عدد.*أيام.*الحضور)/.test(q)&&/(هذا العام|السنة|عام)/.test(q))return `حضرت ${new Set(yearIns.map((x:any)=>day(x.timestamp))).size} يومًا هذا العام.`;
- if(containsAny(q,["حضرت اليوم","حضور اليوم","سجلت حضور اليوم","هل حضرت اليوم"]))return todayIns.length?`نعم، لديك ${todayIns.length} تسجيل حضور اليوم، وآخرها الساعة ${new Date(todayIns[0].timestamp).toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لديك تسجيل حضور اليوم.`;
- if(containsAny(q,["انصرفت اليوم","انصراف اليوم","سجلت انصراف اليوم","هل انصرفت اليوم"]))return todayOuts.length?`نعم، لديك تسجيل انصراف اليوم، وآخره الساعة ${new Date(todayOuts[0].timestamp).toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لديك تسجيل انصراف اليوم.`;
+ if(containsAny(q,["حضرت اليوم","حضور اليوم","سجلت حضور اليوم","هل حضرت اليوم"]))return todayIns.length?`نعم، لديك ${todayIns.length} تسجيل حضور اليوم، وآخرها الساعة ${new Date(todayIns[0].timestamp).toLocaleTimeString("ar-SY",{timeZone,hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لديك تسجيل حضور اليوم.`;
+ if(containsAny(q,["انصرفت اليوم","انصراف اليوم","سجلت انصراف اليوم","هل انصرفت اليوم"]))return todayOuts.length?`نعم، لديك تسجيل انصراف اليوم، وآخره الساعة ${new Date(todayOuts[0].timestamp).toLocaleTimeString("ar-SY",{timeZone,hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لديك تسجيل انصراف اليوم.`;
  if(containsAny(q,["أنا في العمل","انا في العمل","بالعمل الآن","في العمل الآن","أعمل الآن","اعمل الآن","هل أنا في العمل"]))return currentlyWorking?"نعم، أنت في العمل حاليًا وفق آخر تسجيل حضور وجدول دوامك.":"لا يظهر أنك في العمل حاليًا وفق آخر تسجيل حضور وجدول دوامك.";
- if(containsAny(q,["آخر حضور","اخر حضور","متى كان آخر حضور","آخر مرة حضرت"]))return lastIn?`آخر حضور لك كان ${dateLabel(day(lastIn.timestamp))} الساعة ${new Date(lastIn.timestamp).toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لدي تسجيل حضور لك.`;
- if(containsAny(q,["آخر انصراف","اخر انصراف","متى انصرفت آخر مرة"]))return lastOut?`آخر انصراف لك كان ${dateLabel(day(lastOut.timestamp))} الساعة ${new Date(lastOut.timestamp).toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لدي تسجيل انصراف لك.`;
+ if(containsAny(q,["آخر حضور","اخر حضور","متى كان آخر حضور","آخر مرة حضرت"]))return lastIn?`آخر حضور لك كان ${dateLabel(day(lastIn.timestamp))} الساعة ${new Date(lastIn.timestamp).toLocaleTimeString("ar-SY",{timeZone,hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لدي تسجيل حضور لك.`;
+ if(containsAny(q,["آخر انصراف","اخر انصراف","متى انصرفت آخر مرة"]))return lastOut?`آخر انصراف لك كان ${dateLabel(day(lastOut.timestamp))} الساعة ${new Date(lastOut.timestamp).toLocaleTimeString("ar-SY",{timeZone,hour:"2-digit",minute:"2-digit"})}.`:`لا يوجد لدي تسجيل انصراف لك.`;
  if(/(مناوب|جدول|دوام).*(اليوم|اليوم؟)|اليوم.*(مناوب|جدول|دوام)/.test(q)){
    if(isRotation(e)){
      if(period.isWorkDay){
-       const startText=period.start?.toLocaleTimeString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit"});
-       const endText=period.end?.toLocaleString("ar-SY",{timeZone:"Asia/Damascus",hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit",year:"numeric"});
+       const startText=period.start?.toLocaleTimeString("ar-SY",{timeZone,hour:"2-digit",minute:"2-digit"});
+       const endText=period.end?.toLocaleString("ar-SY",{timeZone,hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit",year:"numeric"});
        return `مناوبتك اليوم قائمة. أنت في اليوم ${period.cycleDay} من ${period.on} يوم عمل ضمن دورة ${period.on}/${period.off}. بداية المناوبة ${startText} وتنتهي ${endText}.`;
      }
      return `اليوم ضمن فترة الراحة في جدولك التناوبي.`;

@@ -9,6 +9,7 @@ import { getEmployees, saveEmployees, getSettings } from "@/lib/storage";
 import { generateId } from "@/lib/utils";
 import { hash } from "@/lib/hash";
 import type { Employee, EscapeEvent, Location, ScheduleType } from "@/types";
+import { getSystemTimeZone } from "@/lib/systemTimezone";
 type FormState = {
     name: string;
     jobNumber: string;
@@ -304,7 +305,7 @@ export default function ManagerEmployees() {
     const openAdminEmployeeRequest = (e: Employee, type: "permission" | "leave") => {
         if (!canManage || e.status !== "active")
             return;
-        const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus" }).format(new Date());
+        const today = new Intl.DateTimeFormat("en-CA", { timeZone: getSystemTimeZone() }).format(new Date());
         setRequestDialog({ employee: e, type });
         setRequestStartDate(today);
         setRequestEndDate(today);

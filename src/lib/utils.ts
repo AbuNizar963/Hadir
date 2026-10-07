@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { getSystemTimeZone } from "@/lib/systemTimezone";
 
 /** Normalize Arabic-Indic and Eastern Arabic-Indic digits to Western Arabic digits (0-9). */
 export function normalizeDigits(value: string): string {
@@ -12,24 +13,24 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDateTime(iso: string): string {
+export function formatDateTime(iso: string, timeZone = getSystemTimeZone()): string {
   const date = new Date(iso);
   return normalizeDigits(date.toLocaleString("ar-EG", {
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-    timeZone: "Asia/Damascus",
+    timeZone,
   }));
 }
 
-export function formatTime(iso: string): string {
+export function formatTime(iso: string, timeZone = getSystemTimeZone()): string {
   return normalizeDigits(new Date(iso).toLocaleTimeString("ar-EG", {
-    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Damascus",
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone,
   }));
 }
 
-export function formatDate(iso: string): string {
+export function formatDate(iso: string, timeZone = getSystemTimeZone()): string {
   return normalizeDigits(new Date(iso).toLocaleDateString("ar-EG", {
-    year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Damascus",
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone,
   }));
 }
 
@@ -37,10 +38,10 @@ export function formatNumber(value: number): string {
   return normalizeDigits(new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value));
 }
 
-/** Return the application's official calendar date in Damascus time. */
-export function todayKey(date = new Date()): string {
+/** Return the application's official calendar date in its configured time zone. */
+export function todayKey(date = new Date(), timeZone = getSystemTimeZone()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Damascus",
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

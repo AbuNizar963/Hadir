@@ -133,6 +133,7 @@ export interface AuditEntry {
 
 export interface Settings {
   qrCode: string;
+  timezone?: string;
   workSiteLat: number;
   workSiteLng: number;
   radiusMeters: number;

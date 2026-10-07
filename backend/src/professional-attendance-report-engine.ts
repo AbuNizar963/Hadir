@@ -2,8 +2,10 @@ import {
   handleDailyStatus,
   isRotationVisibleDay,
 } from "./attendance-engine";
+import { localDateTime } from "./attendance-period";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 
-type Env = { DB: D1Database };
+type Env = { DB: D1Database; APP_TIMEZONE?: string };
 
 type FactRow = {
   attendanceDay: string;
@@ -66,11 +68,13 @@ const dateNumber = (day: string) =>
 
 const daysBetween = (from: string, to: string) =>
   Math.round(dateNumber(to) - dateNumber(from)) + 1;
-
-const damascusDay = (date = new Date()) =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Damascus",
-  }).format(date);
+const addDays = (day: string, amount: number) =>
+  new Date((dateNumber(day) + amount) * 86400000).toISOString().slice(0, 10);
+const systemDay = (date: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+};
 
 function validatePeriod(from: string, to: string) {
   if (
@@ -353,8 +357,9 @@ async function loadLiveTodayFacts(
   day: string,
   employeeId: string | undefined,
   actor: any,
+  timezone: string,
 ): Promise<FactRow[] | null> {
-  if (day !== damascusDay() || !actor) return null;
+  if (day !== systemDay(new Date(), timezone) || !actor) return null;
 
   try {
     const response = await handleDailyStatus(
@@ -366,6 +371,7 @@ async function loadLiveTodayFacts(
       env,
       actor,
       false,
+      timezone,
     );
 
     if (!response.ok) return null;
@@ -384,8 +390,8 @@ async function loadLiveTodayFacts(
     if (employeeId && !liveEmployees.length) return [];
     if (!liveEmployees.length) return [];
 
-    const dayStart = new Date(`${day}T00:00:00+03:00`);
-    const dayEnd = new Date(dayStart.getTime() + 86400000);
+    const dayStart = localDateTime(day, "00:00", timezone);
+    const dayEnd = localDateTime(addDays(day, 1), "00:00", timezone);
     const attendanceQuery = employeeId
       ? env.DB
           .prepare(
@@ -402,7 +408,7 @@ async function loadLiveTodayFacts(
     const eventsByEmployee = new Map<string, any[]>();
 
     for (const event of attendanceRows.results || []) {
-      if (damascusDay(new Date(String(event.timestamp))) !== day) continue;
+      if (systemDay(new Date(String(event.timestamp)), timezone) !== day) continue;
       const id = String(event.employeeId || "");
       if (!id) continue;
       const list = eventsByEmployee.get(id) || [];
@@ -537,9 +543,9 @@ async function loadLiveTodayFacts(
         auditIdsJson: "[]",
         attendanceSource: classifySource(events),
         calculationSource: "attendance-engine-live",
-        calculationVersion: "daily-status-v1",
+        calculationVersion: "central-engine-timezone-v2",
         historicalDataQuality: "exact",
-        timezone: "Asia/Damascus",
+        timezone,
         computedAt: String(payload.computedAt || new Date().toISOString()),
       };
     });
@@ -557,16 +563,33 @@ export async function buildProfessionalAttendanceReport(
   actor?: any,
 ) {
   const dayCount = validatePeriod(from, to);
-  const sourceRows = await loadFacts(env, from, to, employeeId);
+  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  let sourceRows = await loadFacts(env, from, to, employeeId);
+  const employeeFilter = employeeId ? " AND employee_id=?" : "";
+  const staleQuery = env.DB.prepare(
+    `SELECT 1 AS stale FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>'central-engine-timezone-v2')${employeeFilter} LIMIT 1`,
+  );
+  const staleFact = employeeId
+    ? await staleQuery.bind(from, to, timezone, employeeId).first<any>()
+    : await staleQuery.bind(from, to, timezone).first<any>();
+  if (staleFact) {
+    const deleteQuery = env.DB.prepare(
+      `DELETE FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>'central-engine-timezone-v2')${employeeFilter}`,
+    );
+    if (employeeId) await deleteQuery.bind(from, to, timezone, employeeId).run();
+    else await deleteQuery.bind(from, to, timezone).run();
+    await ensureProfessionalAttendanceFacts(env, from, to, actor, employeeId, timezone);
+    sourceRows = await loadFacts(env, from, to, employeeId);
+  }
   const reportRows = await filterReportableRows(
     env,
     sourceRows,
     dayCount === 1,
   );
-  const currentDay = damascusDay();
+  const currentDay = systemDay(new Date(), timezone);
   const liveRows =
     from <= currentDay && currentDay <= to
-      ? await loadLiveTodayFacts(env, currentDay, employeeId, actor)
+      ? await loadLiveTodayFacts(env, currentDay, employeeId, actor, timezone)
       : null;
 
   // Historical facts are authoritative for completed days. For the current day
@@ -748,7 +771,8 @@ export async function buildProfessionalAttendanceReport(
     ok: true,
     reportVersion: "2.0",
     generatedAt: new Date().toISOString(),
-    timezone: rows[0]?.timezone || "Asia/Damascus",
+    timezone,
+    calculationTimezones: [...new Set(rows.map((row) => row.timezone).filter(Boolean))].sort(),
     from,
     to,
     days: dayCount,

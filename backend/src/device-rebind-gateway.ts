@@ -5,6 +5,7 @@ import { handleAttendanceCenter } from "./attendance-center-api";
 import { handleProfessionalAttendanceReport } from "./professional-attendance-report-api";
 import { handleCompanyLogoRequest } from "./company-logo";
 import { runAutomaticVip } from "./automatic-vip";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 
 type Env = {
   DB: D1Database;
@@ -53,21 +54,16 @@ function dailyCors(request: Request, env: Env) {
   };
 }
 
-function damascusDayNow() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Damascus",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const value = (type: string) => parts.find((part) => part.type === type)?.value || "";
+function systemDayNow(timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || "00";
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
-function employeeDailyStatusRequest(request: Request, actor: any) {
+function employeeDailyStatusRequest(request: Request, actor: any, timeZone: string) {
   if (String(actor?.role || "").toLowerCase() !== "staff") return request;
   const url = new URL(request.url);
-  url.searchParams.set("date", damascusDayNow());
+  url.searchParams.set("date", systemDayNow(timeZone));
   return new Request(url, request);
 }
 
@@ -125,8 +121,11 @@ export default {
         actorProbe.search = "";
         const probe = await base.fetch(new Request(actorProbe, { method: "GET", headers: request.headers }), env, ctx);
         const actor = probe.ok ? ((await probe.json().catch(() => ({})) as any).user || null) : null;
+        const timezone = normalizedPath === "/api/manager/daily-status"
+          ? await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE)
+          : undefined;
         const result = normalizedPath === "/api/manager/daily-status"
-          ? await handleDailyStatus(employeeDailyStatusRequest(request, actor), env, actor)
+          ? await handleDailyStatus(employeeDailyStatusRequest(request, actor, timezone || DEFAULT_SYSTEM_TIME_ZONE), env, actor, false, timezone)
           : await handleProfessionalAttendanceReport(request, env, actor);
         const headers = new Headers(result.headers);
         for (const [key, value] of Object.entries(cors)) headers.set(key, value);

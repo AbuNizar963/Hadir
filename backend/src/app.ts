@@ -1,8 +1,10 @@
 import { handleEmployeeAttendance } from "./employee-attendance-gateway";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone, isValidSystemTimeZone } from "./system-timezone";
 type Env = {
   DB: D1Database;
   JWT_SECRET?: string;
   APP_ORIGIN?: string;
+  APP_TIMEZONE?: string;
   OWNER_RECOVERY_CODE?: string;
   PROFILE_IMAGES?: R2Bucket;
 };
@@ -366,6 +368,15 @@ export default {
         .all<any>();
       return json(rows.results || [], 200, origin);
     }
+    if (path === "/api/system/timezone" && req.method === "GET") {
+      if (!actor)
+        return json({ error: "غير مصرح" }, 403, origin);
+      return json(
+        { timezone: await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE) },
+        200,
+        origin,
+      );
+    }
     if (path === "/api/settings" && req.method === "GET") {
       if (!actor || !["owner", "manager", "supervisor"].includes(actor.role))
         return json({ error: "غير مصرح" }, 403, origin);
@@ -386,6 +397,8 @@ export default {
       if (!actor || !["owner", "manager"].includes(actor.role))
         return json({ error: "المالك أو المدير فقط" }, 403, origin);
       const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+      if ("timezone" in b && !isValidSystemTimeZone(b.timezone))
+        return json({ error: "المنطقة الزمنية غير صالحة." }, 400, origin);
       const entries = Object.entries(b).filter(
         ([k]) => k !== "ownerPasswordHash",
       );

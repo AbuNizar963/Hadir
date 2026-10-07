@@ -1,5 +1,6 @@
 import { dateKey, getAttendanceShift, getAttendanceShiftForDay } from "./attendance-period";
 import { submitAttendanceThroughCentralEngine } from "./attendance-engine-central";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 
 type Env = {
   DB: D1Database;
@@ -9,12 +10,9 @@ type Env = {
 const MAX_BINDINGS_PER_QUERY = 90;
 
 export function dateKeyLocal(date: Date, tz: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 export function operationalShift(employee: any, current: Date, tz: string) {
@@ -126,22 +124,7 @@ function maxRotationDaysOn(employees: any[]) {
 }
 
 export async function runAutomaticAttendance(env: Env) {
-  const configured = await env.DB
-    .prepare("SELECT value FROM settings WHERE key='timezone' LIMIT 1")
-    .first<any>()
-    .catch(() => null);
-
-  let tz = String(env.APP_TIMEZONE || "Asia/Damascus");
-  try {
-    const parsed = JSON.parse(String(configured?.value || ""));
-    if (typeof parsed === "string" && parsed.trim()) {
-      tz = parsed.trim();
-    }
-  } catch {
-    if (String(configured?.value || "").trim()) {
-      tz = String(configured.value).trim();
-    }
-  }
+  const tz = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
 
   const current = new Date();
   const currentDay = dateKeyLocal(current, tz);

@@ -7,6 +7,7 @@ import { backendEnabled, getBackendAttendance, getBackendEmployeeProfile, getBac
 import { getEmployeeScheduleStatus, getActiveWorkPeriod, getScheduleCountdown } from "@/lib/schedule";
 import { formatDurationMinutes, formatTime, minutesBetween, normalizeDigits } from "@/lib/utils";
 import type { AttendanceRecord, Employee, EmployeeRequest, EscapeEvent, Location } from "@/types";
+import { getSystemTimeZone } from "@/lib/systemTimezone";
 const PROFILE_TIMEOUT_MS = 12000;
 const API_URL = String(
   import.meta.env.VITE_API_URL ||
@@ -74,7 +75,7 @@ function clockText(value: string | undefined, fallback = "09:00") {
 
 function damascusToday() {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Damascus",
+    timeZone: getSystemTimeZone(),
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
