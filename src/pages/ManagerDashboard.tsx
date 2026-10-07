@@ -1,7 +1,6 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CalendarDays,
-  Coffee,
   ShieldAlert,
   Clock3,
   UserCheck,
@@ -19,6 +18,7 @@ type Filter =
   | "present"
   | "absent"
   | "late"
+  | "notStarted"
   | "rest"
   | "leave"
   | "permission"
@@ -43,8 +43,9 @@ function statusLabel(row: DailyStatusRow) {
     case "ABSENT":
       return "غائب";
     case "REST":
-    case "NOT_STARTED":
       return "مستريح";
+    case "NOT_STARTED":
+      return "لم يبدأ";
     case "LEAVE":
       return "إجازة";
     case "PERMISSION":
@@ -63,7 +64,16 @@ function isPresent(row: DailyStatusRow) {
 }
 
 function isRest(row: DailyStatusRow) {
-  return row.status === "REST" || row.status === "NOT_STARTED";
+  return row.status === "REST";
+}
+
+function isNotStarted(row: DailyStatusRow) {
+  return row.status === "NOT_STARTED";
+}
+
+function isReportableDailyRow(row: DailyStatusRow) {
+  const status = String(row.status).toUpperCase();
+  return status !== "REST" && status !== "HOLIDAY";
 }
 
 function alignCurrentShiftStatus(
@@ -177,100 +187,117 @@ export default function ManagerDashboard() {
     };
   }, [today]);
 
-  const currentRows = useMemo(
+  const allCurrentRows = useMemo(
     () => rows.map((row) => alignCurrentShiftStatus(row, nowMs, today)),
     [rows, nowMs, today],
   );
+  const reportableRows = useMemo(
+    () => allCurrentRows.filter(isReportableDailyRow),
+    [allCurrentRows],
+  );
 
   const presentIds = useMemo(
-    () => new Set(currentRows.filter(isPresent).map((row) => row.employeeId)),
-    [currentRows],
+    () =>
+      new Set(
+        reportableRows
+          .filter((row) => row.status === "PRESENT")
+          .map((row) => row.employeeId),
+      ),
+    [reportableRows],
   );
 
   const lateIds = useMemo(
     () =>
       new Set(
-        currentRows
+        reportableRows
           .filter((row) => row.status === "LATE")
           .map((row) => row.employeeId),
       ),
-    [currentRows],
+    [reportableRows],
   );
 
   const absentIds = useMemo(
     () =>
       new Set(
-        currentRows
+        reportableRows
           .filter((row) => row.status === "ABSENT")
           .map((row) => row.employeeId),
       ),
-    [currentRows],
+    [reportableRows],
   );
 
   const restIds = useMemo(
-    () => new Set(currentRows.filter(isRest).map((row) => row.employeeId)),
-    [currentRows],
+    () => new Set(allCurrentRows.filter(isRest).map((row) => row.employeeId)),
+    [allCurrentRows],
+  );
+
+  const notStartedIds = useMemo(
+    () =>
+      new Set(reportableRows.filter(isNotStarted).map((row) => row.employeeId)),
+    [reportableRows],
   );
 
   const leaveIds = useMemo(
     () =>
       new Set(
-        currentRows
+        reportableRows
           .filter((row) => row.status === "LEAVE")
           .map((row) => row.employeeId),
       ),
-    [currentRows],
+    [reportableRows],
   );
 
   const permissionIds = useMemo(
     () =>
       new Set(
-        currentRows
+        reportableRows
           .filter((row) => row.status === "PERMISSION")
           .map((row) => row.employeeId),
       ),
-    [currentRows],
+    [reportableRows],
   );
 
   const escapedIds = useMemo(
     () =>
       new Set(
-        currentRows
+        reportableRows
           .filter((row) => row.status === "ESCAPED")
           .map((row) => row.employeeId),
       ),
-    [currentRows],
+    [reportableRows],
   );
 
-  const filteredRows = useMemo(
-    () =>
-      currentRows.filter((row) => {
-        const id = row.employeeId;
+  const filteredRows = useMemo(() => {
+    const sourceRows = filter === "rest" ? allCurrentRows : reportableRows;
+    return sourceRows.filter((row) => {
+      const id = row.employeeId;
 
-        if (search && !row.employeeName.includes(search)) return false;
-        if (filter === "present" && !presentIds.has(id)) return false;
-        if (filter === "absent" && !absentIds.has(id)) return false;
-        if (filter === "late" && !lateIds.has(id)) return false;
-        if (filter === "rest" && !restIds.has(id)) return false;
-        if (filter === "leave" && !leaveIds.has(id)) return false;
-        if (filter === "permission" && !permissionIds.has(id)) return false;
-        if (filter === "escaped" && !escapedIds.has(id)) return false;
+      if (search && !row.employeeName.includes(search)) return false;
+      if (filter === "present" && !presentIds.has(id)) return false;
+      if (filter === "absent" && !absentIds.has(id)) return false;
+      if (filter === "late" && !lateIds.has(id)) return false;
+      if (filter === "notStarted" && !notStartedIds.has(id)) return false;
+      if (filter === "rest" && !restIds.has(id)) return false;
+      if (filter === "leave" && !leaveIds.has(id)) return false;
+      if (filter === "permission" && !permissionIds.has(id)) return false;
+      if (filter === "escaped" && !escapedIds.has(id)) return false;
 
-        return true;
-      }),
-    [
-      currentRows,
-      search,
-      filter,
-      presentIds,
-      absentIds,
-      lateIds,
-      restIds,
-      leaveIds,
-      permissionIds,
-      escapedIds,
-    ],
-  );
+      return true;
+    });
+  }, [
+    allCurrentRows,
+    reportableRows,
+    search,
+    filter,
+    presentIds,
+    absentIds,
+    lateIds,
+    notStartedIds,
+    restIds,
+    leaveIds,
+    permissionIds,
+    escapedIds,
+  ]);
 
   const displayDate = useMemo(
     () => new Date(`${today}T12:00:00+03:00`),
@@ -282,7 +309,8 @@ export default function ManagerDashboard() {
     ["present", "الحاضرون"],
     ["absent", "الغائبون"],
     ["late", "المتأخرون"],
-    ["rest", "المستريحون"],
+    ["notStarted", "لم يبدأ"],
+    ["rest", "الراحة (خارج تقرير اليوم)"],
     ["leave", "الإجازات"],
     ["permission", "المستأذنون"],
     ["escaped", "الهاربون"],
@@ -312,8 +340,8 @@ export default function ManagerDashboard() {
         aria-label="حالات الدوام"
       >
         <StatusShortcut
-          label="إجمالي الموظفين"
-          value={currentRows.length}
+          label="موظفو تقرير اليوم"
+          value={reportableRows.length}
           icon={<Users className="h-5 w-5" aria-hidden="true" />}
           tone="all"
           onClick={() => setFilter("all")}
@@ -344,12 +372,20 @@ export default function ManagerDashboard() {
           active={filter === "late"}
         />
         <StatusShortcut
-          label="الراحة"
+          label="الراحة خارج التقرير"
           value={restIds.size}
-          icon={<Coffee className="h-5 w-5" aria-hidden="true" />}
+          icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />}
           tone="rest"
           onClick={() => setFilter("rest")}
           active={filter === "rest"}
+        />
+        <StatusShortcut
+          label="لم يبدأ"
+          value={notStartedIds.size}
+          icon={<Clock3 className="h-5 w-5" aria-hidden="true" />}
+          tone="rest"
+          onClick={() => setFilter("notStarted")}
+          active={filter === "notStarted"}
         />
         <StatusShortcut
           label="الإجازات"
