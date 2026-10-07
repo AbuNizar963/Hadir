@@ -179,20 +179,9 @@ export default function AdminAccountsPanel() {
   };
 
   return <div className="space-y-4">
-    <details className="hud-card group border-primary/40 overflow-hidden">
-      <summary className="list-none cursor-pointer select-none p-5 sm:p-6 flex items-center justify-between gap-4 hover:bg-primary/5 transition-colors">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><AdminIcon /></span>
-          <span className="min-w-0">
-            <span className="flex items-center gap-2 text-xs mono text-primary font-bold">ACCESS CONTROL · إدارة الصلاحيات</span>
-            <span className="block mt-1 text-base font-bold">حسابات المدراء والمشرفين</span>
-            <span className="block mt-1 text-xs text-muted-foreground">إضافة وإدارة الحسابات الإدارية والصلاحيات</span>
-          </span>
-        </div>
-        <Chevron />
-      </summary>
-      <div className="border-t border-border/60 p-5 sm:p-6">
-        <p className="text-sm text-muted-foreground mb-5">المالك فقط يستطيع إضافة المدراء والمشرفين. لا يمكن إنشاء مالك من هذه الواجهة.{backendEnabled && " البيانات محفوظة على الخادم."}</p>
+    <div className="space-y-4">
+      <div>
+        <p className="mb-4 text-xs text-muted-foreground">إضافة المديرين والمشرفين متاحة للمالك فقط.{backendEnabled && " البيانات محفوظة على الخادم."}</p>
         <div className="grid md:grid-cols-4 gap-3 items-end mb-5">
           <label className="text-xs">الاسم<input className="input mt-1" value={name} onChange={e=>setName(e.target.value)} placeholder="اسم المدير أو المشرف" /></label>
           <label className="text-xs">اسم المستخدم<input className="input mt-1" value={username} onChange={e=>setUsername(e.target.value)} placeholder="username" /></label>
@@ -206,16 +195,16 @@ export default function AdminAccountsPanel() {
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><AttendancePolicyIcon /></span>
             <div>
               <div className="font-bold text-sm">سياسة تسجيل الحضور والانصراف</div>
-              <div className="text-xs text-muted-foreground mt-1 leading-5">تحكم في السماح بالتسجيل قبل بداية العمل وبعد نهاية الدوام، مع الحفاظ على التحقق من الموقع والجهاز ورمز QR.</div>
+              <div className="text-xs text-muted-foreground mt-1 leading-5">حدد نوافذ التسجيل المبكر والانصراف المتأخر.</div>
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-3">
             <label className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 p-3 cursor-pointer">
-              <span><span className="block text-sm font-bold">السماح بالحضور قبل بداية العمل</span><span className="block text-[11px] text-muted-foreground mt-1">يفتح التسجيل المبكر ضمن المهلة المحددة أدناه.</span></span>
+              <span><span className="block text-sm font-bold">السماح بالحضور قبل بداية العمل</span><span className="settings-option-hint block text-[11px] text-muted-foreground mt-1">ضمن المهلة المحددة أدناه.</span></span>
               <input type="checkbox" className="h-5 w-5 accent-primary" checked={Boolean(settings.allowEarlyCheckIn)} onChange={e=>setSettings(prev=>({ ...prev, allowEarlyCheckIn: e.target.checked }))} />
             </label>
             <label className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 p-3 cursor-pointer">
-              <span><span className="block text-sm font-bold">السماح بالانصراف بعد نهاية الدوام</span><span className="block text-[11px] text-muted-foreground mt-1">يبقى الانصراف متاحًا ضمن المهلة المحددة أدناه.</span></span>
+              <span><span className="block text-sm font-bold">السماح بالانصراف بعد نهاية الدوام</span><span className="settings-option-hint block text-[11px] text-muted-foreground mt-1">ضمن المهلة المحددة أدناه.</span></span>
               <input type="checkbox" className="h-5 w-5 accent-primary" checked={Boolean(settings.allowLateCheckOut)} onChange={e=>setSettings(prev=>({ ...prev, allowLateCheckOut: e.target.checked }))} />
             </label>
           </div>
@@ -249,6 +238,6 @@ export default function AdminAccountsPanel() {
           {displayAccounts.length===0 && <div className="text-center text-xs text-muted-foreground py-4">لا توجد حسابات مدير أو مشرف بعد.</div>}
         </div>
       </div>
-    </details>
+    </div>
   </div>;
 }

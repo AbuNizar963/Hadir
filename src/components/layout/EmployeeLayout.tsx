@@ -463,7 +463,7 @@ export default function EmployeeLayout({
         </div>
       )}
 
-      <header className="mx-auto max-w-7xl border-b border-border/40 px-4 pb-5 pt-7 sm:px-6 lg:px-10">
+      <header className="employee-page-header mx-auto max-w-7xl border-b border-border/40 px-4 pb-5 pt-7 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">
@@ -473,7 +473,7 @@ export default function EmployeeLayout({
               {title}
             </h1>
             {subtitle && (
-              <div className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+              <div className="page-subtitle mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                 {subtitle}
               </div>
             )}

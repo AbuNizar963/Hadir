@@ -741,7 +741,7 @@ export default function ManagerLayout({
               {title}
             </h1>
             {subtitle && (
-              <div className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+              <div className="page-subtitle mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                 {subtitle}
               </div>
             )}

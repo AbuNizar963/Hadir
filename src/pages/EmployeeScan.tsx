@@ -248,15 +248,10 @@ export default function EmployeeScan() {
       </div>
 
       <div className="employee-scan-content w-full pb-10">
-        <section className="mb-4 text-center">
-          <div className="text-xs font-bold tracking-widest text-muted-foreground">
-            {action === "check-in" ? "CHECK IN" : "CHECK OUT"}
-          </div>
-          <h1 className="mt-1 text-2xl font-extrabold">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {session?.name ?? "الموظف"} · {session?.jobNumber ?? "-"}
-          </p>
-        </section>
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3">
+          <div className="text-xs font-bold tracking-widest text-muted-foreground">{action === "check-in" ? "CHECK IN" : "CHECK OUT"}</div>
+          <div className="text-xs text-muted-foreground">{session?.name ?? "الموظف"} · {session?.jobNumber ?? "-"}</div>
+        </div>
 
         {step === "camera" && (
           <section className="overflow-hidden rounded-3xl border border-border/70 bg-black shadow-xl">

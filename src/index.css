@@ -175,3 +175,9 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Unified hierarchy: page title first, details only when the screen needs them. */
+.page-subtitle { display: none; }
+.settings-page .settings-card-description,
+.settings-page .settings-option-hint { display: none; }
+.settings-page .settings-tab-panel .company-specialties-host p.mt-1 { display: none; }
