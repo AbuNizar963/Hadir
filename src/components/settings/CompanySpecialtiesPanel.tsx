@@ -186,7 +186,7 @@ export default function CompanySpecialtiesPanel() {
                 {displayedLogo ? <img src={displayedLogo} alt={brandName.trim() || "شعار الشركة"} className="h-full w-full object-contain p-2" /> : <ImagePlus className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />}
               </div>
               <div className="mt-3 flex items-center justify-center gap-2">
-                <label className={`grid h-9 w-9 cursor-pointer place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm transition hover:brightness-105 ${saving || !hydrated ? "pointer-events-none opacity-50" : ""}`} title="تعديل الشعار" aria-label="تعديل الشعار">
+                <label className={`grid h-9 w-9 cursor-pointer place-items-center rounded-lg bg-background text-emerald-600 shadow-sm ring-1 ring-border transition hover:bg-emerald-500 hover:text-white ${saving || !hydrated ? "pointer-events-none opacity-50" : ""}`} title="تعديل الشعار" aria-label="تعديل الشعار">
                   <Pencil className="h-4 w-4" />
                   <input type="file" accept="image/*" className="sr-only" disabled={saving || !hydrated} onChange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ""; void handleLogo(f); }} />
                 </label>
