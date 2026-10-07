@@ -7,6 +7,7 @@ import {
   listReportArchives,
   repairArchiveManifest,
 } from "./report-archive";
+import { refreshProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
 export { HadirRealtime };
 
 type Env = {
@@ -157,6 +158,32 @@ export default {
           500,
           o,
         );
+      }
+    }
+
+    if (path === "/api/reports/archive/prepare" && request.method === "POST") {
+      const a = await archiveActor(request, env);
+      if (!archiveDeleteAllowed(a))
+        return json({ error: "تجهيز الأرشيف متاح للمالك فقط" }, 403, o);
+      try {
+        const body = await request.json().catch(() => ({} as any));
+        const cursor = Math.max(0, Math.floor(Number(body?.cursor || 0)));
+        const timezone = String(env.APP_TIMEZONE || "Asia/Damascus");
+        const now = new Date();
+        const current = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit" }).formatToParts(now);
+        const year = Number(current.find((part) => part.type === "year")?.value);
+        const month = Number(current.find((part) => part.type === "month")?.value);
+        const previous = new Date(Date.UTC(year, month - 2, 1));
+        const from = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}-01`;
+        const lastDay = new Date(Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth() + 1, 0)).getUTCDate();
+        const to = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        const row = await env.DB.prepare("SELECT id FROM employees ORDER BY id LIMIT 1 OFFSET ?").bind(cursor).first<{ id: string }>();
+        if (!row) return json({ ok: true, done: true, cursor, from, to }, 200, o);
+        const written = await refreshProfessionalAttendanceFacts(env, from, to, { id: a.id, role: a.role }, String(row.id));
+        return json({ ok: true, done: false, cursor, nextCursor: cursor + 1, employeeId: row.id, written, from, to }, 200, o);
+      } catch (error) {
+        console.error("[report-archive] batch preparation failed", error);
+        return json({ error: error instanceof Error ? error.message : "تعذر تجهيز دفعة الأرشيف" }, 500, o);
       }
     }
 

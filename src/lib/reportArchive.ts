@@ -98,6 +98,25 @@ export async function refreshReportArchive() {
   return data;
 }
 
+export async function prepareReportArchive(cursor: number) {
+  const response = await fetch(`${API_URL}/api/reports/archive/prepare`, {
+    method: "POST",
+    headers: { ...adminHeaders(), "content-type": "application/json" },
+    body: JSON.stringify({ cursor }),
+    credentials: "include",
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => null)) as {
+    error?: string;
+    done?: boolean;
+    nextCursor?: number;
+    employeeId?: string;
+  } | null;
+  if (!response.ok)
+    throw new Error(String(data?.error || `HTTP ${response.status}`));
+  return data || { done: false, nextCursor: cursor + 1 };
+}
+
 export async function downloadArchivedReport(
   reportId: string,
   fileName: string,

@@ -20,6 +20,7 @@ import {
   deleteArchivedReport,
   downloadArchivedReport,
   listArchivedReports,
+  prepareReportArchive,
   refreshReportArchive,
 } from "@/lib/reportArchive";
 import { currentManager } from "@/lib/auth";
@@ -105,6 +106,12 @@ export default function ReportArchive() {
     setError(null);
 
     try {
+      let cursor = 0;
+      for (;;) {
+        const batch = await prepareReportArchive(cursor);
+        if (batch.done) break;
+        cursor = Number(batch.nextCursor ?? cursor + 1);
+      }
       await refreshReportArchive();
       await refresh();
     } catch (cause) {
