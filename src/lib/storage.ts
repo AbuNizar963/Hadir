@@ -58,6 +58,7 @@ export const defaultSettings: Settings = {
   brandName: "حاضِر",
   brandLogo: null,
   locations: [],
+  holidayCountry: "",
 };
 
 export function getSettings(): Settings {

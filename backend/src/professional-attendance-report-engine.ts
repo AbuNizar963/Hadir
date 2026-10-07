@@ -47,6 +47,7 @@ const VALID_STATUSES = new Set([
   "PERMISSION",
   "ESCAPED",
   "NOT_STARTED",
+  "HOLIDAY",
   "INVALID",
 ]);
 
@@ -320,6 +321,17 @@ async function loadFacts(
   return result.results || [];
 }
 
+function deriveNotes(row: Pick<FactRow, "status" | "scheduleType" | "checkInAt" | "checkOutAt" | "scheduledEnd" | "exceptionCode">) {
+  if (row.status === "HOLIDAY") return "عطلة رسمية";
+  if (row.scheduleType === "ROTATION" && row.checkInAt && row.scheduledEnd) {
+    const ended = Date.now() >= Date.parse(row.scheduledEnd);
+    if (ended) return row.checkOutAt ? "انتهت المناوبة · سُجل الانصراف" : "انتهت المناوبة · لم يُسجل الانصراف";
+    return "حضور مستمر حتى نهاية المناوبة";
+  }
+  if (row.exceptionCode === "MISSING_CHECKOUT") return "حضر ولم يسجل الانصراف بعد";
+  return "";
+}
+
 function toPublicRow(row: FactRow) {
   return {
     attendanceDay: row.attendanceDay,
@@ -341,6 +353,7 @@ function toPublicRow(row: FactRow) {
     overtimeMinutes: Number(row.overtimeMinutes || 0),
     open: Boolean(row.open),
     exceptionCode: row.exceptionCode,
+    notes: deriveNotes(row),
     attendanceEventIds: jsonArray(row.attendanceEventIdsJson),
     requestIds: jsonArray(row.requestIdsJson),
     auditIds: jsonArray(row.auditIdsJson),
@@ -536,6 +549,7 @@ async function loadLiveTodayFacts(
         overtimeMinutes,
         open: exceptionCode === "MISSING_CHECKOUT" ? 1 : 0,
         exceptionCode,
+        notes: deriveNotes({ status: String(row.status || "INVALID"), scheduleType: String(row.scheduleType || "ADMIN"), checkInAt, checkOutAt, scheduledEnd: expectedEnd, exceptionCode }),
         attendanceEventIdsJson: JSON.stringify(
           events.map((event) => String(event.id)),
         ),
@@ -543,7 +557,7 @@ async function loadLiveTodayFacts(
         auditIdsJson: "[]",
         attendanceSource: classifySource(events),
         calculationSource: "attendance-engine-live",
-        calculationVersion: "central-engine-timezone-v2",
+            calculationVersion: "central-engine-timezone-v3-holidays-notes",
         historicalDataQuality: "exact",
         timezone,
         computedAt: String(payload.computedAt || new Date().toISOString()),
@@ -567,14 +581,14 @@ export async function buildProfessionalAttendanceReport(
   let sourceRows = await loadFacts(env, from, to, employeeId);
   const employeeFilter = employeeId ? " AND employee_id=?" : "";
   const staleQuery = env.DB.prepare(
-    `SELECT 1 AS stale FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>'central-engine-timezone-v2')${employeeFilter} LIMIT 1`,
+    `SELECT 1 AS stale FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>'central-engine-timezone-v3-holidays-notes')${employeeFilter} LIMIT 1`,
   );
   const staleFact = employeeId
     ? await staleQuery.bind(from, to, timezone, employeeId).first<any>()
     : await staleQuery.bind(from, to, timezone).first<any>();
   if (staleFact) {
     const deleteQuery = env.DB.prepare(
-      `DELETE FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>'central-engine-timezone-v2')${employeeFilter}`,
+      `DELETE FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>'central-engine-timezone-v3-holidays-notes')${employeeFilter}`,
     );
     if (employeeId) await deleteQuery.bind(from, to, timezone, employeeId).run();
     else await deleteQuery.bind(from, to, timezone).run();

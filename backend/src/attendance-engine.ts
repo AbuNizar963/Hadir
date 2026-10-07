@@ -1,4 +1,5 @@
 import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import { publicHolidayForDay } from "./public-holidays";
 type Env = {
   DB: D1Database;
   APP_ORIGIN?: string;
@@ -15,6 +16,7 @@ type Status =
   | "PERMISSION"
   | "ESCAPED"
   | "NOT_STARTED"
+  | "HOLIDAY"
   | "INVALID";
 const statusLabel = (status: Status) =>
   ({
@@ -26,6 +28,7 @@ const statusLabel = (status: Status) =>
     PERMISSION: "استئذان",
     ESCAPED: "هارب",
     NOT_STARTED: "لم يبدأ",
+    HOLIDAY: "عطلة رسمية",
     INVALID: "غير صالح",
   })[status];
 type EmployeeRow = {
@@ -275,6 +278,9 @@ export async function handleDailyStatus(
     }
     const employees = employeeQuery.results || [];
     const requests = requestQuery.results || [];
+    const holidaySettings = await env.DB.prepare("SELECT key,value FROM settings WHERE key='holidayCountry'").all<{ key: string; value: string }>();
+    const holidayCountry = holidaySettings.results?.[0]?.value ? (() => { try { return JSON.parse(holidaySettings.results[0].value); } catch { return holidaySettings.results[0].value; } })() : "";
+    const publicHolidayName = publicHolidayForDay(day, String(holidayCountry || ""));
     const scopedEmployees = employees.filter((employee) =>
       isRotationVisibleDay(employee, day, timezone),
     );
@@ -450,6 +456,7 @@ export async function handleDailyStatus(
         schedule.work &&
         !leaveIds.has(id) &&
         !permissionIds.has(id);
+      const isAdminHoliday = !isRotation && schedule.work && Boolean(publicHolidayName);
       const latestEscape = latestEscapeByEmployee.get(id);
       let status: Status;
       if (
@@ -461,6 +468,7 @@ export async function handleDailyStatus(
         status = "ESCAPED";
       else if (leaveIds.has(id)) status = "LEAVE";
       else if (permissionIds.has(id)) status = "PERMISSION";
+      else if (isAdminHoliday) status = "HOLIDAY";
       else if (schedule.status === "REST") status = "REST";
       else if (schedule.status === "NOT_STARTED") status = "NOT_STARTED";
       else if (schedule.status === "INVALID") status = "INVALID";
@@ -557,7 +565,7 @@ export async function handleDailyStatus(
           ? "CHECKOUT_WITHOUT_CHECKIN"
           : shiftEnded && (status === "PRESENT" || status === "LATE")
             ? "MISSING_CHECKOUT"
-            : status === "ABSENT"
+              : status === "ABSENT"
               ? "ABSENT_NO_APPROVED_REASON"
               : lateMinutes
                 ? "LATE_ARRIVAL"
@@ -569,6 +577,15 @@ export async function handleDailyStatus(
 
       // Legacy open metric is derived from the exception layer, never from the primary status.
       const open = exceptionCode === "MISSING_CHECKOUT" ? 1 : 0;
+      const notes = publicHolidayName && status === "HOLIDAY"
+        ? publicHolidayName
+        : isRotation && checkIn && schedule.end && now.getTime() >= schedule.end.getTime()
+          ? checkOut ? "انتهت المناوبة · سُجل الانصراف" : "انتهت المناوبة · لم يُسجل الانصراف"
+          : isRotation && checkIn
+            ? "حضور مستمر حتى نهاية المناوبة"
+            : exceptionCode === "MISSING_CHECKOUT"
+              ? "حضر ولم يسجل الانصراف بعد"
+              : "";
       return {
         attendanceDay: day,
         employeeId: id,
@@ -592,6 +609,7 @@ export async function handleDailyStatus(
         overtimeMinutes,
         open,
         exceptionCode,
+        notes,
       };
     });
     const computedAt = new Date().toISOString();

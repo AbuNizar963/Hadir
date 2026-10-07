@@ -1,4 +1,4 @@
-export type ProfessionalAttendanceStatus = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "ESCAPED" | "NOT_STARTED" | "INVALID";
+export type ProfessionalAttendanceStatus = "PRESENT" | "LATE" | "ABSENT" | "REST" | "LEAVE" | "PERMISSION" | "ESCAPED" | "NOT_STARTED" | "INVALID" | "HOLIDAY";
 
 export type ProfessionalAttendanceRow = {
   attendanceDay: string;
@@ -20,6 +20,7 @@ export type ProfessionalAttendanceRow = {
   overtimeMinutes: number;
   open: boolean;
   exceptionCode: string | null;
+  notes: string;
   attendanceEventIds: string[];
   requestIds: string[];
   auditIds: string[];

@@ -160,4 +160,5 @@ export interface Settings {
   workTypes?: string[];
   locations?: Location[];
   specialties?: string[];
+  holidayCountry?: string;
 }

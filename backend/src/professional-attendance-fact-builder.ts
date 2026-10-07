@@ -352,7 +352,7 @@ export async function materializeDay(
         json(requests.map((x) => String(x.id))),
         json(audits.map((x) => String(x.id))),
         "attendance-engine+requests+schedule+daily_attendance_status",
-        "central-engine-timezone-v2",
+        "central-engine-timezone-v3-holidays-notes",
         quality,
         timezone,
         new Date().toISOString(),

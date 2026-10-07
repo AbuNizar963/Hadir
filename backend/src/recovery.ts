@@ -139,6 +139,7 @@ const DEFAULT_SETTINGS: Record<string, unknown> = {
   brandLogo: null,
   workTypes: [],
   specialties: [],
+  holidayCountry: "",
 };
 
 const SETTINGS_KEYS = new Set(Object.keys(DEFAULT_SETTINGS));

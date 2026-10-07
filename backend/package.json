@@ -11,8 +11,9 @@
     "migrate": "wrangler d1 migrations apply Hadir --remote"
   },
   "dependencies": {
-    "@simplewebauthn/server": "^13.2.2",
     "@mmmike/web-push": "^1.3.0",
+    "@simplewebauthn/server": "^13.2.2",
+    "date-holidays": "^3.25.0",
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {

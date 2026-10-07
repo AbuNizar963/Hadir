@@ -52,6 +52,7 @@ const labels: Record<string, string> = {
   REST: "راحة",
   ESCAPED: "هارب",
   NOT_STARTED: "لم يبدأ",
+  HOLIDAY: "عطلة رسمية",
   INVALID: "غير صالح",
 };
 
@@ -64,6 +65,7 @@ const statusBadgeClasses: Record<string, string> = {
   ESCAPED: "bg-red-900 text-white dark:bg-red-950",
   REST: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
   NOT_STARTED: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  HOLIDAY: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200",
   INVALID: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
 };
 
@@ -316,7 +318,7 @@ export default function GlobalAttendanceReports() {
         "التأخر",
         "الانصراف المبكر",
         "الإضافي",
-        "الاستثناء",
+        "الملاحظات",
       ],
       rows.map((row) => [
         row.attendanceDay,
@@ -393,6 +395,7 @@ export default function GlobalAttendanceReports() {
         .global-attendance-print-status-permission { background: #e0f2fe !important; color: #0369a1 !important; }
         .global-attendance-print-status-escaped { background: #7f1d1d !important; color: #fff !important; }
         .global-attendance-print-status-rest { background: #f1f5f9 !important; color: #475569 !important; }
+        .global-attendance-print-status-holiday { background: #f3e8ff !important; color: #7e22ce !important; }
         .global-attendance-print-status-not-started { background: #f1f5f9 !important; color: #64748b !important; }
         .global-attendance-print-status-invalid { background: #e2e8f0 !important; color: #334155 !important; }
         .global-attendance-print-summary { display: flex; align-items: center; justify-content: center; gap: 10mm; margin-top: 4mm; padding-top: 3mm; border-top: 0.5mm solid #111; font-size: 11pt; font-weight: 900; break-inside: avoid; page-break-inside: avoid; }
@@ -425,14 +428,14 @@ export default function GlobalAttendanceReports() {
           };
           const ai = specialtyIndex(a), bi = specialtyIndex(b);
           return ai - bi || String(a.employeeName || "").localeCompare(String(b.employeeName || ""), "ar");
-        }).map((r, i) => { const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : r.status === "ESCAPED" ? "escaped" : r.status === "REST" ? "rest" : r.status === "NOT_STARTED" ? "not-started" : "invalid"; const noteLabels: Record<string, string> = { CHECKOUT_WITHOUT_CHECKIN: "انصراف دون حضور", ESCAPED: "هرب من العمل", MISSING_CHECKOUT: "انصراف معلق", ABSENT_NO_APPROVED_REASON: "غياب دون عذر معتمد", LATE_ARRIVAL: "تأخر في الحضور", EARLY_LEAVE: "انصراف مبكر", OVERTIME: "عمل إضافي" }; return <tr key={`${r.attendanceDay}-${r.employeeId}`}>
+        }).map((r, i) => { const statusClass = r.status === "PRESENT" ? "present" : r.status === "LATE" ? "late" : r.status === "ABSENT" ? "absent" : r.status === "LEAVE" ? "leave" : r.status === "PERMISSION" ? "permission" : r.status === "ESCAPED" ? "escaped" : r.status === "REST" ? "rest" : r.status === "HOLIDAY" ? "holiday" : r.status === "NOT_STARTED" ? "not-started" : "invalid"; const noteLabels: Record<string, string> = { CHECKOUT_WITHOUT_CHECKIN: "انصراف دون حضور", ESCAPED: "هرب من العمل", MISSING_CHECKOUT: "انصراف معلق", ABSENT_NO_APPROVED_REASON: "غياب دون عذر معتمد", LATE_ARRIVAL: "تأخر في الحضور", EARLY_LEAVE: "انصراف مبكر", OVERTIME: "عمل إضافي" }; return <tr key={`${r.attendanceDay}-${r.employeeId}`}>
           <td className="global-attendance-print-center">{i + 1}</td>
           <td>{employees.find((e) => String(e.id) === String(r.employeeId))?.specialties?.[0] || "غير محدد"}</td>
           <td><strong>{r.employeeName}</strong></td>
           <td className="global-attendance-print-center"><span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{labels[r.status] || r.status}</span></td>
           <td className="global-attendance-print-center">{r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString("ar", { timeZone: getSystemTimeZone(), hour: "2-digit", minute: "2-digit" }) : "—"}</td>
           <td className="global-attendance-print-center">{r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString("ar", { timeZone: getSystemTimeZone(), hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-          <td>{r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : r.status === "ESCAPED" ? "هرب من العمل" : "—"}</td>
+          <td>{r.notes || (r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : r.status === "ESCAPED" ? "هرب من العمل" : "—")}</td>
         </tr>; })}</tbody>
       </table>
       <div className="global-attendance-print-summary">
@@ -673,7 +676,7 @@ export default function GlobalAttendanceReports() {
                           <td className="p-3">{row.lateMinutes}د</td>
                           <td className="p-3">{row.earlyLeaveMinutes}د</td>
                           <td className="p-3">{row.overtimeMinutes}د</td>
-                          <td className="p-3">{getExceptionLabel(row.exceptionCode, row.status)}</td>
+                          <td className="p-3">{row.notes || getExceptionLabel(row.exceptionCode, row.status)}</td>
                         </tr>
                       ))}
                     </tbody>
