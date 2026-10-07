@@ -1,11 +1,12 @@
 import { addAttendance, findEmployeeByJobNumber, getAttendance, getEmployees, getSettings, saveEmployees } from "@/lib/storage";
-import { createBackendAttendance, getBackendAttendance, getBackendEmployeeLocation, getBackendEmployeeProfile, getBackendSettings, getBackendRequests, backendEnabled } from "@/lib/backend";
+import { createBackendAttendance, getBackendAttendance, getBackendEmployeeLocation, getBackendEmployeeProfile, getBackendSettings, getBackendSystemTimeZone, getBackendRequests, backendEnabled } from "@/lib/backend";
 import { currentSession } from "@/lib/auth";
 import { getDeviceId, getClientIpPlaceholder } from "@/lib/device";
 import { haversineMeters, isValidGeoPosition, isLikelyMockedPosition, type GeoPosition } from "@/lib/geo";
 import type { AttendanceRecord, Employee } from "@/types";
 import { log } from "@/lib/audit";
 import { getActiveWorkPeriod, getEmployeeWorkPeriod } from "@/lib/schedule";
+import { getSystemTimeZone, isValidSystemTimeZone, setSystemTimeZone } from "@/lib/systemTimezone";
 
 export interface RecordArgs { jobNumber: string; type: "check-in" | "check-out"; position: GeoPosition; qrCode: string; }
 export interface RecordResult { ok: boolean; reason?: string; record?: AttendanceRecord; distance?: number; lateMinutes?: number; earlyMinutes?: number; timeNote?: string; }
@@ -19,13 +20,15 @@ function recordsForPeriod(employeeId: string, periodStart: Date | null, periodEn
 export function todayRecords(employeeId: string): AttendanceRecord[] {
   const employee=getEmployees().find((item)=>item.id===employeeId);
   if(!employee) return getAttendance().filter((r)=>r.employeeId===employeeId);
-  const period=getActiveWorkPeriod(employee,new Date());
+  const period=getActiveWorkPeriod(employee,new Date(),getSystemTimeZone());
   return recordsForPeriod(employeeId,period.start,period.end);
 }
 
 export async function recordAttendance(args: RecordArgs): Promise<RecordResult> {
   let settings=getSettings();
+  let timeZone=getSystemTimeZone();
   if(backendEnabled){try{const cloud=await getBackendSettings();settings={...settings,...cloud,adminAccounts:Array.isArray(cloud.adminAccounts)?cloud.adminAccounts:settings.adminAccounts};}catch(error){console.warn("تعذر تحميل إعدادات الحضور من Cloudflare D1:",error);}}
+  if(backendEnabled){try{const remote=await getBackendSystemTimeZone();if(isValidSystemTimeZone(remote.timezone)){timeZone=remote.timezone;setSystemTimeZone(timeZone);}}catch(error){console.warn("تعذر تحميل المنطقة الزمنية المعتمدة:",error);}}
 
   let employee: Employee | null = null;
   if(backendEnabled){try{const session=currentSession();employee=await getBackendEmployeeProfile();if(!session||String(session.employeeId).trim()!==String(employee.id).trim())return{ok:false,reason:"جلسة الموظف لا تطابق الحساب الحالي. يرجى تسجيل الدخول مرة أخرى."};}catch(error){return{ok:false,reason:error instanceof Error?error.message:"تعذر التحقق من جلسة الموظف"};}}
@@ -36,7 +39,7 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
   if(!isValidGeoPosition(args.position))return{ok:false,reason:"تعذر التحقق من موقعك. يرجى إعادة محاولة تحديد الموقع."};
 
   const now=new Date();
-  const currentPeriod=getEmployeeWorkPeriod(employee,now);
+  const currentPeriod=getEmployeeWorkPeriod(employee,now,timeZone);
   const earlyCheckInEnabled=settings.allowEarlyCheckIn===true;
   const earlyCheckInGraceMinutes=earlyCheckInEnabled?Math.min(180,Math.max(0,Math.floor(Number(settings.earlyCheckInGraceMinutes??30)||0))):0;
   const earlyWindowStart=currentPeriod.start?new Date(currentPeriod.start.getTime()-earlyCheckInGraceMinutes*60000):null;
@@ -102,7 +105,7 @@ export async function recordAttendance(args: RecordArgs): Promise<RecordResult> 
       if(backendEnabled){
         try{
           const requests=await getBackendRequests("employee");
-          const today=now.toISOString().slice(0,10);
+          const today=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
           approvedEarlyCheckout=Array.isArray(requests)&&requests.some((r:any)=>String(r.type||"").toLowerCase()==="checkout"&&(String(r.status||"").toLowerCase()==="approved"||String(r.status||"").toLowerCase()==="confirmed")&&String(r.createdAt||"").slice(0,10)===today);
         }catch(error){
           console.warn("تعذر التحقق من إذن الانصراف المبكر:",error);

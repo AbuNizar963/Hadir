@@ -20,7 +20,8 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import Brand from "@/components/Brand";
 import { cn } from "@/lib/utils";
 import { currentSession } from "@/lib/auth";
-import { backendLogout } from "@/lib/backend";
+import { backendLogout, getBackendSystemTimeZone } from "@/lib/backend";
+import { setSystemTimeZone } from "@/lib/systemTimezone";
 import {
   getNotifications,
   syncNotificationsFromD1,
@@ -116,6 +117,15 @@ export default function EmployeeLayout({
   const session = currentSession();
   const navigate = useNavigate();
   const employeeId = String(session?.employeeId || "");
+
+  useEffect(() => {
+    if (!employeeId) return;
+    let active = true;
+    void getBackendSystemTimeZone()
+      .then(({ timezone }) => { if (active) setSystemTimeZone(timezone); })
+      .catch((error) => console.warn("تعذر تحميل المنطقة الزمنية للنظام:", error));
+    return () => { active = false; };
+  }, [employeeId]);
 
   useEffect(() => {
     applyTheme(theme);

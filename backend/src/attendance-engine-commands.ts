@@ -5,6 +5,7 @@ import {
 } from "./attendance-period";
 import { handleDailyStatus } from "./attendance-engine";
 import { refreshProfessionalAttendanceFact } from "./professional-attendance-fact-builder";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 
 type Env = { DB: D1Database; APP_TIMEZONE?: string };
 const TZ = "Asia/Damascus";
@@ -67,13 +68,13 @@ function workDays(employee: any) {
   } catch {}
   return [0, 1, 2, 3, 4];
 }
-function currentShift(employee: any, now: Date) {
+function currentShift(employee: any, now: Date, timeZone = TZ) {
   if (String(employee.scheduleType || "").toUpperCase() === "ROTATION")
-    return getAttendanceShiftForDay(employee, dateKey(now, TZ), TZ);
-  const shift = getAttendanceShift(employee, now, TZ);
+    return getAttendanceShiftForDay(employee, dateKey(now, timeZone), timeZone);
+  const shift = getAttendanceShift(employee, now, timeZone);
   if (shift.kind === "ADMIN") {
     const weekday = new Intl.DateTimeFormat("en-US", {
-      timeZone: TZ,
+      timeZone: timeZone,
       weekday: "short",
     }).format(now);
     const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -180,8 +181,9 @@ async function approvedEarlyCheckoutToday(
   db: D1Database,
   employeeId: string,
   now: Date,
+  timeZone = TZ,
 ) {
-  const today = dateKey(now, TZ);
+  const today = dateKey(now, timeZone);
   const rows = await db
     .prepare(
       "SELECT type,status,created_at AS createdAt FROM requests WHERE employee_id=? AND type='checkout' ORDER BY created_at DESC LIMIT 50",
@@ -223,63 +225,19 @@ function checkoutRows(
   rotationDaysOn = 1,
   startOverride?: Date,
   lateGraceMinutes = 0,
+  timeZone = TZ,
 ) {
-  const localMidnightAfterDay = (day: string) => {
-    const [y, m, d] = day.split("-").map(Number);
-    const base = Date.UTC(y, m - 1, d + 1, 0, 0);
-    const noon = new Date(Date.UTC(y, m - 1, d, 12, 0));
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: TZ,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(noon);
-    const get = (t: string) =>
-      parts.find((p: any) => p.type === t)?.value || "";
-    const offset =
-      Date.UTC(
-        Number(get("year")),
-        Number(get("month")) - 1,
-        Number(get("day")),
-        Number(get("hour")),
-        Number(get("minute")),
-      ) - noon.getTime();
-    return new Date(base - offset);
+  const addDaysToKey = (day: string, amount: number) => {
+    const [year, month, date] = day.split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1, date + amount)).toISOString().slice(0, 10);
   };
-  const startDay = dateKey(shift.start, TZ);
-  const [y, m, d] = startDay.split("-").map(Number);
-  const finalOnDay = new Date(
-    Date.UTC(
-      y,
-      m - 1,
-      d + Math.max(0, Math.floor(Number(rotationDaysOn) || 1) - 1),
-      12,
-    ),
-  );
-  const finalParts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(finalOnDay);
-  const getFinal = (t: string) =>
-    finalParts.find((p: any) => p.type === t)?.value || "";
-  const finalDay = `${getFinal("year")}-${getFinal("month")}-${getFinal("day")}`;
-  const baseCutoff =
-    shift.kind === "ROTATION"
-      ? new Date(
-          Math.max(
-            shift.end.getTime(),
-            localMidnightAfterDay(finalDay).getTime(),
-          ),
-        )
-      : localMidnightAfterDay(dateKey(shift.end, TZ));
+  const localMidnightAfterDay = (day: string) =>
+    localDateTime(addDaysToKey(day, 1), "00:00", timeZone);
+  const startDay = dateKey(shift.start, timeZone);
+  const finalDay = addDaysToKey(startDay, Math.max(0, Math.floor(Number(rotationDaysOn) || 1) - 1));
+  const baseCutoff = shift.kind === "ROTATION"
+    ? new Date(Math.max(shift.end.getTime(), localMidnightAfterDay(finalDay).getTime()))
+    : localMidnightAfterDay(dateKey(shift.end, timeZone));
   const cutoff = new Date(baseCutoff.getTime() + lateGraceMinutes * 60000);
   const upper = Math.min(cutoff.getTime() - 1, now.getTime() + 30000);
   const start = startOverride || shift.start;
@@ -288,53 +246,14 @@ function checkoutRows(
       const t = Date.parse(String(r.timestamp));
       return Number.isFinite(t) && t >= start.getTime() && t <= upper;
     })
-    .sort(
-      (a: any, b: any) =>
-        Date.parse(String(a.timestamp)) - Date.parse(String(b.timestamp)),
-    );
+    .sort((a: any, b: any) => Date.parse(String(a.timestamp)) - Date.parse(String(b.timestamp)));
 }
-function dailyAttendanceWindow(employee: any, now: Date) {
-  const day = dateKey(now, TZ);
+function dailyAttendanceWindow(employee: any, now: Date, timeZone = TZ) {
+  const day = dateKey(now, timeZone);
   const time = String(employee.rotationDailyAttendanceTime || "12:00");
-  const m = /^(\d{1,2}):(\d{2})$/.exec(time);
-  if (!m) return null;
-  const hour = Math.min(23, Math.max(0, Number(m[1]))),
-    minute = Math.min(59, Math.max(0, Number(m[2])));
-  const noon = new Date(`${day}T12:00:00Z`);
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(noon);
-  const get = (t: string) => parts.find((p: any) => p.type === t)?.value || "";
-  const offset =
-    Date.UTC(
-      Number(get("year")),
-      Number(get("month")) - 1,
-      Number(get("day")),
-      Number(get("hour")),
-      Number(get("minute")),
-    ) - noon.getTime();
-  const checkpoint = new Date(
-    Date.UTC(
-      Number(day.slice(0, 4)),
-      Number(day.slice(5, 7)) - 1,
-      Number(day.slice(8, 10)),
-      hour,
-      minute,
-    ) - offset,
-  );
-  const grace = Math.min(
-    180,
-    Math.max(
-      0,
-      Math.floor(Number(employee.rotationDailyAttendanceGraceMinutes ?? 0)),
-    ),
-  );
+  if (!/^(\d{1,2}):(\d{2})$/.test(time)) return null;
+  const checkpoint = localDateTime(day, time, timeZone);
+  const grace = Math.min(180, Math.max(0, Math.floor(Number(employee.rotationDailyAttendanceGraceMinutes ?? 0))));
   return { checkpoint, end: new Date(checkpoint.getTime() + grace * 60000) };
 }
 async function expectedQrCode(db: D1Database) {
@@ -354,7 +273,8 @@ async function expectedQrCode(db: D1Database) {
 }
 export async function refreshCanonicalStatus(env: Env, actor: any, now: Date) {
   try {
-    const day = dateKey(now, TZ);
+    const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+    const day = dateKey(now, timezone);
     await handleDailyStatus(
       new Request(
         `https://hadir.local/api/manager/daily-status?date=${encodeURIComponent(day)}`,
@@ -363,6 +283,7 @@ export async function refreshCanonicalStatus(env: Env, actor: any, now: Date) {
       env,
       actor,
       true,
+      timezone,
     );
     const employees = await env.DB.prepare(
       "SELECT id,schedule_type AS scheduleType,rotation_start_date AS rotationStartDate,rotation_days_on AS rotationDaysOn,rotation_days_off AS rotationDaysOff,work_start_time AS workStartTime,work_end_time AS workEndTime,work_days_json AS workDaysJson,grace_period_minutes AS gracePeriodMinutes FROM employees WHERE status='active'",
@@ -371,7 +292,7 @@ export async function refreshCanonicalStatus(env: Env, actor: any, now: Date) {
     for (const employee of employees.results || []) {
       if (String(employee.scheduleType || "").toUpperCase() === "ROTATION")
         continue;
-      const shift = getAttendanceShift(employee, now, TZ);
+      const shift = getAttendanceShift(employee, now, timezone);
       if (!shift.isWorkDay || !shift.start) continue;
       const grace = Math.max(
         0,
@@ -500,11 +421,12 @@ export async function handleEmployeeAttendance(
         origin,
       );
   }
+  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
   const now = new Date();
   const eventDate = trustedTimestamp ? new Date(trustedTimestamp) : now;
   if (!Number.isFinite(eventDate.getTime()))
     return json({ error: "وقت تسجيل الحضور غير صالح" }, 400, origin);
-  let shift = currentShift(fresh.employee, now);
+  let shift = currentShift(fresh.employee, now, timezone);
   const rows = await env.DB.prepare(
     "SELECT id,type,timestamp FROM attendance WHERE employee_id=? ORDER BY timestamp DESC LIMIT 500",
   )
@@ -525,8 +447,8 @@ export async function handleEmployeeAttendance(
       const checkInTime = new Date(String(latestCheckIn.timestamp));
       const candidate = getAttendanceShiftForDay(
         fresh.employee,
-        dateKey(checkInTime, TZ),
-        TZ,
+        dateKey(checkInTime, timezone),
+        timezone,
       );
       if (
         candidate.isWorkDay &&
@@ -549,14 +471,14 @@ export async function handleEmployeeAttendance(
     now,
     earlyWindowStart,
   );
-  const localDay = dateKey(now, TZ);
+  const localDay = dateKey(now, timezone);
   const dailyMode =
     String(fresh.employee.scheduleType || "").toUpperCase() === "ROTATION" &&
     Number(fresh.employee.rotationDailyAttendanceEnabled) === 1;
   const dailyRows = dailyMode
     ? (rows.results || []).filter((r: any) => {
         const ts = Date.parse(String(r.timestamp || ""));
-        return Number.isFinite(ts) && dateKey(new Date(ts), TZ) === localDay;
+        return Number.isFinite(ts) && dateKey(new Date(ts), timezone) === localDay;
       })
     : periodRows;
   const lastCheckOutRows =
@@ -568,12 +490,13 @@ export async function handleEmployeeAttendance(
           Number(fresh.employee.rotationDaysOn),
           earlyWindowStart,
           policy.lateCheckOutGraceMinutes,
+          timezone,
         )
       : periodRows;
   const last = lastCheckOutRows[lastCheckOutRows.length - 1];
   if (type === "check-in") {
     if (dailyMode) {
-      const window = dailyAttendanceWindow(fresh.employee, now);
+      const window = dailyAttendanceWindow(fresh.employee, now, timezone);
       if (!window)
         return json(
           { error: "إعداد وقت التسجيل اليومي غير صالح" },
@@ -649,7 +572,7 @@ export async function handleEmployeeAttendance(
         allowed > 0 &&
         now.getTime() >=
           Math.max(shift.start.getTime(), end.getTime() - allowed * 60000);
-      if (!inside && !(await approvedEarlyCheckoutToday(env.DB, actor.id, now)))
+      if (!inside && !(await approvedEarlyCheckoutToday(env.DB, actor.id, now, timezone)))
         return json({ error: "لم ينتهِ وقت دوامك بعد" }, 403, origin);
     }
   }
@@ -660,11 +583,11 @@ export async function handleEmployeeAttendance(
   let insertResult;
   if (type === "check-in") {
     const guardStart = dailyMode
-      ? (dailyAttendanceWindow(fresh.employee, now)?.checkpoint.getTime() ??
+      ? (dailyAttendanceWindow(fresh.employee, now, timezone)?.checkpoint.getTime() ??
         shift.start.getTime())
       : earlyWindowStart.getTime();
     const guardEnd = dailyMode
-      ? (dailyAttendanceWindow(fresh.employee, now)?.end.getTime() ??
+      ? (dailyAttendanceWindow(fresh.employee, now, timezone)?.end.getTime() ??
         shift.end.getTime() + 60000)
       : shift.end.getTime() + 60000;
     insertResult = await env.DB.prepare(
@@ -770,7 +693,7 @@ export async function handleEmployeeAttendance(
   );
   await refreshProfessionalAttendanceFact(
     env,
-    dateKey(eventDate, TZ),
+    dateKey(eventDate, timezone),
     { ...actor, id: fresh.employee.id, role: "staff" },
     fresh.employee.id,
   );

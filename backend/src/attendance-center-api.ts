@@ -1,12 +1,13 @@
 import { handleDailyStatus } from "./attendance-engine";
 import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 import {
   buildProfessionalAttendanceReport,
   isReportableEmployeeDay,
   type ScheduleMeta,
 } from "./professional-attendance-report-engine";
 
-type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string };
+type Env = { DB: D1Database; APP_ORIGIN?: string; APP_ORIGINS?: string; APP_TIMEZONE?: string };
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CORS = (origin: string) => ({
@@ -25,8 +26,11 @@ const json = (data: unknown, status: number, origin: string) =>
 const dayFromRequest = (url: URL) => String(url.searchParams.get("date") || "").trim();
 const fromRequest = (url: URL) => String(url.searchParams.get("from") || dayFromRequest(url)).trim();
 const toRequest = (url: URL) => String(url.searchParams.get("to") || dayFromRequest(url)).trim();
-const damascusDay = (date = new Date()) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus" }).format(date);
+const systemDay = (date: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+};
 
 const parseIds = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -148,8 +152,9 @@ async function assertCurrentDayCompleteness(
   employeeId: string | undefined,
   report: { rows: Array<{ attendanceDay: string; employeeId: string }> },
   actor: any,
+  timezone: string,
 ) {
-  const today = damascusDay();
+  const today = systemDay(new Date(), timezone);
   if (today < from || today > to) return;
 
   // The daily-status engine is the canonical current-day roster. The report
@@ -163,6 +168,7 @@ async function assertCurrentDayCompleteness(
     env,
     actor,
     false,
+    timezone,
   );
   if (!response.ok) {
     throw new Error("تعذر التحقق من اكتمال بيانات اليوم الحالي للتقرير");
@@ -212,6 +218,7 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
     return json({ error: "غير مصرح" }, 403, origin);
   }
 
+  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
   const date = dayFromRequest(url);
   const from = fromRequest(url);
   const to = toRequest(url);
@@ -239,6 +246,7 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
       env,
       actor,
       false,
+      timezone,
     );
     if (!dailyStatus.ok) {
       const payload = await dailyStatus.json().catch(() => ({ error: "تعذر قراءة مركز الحضور" }));
@@ -269,7 +277,7 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
       actor,
     );
 
-    await assertCurrentDayCompleteness(env, from, to, employeeId, report, actor);
+    await assertCurrentDayCompleteness(env, from, to, employeeId, report, actor, timezone);
 
     const live = await dailyStatus.json();
 
@@ -277,7 +285,7 @@ export async function handleAttendanceCenter(req: Request, env: Env, actor: any)
       {
         ok: true,
         centerVersion: "1.3",
-        timezone: "Asia/Damascus",
+        timezone,
         date,
         from,
         to,

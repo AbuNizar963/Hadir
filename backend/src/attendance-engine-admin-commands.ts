@@ -1,5 +1,6 @@
 import { getAttendanceShift } from "./attendance-period";
 import { submitAttendanceThroughCentralEngine } from "./attendance-engine-central";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 
 type Env = { DB: D1Database; APP_TIMEZONE?: string };
 type Actor = { id?: string; name?: string; role?: string };
@@ -22,7 +23,8 @@ export async function handleAdministrativeAttendancePreparation(request: Request
   if (!employee || employee.status !== "active") return json({ error: "الموظف غير موجود أو موقوف" }, 404);
 
   const now = new Date();
-  const shift = getAttendanceShift(employee, now, env.APP_TIMEZONE || "Asia/Damascus");
+  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  const shift = getAttendanceShift(employee, now, timezone);
   if (!shift.isWorkDay || now.getTime() < shift.start.getTime() || now.getTime() > shift.end.getTime() + 60000) return json({ error: "لا توجد مناوبة فعالة لهذا الموظف الآن" }, 409);
 
   const result = await submitAttendanceThroughCentralEngine(

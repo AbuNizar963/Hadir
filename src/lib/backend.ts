@@ -565,6 +565,9 @@ export async function getBackendAudit(limit = 500) {
 export async function getBackendSettings() {
   return request<Settings>("/api/settings", {}, "admin");
 }
+export async function getBackendSystemTimeZone() {
+  return request<{ timezone: string }>("/api/system/timezone");
+}
 export async function saveBackendSettings(
   settings: Partial<Settings> & { ownerPassword?: string },
 ) {

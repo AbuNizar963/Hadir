@@ -42,6 +42,7 @@ import {
 } from "recharts";
 import type { Employee } from "@/types";
 
+import { getSystemTimeZone } from "@/lib/systemTimezone";
 const labels: Record<string, string> = {
   PRESENT: "حاضر",
   LATE: "متأخر",
@@ -89,12 +90,12 @@ const fmt = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}س ${Math.round(Math.max(0, minutes) % 60)}د`;
 
 const damascusToday = () =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Damascus" }).format(new Date());
+  new Intl.DateTimeFormat("en-CA", { timeZone: getSystemTimeZone() }).format(new Date());
 
 const formatDateTime = (value: unknown) =>
   value
     ? new Date(String(value)).toLocaleString("ar", {
-        timeZone: "Asia/Damascus",
+        timeZone: getSystemTimeZone(),
         dateStyle: "medium",
         timeStyle: "medium",
       })
@@ -404,7 +405,7 @@ export default function GlobalAttendanceReports() {
           const session = getManagerSession();
           const role = session?.role === "owner" ? "مالك" : session?.role === "manager" ? "مدير" : "غير محدد";
           const issuerName = session?.name || (session?.role === "owner" ? reportSettings.ownerName : session?.role === "manager" ? reportSettings.managerName : "") || "غير محدد";
-          const qrValue = JSON.stringify({ reportDate: report.from, extractedAt: printGeneratedAt, extractedAtDamascus: new Date(printGeneratedAt).toLocaleString("ar", { timeZone: "Asia/Damascus", dateStyle: "medium", timeStyle: "medium" }), extractedBy: issuerName, role });
+          const qrValue = JSON.stringify({ reportDate: report.from, extractedAt: printGeneratedAt, extractedAtDamascus: new Date(printGeneratedAt).toLocaleString("ar", { timeZone: getSystemTimeZone(), dateStyle: "medium", timeStyle: "medium" }), extractedAtSystemTimeZone: new Date(printGeneratedAt).toLocaleString("ar", { timeZone: getSystemTimeZone(), dateStyle: "medium", timeStyle: "medium" }), timezone: getSystemTimeZone(), extractedBy: issuerName, role });
           return <div className="global-attendance-print-qr"><QRCodeSVG value={qrValue} size={128} level="H" includeMargin /></div>;
         })()}
         {reportSettings.brandLogo && <img src={reportSettings.brandLogo} alt="شعار الشركة" className="global-attendance-print-logo" />}
@@ -429,8 +430,8 @@ export default function GlobalAttendanceReports() {
           <td>{employees.find((e) => String(e.id) === String(r.employeeId))?.specialties?.[0] || "غير محدد"}</td>
           <td><strong>{r.employeeName}</strong></td>
           <td className="global-attendance-print-center"><span className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}>{labels[r.status] || r.status}</span></td>
-          <td className="global-attendance-print-center">{r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString("ar", { timeZone: "Asia/Damascus", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-          <td className="global-attendance-print-center">{r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString("ar", { timeZone: "Asia/Damascus", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+          <td className="global-attendance-print-center">{r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString("ar", { timeZone: getSystemTimeZone(), hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+          <td className="global-attendance-print-center">{r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString("ar", { timeZone: getSystemTimeZone(), hour: "2-digit", minute: "2-digit" }) : "—"}</td>
           <td>{r.exceptionCode ? (noteLabels[r.exceptionCode] || r.exceptionCode) : r.status === "ESCAPED" ? "هرب من العمل" : "—"}</td>
         </tr>; })}</tbody>
       </table>
@@ -655,7 +656,7 @@ export default function GlobalAttendanceReports() {
                               ? new Date(row.checkInAt).toLocaleTimeString("ar", {
                                   hour: "2-digit",
                                   minute: "2-digit",
-                                  timeZone: "Asia/Damascus",
+                                  timeZone: getSystemTimeZone(),
                                 })
                               : "—"}
                           </td>
@@ -664,7 +665,7 @@ export default function GlobalAttendanceReports() {
                               ? new Date(row.checkOutAt).toLocaleTimeString("ar", {
                                   hour: "2-digit",
                                   minute: "2-digit",
-                                  timeZone: "Asia/Damascus",
+                                  timeZone: getSystemTimeZone(),
                                 })
                               : "—"}
                           </td>

@@ -1,12 +1,14 @@
 import { sendUserPush } from "./push";
 import { handleDailyStatus } from "./attendance-engine";
 import { refreshProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 
 type Env = {
   DB: D1Database;
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
+  APP_TIMEZONE?: string;
 };
 type Actor = { id: string; role: string; name?: string };
 type RequestRow = {
@@ -43,13 +45,11 @@ const dateValue = (value: unknown) => {
   const v = String(value || "").trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
 };
-const today = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Damascus",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+const today = (timeZone = DEFAULT_SYSTEM_TIME_ZONE) => {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+};
 const typeLabel = (type: RequestRow["type"]) =>
   type === "permission" ? "استئذان" : type === "leave" ? "إجازة" : "انصراف";
 async function notify(
@@ -94,18 +94,19 @@ async function notify(
     } catch {}
   }
 }
-async function refreshEmployeeDailyStatus(env: Env, employeeId: string) {
+async function refreshEmployeeDailyStatus(env: Env, employeeId: string, timezone: string) {
   const id = String(employeeId || "").trim();
   if (!id) return;
   try {
     await handleDailyStatus(
       new Request(
-        `https://hadir.local/api/manager/daily-status?date=${encodeURIComponent(today())}`,
+        `https://hadir.local/api/manager/daily-status?date=${encodeURIComponent(today(timezone))}`,
         { method: "GET" },
       ),
       env,
       { id, role: "staff" },
       true,
+      timezone,
     );
   } catch (error) {
     console.error("request status refresh failed", error);
@@ -134,6 +135,7 @@ export async function handleRequests(
   actor: Actor | null,
   origin: string,
 ) {
+  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
   const url = new URL(req.url);
   const path = url.pathname.replace(/\/$/, "") || "/";
   const method = req.method;
@@ -169,7 +171,7 @@ export async function handleRequests(
     >;
     const type = requestType(body.type ?? body.requestType);
     if (!type) return json({ error: "نوع الطلب غير صحيح" }, 400, origin);
-    const fallback = today();
+    const fallback = today(timezone);
     const startDate = dateValue(body.startDate) || fallback;
     const endDate = dateValue(body.endDate) || startDate;
     if (endDate < startDate)
@@ -209,7 +211,7 @@ export async function handleRequests(
       )
       .run();
     if (createdByManager) {
-      await refreshEmployeeDailyStatus(env, employee.id);
+      await refreshEmployeeDailyStatus(env, employee.id, timezone);
       await refreshEmployeeReportFacts(env, employee.id, startDate, endDate);
       try {
         await notify(
@@ -304,12 +306,12 @@ export async function handleRequests(
       .bind(status, requestMatch[1])
       .run();
     if (status === "approved" || status === "rejected") {
-      await refreshEmployeeDailyStatus(env, row.employeeId);
+      await refreshEmployeeDailyStatus(env, row.employeeId, timezone);
       await refreshEmployeeReportFacts(
         env,
         row.employeeId,
-        row.startDate || today(),
-        row.endDate || row.startDate || today(),
+        row.startDate || today(timezone),
+        row.endDate || row.startDate || today(timezone),
       );
     }
     try {
@@ -330,12 +332,12 @@ export async function handleRequests(
         .bind(requestMatch[1], status)
         .run()
         .catch(() => undefined);
-      await refreshEmployeeDailyStatus(env, row.employeeId);
+      await refreshEmployeeDailyStatus(env, row.employeeId, timezone);
       await refreshEmployeeReportFacts(
         env,
         row.employeeId,
-        row.startDate || today(),
-        row.endDate || row.startDate || today(),
+        row.startDate || today(timezone),
+        row.endDate || row.startDate || today(timezone),
       );
       return json(
         {
@@ -368,8 +370,8 @@ export async function handleRequests(
     await refreshEmployeeReportFacts(
       env,
       actor.id,
-      requestRow.startDate || today(),
-      requestRow.endDate || requestRow.startDate || today(),
+      requestRow.startDate || today(timezone),
+      requestRow.endDate || requestRow.startDate || today(timezone),
     );
     return json({ ok: true, status: "confirmed" }, 200, origin);
   }

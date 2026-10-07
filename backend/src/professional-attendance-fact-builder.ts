@@ -1,11 +1,13 @@
 import { handleDailyStatus } from "./daily-status-api";
+import { localDateTime } from "./attendance-period";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 
 /**
  * Materializes the authoritative attendance facts used by reporting.
  * Raw attendance events are never modified by this module.
  */
 
-type Env = { DB: D1Database };
+type Env = { DB: D1Database; APP_TIMEZONE?: string };
 const TZ = "Asia/Damascus";
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const dayNumber = (day: string) =>
@@ -19,9 +21,9 @@ const addDays = (day: string, n: number) =>
 const daysBetween = (from: string, to: string) =>
   Math.round(dayNumber(to) - dayNumber(from)) + 1;
 const json = (value: unknown) => JSON.stringify(value ?? []);
-function tzParts(date: Date) {
+function tzParts(date: Date, timeZone = TZ) {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -39,36 +41,12 @@ function tzParts(date: Date) {
     minute: Number(get("minute")),
   };
 }
-function timezoneOffsetMinutes(day: string) {
-  const noonUtc = new Date(`${day}T12:00:00Z`);
-  const local = tzParts(noonUtc);
-  return Math.round(
-    (Date.UTC(
-      local.year,
-      local.month - 1,
-      local.day,
-      local.hour,
-      local.minute,
-    ) -
-      noonUtc.getTime()) /
-      60000,
-  );
+function localMidnightUtc(day: string, timeZone = TZ) {
+  return localDateTime(day, "00:00", timeZone);
 }
-function localMidnightUtc(day: string) {
-  return new Date(
-    Date.UTC(
-      Number(day.slice(0, 4)),
-      Number(day.slice(5, 7)) - 1,
-      Number(day.slice(8, 10)),
-      0,
-      0,
-    ) -
-      timezoneOffsetMinutes(day) * 60000,
-  );
-}
-function localDayNow() {
+function localDayNow(timeZone = TZ) {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -76,11 +54,11 @@ function localDayNow() {
   const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
-function employeeCreatedDay(value: unknown) {
+function employeeCreatedDay(value: unknown, timeZone = TZ) {
   const timestamp = Date.parse(String(value || ""));
   if (!Number.isFinite(timestamp)) return null;
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -91,12 +69,14 @@ export async function materializeDay(
   day: string,
   actor: any,
   employeeId?: string,
+  configuredTimeZone?: string,
 ) {
+  const timezone = configuredTimeZone || await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
   const request = new Request(
     `https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}`,
     { method: "GET" },
   );
-  const response = await handleDailyStatus(request, env, actor);
+  const response = await handleDailyStatus(request, env, actor, false, timezone);
   if (!response.ok) throw new Error(`تعذر حساب حالة الدوام لليوم ${day}`);
   const payload = (await response.json()) as any;
   const employees = Array.isArray(payload.employees) ? payload.employees : [];
@@ -122,7 +102,7 @@ export async function materializeDay(
       .all<any>();
 
     for (const row of createdResult.results || []) {
-      createdByEmployee.set(String(row.id), employeeCreatedDay(row.createdAt));
+      createdByEmployee.set(String(row.id), employeeCreatedDay(row.createdAt, timezone));
     }
   }
   const eligible = filtered.filter((e: any) => {
@@ -130,8 +110,8 @@ export async function materializeDay(
     return !createdDay || day >= createdDay;
   });
   if (!eligible.length) return 0;
-  const start = localMidnightUtc(addDays(day, -7)).toISOString();
-  const end = localMidnightUtc(addDays(day, 8)).toISOString();
+  const start = localMidnightUtc(addDays(day, -7), timezone).toISOString();
+  const end = localMidnightUtc(addDays(day, 8), timezone).toISOString();
   const eventsResult = employeeId
     ? await env.DB.prepare(
         "SELECT id,employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? AND employee_id=? ORDER BY timestamp ASC",
@@ -176,8 +156,8 @@ export async function materializeDay(
     list.push(requestRow);
     requestsByEmployee.set(id, list);
   }
-  const auditStart = localMidnightUtc(addDays(day, -7)).toISOString(),
-    auditEnd = localMidnightUtc(addDays(day, 8)).toISOString();
+  const auditStart = localMidnightUtc(addDays(day, -7), timezone).toISOString(),
+    auditEnd = localMidnightUtc(addDays(day, 8), timezone).toISOString();
   const auditResult = employeeId
     ? await env.DB.prepare(
         "SELECT id,employee_id AS employeeId,timestamp FROM audit WHERE employee_id=? AND timestamp>=? AND timestamp<? ORDER BY timestamp ASC",
@@ -198,14 +178,14 @@ export async function materializeDay(
     auditsByEmployee.set(id, list);
   }
   const statements: D1PreparedStatement[] = [];
-  const today = localDayNow();
+  const today = localDayNow(timezone);
   const quality = day === today ? "exact" : "reconstructed";
   const qualityReason =
     day === today
       ? "محسوب من بيانات اليوم الحالية"
       : "أعيد بناؤه من السجلات التاريخية المتاحة؛ لا توجد لقطة جدول تاريخية كاملة";
-  const dayStartMs = localMidnightUtc(day).getTime(),
-    dayEndMs = localMidnightUtc(addDays(day, 1)).getTime();
+  const dayStartMs = localMidnightUtc(day, timezone).getTime(),
+    dayEndMs = localMidnightUtc(addDays(day, 1), timezone).getTime();
   for (const e of eligible) {
     const id = String(e.employeeId || "");
     if (!id) continue;
@@ -228,13 +208,14 @@ export async function materializeDay(
           return false;
         }
         const shiftEndDay = new Intl.DateTimeFormat("en-CA", {
-          timeZone: TZ,
+          timeZone: timezone,
           year: "numeric",
           month: "2-digit",
           day: "2-digit",
         }).format(new Date(shiftEndMs));
         const checkoutCutoffMs = localMidnightUtc(
           addDays(shiftEndDay, 1),
+          timezone,
         ).getTime();
         return ts >= shiftStartMs && ts < checkoutCutoffMs;
       }
@@ -249,13 +230,14 @@ export async function materializeDay(
         // previous calendar day while the reporting day is the shift's active
         // continuation after midnight.
         const endLocalDay = new Intl.DateTimeFormat("en-CA", {
-          timeZone: TZ,
+          timeZone: timezone,
           year: "numeric",
           month: "2-digit",
           day: "2-digit",
         }).format(new Date(scheduledEndMs));
         const checkoutCutoffMs = localMidnightUtc(
           addDays(endLocalDay, 1),
+          timezone,
         ).getTime();
         return ts >= scheduledStartMs && ts < checkoutCutoffMs;
       }
@@ -291,13 +273,14 @@ export async function materializeDay(
           return false;
         }
         const shiftEndDay = new Intl.DateTimeFormat("en-CA", {
-          timeZone: TZ,
+          timeZone: timezone,
           year: "numeric",
           month: "2-digit",
           day: "2-digit",
         }).format(new Date(shiftEndMs));
         const checkoutCutoffMs = localMidnightUtc(
           addDays(shiftEndDay, 1),
+          timezone,
         ).getTime();
         return ts >= shiftStartMs && ts < checkoutCutoffMs;
       }
@@ -321,7 +304,7 @@ export async function materializeDay(
       scheduledStart: e.scheduledStart || null,
       scheduledEnd: e.scheduledEnd || null,
       expectedMinutes,
-      timezone: TZ,
+      timezone,
       capturedAt: new Date().toISOString(),
     };
     statements.push(
@@ -352,9 +335,9 @@ export async function materializeDay(
         json(requests.map((x) => String(x.id))),
         json(audits.map((x) => String(x.id))),
         "attendance-engine+requests+schedule+daily_attendance_status",
-        "central-engine-v1",
+        "central-engine-timezone-v2",
         quality,
-        TZ,
+        timezone,
         new Date().toISOString(),
         json(scheduleSnapshot),
         qualityReason,
@@ -375,10 +358,11 @@ export async function refreshProfessionalAttendanceFact(
   day: string,
   actor: any,
   employeeId: string,
+  configuredTimeZone?: string,
 ) {
   if (!DAY_RE.test(day) || !String(employeeId || "").trim()) return 0;
   try {
-    return await materializeDay(env, day, actor, employeeId);
+    return await materializeDay(env, day, actor, employeeId, configuredTimeZone);
   } catch (error) {
     console.error("professional attendance fact refresh failed", {
       day,
@@ -405,6 +389,7 @@ export async function refreshProfessionalAttendanceFacts(
     return 0;
   const days = daysBetween(from, to);
   if (days < 1 || days > 366) return 0;
+  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
   let written = 0;
   for (let i = 0; i < days; i += 1)
     written += await refreshProfessionalAttendanceFact(
@@ -412,6 +397,7 @@ export async function refreshProfessionalAttendanceFacts(
       addDays(from, i),
       actor,
       employeeId,
+      timezone,
     );
   return written;
 }
@@ -422,14 +408,16 @@ export async function ensureProfessionalAttendanceFacts(
   to: string,
   actor: any,
   employeeId?: string,
+  configuredTimeZone?: string,
 ) {
   if (!DAY_RE.test(from) || !DAY_RE.test(to))
     throw new Error("الفترة الزمنية غير صالحة");
   const days = daysBetween(from, to);
   if (days < 1 || days > 366)
     throw new Error("الفترة الزمنية تتجاوز الحد المسموح (366 يومًا)");
+  const timezone = configuredTimeZone || await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
   let written = 0;
   for (let i = 0; i < days; i += 1)
-    written += await materializeDay(env, addDays(from, i), actor, employeeId);
+    written += await materializeDay(env, addDays(from, i), actor, employeeId, timezone);
   return written;
 }

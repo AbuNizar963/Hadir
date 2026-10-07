@@ -24,6 +24,7 @@ import {
 } from "@/lib/reportArchive";
 import { currentManager } from "@/lib/auth";
 
+import { getSystemTimeZone } from "@/lib/systemTimezone";
 type ArchiveRow = {
   report_id: string;
   report_type: string;
@@ -53,7 +54,7 @@ const typeLabel = (value: string) => {
 const formatDateTime = (value: string | null) =>
   value
     ? new Date(value).toLocaleString("ar", {
-        timeZone: "Asia/Damascus",
+        timeZone: getSystemTimeZone(),
         dateStyle: "medium",
         timeStyle: "short",
       })

@@ -1,6 +1,8 @@
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 type Env = {
   DB: D1Database;
   APP_ORIGIN?: string;
+  APP_TIMEZONE?: string;
 };
 const TZ = "Asia/Damascus";
 const DAY_MS = 86400000;
@@ -67,9 +69,9 @@ const json = (data: unknown, status = 200) =>
       ...CORS_HEADERS,
     },
   });
-function tzParts(date: Date) {
+function tzParts(date: Date, timeZone = TZ) {
   const p = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -78,66 +80,43 @@ function tzParts(date: Date) {
     hour12: false,
   }).formatToParts(date);
   const get = (t: string) => p.find((x) => x.type === t)?.value || "";
-  return {
-    year: Number(get("year")),
-    month: Number(get("month")),
-    day: Number(get("day")),
-    hour: Number(get("hour")),
-    minute: Number(get("minute")),
-  };
+  return { year: Number(get("year")), month: Number(get("month")), day: Number(get("day")), hour: Number(get("hour")) % 24, minute: Number(get("minute")) };
 }
-const dayKey = (date: Date) => {
-  const p = tzParts(date);
+function wallClockAsUtc(date: Date, timeZone: string) {
+  const p = tzParts(date, timeZone);
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+}
+const dayKey = (date: Date, timeZone = TZ) => {
+  const p = tzParts(date, timeZone);
   return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
 };
-const dayNumber = (day: string) =>
-  Date.UTC(
-    Number(day.slice(0, 4)),
-    Number(day.slice(5, 7)) - 1,
-    Number(day.slice(8, 10)),
-  ) / DAY_MS;
-const addDays = (day: string, n: number) =>
-  new Date((dayNumber(day) + n) * DAY_MS).toISOString().slice(0, 10);
+const dayNumber = (day: string) => Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10))) / DAY_MS;
+const addDays = (day: string, n: number) => new Date((dayNumber(day) + n) * DAY_MS).toISOString().slice(0, 10);
 function parseTime(value: string | null | undefined, fallback: string) {
   const f = /(\d{1,2}):(\d{2})/.exec(fallback);
   const m = /(\d{1,2}):(\d{2})/.exec(String(value || ""));
-  const h = Number(m?.[1] ?? f?.[1] ?? 9),
-    min = Number(m?.[2] ?? f?.[2] ?? 0);
-  return {
-    h: Number.isFinite(h) ? Math.min(23, Math.max(0, h)) : 9,
-    m: Number.isFinite(min) ? Math.min(59, Math.max(0, min)) : 0,
-  };
+  const h = Number(m?.[1] ?? f?.[1] ?? 9), min = Number(m?.[2] ?? f?.[2] ?? 0);
+  return { h: Number.isFinite(h) ? Math.min(23, Math.max(0, h)) : 9, m: Number.isFinite(min) ? Math.min(59, Math.max(0, min)) : 0 };
 }
-const minutesBetween = (
-  from: string | null | undefined,
-  to: string | null | undefined,
-) => {
+const minutesBetween = (from: string | null | undefined, to: string | null | undefined) => {
   if (!from || !to) return null;
-  const a = Date.parse(from),
-    b = Date.parse(to);
+  const a = Date.parse(from), b = Date.parse(to);
   if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null;
   return Math.round((b - a) / 60000);
 };
-function damascusOffsetMinutes(day: string) {
-  const noon = new Date(`${day}T12:00:00Z`);
-  const p = tzParts(noon);
-  return Math.round(
-    (Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - noon.getTime()) /
-      60000,
-  );
-}
-function localDateTimeUtc(day: string, time: string | null | undefined) {
+function localDateTimeUtc(day: string, time: string | null | undefined, timeZone = TZ) {
   const t = parseTime(time, "09:00");
-  return new Date(
-    Date.UTC(
-      Number(day.slice(0, 4)),
-      Number(day.slice(5, 7)) - 1,
-      Number(day.slice(8, 10)),
-      t.h,
-      t.m,
-    ) -
-      damascusOffsetMinutes(day) * 60000,
-  );
+  const wallTime = Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)), t.h, t.m);
+  const offsets = new Set<number>();
+  for (const delta of [-36, -12, 0, 12, 36]) {
+    const probe = new Date(wallTime + delta * 60 * 60 * 1000);
+    offsets.add(Math.round((wallClockAsUtc(probe, timeZone) - Math.floor(probe.getTime() / 60000) * 60000) / 60000));
+  }
+  const candidates = [...offsets].map((offset) => new Date(wallTime - offset * 60000));
+  const exact = candidates.filter((candidate) => wallClockAsUtc(candidate, timeZone) === wallTime);
+  if (exact.length) return exact.sort((a, b) => a.getTime() - b.getTime())[0];
+  const after = candidates.map((candidate) => ({ candidate, wall: wallClockAsUtc(candidate, timeZone) })).filter((item) => item.wall > wallTime).sort((a, b) => (a.wall - b.wall) || (a.candidate.getTime() - b.candidate.getTime()));
+  return after[0]?.candidate || candidates[0] || new Date(wallTime);
 }
 function workDays(employee: EmployeeRow) {
   try {
@@ -158,196 +137,86 @@ function workDays(employee: EmployeeRow) {
   } catch {}
   return [0, 1, 2, 3, 4];
 }
-function rotationParams(employee: EmployeeRow) {
+function rotationParams(employee: EmployeeRow, timeZone = TZ) {
   const startDay = String(employee.rotationStartDate || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDay)) return null;
-  const firstStart = localDateTimeUtc(
-    startDay,
-    employee.workStartTime || "09:00",
-  );
-  const on = Math.max(1, Math.floor(Number(employee.rotationDaysOn ?? 4))),
-    off = Math.max(0, Math.floor(Number(employee.rotationDaysOff ?? 4))),
-    cycle = on + off;
+  const startTime = employee.workStartTime || "09:00";
+  const firstStart = localDateTimeUtc(startDay, startTime, timeZone);
+  const on = Math.max(1, Math.floor(Number(employee.rotationDaysOn ?? 4))), off = Math.max(0, Math.floor(Number(employee.rotationDaysOff ?? 4))), cycle = on + off;
   if (cycle <= 0) return null;
-  return {
-    firstStart,
-    on,
-    cycle,
-    cycleMs: cycle * DAY_MS,
-    workMs: on * DAY_MS,
-  };
+  return { startDay, startTime, firstStart, on, cycle };
 }
-function rotationScheduleAt(employee: EmployeeRow, instant: Date) {
-  const p = rotationParams(employee);
-  if (!p)
-    return { work: false, status: "INVALID" as const, start: null, end: null };
-  const elapsed = instant.getTime() - p.firstStart.getTime();
-  if (elapsed < 0)
-    return {
-      work: false,
-      status: "NOT_STARTED" as const,
-      start: null,
-      end: null,
-    };
-  const cycleIndex = Math.floor(elapsed / p.cycleMs),
-    within = elapsed - cycleIndex * p.cycleMs,
-    periodStart = new Date(p.firstStart.getTime() + cycleIndex * p.cycleMs),
-    periodEnd = new Date(periodStart.getTime() + p.workMs);
-  if (within >= p.workMs)
-    return {
-      work: false,
-      status: "REST" as const,
-      start: periodStart,
-      end: periodEnd,
-    };
-  return {
-    work: true,
-    status: "WORK" as const,
-    start: periodStart,
-    end: periodEnd,
-  };
+function rotationScheduleAt(employee: EmployeeRow, instant: Date, timeZone = TZ) {
+  const p = rotationParams(employee, timeZone);
+  if (!p) return { work: false, status: "INVALID" as const, start: null, end: null };
+  if (instant.getTime() < p.firstStart.getTime()) return { work: false, status: "NOT_STARTED" as const, start: null, end: null };
+  const targetDay = dayKey(instant, timeZone), elapsedDays = dayNumber(targetDay) - dayNumber(p.startDay);
+  if (elapsedDays < 0) return { work: false, status: "NOT_STARTED" as const, start: null, end: null };
+  const cycleIndex = Math.floor(elapsedDays / p.cycle), cycleDay = elapsedDays - cycleIndex * p.cycle;
+  const periodStartDay = addDays(p.startDay, cycleIndex * p.cycle);
+  const periodStart = localDateTimeUtc(periodStartDay, p.startTime, timeZone);
+  const periodEnd = localDateTimeUtc(addDays(periodStartDay, p.on), p.startTime, timeZone);
+  if (cycleDay < p.on || (cycleDay === p.on && instant.getTime() < periodEnd.getTime()))
+    return { work: true, status: "WORK" as const, start: periodStart, end: periodEnd };
+  return { work: false, status: "REST" as const, start: periodStart, end: periodEnd };
 }
 export function isRotationVisibleDay(
-  employee: Pick<
-    EmployeeRow,
-    | "scheduleType"
-    | "workStartTime"
-    | "rotationStartDate"
-    | "rotationDaysOn"
-    | "rotationDaysOff"
-  >,
+  employee: Pick<EmployeeRow, "scheduleType" | "workStartTime" | "rotationStartDate" | "rotationDaysOn" | "rotationDaysOff">,
   day: string,
+  timeZone = TZ,
 ) {
-  const kind = String(employee.scheduleType || "")
-    .trim()
-    .toUpperCase();
+  const kind = String(employee.scheduleType || "").trim().toUpperCase();
   if (kind !== "ROTATION") return true;
-
-  const schedule = rotationScheduleAt(employee as EmployeeRow, localDateTimeUtc(day, employee.workStartTime || "09:00"));
+  const schedule = rotationScheduleAt(employee as EmployeeRow, localDateTimeUtc(day, employee.workStartTime || "09:00", timeZone), timeZone);
   if (schedule.work) return true;
-
-  // A rotation remains visible only on the local calendar day containing the
-  // actual end of its work block, so management can verify checkout. Once that
-  // calendar day has ended, the employee is hidden until the next work block.
-  return (
-    schedule.status === "REST" &&
-    !!schedule.end &&
-    dayKey(schedule.end) === day
-  );
+  return schedule.status === "REST" && !!schedule.end && dayKey(schedule.end, timeZone) === day;
 }
-function rotationDailyScheduleFor(employee: EmployeeRow, day: string) {
-  const p = rotationParams(employee);
-  if (!p)
-    return { work: false, status: "INVALID" as const, start: null, end: null };
-  const checkpoint = localDateTimeUtc(
-    day,
-    employee.rotationDailyAttendanceTime || "12:00",
-  );
-  const active = rotationScheduleAt(employee, checkpoint);
-  if (
-    !active.work ||
-    !active.start ||
-    !active.end ||
-    checkpoint.getTime() < active.start.getTime() ||
-    checkpoint.getTime() >= active.end.getTime()
-  )
-    return {
-      work: false,
-      status: active.status,
-      start: checkpoint,
-      end: new Date(
-        checkpoint.getTime() +
-          Math.max(
-            0,
-            Math.floor(
-              Number(employee.rotationDailyAttendanceGraceMinutes ?? 0),
-            ),
-          ) *
-            60000,
-      ),
-    };
-  const grace = Math.min(
-    180,
-    Math.max(
-      0,
-      Math.floor(Number(employee.rotationDailyAttendanceGraceMinutes ?? 0)),
-    ),
-  );
-  return {
-    work: true,
-    status: "WORK" as const,
-    start: checkpoint,
-    end: new Date(checkpoint.getTime() + grace * 60000),
-  };
+function rotationDailyScheduleFor(employee: EmployeeRow, day: string, timeZone = TZ) {
+  const p = rotationParams(employee, timeZone);
+  if (!p) return { work: false, status: "INVALID" as const, start: null, end: null };
+  const checkpoint = localDateTimeUtc(day, employee.rotationDailyAttendanceTime || "12:00", timeZone);
+  const active = rotationScheduleAt(employee, checkpoint, timeZone);
+  if (!active.work || !active.start || !active.end || checkpoint.getTime() < active.start.getTime() || checkpoint.getTime() >= active.end.getTime())
+    return { work: false, status: active.status, start: checkpoint, end: new Date(checkpoint.getTime() + Math.max(0, Math.floor(Number(employee.rotationDailyAttendanceGraceMinutes ?? 0))) * 60000) };
+  const grace = Math.min(180, Math.max(0, Math.floor(Number(employee.rotationDailyAttendanceGraceMinutes ?? 0))));
+  return { work: true, status: "WORK" as const, start: checkpoint, end: new Date(checkpoint.getTime() + grace * 60000) };
 }
-function scheduleFor(employee: EmployeeRow, day: string) {
-  const kind = String(employee.scheduleType || "ADMIN")
-    .trim()
-    .toUpperCase();
+function scheduleFor(employee: EmployeeRow, day: string, timeZone = TZ) {
+  const kind = String(employee.scheduleType || "ADMIN").trim().toUpperCase();
   if (kind !== "ROTATION") {
     const weekday = new Date(dayNumber(day) * DAY_MS).getUTCDay();
-    if (!workDays(employee).includes(weekday))
-      return { work: false, status: "REST" as const, start: null, end: null };
-    const start = localDateTimeUtc(day, employee.workStartTime || "09:00");
-    const rawEnd = localDateTimeUtc(day, employee.workEndTime || "16:00");
-    const end =
-      rawEnd.getTime() <= start.getTime()
-        ? new Date(rawEnd.getTime() + DAY_MS)
-        : rawEnd;
+    if (!workDays(employee).includes(weekday)) return { work: false, status: "REST" as const, start: null, end: null };
+    const start = localDateTimeUtc(day, employee.workStartTime || "09:00", timeZone);
+    const endTime = employee.workEndTime || "16:00";
+    const rawEnd = localDateTimeUtc(day, endTime, timeZone);
+    const end = rawEnd.getTime() <= start.getTime() ? localDateTimeUtc(addDays(day, 1), endTime, timeZone) : rawEnd;
     return { work: true, status: "WORK" as const, start, end };
   }
-  if (Number(employee.rotationDailyAttendanceEnabled) === 1)
-    return rotationDailyScheduleFor(employee, day);
-  const p = rotationParams(employee);
-  if (!p)
-    return { work: false, status: "INVALID" as const, start: null, end: null };
-  const dayAnchor = localDateTimeUtc(day, employee.workStartTime || "09:00");
-  const scheduled = rotationScheduleAt(employee, dayAnchor);
-
-  // The first calendar day after a rotation block is the shift handover day
-  // when the block ended after midnight. Keep that completed shift attached to
-  // this day until local midnight so management can see whether checkout was
-  // recorded. Later rest days remain REST.
-  if (
-    !scheduled.work &&
-    scheduled.status === "REST" &&
-    scheduled.end &&
-    dayKey(scheduled.end) === day
-  ) {
-    return {
-      work: true,
-      status: "WORK" as const,
-      start: scheduled.start,
-      end: scheduled.end,
-    };
-  }
-
+  if (Number(employee.rotationDailyAttendanceEnabled) === 1) return rotationDailyScheduleFor(employee, day, timeZone);
+  const p = rotationParams(employee, timeZone);
+  if (!p) return { work: false, status: "INVALID" as const, start: null, end: null };
+  const dayAnchor = localDateTimeUtc(day, employee.workStartTime || "09:00", timeZone);
+  const scheduled = rotationScheduleAt(employee, dayAnchor, timeZone);
+  if (!scheduled.work && scheduled.status === "REST" && scheduled.end && dayKey(scheduled.end, timeZone) === day)
+    return { work: true, status: "WORK" as const, start: scheduled.start, end: scheduled.end };
   return scheduled;
 }
 function checkoutCutoff(
   employee: EmployeeRow,
-  shift: {
-    start: Date;
-    end: Date;
-  },
+  shift: { start: Date; end: Date },
   day: string,
+  timeZone = TZ,
 ) {
-  const kind = String(employee.scheduleType || "ADMIN")
-    .trim()
-    .toUpperCase();
-  if (kind === "ROTATION" && shift.end) {
-    // Include the complete local calendar day on which the rotation actually
-    // ends. This preserves a late checkout recorded after the scheduled end
-    // without leaking events into the following calendar day.
-    return localDateTimeUtc(addDays(dayKey(shift.end), 1), "00:00");
-  }
-  return localDateTimeUtc(addDays(dayKey(shift.end), 1), "00:00");
+  const kind = String(employee.scheduleType || "").trim().toUpperCase();
+  if (kind === "ROTATION" && shift.end) return localDateTimeUtc(addDays(dayKey(shift.end, timeZone), 1), "00:00", timeZone);
+  return localDateTimeUtc(addDays(dayKey(shift.end, timeZone), 1), "00:00", timeZone);
 }
 export async function handleDailyStatus(
   req: Request,
   env: Env,
   actor: any,
   persist = false,
+  timezoneOverride?: string,
 ) {
   if (req.method === "OPTIONS")
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -357,11 +226,12 @@ export async function handleDailyStatus(
     !["owner", "manager", "supervisor", "staff"].includes(String(actor.role))
   )
     return json({ error: "غير مصرح" }, 403);
+  const timezone = timezoneOverride || await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
   const url = new URL(req.url),
     requestedDay = String(url.searchParams.get("date") || "").trim(),
     day = /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
       ? requestedDay
-      : dayKey(new Date()),
+      : dayKey(new Date(), timezone),
     nextDay = addDays(day, 1),
     requestedEmployeeId = String(
       url.searchParams.get("employeeId") || "",
@@ -371,8 +241,8 @@ export async function handleDailyStatus(
       "SELECT e.id,e.name,e.job_number AS jobNumber,e.status,e.schedule_type AS scheduleType,e.work_start_time AS workStartTime,e.work_end_time AS workEndTime,e.work_days_json AS workDaysJson,e.rotation_start_date AS rotationStartDate,e.rotation_days_on AS rotationDaysOn,e.rotation_days_off AS rotationDaysOff,e.rotation_daily_attendance_enabled AS rotationDailyAttendanceEnabled,e.rotation_daily_attendance_time AS rotationDailyAttendanceTime,e.rotation_daily_attendance_grace_minutes AS rotationDailyAttendanceGraceMinutes,e.grace_period_minutes AS gracePeriodMinutes,e.is_vip AS isVip,e.auto_check_in AS autoCheckIn,e.auto_check_out AS autoCheckOut FROM employees e WHERE (e.status='active' OR EXISTS (SELECT 1 FROM attendance a WHERE a.employee_id=e.id AND a.timestamp>=? AND a.timestamp<?)) AND (? != 'staff' OR e.id=?) AND e.id=COALESCE(NULLIF(?, ''), e.id) ORDER BY e.name",
     )
       .bind(
-        localDateTimeUtc(day, "00:00").toISOString(),
-        localDateTimeUtc(nextDay, "00:00").toISOString(),
+        localDateTimeUtc(day, "00:00", timezone).toISOString(),
+        localDateTimeUtc(nextDay, "00:00", timezone).toISOString(),
         String(actor.role),
         String(actor.id),
         requestedEmployeeId,
@@ -384,8 +254,8 @@ export async function handleDailyStatus(
       .bind(day, day, requestedEmployeeId, day, requestedEmployeeId)
       .all<any>();
     const now = new Date(),
-      today = dayKey(now),
-      escapeCutoff = day === today ? now : localDateTimeUtc(nextDay, "00:00");
+      today = dayKey(now, timezone),
+      escapeCutoff = day === today ? now : localDateTimeUtc(nextDay, "00:00", timezone);
     const escapeQuery = requestedEmployeeId
       ? await env.DB.prepare(
           "SELECT employee_id AS employeeId,status,timestamp FROM escape_events WHERE employee_id=? AND timestamp<? ORDER BY timestamp DESC LIMIT 1",
@@ -406,7 +276,7 @@ export async function handleDailyStatus(
     const employees = employeeQuery.results || [];
     const requests = requestQuery.results || [];
     const scopedEmployees = employees.filter((employee) =>
-      isRotationVisibleDay(employee, day),
+      isRotationVisibleDay(employee, day, timezone),
     );
     const requestActive = (r: any) => {
       const start = String(r.startDate || r.createdAt || "").slice(0, 10);
@@ -445,10 +315,12 @@ export async function handleDailyStatus(
     const historicalFrom = localDateTimeUtc(
       addDays(day, -Math.max(1, maxRotationOn - 1)),
       "00:00",
+      timezone,
     ).toISOString();
     const historicalTo = localDateTimeUtc(
       addDays(day, Math.max(2, maxRotationOn + 1)),
       "00:00",
+      timezone,
     ).toISOString();
     const historical = await env.DB.prepare(
       "SELECT employee_id AS employeeId,type,timestamp FROM attendance WHERE timestamp>=? AND timestamp<? AND employee_id=COALESCE(NULLIF(?, ''), employee_id) ORDER BY timestamp ASC",
@@ -472,7 +344,7 @@ export async function handleDailyStatus(
             .toUpperCase() === "ROTATION",
         dailyRotationAttendance =
           isRotation && Number(employee.rotationDailyAttendanceEnabled) === 1;
-      let schedule = scheduleFor(employee, day);
+      let schedule = scheduleFor(employee, day, timezone);
       if (
         !isRotation &&
         day === today &&
@@ -481,7 +353,7 @@ export async function handleDailyStatus(
         employee.workEndTime
       ) {
         const previousDay = addDays(day, -1);
-        const previousSchedule = scheduleFor(employee, previousDay);
+        const previousSchedule = scheduleFor(employee, previousDay, timezone);
         if (
           previousSchedule.work &&
           previousSchedule.start &&
@@ -516,6 +388,7 @@ export async function handleDailyStatus(
             employee,
             { start: periodStart, end: periodEnd },
             day,
+            timezone,
           ).getTime();
           const checkoutEvents = (historicalByEmployee.get(id) || []).filter(
             (r: any) => {
@@ -540,7 +413,7 @@ export async function handleDailyStatus(
                 return (
                   Number.isFinite(ts) &&
                   ts >= schedule.start!.getTime() &&
-                  ts < localDateTimeUtc(addDays(day, 1), "00:00").getTime()
+                  ts < localDateTimeUtc(addDays(day, 1), "00:00", timezone).getTime()
                 );
               })
             : [];
@@ -550,6 +423,7 @@ export async function handleDailyStatus(
                 employee,
                 { start: schedule.start, end: schedule.end },
                 day,
+                timezone,
               ).getTime()
             : 0;
         const scopedRows =
@@ -768,7 +642,7 @@ export async function handleDailyStatus(
     }, {});
     return json({
       attendanceDay: day,
-      timezone: TZ,
+      timezone,
       computedAt,
       total: result.length,
       counts,

@@ -1,4 +1,5 @@
 import { insertAutomaticAttendance, operationalShift } from "./attendance-engine-automatic-commands";
+import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 
 export { runAutomaticAttendance } from "./attendance-engine-automatic-commands";
 
@@ -74,7 +75,7 @@ export async function directAttendance(
         : "check-in";
 
   const current = new Date();
-  const tz = env.APP_TIMEZONE || "Asia/Damascus";
+  const tz = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
   const shift = operationalShift(employee, current, tz);
 
   if (!shift.isWorkDay) {

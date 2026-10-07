@@ -38,12 +38,13 @@ import {
   type AppNotification,
 } from "@/lib/notifications";
 import { getManagerSession, setManagerSession } from "@/lib/storage";
-import { backendLogout } from "@/lib/backend";
+import { backendLogout, getBackendSystemTimeZone } from "@/lib/backend";
 import {
   getDiagnostics,
   clearDiagnostics,
   type DiagnosticEntry,
 } from "@/lib/systemDiagnostics";
+import { setSystemTimeZone } from "@/lib/systemTimezone";
 
 const THEME_KEY = "hadir.theme";
 
@@ -179,6 +180,15 @@ export default function ManagerLayout({
   );
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    let active = true;
+    void getBackendSystemTimeZone()
+      .then(({ timezone }) => { if (active) setSystemTimeZone(timezone); })
+      .catch((error) => console.warn("تعذر تحميل المنطقة الزمنية للنظام:", error));
+    return () => { active = false; };
+  }, [currentUserId]);
 
   useEffect(() => {
     const el = topbarRef.current;
