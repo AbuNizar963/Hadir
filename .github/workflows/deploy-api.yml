@@ -60,7 +60,15 @@ jobs:
 
       - name: Apply remote D1 migrations
         working-directory: backend
-        run: npx wrangler d1 migrations apply Hadir --remote
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet HEAD^ HEAD -- migrations; then
+            echo "No migration files changed; skipping remote D1 migration step."
+          else
+            echo "Migration files changed; applying remote D1 migrations."
+            timeout 120s npx wrangler d1 migrations apply Hadir --remote
+          fi
 
       - name: Verify employee foreign-key lifecycle
         working-directory: backend
