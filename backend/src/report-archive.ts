@@ -99,7 +99,8 @@ function xmlEscape(value: unknown) {
     .replace(/'/g, "&apos;");
 }
 function columnName(index: number) {
-  let n = index + 1, result = "";
+  let n = index + 1,
+    result = "";
   while (n > 0) {
     const remainder = (n - 1) % 26;
     result = String.fromCharCode(65 + remainder) + result;
@@ -108,29 +109,204 @@ function columnName(index: number) {
   return result;
 }
 function sheetXml(rows: any[][]) {
-  const body = rows.map((row, r) => `<row r="${r + 1}">${row.map((value, c) => {
-    const ref = `${columnName(c)}${r + 1}`;
-    if (typeof value === "number" && Number.isFinite(value)) return `<c r="${ref}"><v>${value}</v></c>`;
-    return `<c r="${ref}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
-  }).join("")}</row>`).join("");
+  const body = rows
+    .map(
+      (row, r) =>
+        `<row r="${r + 1}">${row
+          .map((value, c) => {
+            const ref = `${columnName(c)}${r + 1}`;
+            if (typeof value === "number" && Number.isFinite(value))
+              return `<c r="${ref}"><v>${value}</v></c>`;
+            return `<c r="${ref}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
+          })
+          .join("")}</row>`,
+    )
+    .join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${body}</sheetData></worksheet>`;
 }
 function makeWorkbook(report: any) {
   const summaryRows = [
-    ["حاضر · التقرير الشهري المؤرشف"], ["الفترة", `${report.from} → ${report.to}`], ["وقت الإنشاء", report.generatedAt], ["المنطقة الزمنية", report.timezone], [], ["المؤشر", "القيمة"],
-    ["الموظفون", report.summary.employees], ["أيام الموظفين", report.summary.employeeDays], ["حاضر", report.summary.present], ["متأخر", report.summary.late], ["غياب", report.summary.absent], ["إجازة", report.summary.leave], ["إذن", report.summary.permission], ["راحة", report.summary.rest], ["هارب", report.summary.escaped], ["لم يبدأ", report.summary.notStarted], ["غير صالح", report.summary.invalid], ["انصراف معلق", report.summary.open], ["ساعات العمل", minutes(report.summary.workedMinutes)], ["ساعات العمل المتوقعة", minutes(report.summary.expectedMinutes)], ["فرق العمل", minutes(report.summary.workVarianceMinutes)], ["دقائق التأخر", report.summary.lateMinutes], ["دقائق الانصراف المبكر", report.summary.earlyLeaveMinutes], ["دقائق العمل الإضافي", report.summary.overtimeMinutes], ["نسبة الحضور", `${report.summary.attendanceRate}%`], ["نسبة الالتزام بالمواعيد", `${report.summary.punctualityRate}%`],
+    ["حاضر · التقرير الشهري المؤرشف"],
+    ["الفترة", `${report.from} → ${report.to}`],
+    ["وقت الإنشاء", report.generatedAt],
+    ["المنطقة الزمنية", report.timezone],
+    [],
+    ["المؤشر", "القيمة"],
+    ["الموظفون", report.summary.employees],
+    ["أيام الموظفين", report.summary.employeeDays],
+    ["حاضر", report.summary.present],
+    ["متأخر", report.summary.late],
+    ["غياب", report.summary.absent],
+    ["إجازة", report.summary.leave],
+    ["إذن", report.summary.permission],
+    ["راحة", report.summary.rest],
+    ["هارب", report.summary.escaped],
+    ["لم يبدأ", report.summary.notStarted],
+    ["غير صالح", report.summary.invalid],
+    ["انصراف معلق", report.summary.open],
+    ["ساعات العمل", minutes(report.summary.workedMinutes)],
+    ["ساعات العمل المتوقعة", minutes(report.summary.expectedMinutes)],
+    ["فرق العمل", minutes(report.summary.workVarianceMinutes)],
+    ["دقائق التأخر", report.summary.lateMinutes],
+    ["دقائق الانصراف المبكر", report.summary.earlyLeaveMinutes],
+    ["دقائق العمل الإضافي", report.summary.overtimeMinutes],
+    ["نسبة الحضور", `${report.summary.attendanceRate}%`],
+    ["نسبة الالتزام بالمواعيد", `${report.summary.punctualityRate}%`],
   ];
-  const dailyRows = [["التاريخ", "حاضر", "متأخر", "غياب", "إجازة", "إذن", "راحة", "هارب", "انصراف معلق", "عمل", "متوقع", "تأخر", "مبكر", "إضافي"], ...report.analytics.dailySeries.map((r: any) => [r.attendanceDay, r.present, r.late, r.absent, r.leave, r.permission, r.rest, r.escaped, r.open, minutes(r.workedMinutes), minutes(r.expectedMinutes), r.lateMinutes, r.earlyLeaveMinutes, r.overtimeMinutes])];
-  const employeeRows = [["الموظف", "الرقم الوظيفي", "الأيام", "حاضر", "متأخر", "غياب", "إجازة", "إذن", "راحة", "هارب", "انصراف معلق", "العمل", "المتوقع", "التأخر", "المبكر", "الإضافي"], ...report.analytics.employeeSummaries.map((r: any) => [r.employeeName, r.jobNumber || "", r.days, r.present, r.late, r.absent, r.leave, r.permission, r.rest, r.escaped, r.open, minutes(r.workedMinutes), minutes(r.expectedMinutes), r.lateMinutes, r.earlyLeaveMinutes, r.overtimeMinutes])];
-  const detailRows = [["التاريخ", "الموظف", "الرقم", "الحالة", "المصدر", "بداية الدوام", "نهاية الدوام", "الحضور", "الانصراف", "العمل", "التأخر", "المبكر", "الإضافي", "رمز الاستثناء", "جودة البيانات", "مصدر الحساب"], ...report.rows.map((r: any) => [r.attendanceDay, r.employeeName, r.jobNumber || "", statusArabic(r.status), r.attendanceSource, r.scheduledStart || "", r.scheduledEnd || "", r.checkInAt || "", r.checkOutAt || "", minutes(r.workedMinutes), r.lateMinutes, r.earlyLeaveMinutes, r.overtimeMinutes, r.exceptionCode || "", r.historicalDataQuality, r.calculationSource])];
-  const exceptionRows = [["التاريخ", "الموظف", "الرقم", "الاستثناء", "الحالة", "المصدر", "الدقائق", "معرّفات الحضور", "معرّفات الطلبات", "معرّفات التدقيق"], ...report.analytics.exceptions.map((r: any) => [r.attendanceDay, r.employeeName, r.jobNumber || "", r.code, statusArabic(r.status), r.attendanceSource, r.minutes, (r.attendanceEventIds || []).join(", "), (r.requestIds || []).join(", "), (r.auditIds || []).join(", ")])];
-  const names = ["الملخص", "اليومي", "الموظفون", "التفاصيل", "الاستثناءات"], rows = [summaryRows, dailyRows, employeeRows, detailRows, exceptionRows];
+  const dailyRows = [
+    [
+      "التاريخ",
+      "حاضر",
+      "متأخر",
+      "غياب",
+      "إجازة",
+      "إذن",
+      "راحة",
+      "هارب",
+      "انصراف معلق",
+      "عمل",
+      "متوقع",
+      "تأخر",
+      "مبكر",
+      "إضافي",
+    ],
+    ...report.analytics.dailySeries.map((r: any) => [
+      r.attendanceDay,
+      r.present,
+      r.late,
+      r.absent,
+      r.leave,
+      r.permission,
+      r.rest,
+      r.escaped,
+      r.open,
+      minutes(r.workedMinutes),
+      minutes(r.expectedMinutes),
+      r.lateMinutes,
+      r.earlyLeaveMinutes,
+      r.overtimeMinutes,
+    ]),
+  ];
+  const employeeRows = [
+    [
+      "الموظف",
+      "الرقم الوظيفي",
+      "الأيام",
+      "حاضر",
+      "متأخر",
+      "غياب",
+      "إجازة",
+      "إذن",
+      "راحة",
+      "هارب",
+      "انصراف معلق",
+      "العمل",
+      "المتوقع",
+      "التأخر",
+      "المبكر",
+      "الإضافي",
+    ],
+    ...report.analytics.employeeSummaries.map((r: any) => [
+      r.employeeName,
+      r.jobNumber || "",
+      r.days,
+      r.present,
+      r.late,
+      r.absent,
+      r.leave,
+      r.permission,
+      r.rest,
+      r.escaped,
+      r.open,
+      minutes(r.workedMinutes),
+      minutes(r.expectedMinutes),
+      r.lateMinutes,
+      r.earlyLeaveMinutes,
+      r.overtimeMinutes,
+    ]),
+  ];
+  const detailRows = [
+    [
+      "التاريخ",
+      "الموظف",
+      "الرقم",
+      "الحالة",
+      "المصدر",
+      "بداية الدوام",
+      "نهاية الدوام",
+      "الحضور",
+      "الانصراف",
+      "العمل",
+      "التأخر",
+      "المبكر",
+      "الإضافي",
+      "رمز الاستثناء",
+      "جودة البيانات",
+      "مصدر الحساب",
+    ],
+    ...report.rows.map((r: any) => [
+      r.attendanceDay,
+      r.employeeName,
+      r.jobNumber || "",
+      statusArabic(r.status),
+      r.attendanceSource,
+      r.scheduledStart || "",
+      r.scheduledEnd || "",
+      r.checkInAt || "",
+      r.checkOutAt || "",
+      minutes(r.workedMinutes),
+      r.lateMinutes,
+      r.earlyLeaveMinutes,
+      r.overtimeMinutes,
+      r.exceptionCode || "",
+      r.historicalDataQuality,
+      r.calculationSource,
+    ]),
+  ];
+  const exceptionRows = [
+    [
+      "التاريخ",
+      "الموظف",
+      "الرقم",
+      "الاستثناء",
+      "الحالة",
+      "المصدر",
+      "الدقائق",
+      "معرّفات الحضور",
+      "معرّفات الطلبات",
+      "معرّفات التدقيق",
+    ],
+    ...report.analytics.exceptions.map((r: any) => [
+      r.attendanceDay,
+      r.employeeName,
+      r.jobNumber || "",
+      r.code,
+      statusArabic(r.status),
+      r.attendanceSource,
+      r.minutes,
+      (r.attendanceEventIds || []).join(", "),
+      (r.requestIds || []).join(", "),
+      (r.auditIds || []).join(", "),
+    ]),
+  ];
+  const names = ["الملخص", "اليومي", "الموظفون", "التفاصيل", "الاستثناءات"],
+    rows = [summaryRows, dailyRows, employeeRows, detailRows, exceptionRows];
   const files: Record<string, Uint8Array> = {};
-  files["[Content_Types].xml"] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${names.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`);
-  files["_rels/.rels"] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
-  files["xl/workbook.xml"] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${names.map((name, i) => `<sheet name="${xmlEscape(name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets></workbook>`);
-  files["xl/_rels/workbook.xml.rels"] = strToU8(`<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${names.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}</Relationships>`);
-  rows.forEach((value, i) => { files[`xl/worksheets/sheet${i + 1}.xml`] = strToU8(sheetXml(value)); });
+  files["[Content_Types].xml"] = strToU8(
+    `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${names.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`,
+  );
+  files["_rels/.rels"] = strToU8(
+    `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+  );
+  files["xl/workbook.xml"] = strToU8(
+    `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${names.map((name, i) => `<sheet name="${xmlEscape(name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets></workbook>`,
+  );
+  files["xl/_rels/workbook.xml.rels"] = strToU8(
+    `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${names.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}</Relationships>`,
+  );
+  rows.forEach((value, i) => {
+    files[`xl/worksheets/sheet${i + 1}.xml`] = strToU8(sheetXml(value));
+  });
   return zipSync(files, { level: 1 });
 }
 function archiveKey(period: { year: number; month: number }) {
