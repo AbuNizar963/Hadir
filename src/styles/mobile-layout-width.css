@@ -1,5 +1,5 @@
 /* Shared mobile canvas for OWNER and EMPLOYEE.
-   Use a minimal 4px safety gutter while allowing cards/widgets to use the full viewport. */
+   Use a consistent 12px safety gutter while allowing cards/widgets to use the full viewport. */
 @media (max-width: 639px) {
   html, body, #root {
     width: 100%;
@@ -23,8 +23,8 @@
   main.mx-auto.max-w-7xl,
   main.max-w-xl.mx-auto,
   .hadir-shell-frame {
-    padding-left: 4px;
-    padding-right: 4px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   /* Override larger shell gutters introduced by the shared desktop layout. */
@@ -34,8 +34,8 @@
     max-width: 100%;
     margin-left: 0;
     margin-right: 0;
-    padding-left: 4px;
-    padding-right: 4px;
+    padding-left: 12px;
+    padding-right: 12px;
     box-sizing: border-box;
   }
 
@@ -46,8 +46,8 @@
   main.max-w-xl.mx-auto.px-5.sm\:px-6 {
     width: 100%;
     max-width: 100%;
-    padding-left: 4px;
-    padding-right: 4px;
+    padding-left: 12px;
+    padding-right: 12px;
     box-sizing: border-box;
   }
 

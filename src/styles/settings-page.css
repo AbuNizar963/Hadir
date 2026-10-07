@@ -208,3 +208,14 @@ main > section.hud-card > div.rounded-2xl.border.p-4 { width: 100%; max-width: n
 main > section.hud-card > div.rounded-2xl.border.p-4 > div.rounded-xl { width: 100%; min-width: 0; box-sizing: border-box; }
 main > section.hud-card > div.rounded-2xl.border.p-4 .mono { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 main > section.hud-card { width: 100%; min-width: 0; }
+
+/* Compact settings hierarchy: the category/title already explains the context. */
+.settings-page .settings-nav-hint,
+.settings-page .settings-content-header p,
+.settings-page .settings-brand-description {
+  display: none;
+}
+
+.settings-page .settings-nav-copy {
+  gap: 0;
+}

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { BrowserQRCodeReader } from "@zxing/browser";
-import Brand from "@/components/Brand";
 import { currentSession } from "@/lib/auth";
 import { recordAttendance } from "@/lib/attendance";
 import { getCurrentPosition, type GeoPosition } from "@/lib/geo";
@@ -236,8 +235,8 @@ export default function EmployeeScan() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="mx-auto flex w-full max-w-xl items-center justify-between px-5 py-4">
+    <div className="scan-page w-full">
+      <div className="mb-4 flex justify-start">
         <button
           type="button"
           onClick={close}
@@ -246,11 +245,9 @@ export default function EmployeeScan() {
         >
           رجوع
         </button>
-        <Brand />
-        <div className="w-16" aria-hidden="true" />
-      </header>
+      </div>
 
-      <main className="mx-auto w-full max-w-xl px-4 pb-10 sm:px-5">
+      <div className="w-full pb-10">
         <section className="mb-4 text-center">
           <div className="text-xs font-bold tracking-widest text-muted-foreground">
             {action === "check-in" ? "CHECK IN" : "CHECK OUT"}
@@ -389,7 +386,7 @@ export default function EmployeeScan() {
             </div>
           </section>
         )}
-      </main>
+      </div>
     </div>
   );
 }

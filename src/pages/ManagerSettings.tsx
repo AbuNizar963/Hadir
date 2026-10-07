@@ -26,11 +26,11 @@ const HOLIDAY_COUNTRIES = [["", "بدون عطلات رسمية"], ["SA", "ال�
 type SettingsTab = "general" | "locations" | "security" | "advanced" | "time";
 type SettingsIcon = "accounts" | "profile" | "locations" | "diagnostics" | "clock";
 const tabs: Array<{ id: SettingsTab; label: string; hint: string; icon: SettingsIcon; code: string }> = [
-  { id: "general", label: "الجهة والوصول", hint: "التعريف بالمنشأة وحسابات دخول الإدارة", icon: "profile", code: "01" },
-  { id: "locations", label: "مواقع الدوام", hint: "المقر والفروع ونطاق GPS ورمز التحقق", icon: "locations", code: "02" },
-  { id: "security", label: "إدارة الموظفين", hint: "بيانات المالك وساعات العمل والمهل الجماعية", icon: "accounts", code: "03" },
-  { id: "time", label: "التاريخ والوقت", hint: "المنطقة الزمنية المعتمدة للحضور والتقارير", icon: "clock", code: "04" },
-  { id: "advanced", label: "صيانة النظام", hint: "سجل التشخيص وأدوات إعادة ضبط البيانات", icon: "diagnostics", code: "05" },
+  { id: "general", label: "الجهة والوصول", hint: "المنشأة والحسابات", icon: "profile", code: "01" },
+  { id: "locations", label: "مواقع الدوام", hint: "المقر والفروع", icon: "locations", code: "02" },
+  { id: "security", label: "إدارة الموظفين", hint: "سياسات الموظفين", icon: "accounts", code: "03" },
+  { id: "time", label: "التاريخ والوقت", hint: "المنطقة الزمنية", icon: "clock", code: "04" },
+  { id: "advanced", label: "صيانة النظام", hint: "التشخيص والصيانة", icon: "diagnostics", code: "05" },
 ];
 
 function TabIcon({ type }: { type: SettingsIcon }) {
@@ -151,7 +151,7 @@ export default function ManagerSettings() {
     }, 0);
   };
 
-  return <ManagerLayout title="الإعدادات" subtitle="إدارة بيانات الجهة ومواقع الدوام وسياسات الموظفين">
+  return <ManagerLayout title="الإعدادات">
     <div ref={settingsRef} className="settings-page">
       <section className="settings-brand-card" aria-label="هوية الشركة">
         <div className="settings-brand-content">
@@ -179,7 +179,7 @@ export default function ManagerSettings() {
 
       <div className="settings-workspace">
         <aside id="settings-navigation" className="settings-navigation" aria-label="التنقل في الإعدادات" hidden={!categoryListOpen}>
-          <div className="settings-navigation-heading"><span className="settings-eyebrow">لوحة التحكم</span><h2>أقسام الإعدادات</h2><p>اختر القسم المطلوب؛ ستبقى بقية الخيارات محفوظة كما هي.</p></div>
+          <div className="settings-navigation-heading"><span className="settings-eyebrow">تنظيم النظام</span><h2>اختر قسماً</h2></div>
           <nav className="settings-navigation-list" aria-label="أقسام الإعدادات" onKeyDown={handleCategoryKeyDown}>
             {tabs.map((tab) => <button key={tab.id} id={`settings-tab-${tab.id}`} type="button" data-settings-tab={tab.id} aria-controls={`settings-panel-${tab.id}`} aria-expanded={!categoryListOpen && activeTab === tab.id} onClick={() => { setActiveTab(tab.id); setCategoryListOpen(false); window.setTimeout(() => { const header = document.getElementById("settings-content-header"); header?.scrollIntoView({ behavior: "smooth", block: "start" }); header?.focus(); }, 0); }} className="settings-nav-item">
               <span className="settings-nav-icon"><TabIcon type={tab.icon} /></span>

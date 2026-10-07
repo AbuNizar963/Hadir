@@ -737,7 +737,7 @@ export default function ManagerLayout({
             <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">
               HADIR · {currentRole.toUpperCase()}
             </div>
-            <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <h1 className="mt-1 text-xl font-extrabold tracking-tight sm:text-2xl">
               {title}
             </h1>
             {subtitle && (

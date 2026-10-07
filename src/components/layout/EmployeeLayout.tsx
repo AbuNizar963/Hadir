@@ -469,7 +469,7 @@ export default function EmployeeLayout({
             <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">
               HADIR · EMPLOYEE
             </div>
-            <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
+            <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
               {title}
             </h1>
             {subtitle && (

@@ -66,6 +66,13 @@
   [role="tab"]:hover { transform:translateY(-1px); }
   [role="tab"][data-state="active"] { box-shadow:0 6px 18px hsl(222 40% 3%/.16),inset 0 1px 0 hsl(var(--foreground)/.06); }
   [role="tabpanel"] { animation:tab-panel-in .2s ease both; }
+  button:focus-visible, a:focus-visible, summary:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:3px; }
+  @media (hover: hover) and (pointer: fine) {
+    .hud-card:hover, .data-card:hover { transform:translateY(-1px); }
+  }
+  @media (hover: none) {
+    .hud-card:hover, .data-card:hover { transform:none; }
+  }
   table { border-collapse:separate; border-spacing:0; overflow:hidden; border:1px solid hsl(var(--border)/.72); border-radius:1rem; }
   thead tr { background:hsl(var(--secondary)/.72); }
   th { font-size:.72rem; letter-spacing:.04em; color:hsl(var(--muted-foreground)); font-weight:700; }
@@ -154,4 +161,17 @@ html {
 body {
   min-height: 100%;
   overscroll-behavior-y: none;
+}
+
+@media (hover: none) {
+  .hud-card:hover, .data-card:hover { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

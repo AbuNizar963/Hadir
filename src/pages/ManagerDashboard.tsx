@@ -305,7 +305,7 @@ export default function ManagerDashboard() {
   return (
     <ManagerLayout
       title="لوحة القيادة"
-      subtitle={`نظرة مباشرة على حالة الدوام · ${displayDate.toLocaleDateString(
+      subtitle={displayDate.toLocaleDateString(
         "ar-EG",
         {
           weekday: "long",
@@ -313,7 +313,7 @@ export default function ManagerDashboard() {
           month: "long",
           timeZone: getSystemTimeZone(),
         },
-      )}`}
+      )}
     >
       {error ? (
         <section className="hud-card mb-6 border border-destructive/30 bg-destructive/5 p-4">
@@ -323,15 +323,6 @@ export default function ManagerDashboard() {
           <div className="mt-1 text-xs text-muted-foreground">{error}</div>
         </section>
       ) : null}
-
-      <section className="hud-card mb-6 p-4">
-        <div className="text-sm font-extrabold">الحالة التشغيلية الحالية</div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          هذه لوحة تشغيل مباشرة لليوم الحالي. الموظف يُقيّم وفق جدول دوامه
-          الفعلي؛ يوم الراحة لا يُحتسب غيابًا، والنوبة التناوبية الممتدة تبقى
-          فعالة طوال فترة العمل.
-        </div>
-      </section>
 
       <section
         className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4"
