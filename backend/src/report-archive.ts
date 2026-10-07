@@ -291,7 +291,11 @@ function makeWorkbook(report: any) {
   }
   wb.Workbook = wb.Workbook || {};
   wb.Workbook.Views = [{ RTL: true }];
-  return XLSX.write(wb, { bookType: "xlsx", type: "array", compression: false });
+  return XLSX.write(wb, {
+    bookType: "xlsx",
+    type: "array",
+    compression: false,
+  });
 }
 function archiveKey(period: { year: number; month: number }) {
   const mm = String(period.month).padStart(2, "0");
