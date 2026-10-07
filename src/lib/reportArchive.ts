@@ -98,23 +98,25 @@ export async function refreshReportArchive() {
   return data;
 }
 
-export async function prepareReportArchive(cursor: number) {
+export async function prepareReportArchive(cursor: number, employeeCursor = 0) {
   const response = await fetch(`${API_URL}/api/reports/archive/prepare`, {
     method: "POST",
     headers: { ...adminHeaders(), "content-type": "application/json" },
-    body: JSON.stringify({ cursor }),
+    body: JSON.stringify({ cursor, employeeCursor }),
     credentials: "include",
     cache: "no-store",
   });
   const data = (await response.json().catch(() => null)) as {
     error?: string;
     done?: boolean;
+    dayDone?: boolean;
     nextCursor?: number;
+    nextEmployeeCursor?: number;
     employeeId?: string;
   } | null;
   if (!response.ok)
     throw new Error(String(data?.error || `HTTP ${response.status}`));
-  return data || { done: false, nextCursor: cursor + 1 };
+  return data || { done: false, nextCursor: cursor, nextEmployeeCursor: employeeCursor + 2 };
 }
 
 export async function downloadArchivedReport(

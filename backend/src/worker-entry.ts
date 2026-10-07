@@ -168,6 +168,7 @@ export default {
       try {
         const body = await request.json().catch(() => ({} as any));
         const cursor = Math.max(0, Math.floor(Number(body?.cursor || 0)));
+        const employeeCursor = Math.max(0, Math.floor(Number(body?.employeeCursor || 0)));
         const timezone = String(env.APP_TIMEZONE || "Asia/Damascus");
         const now = new Date();
         const current = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit" }).formatToParts(now);
@@ -179,8 +180,14 @@ export default {
         const to = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
         const day = new Date(Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth(), 1 + cursor)).toISOString().slice(0, 10);
         if (day > to) return json({ ok: true, done: true, cursor, from, to }, 200, o);
-        const written = await materializeDay(env, day, { id: a.id, role: a.role }, undefined, timezone);
-        return json({ ok: true, done: false, cursor, nextCursor: cursor + 1, day, written, from, to }, 200, o);
+        const employees = await env.DB.prepare("SELECT id FROM employees ORDER BY id LIMIT 2 OFFSET ?").bind(employeeCursor).all<{ id: string }>();
+        const ids = (employees.results || []).map((row) => String(row.id));
+        if (!ids.length)
+          return json({ ok: true, done: false, dayDone: true, cursor, nextCursor: cursor + 1, employeeCursor: 0, day, from, to }, 200, o);
+        let written = 0;
+        for (const employeeId of ids)
+          written += await materializeDay(env, day, { id: a.id, role: a.role }, employeeId, timezone);
+        return json({ ok: true, done: false, dayDone: false, cursor, nextCursor: cursor, nextEmployeeCursor: employeeCursor + ids.length, day, written, from, to }, 200, o);
       } catch (error) {
         console.error("[report-archive] batch preparation failed", error);
         return json({ error: error instanceof Error ? error.message : "تعذر تجهيز دفعة الأرشيف" }, 500, o);

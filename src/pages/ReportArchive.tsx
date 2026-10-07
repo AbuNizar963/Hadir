@@ -107,10 +107,16 @@ export default function ReportArchive() {
 
     try {
       let cursor = 0;
+      let employeeCursor = 0;
       for (;;) {
-        const batch = await prepareReportArchive(cursor);
+        const batch = await prepareReportArchive(cursor, employeeCursor);
         if (batch.done) break;
-        cursor = Number(batch.nextCursor ?? cursor + 1);
+        if (batch.dayDone) {
+          cursor = Number(batch.nextCursor ?? cursor + 1);
+          employeeCursor = 0;
+        } else {
+          employeeCursor = Number(batch.nextEmployeeCursor ?? employeeCursor + 2);
+        }
       }
       await refreshReportArchive();
       await refresh();
