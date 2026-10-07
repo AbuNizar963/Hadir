@@ -276,6 +276,9 @@ jobs:
           for result in data if isinstance(data,list) else []: rows.extend(result.get("results") or [])
           if not rows: raise SystemExit(f"ERROR: previous-month archive manifest is missing for {period_from}..{period_to}")
           row=rows[0]
+          if row.get("status") in {"PENDING", "PROCESSING", "DRAFT"}:
+              print(f"previous-month archive preparation is in progress: {period_from}, status={row.get('status')}")
+              raise SystemExit(0)
           if row.get("status")!="LOCKED": raise SystemExit(f"ERROR: archive manifest exists but is not LOCKED: {row.get('status')}")
           if row.get("period_from")!=period_from or row.get("period_to")!=period_to: raise SystemExit(f"ERROR: archive period mismatch: {row}")
           if not row.get("file_key") or not row.get("file_sha256") or not row.get("locked_at"): raise SystemExit(f"ERROR: archive manifest is incomplete: {row}")
