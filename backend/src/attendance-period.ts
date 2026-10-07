@@ -6,17 +6,26 @@ export type AttendanceShift = {
 };
 const DAY_MS = 86_400_000;
 const DEFAULT_TZ = "Asia/Damascus";
+const PARTS_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+function partsFormatter(timeZone: string) {
+  let formatter = PARTS_FORMATTERS.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    PARTS_FORMATTERS.set(timeZone, formatter);
+  }
+  return formatter;
+}
 function parts(date: Date, tz: string) {
-  const p = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
+  const p = partsFormatter(tz).formatToParts(date);
   const get = (t: string) => p.find((x) => x.type === t)?.value || "";
   return {
     year: Number(get("year")),

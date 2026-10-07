@@ -318,12 +318,17 @@ export async function handleAttendanceCenter(
       return json(payload, dailyStatus.status, origin);
     }
 
+    const live = (await dailyStatus.json().catch(() => ({}))) as {
+      employees?: unknown[];
+    };
+    const currentDayOnly = from === to && from === systemDay(asOf, timezone);
+
     // A daily report must include every employee reportable at this request's
     // evaluation time, not merely facts already materialized by background
-    // refreshes. Build canonical facts first so scheduled employees without an
-    // attendance event still receive their status, while rotations before their
-    // configured start time remain outside the report. Raw attendance is read-only.
-    if (from === to) {
+    // refreshes. Reuse today's canonical live snapshot; materialize historical
+    // single-day reports as needed. Rotations before their configured start time
+    // remain outside the report, and raw attendance remains read-only.
+    if (from === to && !currentDayOnly) {
       await ensureProfessionalAttendanceFacts(
         env,
         from,
@@ -341,12 +346,14 @@ export async function handleAttendanceCenter(
       to,
       employeeId,
       actor,
-      { asOf },
+      {
+        asOf,
+        ...(currentDayOnly
+          ? { rebuildStaleFacts: false, liveStatusPayload: live }
+          : {}),
+      },
     );
 
-    const live = (await dailyStatus.json().catch(() => ({}))) as {
-      employees?: unknown[];
-    };
     await assertCurrentDayCompleteness(from, to, report, live, timezone, asOf);
 
     return json(

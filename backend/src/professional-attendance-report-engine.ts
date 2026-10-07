@@ -46,6 +46,7 @@ const MAX_DAYS = 366;
 type BuildOptions = {
   rebuildStaleFacts?: boolean;
   asOf?: Date;
+  liveStatusPayload?: unknown;
 };
 const VALID_STATUSES = new Set([
   "PRESENT",
@@ -80,13 +81,19 @@ const daysBetween = (from: string, to: string) =>
   Math.round(dateNumber(to) - dateNumber(from)) + 1;
 const addDays = (day: string, amount: number) =>
   new Date((dateNumber(day) + amount) * 86400000).toISOString().slice(0, 10);
+const SYSTEM_DAY_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
 const systemDay = (date: Date, timeZone: string) => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
+  let formatter = SYSTEM_DAY_FORMATTERS.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    SYSTEM_DAY_FORMATTERS.set(timeZone, formatter);
+  }
+  const parts = formatter.formatToParts(date);
   const get = (type: string) =>
     parts.find((part) => part.type === type)?.value || "00";
   return `${get("year")}-${get("month")}-${get("day")}`;
@@ -462,26 +469,31 @@ async function loadLiveTodayFacts(
   actor: any,
   timezone: string,
   asOf = new Date(),
+  liveStatusPayload?: unknown,
 ): Promise<FactRow[] | null> {
   if (day !== systemDay(asOf, timezone) || !actor) return null;
 
   try {
-    const response = await handleDailyStatus(
-      new Request(
-        `https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}${
-          employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : ""
-        }`,
-      ),
-      env,
-      actor,
-      false,
-      timezone,
-      asOf,
-    );
+    let payload: any;
+    if (liveStatusPayload !== undefined && liveStatusPayload !== null) {
+      payload = liveStatusPayload;
+    } else {
+      const response = await handleDailyStatus(
+        new Request(
+          `https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}${
+            employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : ""
+          }`,
+        ),
+        env,
+        actor,
+        false,
+        timezone,
+        asOf,
+      );
 
-    if (!response.ok) return null;
-
-    const payload = (await response.json()) as any;
+      if (!response.ok) return null;
+      payload = (await response.json()) as any;
+    }
     const liveEmployees = (
       Array.isArray(payload.employees) ? payload.employees : []
     ).filter(
@@ -768,6 +780,7 @@ export async function buildProfessionalAttendanceReport(
           actor,
           timezone,
           asOf,
+          options.liveStatusPayload,
         )
       : null;
 

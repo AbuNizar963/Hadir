@@ -11,6 +11,7 @@ type Env = {
 };
 const TZ = "Asia/Damascus";
 const DAY_MS = 86400000;
+const TZ_PARTS_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
 type Status =
   | "PRESENT"
   | "LATE"
@@ -108,15 +109,20 @@ const json = (data: unknown, status = 200) =>
     },
   });
 function tzParts(date: Date, timeZone = TZ) {
-  const p = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
+  let formatter = TZ_PARTS_FORMATTERS.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    TZ_PARTS_FORMATTERS.set(timeZone, formatter);
+  }
+  const p = formatter.formatToParts(date);
   const get = (t: string) => p.find((x) => x.type === t)?.value || "";
   return {
     year: Number(get("year")),
