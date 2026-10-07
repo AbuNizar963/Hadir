@@ -78,7 +78,7 @@ const NAV: ManagerNavItem[] = [
     to: "/manager/workforce",
     label: "قوى العمل",
     icon: ClipboardCheck,
-    editRoles: ["owner", "manager", "supervisor"],
+    editRoles: ["owner"],
   },
   {
     to: "/manager/requests",

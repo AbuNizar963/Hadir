@@ -313,7 +313,7 @@ export default function App() {
           path="/manager/workforce"
           element={
             <ManagerOnly>
-              <RequireManagerRole roles={["owner", "manager", "supervisor"]}>
+              <RequireManagerRole roles={["owner"]}>
                 <ManagerWorkforceControls />
               </RequireManagerRole>
             </ManagerOnly>
