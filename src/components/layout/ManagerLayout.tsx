@@ -731,9 +731,9 @@ export default function ManagerLayout({
         </div>
       )}
 
-      <header className="manager-page-header mx-auto max-w-7xl border-b border-border/40 px-4 pb-4 pt-5 sm:px-6 lg:px-10">
+      <header className="manager-page-header mx-auto max-w-7xl border-b border-border/40 px-4 pb-4 pt-5 sm:px-6 lg:px-10" aria-label={title}>
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div className="manager-page-header-copy" aria-hidden="true">
             <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">
               HADIR · {currentRole.toUpperCase()}
             </div>
@@ -746,11 +746,11 @@ export default function ManagerLayout({
               </div>
             )}
           </div>
-          {actions}
+          {actions && <div className="manager-page-header-actions">{actions}</div>}
         </div>
       </header>
 
-      <main className="manager-content mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10">
+      <main className="manager-content mx-auto w-full max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-10" aria-label={title}>
         {children}
       </main>
 

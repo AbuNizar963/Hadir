@@ -181,3 +181,18 @@ body {
 .settings-page .settings-card-description,
 .settings-page .settings-option-hint { display: none; }
 .settings-page .settings-tab-panel .company-specialties-host p.mt-1 { display: none; }
+
+/* The navigation already names the active section; keep only page actions in the top rail. */
+.manager-page-header-copy {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.manager-page-header:not(:has(.manager-page-header-actions)) { display: none !important; }
+.manager-page-header:has(.manager-page-header-actions) { padding-top: 10px !important; padding-bottom: 10px !important; }
