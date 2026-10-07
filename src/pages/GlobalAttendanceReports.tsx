@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  Legend,
 } from "recharts";
 import type { Employee } from "@/types";
 
@@ -84,6 +85,18 @@ const statusBadgeClasses: Record<string, string> = {
   INVALID: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
   MISSING_CHECKOUT:
     "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200",
+};
+
+const chartStatusColors: Record<string, string> = {
+  PRESENT: "#059669",
+  LATE: "#d97706",
+  ABSENT: "#dc2626",
+  LEAVE: "#7c3aed",
+  PERMISSION: "#0891b2",
+  REST: "#64748b",
+  ESCAPED: "#991b1b",
+  NOT_STARTED: "#2563eb",
+  INVALID: "#475569",
 };
 
 const exceptionLabels: Record<string, string> = {
@@ -170,6 +183,9 @@ export default function GlobalAttendanceReports() {
   );
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const detailRequestIdRef = useRef(0);
+  const detailReturnFocusRef = useRef<HTMLElement | null>(null);
+  const detailScrollYRef = useRef(0);
   const [printGeneratedAt, setPrintGeneratedAt] = useState(() =>
     new Date().toISOString(),
   );
@@ -202,20 +218,42 @@ export default function GlobalAttendanceReports() {
     }
   };
 
-  const openDetail = async (attendanceDay: string, id: string) => {
+  const openDetail = async (
+    attendanceDay: string,
+    id: string,
+    trigger?: HTMLElement,
+  ) => {
+    const requestId = ++detailRequestIdRef.current;
+    if (trigger) {
+      detailReturnFocusRef.current = trigger;
+      detailScrollYRef.current = window.scrollY;
+    }
     setDetail(null);
     setDetailError(null);
     setDetailLoading(true);
 
     try {
-      setDetail(await getProfessionalAttendanceDrilldown(attendanceDay, id));
-    } catch (cause) {
-      setDetailError(
-        cause instanceof Error ? cause.message : "تعذر تحميل التفصيل",
+      const result = await getProfessionalAttendanceDrilldown(
+        attendanceDay,
+        id,
       );
+      if (requestId === detailRequestIdRef.current) setDetail(result);
+    } catch (cause) {
+      if (requestId === detailRequestIdRef.current) {
+        setDetailError(
+          cause instanceof Error ? cause.message : "تعذر تحميل التفصيل",
+        );
+      }
     } finally {
-      setDetailLoading(false);
+      if (requestId === detailRequestIdRef.current) setDetailLoading(false);
     }
+  };
+
+  const closeDetail = () => {
+    detailRequestIdRef.current += 1;
+    setDetail(null);
+    setDetailLoading(false);
+    setDetailError(null);
   };
 
   useEffect(() => {
@@ -260,15 +298,51 @@ export default function GlobalAttendanceReports() {
 
   const statusData = report
     ? [
-        { name: labels.PRESENT, value: report.summary.present },
-        { name: labels.LATE, value: report.summary.late },
-        { name: labels.ABSENT, value: report.summary.absent },
-        { name: labels.LEAVE, value: report.summary.leave },
-        { name: labels.PERMISSION, value: report.summary.permission },
-        { name: labels.REST, value: report.summary.rest },
-        { name: labels.ESCAPED, value: report.summary.escaped },
-        { name: labels.NOT_STARTED, value: report.summary.notStarted },
-        { name: labels.INVALID, value: report.summary.invalid },
+        {
+          name: labels.PRESENT,
+          value: report.summary.present,
+          color: chartStatusColors.PRESENT,
+        },
+        {
+          name: labels.LATE,
+          value: report.summary.late,
+          color: chartStatusColors.LATE,
+        },
+        {
+          name: labels.ABSENT,
+          value: report.summary.absent,
+          color: chartStatusColors.ABSENT,
+        },
+        {
+          name: labels.LEAVE,
+          value: report.summary.leave,
+          color: chartStatusColors.LEAVE,
+        },
+        {
+          name: labels.PERMISSION,
+          value: report.summary.permission,
+          color: chartStatusColors.PERMISSION,
+        },
+        {
+          name: labels.REST,
+          value: report.summary.rest,
+          color: chartStatusColors.REST,
+        },
+        {
+          name: labels.ESCAPED,
+          value: report.summary.escaped,
+          color: chartStatusColors.ESCAPED,
+        },
+        {
+          name: labels.NOT_STARTED,
+          value: report.summary.notStarted,
+          color: chartStatusColors.NOT_STARTED,
+        },
+        {
+          name: labels.INVALID,
+          value: report.summary.invalid,
+          color: chartStatusColors.INVALID,
+        },
       ].filter((item) => item.value > 0)
     : [];
 
@@ -681,13 +755,13 @@ export default function GlobalAttendanceReports() {
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
                 <div className="text-xs font-bold text-primary">
-                  HADIR · GLOBAL WORKFORCE REPORTING
+                  HADIR · نظام إدارة الحضور والدوام
                 </div>
                 <h1 className="mt-2 text-2xl font-black">
-                  لوحة الحضور التنفيذية
+                  تقارير الحضور والدوام
                 </h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  مصدر موحد للسجل اليومي، المؤشرات، الساعات، والاستثناءات.
+                  متابعة الحضور والساعات والاستثناءات للفترة المحددة.
                 </p>
               </div>
               <div className="flex flex-wrap items-end gap-2">
@@ -787,7 +861,7 @@ export default function GlobalAttendanceReports() {
                 variant={tab === "overview" ? "default" : "outline"}
                 onClick={() => setTab("overview")}
               >
-                النظرة التنفيذية
+                الرسوم البيانية
               </Button>
               <Button
                 variant={tab === "daily" ? "default" : "outline"}
@@ -820,34 +894,61 @@ export default function GlobalAttendanceReports() {
                     </CardHeader>
                     <CardContent className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={daily}>
-                          <CartesianGrid strokeDasharray="3 3" />
+                        <AreaChart
+                          data={daily}
+                          margin={{ top: 8, right: 12, left: 8, bottom: 8 }}
+                        >
+                          <CartesianGrid
+                            stroke="#e2e8f0"
+                            strokeDasharray="3 3"
+                          />
                           <XAxis
                             dataKey="attendanceDay"
-                            tick={{ fontSize: 11 }}
+                            tick={{ fontSize: 11, fill: "#64748b" }}
                           />
-                          <YAxis allowDecimals={false} />
-                          <Tooltip />
+                          <YAxis
+                            allowDecimals={false}
+                            tick={{ fill: "#64748b" }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              borderRadius: 12,
+                              borderColor: "#cbd5e1",
+                            }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 12 }} />
                           <Area
                             type="monotone"
                             dataKey="present"
                             name="حاضر"
-                            fillOpacity={0.15}
+                            stroke="#059669"
+                            fill="#059669"
+                            fillOpacity={0.18}
                             strokeWidth={2}
+                            dot={{ r: 4, strokeWidth: 1, fill: "#ffffff" }}
+                            activeDot={{ r: 6 }}
                           />
                           <Area
                             type="monotone"
                             dataKey="late"
                             name="متأخر"
-                            fillOpacity={0.12}
+                            stroke="#d97706"
+                            fill="#d97706"
+                            fillOpacity={0.14}
                             strokeWidth={2}
+                            dot={{ r: 4, strokeWidth: 1, fill: "#ffffff" }}
+                            activeDot={{ r: 6 }}
                           />
                           <Area
                             type="monotone"
                             dataKey="absent"
                             name="غياب"
-                            fillOpacity={0.12}
+                            stroke="#dc2626"
+                            fill="#dc2626"
+                            fillOpacity={0.14}
                             strokeWidth={2}
+                            dot={{ r: 4, strokeWidth: 1, fill: "#ffffff" }}
+                            activeDot={{ r: 6 }}
                           />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -866,13 +967,21 @@ export default function GlobalAttendanceReports() {
                             nameKey="name"
                             innerRadius={55}
                             outerRadius={90}
-                            label
+                            paddingAngle={2}
+                            label={({ value }) => String(value)}
+                            labelLine={false}
                           >
-                            {statusData.map((_, index) => (
-                              <Cell key={index} />
+                            {statusData.map((item) => (
+                              <Cell
+                                key={item.name}
+                                fill={item.color}
+                                stroke="#ffffff"
+                                strokeWidth={2}
+                              />
                             ))}
                           </Pie>
                           <Tooltip />
+                          <Legend wrapperStyle={{ fontSize: 12 }} />
                         </PieChart>
                       </ResponsiveContainer>
                     </CardContent>
@@ -887,24 +996,34 @@ export default function GlobalAttendanceReports() {
                   </CardHeader>
                   <CardContent className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={daily}>
-                        <CartesianGrid strokeDasharray="3 3" />
+                      <BarChart
+                        data={daily}
+                        margin={{ top: 8, right: 12, left: 8, bottom: 8 }}
+                      >
+                        <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
                         <XAxis
                           dataKey="attendanceDay"
-                          tick={{ fontSize: 11 }}
+                          tick={{ fontSize: 11, fill: "#64748b" }}
                         />
-                        <YAxis />
+                        <YAxis
+                          tick={{ fill: "#64748b" }}
+                          tickFormatter={(value) =>
+                            `${(Number(value) / 60).toFixed(1)}س`
+                          }
+                        />
                         <Tooltip formatter={(value) => fmt(Number(value))} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Bar
                           dataKey="expectedMinutes"
                           name="المتوقع"
-                          fill="currentColor"
-                          fillOpacity={0.25}
+                          fill="#94a3b8"
+                          radius={[4, 4, 0, 0]}
                         />
                         <Bar
                           dataKey="workedMinutes"
                           name="الفعلي"
-                          fill="currentColor"
+                          fill="#2563eb"
+                          radius={[4, 4, 0, 0]}
                         />
                       </BarChart>
                     </ResponsiveContainer>
@@ -946,14 +1065,45 @@ export default function GlobalAttendanceReports() {
                       {rows.map((row) => (
                         <tr
                           key={`${row.attendanceDay}-${row.employeeId}`}
-                          className="cursor-pointer border-b hover:bg-muted/50"
-                          onClick={() =>
-                            void openDetail(row.attendanceDay, row.employeeId)
+                          tabIndex={0}
+                          className="cursor-pointer border-b hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                          onClick={(event) =>
+                            void openDetail(
+                              row.attendanceDay,
+                              row.employeeId,
+                              event.currentTarget,
+                            )
                           }
+                          onKeyDown={(event) => {
+                            if (
+                              event.target === event.currentTarget &&
+                              (event.key === "Enter" || event.key === " ")
+                            ) {
+                              event.preventDefault();
+                              void openDetail(
+                                row.attendanceDay,
+                                row.employeeId,
+                                event.currentTarget,
+                              );
+                            }
+                          }}
                         >
                           <td className="p-3">{row.attendanceDay}</td>
                           <td className="p-3 font-semibold">
-                            {row.employeeName}
+                            <button
+                              type="button"
+                              className="text-right font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void openDetail(
+                                  row.attendanceDay,
+                                  row.employeeId,
+                                  event.currentTarget,
+                                );
+                              }}
+                            >
+                              {row.employeeName}
+                            </button>
                             <div className="text-xs text-muted-foreground">
                               {row.jobNumber || "—"}
                             </div>
@@ -1090,9 +1240,14 @@ export default function GlobalAttendanceReports() {
                       {exceptions.map((item, index) => (
                         <tr
                           key={`${item.employeeId}-${item.attendanceDay}-${index}`}
-                          className="cursor-pointer border-b hover:bg-muted/50"
-                          onClick={() =>
-                            void openDetail(item.attendanceDay, item.employeeId)
+                          tabIndex={0}
+                          className="cursor-pointer border-b hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                          onClick={(event) =>
+                            void openDetail(
+                              item.attendanceDay,
+                              item.employeeId,
+                              event.currentTarget,
+                            )
                           }
                         >
                           <td className="p-3">{item.attendanceDay}</td>
@@ -1147,15 +1302,27 @@ export default function GlobalAttendanceReports() {
       <Dialog
         open={detail !== null || detailLoading || detailError !== null}
         onOpenChange={(open) => {
-          if (!open && !detailLoading) {
-            setDetail(null);
-            setDetailError(null);
-          }
+          if (!open) closeDetail();
         }}
       >
         <DialogContent
-          className="max-h-[90vh] max-w-4xl overflow-y-auto"
+          className="max-w-4xl overflow-y-auto translate-y-0"
           dir="rtl"
+          style={{
+            top: "calc(var(--hadir-manager-topbar-h, 138px) + 12px)",
+            maxHeight:
+              "calc(100dvh - var(--hadir-manager-topbar-h, 138px) - 24px)",
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            requestAnimationFrame(() => {
+              detailReturnFocusRef.current?.focus({ preventScroll: true });
+              window.scrollTo({
+                top: detailScrollYRef.current,
+                behavior: "auto",
+              });
+            });
+          }}
         >
           <DialogHeader>
             <DialogTitle>تفصيل سجل الحضور</DialogTitle>
@@ -1163,6 +1330,12 @@ export default function GlobalAttendanceReports() {
               تفصيل قراءة فقط مرتبط بسجل التقرير ومصادره الأصلية.
             </DialogDescription>
           </DialogHeader>
+
+          <div className="flex justify-start">
+            <Button variant="outline" size="sm" onClick={closeDetail}>
+              العودة إلى السجل اليومي
+            </Button>
+          </div>
 
           {detailLoading && (
             <div className="p-8 text-center text-muted-foreground">
