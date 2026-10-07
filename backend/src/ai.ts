@@ -1,10 +1,19 @@
 import { localDateTime } from "./attendance-period";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 type AIModel = {
   run(model: string, input: Record<string, unknown>): Promise<any>;
 };
 
-type Env = { AI?: AIModel; GEMINI_API_KEY?: string; APP_ORIGIN?: string; APP_TIMEZONE?: string; DB?: D1Database };
+type Env = {
+  AI?: AIModel;
+  GEMINI_API_KEY?: string;
+  APP_ORIGIN?: string;
+  APP_TIMEZONE?: string;
+  DB?: D1Database;
+};
 function trimText(value: unknown, max = 12000) {
   return String(value ?? "").slice(0, max);
 }
@@ -54,17 +63,30 @@ function requestedProvider(q: string): "gemini" | "workers" | "auto" {
   return "auto";
 }
 function dateInZone(timeZone = DEFAULT_SYSTEM_TIME_ZONE) {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "00";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 function isoDay(value: any, timeZone = DEFAULT_SYSTEM_TIME_ZONE) {
   const s = String(value || "");
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const date = new Date(s);
-  if (!Number.isFinite(date.getTime())) return s.length >= 10 ? s.slice(0, 10) : "";
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+  if (!Number.isFinite(date.getTime()))
+    return s.length >= 10 ? s.slice(0, 10) : "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "00";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 function isCheckIn(type: any) {
@@ -142,7 +164,11 @@ function employeeAnalytics(data: any, timeZone = DEFAULT_SYSTEM_TIME_ZONE) {
       String(employee.workStartTime || "08:00"),
     );
     if (!m) return false;
-    const scheduled = localDateTime(toLocalDay(a.timestamp), `${m[1]}:${m[2]}`, timeZone);
+    const scheduled = localDateTime(
+      toLocalDay(a.timestamp),
+      `${m[1]}:${m[2]}`,
+      timeZone,
+    );
     return (
       ts.getTime() >
       scheduled.getTime() + Number(employee.gracePeriodMinutes || 0) * 60000
@@ -167,7 +193,9 @@ function employeeAnalytics(data: any, timeZone = DEFAULT_SYSTEM_TIME_ZONE) {
   const todayAttendance = records.filter(
     (a: any) => toLocalDay(a.timestamp) === today,
   );
-  const checkInDays = new Set(thisYearIns.map((a: any) => toLocalDay(a.timestamp)));
+  const checkInDays = new Set(
+    thisYearIns.map((a: any) => toLocalDay(a.timestamp)),
+  );
   const leaveRanges = yearLeaves
     .map((r: any) => ({
       start: toLocalDay(r.startDate || r.start_date),
@@ -211,10 +239,12 @@ function employeeAnalytics(data: any, timeZone = DEFAULT_SYSTEM_TIME_ZONE) {
     attendanceCountAll: checkIns.length,
     attendanceCountYear: thisYearIns.length,
     attendanceCountMonth: thisMonthIns.length,
-    presentDaysYear: new Set(thisYearIns.map((x: any) => toLocalDay(x.timestamp)))
-      .size,
-    presentDaysMonth: new Set(thisMonthIns.map((x: any) => toLocalDay(x.timestamp)))
-      .size,
+    presentDaysYear: new Set(
+      thisYearIns.map((x: any) => toLocalDay(x.timestamp)),
+    ).size,
+    presentDaysMonth: new Set(
+      thisMonthIns.map((x: any) => toLocalDay(x.timestamp)),
+    ).size,
     lateCountYear: lateRecords.length,
     lateCountMonth: lateRecords.filter((x: any) =>
       toLocalDay(x.timestamp).startsWith(month),
@@ -277,7 +307,9 @@ function analytics(data: any, timeZone = DEFAULT_SYSTEM_TIME_ZONE) {
     month = today.slice(0, 7);
   const active = employees.filter((e: any) => norm(e.status) === "active"),
     suspended = employees.filter((e: any) => norm(e.status) === "suspended");
-  const todayAtt = attendance.filter((a: any) => toLocalDay(a.timestamp) === today),
+  const todayAtt = attendance.filter(
+      (a: any) => toLocalDay(a.timestamp) === today,
+    ),
     yearAtt = attendance.filter((a: any) =>
       toLocalDay(a.timestamp).startsWith(year),
     ),
@@ -561,7 +593,10 @@ export async function handleAI(request: Request, env: Env) {
   const question = trimText(body?.question, 1000).trim();
   if (!question) return reply({ ok: false, error: "السؤال فارغ" }, 400, env);
   const timezone = env.DB
-    ? await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE)
+    ? await getConfiguredSystemTimeZone(
+        env.DB,
+        env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+      )
     : env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE;
   const prompt = buildPrompt(role, question, body?.data ?? {}, timezone);
   const requested = requestedProvider(question);

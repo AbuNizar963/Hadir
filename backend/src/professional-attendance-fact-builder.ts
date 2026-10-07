@@ -1,6 +1,9 @@
 import { handleDailyStatus } from "./daily-status-api";
 import { localDateTime } from "./attendance-period";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 
 /**
  * Materializes the authoritative attendance facts used by reporting.
@@ -71,12 +74,23 @@ export async function materializeDay(
   employeeId?: string,
   configuredTimeZone?: string,
 ) {
-  const timezone = configuredTimeZone || await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  const timezone =
+    configuredTimeZone ||
+    (await getConfiguredSystemTimeZone(
+      env.DB,
+      env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+    ));
   const request = new Request(
     `https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}`,
     { method: "GET" },
   );
-  const response = await handleDailyStatus(request, env, actor, false, timezone);
+  const response = await handleDailyStatus(
+    request,
+    env,
+    actor,
+    false,
+    timezone,
+  );
   if (!response.ok) throw new Error(`تعذر حساب حالة الدوام لليوم ${day}`);
   const payload = (await response.json()) as any;
   const employees = Array.isArray(payload.employees) ? payload.employees : [];
@@ -102,7 +116,10 @@ export async function materializeDay(
       .all<any>();
 
     for (const row of createdResult.results || []) {
-      createdByEmployee.set(String(row.id), employeeCreatedDay(row.createdAt, timezone));
+      createdByEmployee.set(
+        String(row.id),
+        employeeCreatedDay(row.createdAt, timezone),
+      );
     }
   }
   const eligible = filtered.filter((e: any) => {
@@ -362,7 +379,13 @@ export async function refreshProfessionalAttendanceFact(
 ) {
   if (!DAY_RE.test(day) || !String(employeeId || "").trim()) return 0;
   try {
-    return await materializeDay(env, day, actor, employeeId, configuredTimeZone);
+    return await materializeDay(
+      env,
+      day,
+      actor,
+      employeeId,
+      configuredTimeZone,
+    );
   } catch (error) {
     console.error("professional attendance fact refresh failed", {
       day,
@@ -389,7 +412,10 @@ export async function refreshProfessionalAttendanceFacts(
     return 0;
   const days = daysBetween(from, to);
   if (days < 1 || days > 366) return 0;
-  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  const timezone = await getConfiguredSystemTimeZone(
+    env.DB,
+    env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+  );
   let written = 0;
   for (let i = 0; i < days; i += 1)
     written += await refreshProfessionalAttendanceFact(
@@ -415,9 +441,20 @@ export async function ensureProfessionalAttendanceFacts(
   const days = daysBetween(from, to);
   if (days < 1 || days > 366)
     throw new Error("الفترة الزمنية تتجاوز الحد المسموح (366 يومًا)");
-  const timezone = configuredTimeZone || await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE);
+  const timezone =
+    configuredTimeZone ||
+    (await getConfiguredSystemTimeZone(
+      env.DB,
+      env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+    ));
   let written = 0;
   for (let i = 0; i < days; i += 1)
-    written += await materializeDay(env, addDays(from, i), actor, employeeId, timezone);
+    written += await materializeDay(
+      env,
+      addDays(from, i),
+      actor,
+      employeeId,
+      timezone,
+    );
   return written;
 }

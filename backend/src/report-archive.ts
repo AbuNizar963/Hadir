@@ -1,6 +1,9 @@
 import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
 import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
-import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
+import {
+  DEFAULT_SYSTEM_TIME_ZONE,
+  getConfiguredSystemTimeZone,
+} from "./system-timezone";
 import * as XLSX from "xlsx-js-style";
 
 type Env = {
@@ -350,7 +353,10 @@ export async function archiveClosedMonth(
 ) {
   if (!env.REPORT_ARCHIVES)
     throw new Error("R2 binding REPORT_ARCHIVES غير موجود");
-  const timezone = await getConfiguredSystemTimeZone(env.DB, env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE),
+  const timezone = await getConfiguredSystemTimeZone(
+      env.DB,
+      env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
+    ),
     period = previousMonthPeriod(now, timezone),
     id = `attendance_period_${period.from}`,
     key = archiveKey(period);
