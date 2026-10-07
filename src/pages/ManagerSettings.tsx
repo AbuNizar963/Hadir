@@ -22,11 +22,12 @@ function SettingsSection({ type, code, title, description, children, defaultOpen
 const PROJECT_LOGO = `${import.meta.env.BASE_URL}favicon.svg`;
 
 type SettingsTab = "general" | "locations" | "security" | "advanced";
-const tabs: Array<{ id: SettingsTab; label: string; hint: string }> = [
-  { id: "general", label: "الهوية والحسابات", hint: "هوية الشركة وحسابات الإدارة" },
-  { id: "locations", label: "المواقع و QR", hint: "مواقع العمل ورموز QR" },
-  { id: "security", label: "الأمان والصلاحيات", hint: "الحسابات والصلاحيات الإدارية" },
-  { id: "advanced", label: "النظام والتشخيص", hint: "التشخيص وإعادة التهيئة" },
+type SettingsIcon = "accounts" | "profile" | "locations" | "diagnostics";
+const tabs: Array<{ id: SettingsTab; label: string; hint: string; icon: SettingsIcon; code: string }> = [
+  { id: "general", label: "الهوية والحسابات", hint: "بيانات الجهة وحسابات الإدارة", icon: "profile", code: "01" },
+  { id: "locations", label: "مواقع العمل و QR", hint: "المقر والمواقع الإضافية ورموز التحقق", icon: "locations", code: "02" },
+  { id: "security", label: "الأمان وإدارة الموظفين", hint: "حساب المالك والعمليات الجماعية", icon: "accounts", code: "03" },
+  { id: "advanced", label: "النظام والتشخيص", hint: "سجل الأخطاء وأدوات الصيانة", icon: "diagnostics", code: "04" },
 ];
 
 export default function ManagerSettings() {
@@ -108,9 +109,6 @@ export default function ManagerSettings() {
   const reset = () => { if (confirm("سيتم حذف بيانات النظام المحلية وإعادة التهيئة. هل أنت متأكد؟")) { resetAll(); setS(getSettings()); } };
   const resetCloudTestData = async () => { if (!isOwner || resettingCloud) return; const confirmation = window.prompt("هذه عملية Reset لبيانات النظام. اكتب: تأكيد"); if (confirmation !== "تأكيد") { if (confirmation !== null) setResetCloudResult("تم إلغاء العملية: كلمة التأكيد غير صحيحة."); return; } setResettingCloud(true); setResetCloudResult(null); try { const result = await resetBackendTestData(); resetAll(); setS(getSettings()); setResetCloudResult(result.message); } catch (e) { setResetCloudResult(e instanceof Error ? e.message : "تعذر تنفيذ Reset لبيانات الخادم."); } finally { setResettingCloud(false); } };
   const [editingBrandName, setEditingBrandName] = useState(false);
-  const [settingsHome, setSettingsHome] = useState(true);
-  const settingsDetailRef = useRef<HTMLElement>(null);
-  useEffect(() => { if (settingsHome) return; const frame = window.requestAnimationFrame(() => { settingsDetailRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" }); window.scrollTo({ top: 0, left: 0, behavior: "auto" }); }); return () => window.cancelAnimationFrame(frame); }, [settingsHome, activeTab]);
   const [brandNameDraft, setBrandNameDraft] = useState(s.brandName || "");
   const [savingBrandName, setSavingBrandName] = useState(false);
   const brandLogoInputRef = useRef<HTMLInputElement>(null);
@@ -119,48 +117,67 @@ export default function ManagerSettings() {
   const dataUrlToBlob = (dataUrl: string) => { const comma = dataUrl.indexOf(","); if (comma < 0) throw new Error("صيغة الشعار غير صالحة."); const mime = /^data:([^;]+);base64$/i.exec(dataUrl.slice(0, comma))?.[1] || "image/webp"; const binary = atob(dataUrl.slice(comma + 1)); const bytes = new Uint8Array(binary.length); for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i); return new Blob([bytes], { type: mime }); };
   const uploadBrandLogoInline = async (file?: File) => { if (!file) return; try { if (!file.type.startsWith("image/")) throw new Error("يرجى اختيار ملف صورة صالح."); const raw = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("تعذر قراءة الصورة.")); reader.onerror = () => reject(new Error("تعذر قراءة الصورة.")); reader.readAsDataURL(file); }); const compressed = await compressProfileImageDataUrl(raw, { maxWidth: 768, maxHeight: 768, quality: 0.84, type: "image/webp", maxBytes: 100 * 1024 }); const form = new FormData(); form.append("file", dataUrlToBlob(compressed), "company-logo.webp"); const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "") + "/api/company/logo"; const token = localStorage.getItem("hadir.api.token.admin") || ""; const response = await fetch(api, { method: "POST", headers: token ? { authorization: "Bearer " + token } : undefined, body: form, credentials: "include", cache: "no-store" }); const payload = await response.json().catch(() => ({})) as { error?: string; url?: string }; if (!response.ok || typeof payload.url !== "string") throw new Error(payload.error || "تعذر حفظ شعار الشركة."); const uploadedUrl = payload.url; const immediate = { ...getSettings(), brandLogo: uploadedUrl } as Settings; setS(immediate); window.dispatchEvent(new Event("hadir:settings-changed")); try { const remote = await getBackendSettings(); const merged = { ...immediate, ...remote, brandLogo: uploadedUrl } as Settings; saveSettings(merged); setS(merged); } catch { setS(immediate); } toast.success("تم حفظ شعار الشركة وتحديثه فورًا"); } catch (e) { toast.error("تعذر حفظ الشعار", userFacingError(e, "تعذر حفظ شعار الشركة.")); } finally { if (brandLogoInputRef.current) brandLogoInputRef.current.value = ""; } };
   const removeBrandLogoInline = async () => { if (!s.brandLogo) return; try { const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "") + "/api/company/logo"; const token = localStorage.getItem("hadir.api.token.admin") || ""; const response = await fetch(api, { method: "DELETE", headers: token ? { authorization: "Bearer " + token } : undefined, credentials: "include", cache: "no-store" }); const payload = await response.json().catch(() => ({})) as { error?: string }; if (!response.ok) throw new Error(payload.error || "تعذر إزالة الشعار."); const remote = await getBackendSettings(); const merged = { ...getSettings(), ...remote } as Settings; saveSettings(merged); setS(merged); window.dispatchEvent(new Event("hadir:settings-changed")); toast.success("تمت إزالة شعار الشركة"); } catch (e) { toast.error("تعذر إزالة الشعار", userFacingError(e, "تعذر إزالة شعار الشركة.")); } };
-  const section = (id: SettingsTab, children: React.ReactNode) => <div className={`settings-tab-panel ${activeTab === id ? "block" : "hidden"}`}>{children}</div>;
+  const activeTabInfo = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+  const section = (id: SettingsTab, children: React.ReactNode) => <div id={`settings-panel-${id}`} role="tabpanel" aria-labelledby={`settings-tab-${id}`} tabIndex={activeTab === id ? 0 : -1} hidden={activeTab !== id} className={`settings-tab-panel ${activeTab === id ? "block" : "hidden"}`}>{children}</div>;
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
+    else if (event.key === "ArrowUp" || event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    setActiveTab(nextTab.id);
+    window.requestAnimationFrame(() => document.getElementById(`settings-tab-${nextTab.id}`)?.focus());
+  };
 
   return <ManagerLayout title="الإعدادات" subtitle="إدارة النظام والهوية والمواقع والحسابات والأمان">
-    <div ref={settingsRef} className="pb-28">
-      <section className="mb-4 overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
-        <div className="relative px-5 pb-5 pt-7 text-center sm:px-8 sm:pt-8">
-          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/10 to-transparent" aria-hidden="true" />
-          <div className="relative mx-auto w-fit">
-            <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-background bg-muted shadow-lg ring-1 ring-border/70 sm:h-32 sm:w-32">
-              {s.brandLogo ? <img src={s.brandLogo} alt={s.brandName || "شعار الشركة"} className="h-full w-full object-contain p-2" /> : <img src={PROJECT_LOGO} alt={s.brandName || "حاضر"} className="h-full w-full object-contain p-5" />}
+    <div ref={settingsRef} className="settings-page">
+      <section className="settings-brand-card" aria-label="هوية الشركة">
+        <div className="settings-brand-content">
+          <div className="settings-brand-logo">
+            <div className="settings-brand-image">
+              {s.brandLogo ? <img src={s.brandLogo} alt={s.brandName || "شعار الشركة"} className="h-full w-full object-contain p-2" /> : <img src={PROJECT_LOGO} alt={s.brandName || "حاضر"} className="h-full w-full object-contain p-4" />}
             </div>
-            <button type="button" aria-label="تغيير شعار الشركة" title="تغيير الشعار" onClick={() => brandLogoInputRef.current?.click()} className="absolute bottom-0 left-0 grid h-10 w-10 place-items-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-lg hover:scale-105">
+            <button type="button" aria-label="تغيير شعار الشركة" title="تغيير الشعار" onClick={() => brandLogoInputRef.current?.click()} className="settings-brand-upload">
               <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
             </button>
             <input ref={brandLogoInputRef} type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.currentTarget.files?.[0]; void uploadBrandLogoInline(f); }} />
           </div>
-          <div className="mt-4 flex items-center justify-center gap-2">
-            {editingBrandName ? <div className="flex w-full max-w-md items-center gap-2"><input autoFocus value={brandNameDraft} maxLength={120} onChange={(e) => setBrandNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveBrandNameInline(); } if (e.key === "Escape") { setBrandNameDraft(s.brandName || ""); setEditingBrandName(false); } }} className="input h-11 flex-1 rounded-xl text-center text-lg font-black" /><button type="button" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground" onClick={() => void saveBrandNameInline()} disabled={savingBrandName} aria-label="حفظ الاسم"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6"/></svg></button></div> : <><h1 className="max-w-[75vw] truncate text-2xl font-black tracking-tight sm:max-w-xl sm:text-3xl">{s.brandName || "اسم الشركة / الجهة"}</h1><button type="button" aria-label="تعديل اسم الشركة" title="تعديل الاسم" onClick={() => { setBrandNameDraft(s.brandName || ""); setEditingBrandName(true); }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m4 16-.8 3.8L7 19l10.5-10.5-3-3z"/><path d="m13 6 3 3"/></svg></button></>}
-          </div>
-          <div className="mt-1 text-xs text-muted-foreground">هوية الشركة · {savingBrandName ? "جارٍ حفظ الاسم…" : "الإعدادات المركزية"}</div>
-          {s.brandLogo && <button type="button" onClick={() => void removeBrandLogoInline()} className="mt-2 text-[11px] font-bold text-destructive/80 hover:text-destructive">إزالة الشعار</button>}
-        </div>
-      </section>
-      {settingsHome ? <section className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm" aria-label="قائمة أقسام الإعدادات">
-        <div className="border-b border-border/60 px-5 py-4 text-right"><div className="text-lg font-black">الإعدادات</div><div className="mt-1 text-xs text-muted-foreground">اختر قسمًا لفتحه كواجهة مستقلة</div></div>
-        <div className="divide-y divide-border/60">{tabs.map(tab => { const iconType = tab.id === "general" ? "profile" : tab.id === "locations" ? "locations" : tab.id === "security" ? "accounts" : "diagnostics"; return <button key={tab.id} type="button" onClick={() => { setActiveTab(tab.id); setSettingsHome(false); }} className="group flex w-full items-center gap-4 px-5 py-4 text-right transition-colors hover:bg-primary/5 sm:px-6 sm:py-5"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><SectionIcon type={iconType} /></span><span className="min-w-0 flex-1"><span className="block text-sm font-black">{tab.id === "general" ? "الهوية والحسابات" : tab.id === "locations" ? "المواقع و QR" : tab.id === "security" ? "الأمان والصلاحيات" : "المتقدم والتشخيص"}</span><span className="mt-1 block text-xs text-muted-foreground">{tab.hint}</span></span></button>; })}</div>
-      </section> : <section ref={settingsDetailRef} className="settings-detail-screen fixed top-[138px] bottom-0 inset-x-0 z-[80] overflow-y-auto bg-background" aria-label="إعدادات القسم">
-        <header className="sticky top-0 z-10 border-b border-border/50 bg-background/95 px-4 py-3 backdrop-blur sm:px-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <button type="button" aria-label="العودة إلى الإعدادات" title="رجوع" onClick={() => setSettingsHome(true)} className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-muted active:bg-muted/80">
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-              </button>
-              <h1 className="truncate text-xl font-black">{tabs.find(tab => tab.id === activeTab)?.label || "الإعدادات"}</h1>
+          <div className="settings-brand-copy">
+            <div className="settings-eyebrow">ملف المنشأة · إعدادات مركزية</div>
+            <div className="settings-brand-name-row">
+              {editingBrandName ? <div className="settings-brand-edit"><input autoFocus aria-label="اسم الشركة" value={brandNameDraft} maxLength={120} onChange={(e) => setBrandNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveBrandNameInline(); } if (e.key === "Escape") { setBrandNameDraft(s.brandName || ""); setEditingBrandName(false); } }} className="input settings-brand-name-input" /><button type="button" className="settings-brand-action settings-brand-action--primary" onClick={() => void saveBrandNameInline()} disabled={savingBrandName} aria-label="حفظ الاسم"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6"/></svg></button></div> : <><h1 className="settings-brand-name">{s.brandName || "اسم الشركة / الجهة"}</h1><button type="button" aria-label="تعديل اسم الشركة" title="تعديل الاسم" onClick={() => { setBrandNameDraft(s.brandName || ""); setEditingBrandName(true); }} className="settings-brand-action"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m4 16-.8 3.8L7 19 17.5 8.5l-3-3z"/><path d="m13 6 3 3"/></svg></button></>}
             </div>
-            <button type="button" aria-label="العودة إلى قائمة الإعدادات" title="إغلاق" onClick={() => setSettingsHome(true)} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border/70 bg-card text-foreground shadow-sm hover:bg-muted active:bg-muted/80">
-              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
-            </button>
+            <p className="settings-brand-description">هوية الشركة والتخصصات والمواقع والحسابات التي يعتمد عليها نظام حاضر.</p>
+            {savingBrandName && <span className="settings-saving-hint">جارٍ حفظ اسم الشركة…</span>}
+            {s.brandLogo && <button type="button" onClick={() => void removeBrandLogoInline()} className="settings-remove-logo">إزالة الشعار</button>}
           </div>
-        </header>
-        <div className="settings-detail-content mx-auto w-full max-w-5xl px-4 py-4 pb-28 sm:px-6 sm:py-6">
-          <style>{".settings-detail-screen details > summary > svg{display:none!important}.settings-detail-screen .company-specialties-host > details > summary > svg{display:none!important}.settings-detail-screen [data-settings-accordion] > summary{padding-inline-end:1.25rem!important}.settings-detail-screen [data-settings-accordion] > summary > div:last-child{display:none!important}"}</style>
+        </div>
+        <div className="settings-brand-badge"><span className="settings-brand-badge__dot"/>نظام حاضر</div>
+      </section>
+
+      <div className="settings-workspace">
+        <aside className="settings-navigation" aria-label="التنقل في الإعدادات">
+          <div className="settings-navigation-heading"><span className="settings-eyebrow">لوحة التحكم</span><h2>أقسام الإعدادات</h2><p>اختر القسم المطلوب؛ ستبقى بقية الخيارات محفوظة كما هي.</p></div>
+          <div className="settings-navigation-list" role="tablist" aria-label="أقسام الإعدادات" onKeyDown={handleTabKeyDown}>
+            {tabs.map((tab) => <button key={tab.id} id={`settings-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)} className={`settings-nav-item ${activeTab === tab.id ? "is-active" : ""}`}>
+              <span className="settings-nav-icon"><SectionIcon type={tab.icon} /></span>
+              <span className="settings-nav-copy"><span className="settings-nav-code">{tab.code}</span><span className="settings-nav-label">{tab.label}</span><span className="settings-nav-hint">{tab.hint}</span></span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="settings-nav-chevron" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>)}
+          </div>
+          <div className="settings-navigation-note"><span className="settings-navigation-note__icon">i</span><span>تُحفظ إعدادات النظام من الزر الثابت أسفل الشاشة. بعض الأقسام لها إجراءات حفظ مستقلة.</span></div>
+        </aside>
+
+        <section className="settings-content" aria-label="محتوى الإعدادات">
+          <header className="settings-content-header">
+            <div className="settings-content-title"><span className="settings-content-icon"><SectionIcon type={activeTabInfo.icon} /></span><div><span className="settings-eyebrow">القسم {activeTabInfo.code} من {tabs.length}</span><h2>{activeTabInfo.label}</h2><p>{activeTabInfo.hint}</p></div></div>
+            <span className="settings-content-chip">إعدادات النظام</span>
+          </header>
+          <div className="settings-panels">
       {section("general", <div className="space-y-6">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
           <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
@@ -256,11 +273,11 @@ export default function ManagerSettings() {
       </div>)}
 
         </div>
-      </section>}
-
+      </section>
+    </div>
       {error && <div className="mt-6 flex items-start gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"><svg viewBox="0 0 24 24" aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 3.5 20h17L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg><span>{error}</span></div>}
     </div>
 
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/70 bg-background/95 px-3 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,.12)] backdrop-blur-xl sm:px-6"><div className="mx-auto flex max-w-7xl items-center gap-2"><div className="hidden min-w-0 flex-1 sm:block"><div className="text-xs font-black">تغييرات الإعدادات</div><div className="text-[10px] text-muted-foreground">احفظ التعديلات لتطبيقها على النظام.</div></div><button type="button" className="btn-primary min-w-32 flex-1 sm:flex-none" onClick={() => void save()} disabled={savingSettings}>{savingSettings ? "جارٍ الحفظ..." : "حفظ الإعدادات"}</button>{saved && <span className="hidden text-sm font-bold text-primary sm:inline">تم الحفظ ✓</span>}</div></div>
+    <div className="settings-save-bar border-t border-border/70 bg-background/95 px-3 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,.12)] backdrop-blur-xl sm:px-6"><div className="settings-save-bar__inner"><div className="settings-save-bar__copy"><div className="text-xs font-black">تغييرات الإعدادات</div><div className="text-[10px] text-muted-foreground">احفظ التعديلات لتطبيقها على النظام.</div></div><div className="settings-save-bar__actions">{saved && <span className="settings-saved-status">تم الحفظ ✓</span>}<button type="button" className="btn-primary settings-save-button" onClick={() => void save()} disabled={savingSettings}>{savingSettings ? "جارٍ الحفظ..." : "حفظ الإعدادات"}</button></div></div></div>
   </ManagerLayout>;
 }
