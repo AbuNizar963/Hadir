@@ -1,5 +1,7 @@
 import { handleEmployeeAttendance } from "./employee-attendance-gateway";
 import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone, isValidSystemTimeZone } from "./system-timezone";
+import { HOLIDAY_COUNTRIES } from "./public-holidays";
+import { readHolidayCalendar, refreshHolidayCalendar } from "./holiday-calendar";
 type Env = {
   DB: D1Database;
   JWT_SECRET?: string;
@@ -409,6 +411,29 @@ export default {
           .bind(key, JSON.stringify(value))
           .run();
       return json({ ok: true }, 200, origin);
+    }
+    if (path === "/api/holiday-countries" && req.method === "GET") {
+      if (!actor || !["owner", "manager", "supervisor"].includes(actor.role))
+        return json({ error: "غير مصرح" }, 403, origin);
+      return json({ sourceVersion: "date-holidays-3.25.0", countries: HOLIDAY_COUNTRIES }, 200, origin);
+    }
+    if (path === "/api/holiday-calendar" && req.method === "GET") {
+      if (!actor || !["owner", "manager", "supervisor"].includes(actor.role))
+        return json({ error: "غير مصرح" }, 403, origin);
+      const country = String(url.searchParams.get("country") || "").trim().toUpperCase();
+      const year = Number(url.searchParams.get("year") || new Date().getUTCFullYear());
+      return json({ country, year, holidays: await readHolidayCalendar(env.DB, country, year) }, 200, origin);
+    }
+    if (path === "/api/holiday-calendar/refresh" && req.method === "POST") {
+      if (!actor || !["owner", "manager"].includes(actor.role))
+        return json({ error: "المالك أو المدير فقط" }, 403, origin);
+      const payload = (await req.json().catch(() => ({}))) as { country?: string; year?: number };
+      try {
+        const result = await refreshHolidayCalendar(env.DB, String(payload.country || ""), Number(payload.year || new Date().getUTCFullYear()));
+        return json(result, 200, origin);
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "تعذر تحديث تقويم العطل" }, 400, origin);
+      }
     }
     if (path === "/api/locations" && req.method === "GET") {
       if (

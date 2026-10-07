@@ -1,5 +1,6 @@
 import { DEFAULT_SYSTEM_TIME_ZONE, getConfiguredSystemTimeZone } from "./system-timezone";
 import { publicHolidayForDay } from "./public-holidays";
+import { holidayNameFromLocalCalendar } from "./holiday-calendar";
 type Env = {
   DB: D1Database;
   APP_ORIGIN?: string;
@@ -280,7 +281,10 @@ export async function handleDailyStatus(
     const requests = requestQuery.results || [];
     const holidaySettings = await env.DB.prepare("SELECT key,value FROM settings WHERE key='holidayCountry'").all<{ key: string; value: string }>();
     const holidayCountry = holidaySettings.results?.[0]?.value ? (() => { try { return JSON.parse(holidaySettings.results[0].value); } catch { return holidaySettings.results[0].value; } })() : "";
-    const publicHolidayName = publicHolidayForDay(day, String(holidayCountry || ""));
+    const localHolidayName = holidayCountry
+      ? await holidayNameFromLocalCalendar(env.DB, day, String(holidayCountry))
+      : null;
+    const publicHolidayName = localHolidayName || publicHolidayForDay(day, String(holidayCountry || ""));
     const scopedEmployees = employees.filter((employee) =>
       isRotationVisibleDay(employee, day, timezone),
     );
@@ -456,7 +460,7 @@ export async function handleDailyStatus(
         schedule.work &&
         !leaveIds.has(id) &&
         !permissionIds.has(id);
-      const isAdminHoliday = !isRotation && schedule.work && Boolean(publicHolidayName);
+      const isAdminHoliday = schedule.work && Boolean(publicHolidayName);
       const latestEscape = latestEscapeByEmployee.get(id);
       let status: Status;
       if (

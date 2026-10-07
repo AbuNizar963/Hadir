@@ -578,6 +578,17 @@ export async function saveBackendSettings(
     "admin",
   );
 }
+export type HolidayCountryOption = { code: string; name: string; nameEn: string };
+export type HolidayCalendarEntry = { countryCode: string; date: string; name: string; type: string; year: number; sourceVersion: string; updatedAt: string };
+export async function getHolidayCountries() {
+  return request<{ sourceVersion: string; countries: HolidayCountryOption[] }>("/api/holiday-countries", {}, "admin");
+}
+export async function getHolidayCalendar(country: string, year: number) {
+  return request<{ country: string; year: number; holidays: HolidayCalendarEntry[] }>(`/api/holiday-calendar?country=${encodeURIComponent(country)}&year=${year}`, {}, "admin");
+}
+export async function refreshHolidayCalendar(country: string, year: number) {
+  return requestWithRetry<{ countryCode: string; year: number; count: number; sourceVersion: string; updatedAt: string }>("/api/holiday-calendar/refresh", { method: "POST", body: JSON.stringify({ country, year }) }, 3, "admin");
+}
 export async function getBackendLocations(role?: RoleHint) {
   return request<Location[]>("/api/locations", {}, role || activeRole());
 }
