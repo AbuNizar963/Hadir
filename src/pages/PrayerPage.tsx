@@ -7,7 +7,6 @@ import {
   Compass,
   MapPin,
   Moon,
-  Share2,
   Sun,
   Sunrise,
   Sunset,
@@ -470,18 +469,6 @@ export default function PrayerPage() {
     sensorEnabled &&
     bearing != null &&
     Math.abs(shortestDelta(bearing, heading)) <= 5;
-  const share = async () => {
-    const text = `اتجاه القبلة من ${city}: ${bearing == null ? "--" : `${Math.round(bearing)}°`} • المسافة إلى مكة: ${distance == null ? "--" : `${distance.toFixed(1)} كم`}`;
-    try {
-      if (navigator.share)
-        await navigator.share({ title: "اتجاه القبلة", text });
-      else if (navigator.clipboard) await navigator.clipboard.writeText(text);
-      else setSensorMessage(text);
-    } catch {
-      /* إلغاء المشاركة ليس خطأ. */
-    }
-  };
-
   return (
     <main dir="rtl" className="min-h-screen bg-[#06101c] p-3 text-white sm:p-6">
       <div className="mx-auto max-w-5xl space-y-4">
@@ -494,8 +481,8 @@ export default function PrayerPage() {
         </button>
         <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#0d2743] via-[#08192b] to-[#040b14] shadow-2xl">
           <div className="p-5 sm:p-7">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="w-full">
                 <h1 className="mt-1 text-2xl font-black sm:text-3xl">
                   مواقيت الصلاة والقبلة
                 </h1>
@@ -515,7 +502,7 @@ export default function PrayerPage() {
                   {nextPrayer?.prayer.name || "جارٍ تحديد الموقع"}
                 </p>
               </div>
-              <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-5 py-3 text-center">
+              <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-7 py-3 text-center shadow-[0_0_24px_rgba(52,211,153,.08)]">
                 <div className="text-xs text-emerald-100/70">المتبقي</div>
                 <div className="font-mono text-3xl font-black tracking-wider text-emerald-100">
                   {timer}
@@ -544,8 +531,8 @@ export default function PrayerPage() {
                         : "○ ضع الهاتف أفقياً"}
                   </div>
                 </div>
-                <div className="mx-auto mt-3 w-full max-w-[360px]">
-                  <div className="mb-3 flex items-center justify-center gap-2 text-center">
+                <div className="mx-auto mt-6 w-full max-w-[360px]">
+                  <div className="mb-4 flex flex-col items-center justify-center gap-2 text-center">
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-rose-300/30 bg-rose-500/15 text-rose-200 shadow-[0_0_24px_rgba(251,113,133,.25)]">
                       <KaabaIcon className="h-7 w-7" />
                     </div>
@@ -619,15 +606,6 @@ export default function PrayerPage() {
                     • المسافة{" "}
                     {distance == null ? "--" : `${distance.toFixed(1)} كم`}
                   </div>
-                </div>
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  <button
-                    onClick={share}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2 text-sm font-bold text-slate-950"
-                  >
-                    <Share2 className="h-4 w-4" />
-                    مشاركة اتجاه مدينتي
-                  </button>
                 </div>
                 {sensorMessage && (
                   <p className="mt-3 text-center text-xs text-amber-200">
