@@ -17,17 +17,7 @@ on:
       - "tsconfig*.json"
       - "vite.config.*"
       - "scripts/build.mjs"
-      - "scripts/patch-manager-report-header.mjs"
-      - "scripts/patch-manager-report-share.mjs"
-      - "scripts/patch-employee-home-shift-info.mjs"
-      - "scripts/patch-manager-settings-ui.mjs"
-      - "scripts/fix-manager-settings-ui-qr.mjs"
-      - "scripts/patch-manager-settings-telegram-ui.mjs"
-      - "scripts/patch-manager-settings-telegram-screen.mjs"
-      - "scripts/normalize-manager-settings-locations-anchor.mjs"
-      - "scripts/patch-manager-settings-locations-dedicated.mjs"
-      - "scripts/patch-manager-settings-locations-fixes.mjs"
-      - "scripts/patch-manager-settings-reset-placement.mjs"
+      - "scripts/verify-production-build.mjs"
       - ".github/workflows/deploy-frontend.yml"
 
 permissions:
@@ -57,7 +47,7 @@ jobs:
           bun-version: 1.2.15
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Typecheck
         run: bun run typecheck

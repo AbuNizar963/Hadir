@@ -12,8 +12,8 @@
 
 ```bash
 cd backend
-bun install
-bun run scripts/generate-vapid.mjs
+npm ci
+node --input-type=module -e 'import { generateVapidKeys } from "@mmmike/web-push"; console.log(JSON.stringify(await generateVapidKeys(), null, 2))'
 ```
 
 سيظهر:

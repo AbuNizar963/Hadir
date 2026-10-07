@@ -7,7 +7,10 @@ import {
   listReportArchives,
   repairArchiveManifest,
 } from "./report-archive";
-import { materializeDay } from "./professional-attendance-fact-builder";
+import {
+  materializeDay,
+  PROFESSIONAL_FACT_CALCULATION_VERSION,
+} from "./professional-attendance-fact-builder";
 import { refreshHolidayCalendar } from "./holiday-calendar";
 export { HadirRealtime };
 
@@ -120,7 +123,9 @@ export default {
       }
 
       try {
-        const result = await archiveClosedMonth(env, new Date(), true);
+        const result = await archiveClosedMonth(env, new Date(), true, {
+          materializeFacts: false,
+        });
         return json(result, 200, o);
       } catch (error) {
         console.error("[report-archive] manual refresh failed", error);
@@ -207,7 +212,25 @@ export default {
           .bind(employeeCursor)
           .all<{ id: string }>();
         const ids = (employees.results || []).map((row) => String(row.id));
-        if (!ids.length)
+        if (!ids.length) {
+          await env.DB.prepare(
+            `INSERT INTO report_archive_preparation (period_from,period_to,attendance_day,calculation_version,timezone,prepared_at)
+             VALUES (?,?,?,?,?,?)
+             ON CONFLICT(period_from,attendance_day) DO UPDATE SET
+               period_to=excluded.period_to,
+               calculation_version=excluded.calculation_version,
+               timezone=excluded.timezone,
+               prepared_at=excluded.prepared_at`,
+          )
+            .bind(
+              from,
+              to,
+              day,
+              PROFESSIONAL_FACT_CALCULATION_VERSION,
+              timezone,
+              new Date().toISOString(),
+            )
+            .run();
           return json(
             {
               ok: true,
@@ -223,6 +246,7 @@ export default {
             200,
             o,
           );
+        }
         let written = 0;
         for (const employeeId of ids)
           written += await materializeDay(
@@ -372,13 +396,18 @@ export default {
         console.error("[holiday-calendar] monthly refresh failed", error);
       }
     }
-    try {
-      console.log(
-        "[report-archive]",
-        JSON.stringify(await archiveClosedMonth(env)),
-      );
-    } catch (error) {
-      console.error("[report-archive] monthly archive failed", error);
-    }
+    const archiveTask = archiveClosedMonth(env, new Date(), false, {
+      materializeFacts: false,
+      deferWhenFactsNeedPreparation: true,
+    });
+    ctx.waitUntil(
+      archiveTask
+        .then((result) =>
+          console.log("[report-archive]", JSON.stringify(result)),
+        )
+        .catch((error) =>
+          console.error("[report-archive] monthly archive failed", error),
+        ),
+    );
   },
 };

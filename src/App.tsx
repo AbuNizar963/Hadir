@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   BrowserRouter,
   Navigate,
@@ -7,27 +7,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import Landing from "@/pages/Landing";
-import EmployeeLogin from "@/features/auth/employee/EmployeeLogin";
-import EmployeeHome from "@/pages/EmployeeHome";
-import EmployeeHistory from "@/pages/EmployeeHistory";
-import EmployeeScanAutoFlow from "@/pages/EmployeeScanAutoFlow";
-import EmployeeProfile from "@/pages/EmployeeProfile";
-import EmployeeCenter from "@/pages/EmployeeCenter";
-import EmployeeNotifications from "@/pages/EmployeeNotifications";
-import WeatherPage from "@/pages/WeatherPage";
-import PrayerPage from "@/pages/PrayerPage";
-import AIAssistant from "@/pages/AIAssistant";
-import ManagerLogin from "@/pages/ManagerLogin";
-import ManagerDashboard from "@/pages/ManagerDashboard";
-import ManagerEmployees from "@/pages/ManagerEmployees";
-import ManagerWorkforceControls from "@/pages/ManagerWorkforceControls";
-import ManagerRequests from "@/pages/ManagerRequests";
-import ManagerAudit from "@/pages/ManagerAudit";
-import ManagerSettings from "@/pages/ManagerSettings";
-import GlobalAttendanceReports from "@/pages/GlobalAttendanceReports";
-import ReportArchive from "@/pages/ReportArchive";
 import EmployeeLayout from "@/components/layout/EmployeeLayout";
-import NotFound from "@/pages/NotFound";
 import ProtectedEmployee from "@/components/ProtectedEmployee";
 import ProtectedManager from "@/components/ProtectedManager";
 import RequireManagerRole from "@/components/RequireManagerRole";
@@ -37,6 +17,35 @@ import { setManagerSession, setSession } from "@/lib/storage";
 import { enableWebPush } from "@/lib/push";
 import type { Employee, AdminAccount } from "@/types";
 import { ToastProvider } from "@/components/system/ToastProvider";
+
+const EmployeeLogin = lazy(
+  () => import("@/features/auth/employee/EmployeeLogin"),
+);
+const EmployeeHome = lazy(() => import("@/pages/EmployeeHome"));
+const EmployeeHistory = lazy(() => import("@/pages/EmployeeHistory"));
+const EmployeeScanAutoFlow = lazy(() => import("@/pages/EmployeeScanAutoFlow"));
+const EmployeeProfile = lazy(() => import("@/pages/EmployeeProfile"));
+const EmployeeCenter = lazy(() => import("@/pages/EmployeeCenter"));
+const EmployeeNotifications = lazy(
+  () => import("@/pages/EmployeeNotifications"),
+);
+const WeatherPage = lazy(() => import("@/pages/WeatherPage"));
+const PrayerPage = lazy(() => import("@/pages/PrayerPage"));
+const AIAssistant = lazy(() => import("@/pages/AIAssistant"));
+const ManagerLogin = lazy(() => import("@/pages/ManagerLogin"));
+const ManagerDashboard = lazy(() => import("@/pages/ManagerDashboard"));
+const ManagerEmployees = lazy(() => import("@/pages/ManagerEmployees"));
+const ManagerWorkforceControls = lazy(
+  () => import("@/pages/ManagerWorkforceControls"),
+);
+const ManagerRequests = lazy(() => import("@/pages/ManagerRequests"));
+const ManagerAudit = lazy(() => import("@/pages/ManagerAudit"));
+const ManagerSettings = lazy(() => import("@/pages/ManagerSettings"));
+const GlobalAttendanceReports = lazy(
+  () => import("@/pages/GlobalAttendanceReports"),
+);
+const ReportArchive = lazy(() => import("@/pages/ReportArchive"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const ManagerOnly = ({ children }: { children: React.ReactNode }) => (
   <ProtectedManager>{children}</ProtectedManager>
@@ -56,6 +65,19 @@ type User = AdminAccount | Employee;
 type TokenRestoreResult =
   | { status: "restored"; user: User }
   | { status: "invalid" | "transient" };
+
+function RouteLoadingFallback() {
+  return (
+    <main
+      dir="rtl"
+      className="grid min-h-screen place-items-center bg-background px-6"
+      role="status"
+      aria-live="polite"
+    >
+      <p className="font-bold text-muted-foreground">جارٍ تحميل الصفحة…</p>
+    </main>
+  );
+}
 
 function PushSessionBridge() {
   const location = useLocation();
@@ -232,149 +254,151 @@ export default function App() {
       <PushSessionBridge />
       <PWAExperience />
       <ToastProvider />
-      <Routes>
-        <Route path="/" element={<LaunchGateway />} />
-        <Route path="/login" element={<EmployeeLogin />} />
-        <Route path="/weather" element={<WeatherPage />} />
-        <Route path="/prayer" element={<PrayerPage />} />
-        <Route path="/ai" element={<AIAssistant />} />
-        <Route
-          path="/employee"
-          element={
-            <EmployeeShell>
-              <EmployeeHome />
-            </EmployeeShell>
-          }
-        />
-        <Route
-          path="/employee/center"
-          element={
-            <EmployeeShell>
-              <EmployeeCenter />
-            </EmployeeShell>
-          }
-        />
-        <Route
-          path="/employee/premium"
-          element={<Navigate to="/employee/center" replace />}
-        />
-        <Route
-          path="/employee/profile"
-          element={
-            <EmployeeShell>
-              <EmployeeProfile />
-            </EmployeeShell>
-          }
-        />
-        <Route
-          path="/employee/history"
-          element={
-            <EmployeeShell>
-              <EmployeeHistory />
-            </EmployeeShell>
-          }
-        />
-        <Route
-          path="/employee/notifications"
-          element={
-            <EmployeeShell>
-              <EmployeeNotifications />
-            </EmployeeShell>
-          }
-        />
-        <Route
-          path="/employee/scan/:type"
-          element={
-            <EmployeeShell>
-              <EmployeeScanAutoFlow />
-            </EmployeeShell>
-          }
-        />
-        <Route path="/manager/login" element={<ManagerLogin />} />
-        <Route
-          path="/manager"
-          element={
-            <ManagerOnly>
-              <ManagerDashboard />
-            </ManagerOnly>
-          }
-        />
-        <Route
-          path="/manager/employees"
-          element={
-            <ManagerOnly>
-              <RequireManagerRole roles={["owner", "manager", "supervisor"]}>
-                <ManagerEmployees />
-              </RequireManagerRole>
-            </ManagerOnly>
-          }
-        />
-        <Route
-          path="/manager/workforce"
-          element={
-            <ManagerOnly>
-              <RequireManagerRole roles={["owner"]}>
-                <ManagerWorkforceControls />
-              </RequireManagerRole>
-            </ManagerOnly>
-          }
-        />
-        <Route
-          path="/manager/requests"
-          element={
-            <ManagerOnly>
-              <RequireManagerRole roles={["owner", "manager"]}>
-                <ManagerRequests />
-              </RequireManagerRole>
-            </ManagerOnly>
-          }
-        />
-        <Route
-          path="/manager/audit"
-          element={
-            <ManagerOnly>
-              <RequireManagerRole roles={["owner", "manager", "supervisor"]}>
-                <ManagerAudit />
-              </RequireManagerRole>
-            </ManagerOnly>
-          }
-        />
-        <Route
-          path="/manager/reports"
-          element={
-            <ManagerOnly>
-              <RequireManagerRole roles={["owner", "manager"]}>
-                <GlobalAttendanceReports />
-              </RequireManagerRole>
-            </ManagerOnly>
-          }
-        />
-        <Route
-          path="/manager/report-archive"
-          element={
-            <ManagerOnly>
-              <RequireManagerRole roles={["owner", "manager"]}>
-                <ReportArchive />
-              </RequireManagerRole>
-            </ManagerOnly>
-          }
-        />
-        <Route
-          path="/manager/settings"
-          element={
-            <ManagerOnly>
-              <RequireManagerRole roles={["owner"]}>
-                <ManagerSettings />
-              </RequireManagerRole>
-            </ManagerOnly>
-          }
-        />
-        <Route
-          path="/manager-home"
-          element={<Navigate to="/manager" replace />}
-        />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
+          <Route path="/" element={<LaunchGateway />} />
+          <Route path="/login" element={<EmployeeLogin />} />
+          <Route path="/weather" element={<WeatherPage />} />
+          <Route path="/prayer" element={<PrayerPage />} />
+          <Route path="/ai" element={<AIAssistant />} />
+          <Route
+            path="/employee"
+            element={
+              <EmployeeShell>
+                <EmployeeHome />
+              </EmployeeShell>
+            }
+          />
+          <Route
+            path="/employee/center"
+            element={
+              <EmployeeShell>
+                <EmployeeCenter />
+              </EmployeeShell>
+            }
+          />
+          <Route
+            path="/employee/premium"
+            element={<Navigate to="/employee/center" replace />}
+          />
+          <Route
+            path="/employee/profile"
+            element={
+              <EmployeeShell>
+                <EmployeeProfile />
+              </EmployeeShell>
+            }
+          />
+          <Route
+            path="/employee/history"
+            element={
+              <EmployeeShell>
+                <EmployeeHistory />
+              </EmployeeShell>
+            }
+          />
+          <Route
+            path="/employee/notifications"
+            element={
+              <EmployeeShell>
+                <EmployeeNotifications />
+              </EmployeeShell>
+            }
+          />
+          <Route
+            path="/employee/scan/:type"
+            element={
+              <EmployeeShell>
+                <EmployeeScanAutoFlow />
+              </EmployeeShell>
+            }
+          />
+          <Route path="/manager/login" element={<ManagerLogin />} />
+          <Route
+            path="/manager"
+            element={
+              <ManagerOnly>
+                <ManagerDashboard />
+              </ManagerOnly>
+            }
+          />
+          <Route
+            path="/manager/employees"
+            element={
+              <ManagerOnly>
+                <RequireManagerRole roles={["owner", "manager", "supervisor"]}>
+                  <ManagerEmployees />
+                </RequireManagerRole>
+              </ManagerOnly>
+            }
+          />
+          <Route
+            path="/manager/workforce"
+            element={
+              <ManagerOnly>
+                <RequireManagerRole roles={["owner"]}>
+                  <ManagerWorkforceControls />
+                </RequireManagerRole>
+              </ManagerOnly>
+            }
+          />
+          <Route
+            path="/manager/requests"
+            element={
+              <ManagerOnly>
+                <RequireManagerRole roles={["owner", "manager"]}>
+                  <ManagerRequests />
+                </RequireManagerRole>
+              </ManagerOnly>
+            }
+          />
+          <Route
+            path="/manager/audit"
+            element={
+              <ManagerOnly>
+                <RequireManagerRole roles={["owner", "manager", "supervisor"]}>
+                  <ManagerAudit />
+                </RequireManagerRole>
+              </ManagerOnly>
+            }
+          />
+          <Route
+            path="/manager/reports"
+            element={
+              <ManagerOnly>
+                <RequireManagerRole roles={["owner", "manager"]}>
+                  <GlobalAttendanceReports />
+                </RequireManagerRole>
+              </ManagerOnly>
+            }
+          />
+          <Route
+            path="/manager/report-archive"
+            element={
+              <ManagerOnly>
+                <RequireManagerRole roles={["owner", "manager"]}>
+                  <ReportArchive />
+                </RequireManagerRole>
+              </ManagerOnly>
+            }
+          />
+          <Route
+            path="/manager/settings"
+            element={
+              <ManagerOnly>
+                <RequireManagerRole roles={["owner"]}>
+                  <ManagerSettings />
+                </RequireManagerRole>
+              </ManagerOnly>
+            }
+          />
+          <Route
+            path="/manager-home"
+            element={<Navigate to="/manager" replace />}
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

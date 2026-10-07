@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-api.yml"
 
 permissions:
   contents: read
@@ -32,7 +35,7 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: backend
-        run: npm install --package-lock=false
+        run: npm ci --no-audit --no-fund
 
       - name: Validate Worker bundle
         working-directory: backend
@@ -58,17 +61,15 @@ jobs:
             exit "$status"
           fi
 
-      - name: Apply remote D1 migrations
+      - name: Apply pending remote D1 migrations
         working-directory: backend
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet HEAD^ HEAD -- migrations; then
-            echo "No migration files changed; skipping remote D1 migration step."
-          else
-            echo "Migration files changed; applying remote D1 migrations."
-            timeout 120s npx wrangler d1 migrations apply Hadir --remote
-          fi
+          # The migration ledger makes this command idempotent. Applying it on
+          # every backend deployment avoids shallow-history false negatives and
+          # guarantees the Worker never reaches new code before its schema.
+          timeout 120s npx wrangler d1 migrations apply Hadir --remote
 
       - name: Verify employee foreign-key lifecycle
         working-directory: backend
@@ -179,7 +180,7 @@ jobs:
           print("report_archives schema: verified.")
           PY
 
-      - name: Verify and repair auth session schema
+      - name: Verify auth session schema managed by migrations
         working-directory: backend
         shell: bash
         run: |
@@ -187,22 +188,11 @@ jobs:
           schema="$(npx wrangler d1 execute Hadir --remote --json --command 'PRAGMA table_info("auth_sessions")')"
           printf '%s\n' "$schema"
           python - "$schema" <<'PY'
-          import json, subprocess, sys
+          import json, sys
           data=json.loads(sys.argv[1]); rows=[]
           for result in data if isinstance(data,list) else []: rows.extend(result.get("results") or [])
           columns={str(row.get("name")) for row in rows}
-          if "revoked_at" not in columns:
-              print("auth_sessions.revoked_at is missing; adding the nullable compatibility column.")
-              subprocess.run(["npx","wrangler","d1","execute","Hadir","--remote","--command","ALTER TABLE auth_sessions ADD COLUMN revoked_at TEXT;"],check=True)
-          else: print("auth_sessions.revoked_at is present.")
-          PY
-          repaired="$(npx wrangler d1 execute Hadir --remote --json --command 'PRAGMA table_info("auth_sessions")')"
-          python - "$repaired" <<'PY'
-          import json,sys
-          data=json.loads(sys.argv[1]); rows=[]
-          for result in data if isinstance(data,list) else []: rows.extend(result.get("results") or [])
-          columns={str(row.get("name")) for row in rows}
-          if "revoked_at" not in columns: raise SystemExit("ERROR: auth_sessions.revoked_at is still missing after schema repair.")
+          if "revoked_at" not in columns: raise SystemExit("ERROR: auth_sessions.revoked_at is missing; add a versioned D1 migration instead of altering production during deployment.")
           print("auth_sessions schema is compatible with session security.")
           PY
 
@@ -222,6 +212,24 @@ jobs:
       - name: Deploy hadir-api once
         working-directory: backend
         run: npx wrangler deploy --secrets-file .secrets.json
+
+      - name: Redact Worker query strings in observability
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(curl -fsS --retry 5 --retry-delay 2 --retry-all-errors \
+            -X PATCH \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -F 'settings={"observability":{"enabled":true,"head_sampling_rate":1,"redact_query_string":true,"logs":{"enabled":true,"invocation_logs":true,"head_sampling_rate":1,"persist":true},"traces":{"enabled":true,"head_sampling_rate":0.05,"persist":true}}};type=application/json' \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/hadir-api/settings")"
+          printf '%s\n' "$response"
+          python - "$response" <<'PY'
+          import json,sys
+          data=json.loads(sys.argv[1])
+          assert data.get("success") is True,data
+          assert (data.get("result") or {}).get("observability",{}).get("redact_query_string") is True,data
+          print("Worker observability query-string redaction verified.")
+          PY
 
       - name: Verify Cloudflare Worker secrets
         working-directory: backend
@@ -264,7 +272,7 @@ jobs:
           code="$(curl -sS -o /tmp/bootstrap.json -w '%{http_code}' https://hadir-api.abunizar963.workers.dev/api/bootstrap)"; cat /tmp/bootstrap.json
           case "$code" in 200|401) exit 0;; *) echo "Unexpected /api/bootstrap status: $code"; exit 1;; esac
 
-      - name: Verify previous-month archive manifest
+      - name: Verify previous-month archive lifecycle
         working-directory: backend
         shell: bash
         run: |
@@ -282,10 +290,21 @@ jobs:
           raw=subprocess.check_output(["npx","wrangler","d1","execute","Hadir","--remote","--json","--command",sql],text=True)
           data=json.loads(raw); rows=[]
           for result in data if isinstance(data,list) else []: rows.extend(result.get("results") or [])
-          if not rows: raise SystemExit(f"ERROR: previous-month archive manifest is missing for {period_from}..{period_to}")
+          if not rows:
+              print(f"No previous-month archive manifest exists yet for {period_from}..{period_to}; the bounded preparation flow will create it before locking.")
+              raise SystemExit(0)
           row=rows[0]
-          if row.get("status")!="LOCKED": raise SystemExit(f"ERROR: archive manifest exists but is not LOCKED: {row.get('status')}")
           if row.get("period_from")!=period_from or row.get("period_to")!=period_to: raise SystemExit(f"ERROR: archive period mismatch: {row}")
-          if not row.get("file_key") or not row.get("file_sha256") or not row.get("locked_at"): raise SystemExit(f"ERROR: archive manifest is incomplete: {row}")
-          print(f"previous-month archive manifest verified: {period_from}..{period_to}, status=LOCKED, key={row['file_key']}, size={row['file_size']}")
+          status=str(row.get("status") or "")
+          if status=="LOCKED":
+              if not row.get("file_key") or not row.get("file_sha256") or not row.get("locked_at") or int(row.get("file_size") or 0)<=0: raise SystemExit(f"ERROR: locked archive manifest is incomplete: {row}")
+              print(f"Locked archive manifest verified: {period_from}..{period_to}, key={row['file_key']}, size={row['file_size']}")
+          elif status=="DRAFT":
+              if int(row.get("file_size") or 0)!=0 or str(row.get("file_sha256") or "") not in ("", "pending") or row.get("locked_at"):
+                  raise SystemExit(f"ERROR: draft archive must not expose a partial or locked file: {row}")
+              print(f"Archive is safely awaiting bounded preparation: {period_from}..{period_to}. No partial file is exposed.")
+          elif status=="DELETED":
+              print(f"Archive was explicitly deleted by an authorized owner: {period_from}..{period_to}.")
+          else:
+              raise SystemExit(f"ERROR: archive manifest has an unsupported lifecycle status: {row}")
           PY

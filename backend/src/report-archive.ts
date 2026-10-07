@@ -1,5 +1,8 @@
 import { buildProfessionalAttendanceReport } from "./professional-attendance-report-engine";
-import { ensureProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
+import {
+  ensureProfessionalAttendanceFacts,
+  PROFESSIONAL_FACT_CALCULATION_VERSION,
+} from "./professional-attendance-fact-builder";
 import {
   DEFAULT_SYSTEM_TIME_ZONE,
   getConfiguredSystemTimeZone,
@@ -36,6 +39,10 @@ type ArchiveRow = {
 const CONTENT_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const ARCHIVE_VERSION = "1.0";
+type ArchiveOptions = {
+  materializeFacts?: boolean;
+  deferWhenFactsNeedPreparation?: boolean;
+};
 function localYearMonth(now: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
@@ -313,6 +320,42 @@ function archiveKey(period: { year: number; month: number }) {
   const mm = String(period.month).padStart(2, "0");
   return `reports/${period.year}/${mm}/attendance-period-${period.year}-${mm}.xlsx`;
 }
+function periodDayCount(from: string, to: string) {
+  return (
+    Math.round(
+      (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
+        86_400_000,
+    ) + 1
+  );
+}
+async function assertArchivePreparation(
+  env: Env,
+  period: { from: string; to: string },
+  timezone: string,
+) {
+  const prepared = await env.DB.prepare(
+    `SELECT COUNT(DISTINCT attendance_day) AS prepared_days
+       FROM report_archive_preparation
+      WHERE period_from=?
+        AND period_to=?
+        AND calculation_version=?
+        AND timezone=?`,
+  )
+    .bind(
+      period.from,
+      period.to,
+      PROFESSIONAL_FACT_CALCULATION_VERSION,
+      timezone,
+    )
+    .first<{ prepared_days: number }>();
+  const expectedDays = periodDayCount(period.from, period.to);
+  const preparedDays = Number(prepared?.prepared_days || 0);
+  if (preparedDays !== expectedDays) {
+    throw new Error(
+      `لم يكتمل تجهيز حقائق أرشيف الفترة ${period.from} حتى ${period.to}. أعد تشغيل تجهيز الأرشيف لإتمام ${expectedDays} يومًا قبل الإقفال.`,
+    );
+  }
+}
 
 async function claimArchive(
   env: Env,
@@ -361,6 +404,7 @@ export async function archiveClosedMonth(
   env: Env,
   now = new Date(),
   force = false,
+  options: ArchiveOptions = {},
 ) {
   if (!env.REPORT_ARCHIVES)
     throw new Error("R2 binding REPORT_ARCHIVES غير موجود");
@@ -371,6 +415,7 @@ export async function archiveClosedMonth(
     period = previousMonthPeriod(now, timezone),
     id = `attendance_period_${period.from}`,
     key = archiveKey(period);
+  const materializeFacts = options.materializeFacts !== false;
   const existing = await claimArchive(env, id, period.from, period.to, key);
   if (existing?.status === "LOCKED") {
     return {
@@ -393,14 +438,32 @@ export async function archiveClosedMonth(
       period,
     };
   }
+  if (!materializeFacts) {
+    try {
+      await assertArchivePreparation(env, period, timezone);
+    } catch (error) {
+      if (options.deferWhenFactsNeedPreparation) {
+        return {
+          ok: true,
+          archived: false,
+          reason: "awaiting_preparation",
+          id,
+          key,
+          period,
+        };
+      }
+      throw error;
+    }
+  }
   try {
     // The archive is generated from the same canonical fact layer as live
     // reports. Materialize the closed period first so missed background refreshes
     // cannot leave the archive empty while raw attendance data exists.
-    await ensureProfessionalAttendanceFacts(env, period.from, period.to, {
-      id: "system-archive",
-      role: "owner",
-    });
+    if (materializeFacts)
+      await ensureProfessionalAttendanceFacts(env, period.from, period.to, {
+        id: "system-archive",
+        role: "owner",
+      });
 
     const report = await buildProfessionalAttendanceReport(
       env,
@@ -408,6 +471,7 @@ export async function archiveClosedMonth(
       period.to,
       undefined,
       { id: "system-archive", role: "owner" },
+      { rebuildStaleFacts: materializeFacts },
     );
     const snapshotHash = await sha256Hex(
       jsonBytes({

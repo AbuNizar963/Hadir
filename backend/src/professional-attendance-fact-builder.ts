@@ -13,6 +13,8 @@ import {
 type Env = { DB: D1Database; APP_TIMEZONE?: string };
 const TZ = "Asia/Damascus";
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+export const PROFESSIONAL_FACT_CALCULATION_VERSION =
+  "central-engine-timezone-v3-holidays-notes";
 const dayNumber = (day: string) =>
   Date.UTC(
     Number(day.slice(0, 4)),
@@ -355,7 +357,7 @@ export async function materializeDay(
         json(requests.map((x) => String(x.id))),
         json(audits.map((x) => String(x.id))),
         "attendance-engine+requests+schedule+daily_attendance_status",
-        "central-engine-timezone-v3-holidays-notes",
+        PROFESSIONAL_FACT_CALCULATION_VERSION,
         quality,
         timezone,
         new Date().toISOString(),

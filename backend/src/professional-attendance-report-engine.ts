@@ -4,6 +4,10 @@ import {
   DEFAULT_SYSTEM_TIME_ZONE,
   getConfiguredSystemTimeZone,
 } from "./system-timezone";
+import {
+  ensureProfessionalAttendanceFacts,
+  PROFESSIONAL_FACT_CALCULATION_VERSION,
+} from "./professional-attendance-fact-builder";
 
 type Env = { DB: D1Database; APP_TIMEZONE?: string };
 
@@ -38,6 +42,9 @@ type FactRow = {
 };
 
 const MAX_DAYS = 366;
+type BuildOptions = {
+  rebuildStaleFacts?: boolean;
+};
 const VALID_STATUSES = new Set([
   "PRESENT",
   "LATE",
@@ -598,6 +605,7 @@ export async function buildProfessionalAttendanceReport(
   to: string,
   employeeId?: string,
   actor?: any,
+  options: BuildOptions = {},
 ) {
   const dayCount = validatePeriod(from, to);
   const timezone = await getConfiguredSystemTimeZone(
@@ -607,26 +615,48 @@ export async function buildProfessionalAttendanceReport(
   let sourceRows = await loadFacts(env, from, to, employeeId);
   const employeeFilter = employeeId ? " AND employee_id=?" : "";
   const staleQuery = env.DB.prepare(
-    `SELECT 1 AS stale FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>'central-engine-timezone-v3-holidays-notes')${employeeFilter} LIMIT 1`,
+    `SELECT 1 AS stale FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>?)${employeeFilter} LIMIT 1`,
   );
   const staleFact = employeeId
-    ? await staleQuery.bind(from, to, timezone, employeeId).first<any>()
-    : await staleQuery.bind(from, to, timezone).first<any>();
+    ? await staleQuery
+        .bind(
+          from,
+          to,
+          timezone,
+          PROFESSIONAL_FACT_CALCULATION_VERSION,
+          employeeId,
+        )
+        .first<any>()
+    : await staleQuery
+        .bind(from, to, timezone, PROFESSIONAL_FACT_CALCULATION_VERSION)
+        .first<any>();
   if (staleFact) {
     const deleteQuery = env.DB.prepare(
-      `DELETE FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>'central-engine-timezone-v3-holidays-notes')${employeeFilter}`,
+      `DELETE FROM attendance_reporting_facts WHERE attendance_day>=? AND attendance_day<=? AND (COALESCE(timezone,'')<>? OR calculation_version<>?)${employeeFilter}`,
     );
     if (employeeId)
-      await deleteQuery.bind(from, to, timezone, employeeId).run();
-    else await deleteQuery.bind(from, to, timezone).run();
-    await ensureProfessionalAttendanceFacts(
-      env,
-      from,
-      to,
-      actor,
-      employeeId,
-      timezone,
-    );
+      await deleteQuery
+        .bind(
+          from,
+          to,
+          timezone,
+          PROFESSIONAL_FACT_CALCULATION_VERSION,
+          employeeId,
+        )
+        .run();
+    else
+      await deleteQuery
+        .bind(from, to, timezone, PROFESSIONAL_FACT_CALCULATION_VERSION)
+        .run();
+    if (options.rebuildStaleFacts !== false)
+      await ensureProfessionalAttendanceFacts(
+        env,
+        from,
+        to,
+        actor,
+        employeeId,
+        timezone,
+      );
     sourceRows = await loadFacts(env, from, to, employeeId);
   }
   const reportRows = await filterReportableRows(
