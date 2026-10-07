@@ -276,3 +276,6 @@ main > section.hud-card { width: 100%; min-width: 0; }
   .settings-back-button span { display: none; }
   .settings-back-button { width: 32px; justify-content: center; padding: 4px; }
 }
+
+/* Settings categories stay in one clear vertical column on every viewport. */
+.settings-navigation-list { grid-template-columns: minmax(0, 1fr) !important; }
