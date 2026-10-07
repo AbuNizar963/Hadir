@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@config "../tailwind.config.ts";
 
 @layer base {
   :root {
@@ -38,10 +38,10 @@
   .hud-card::before { content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; background:linear-gradient(140deg,hsl(158 65% 48%/.35),transparent 45%,hsl(195 85% 55%/.25)); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
   .hud-card:hover { transform:translateY(-1px); box-shadow:0 14px 34px hsl(222 40% 3%/.18); border-color:hsl(var(--primary)/.28); }
   .btn { @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background; box-shadow:0 1px 2px hsl(222 40% 3%/.16); }
-  .btn-primary { @apply btn bg-primary text-primary-foreground hover:brightness-110 active:brightness-95; }
-  .btn-secondary { @apply btn bg-secondary text-secondary-foreground hover:bg-secondary/80; }
-  .btn-ghost { @apply btn text-foreground/80 hover:bg-secondary hover:text-foreground; box-shadow:none; }
-  .btn-danger { @apply btn bg-destructive text-destructive-foreground hover:brightness-110; }
+  .btn-primary { @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background; box-shadow:0 1px 2px hsl(222 40% 3%/.16); }
+  .btn-secondary { @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-secondary px-4 py-2.5 text-sm font-semibold text-secondary-foreground transition hover:bg-secondary/80 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background; box-shadow:0 1px 2px hsl(222 40% 3%/.16); }
+  .btn-ghost { @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-foreground/80 transition hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background; box-shadow:none; }
+  .btn-danger { @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-2.5 text-sm font-semibold text-destructive-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background; box-shadow:0 1px 2px hsl(222 40% 3%/.16); }
   .input { @apply w-full rounded-xl border border-input bg-secondary/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent sm:text-base; transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease; }
   .input:hover { border-color:hsl(var(--primary)/.32); }
   .badge { @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold; box-shadow:inset 0 0 0 1px hsl(var(--foreground)/.04); }
@@ -90,28 +90,28 @@
 @keyframes tab-panel-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 
 /* EmployeeScan: keep the confirmation timer at the bottom, after GPS and QR, for both check-in and check-out. */
-main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 {
+.employee-scan-content {
   display: flex;
   flex-direction: column;
 }
-main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(1) { order: 0; }
-main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(2) { order: 3; }
-main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(3) { order: 1; }
-main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(4) { order: 2; }
-main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 > section:nth-of-type(5) { order: 4; }
+.employee-scan-content > section:nth-of-type(1) { order: 0; }
+.employee-scan-content > section:nth-of-type(2) { order: 3; }
+.employee-scan-content > section:nth-of-type(3) { order: 1; }
+.employee-scan-content > section:nth-of-type(4) { order: 2; }
+.employee-scan-content > section:nth-of-type(5) { order: 4; }
 
 /* Employee home: use the same full-width content canvas as the owner/manager layout. */
-main.max-w-xl.mx-auto.px-4.sm\\:px-5.pb-16.space-y-4 {
+.employee-home-page {
   width: 100%;
   max-width: 80rem;
   margin-inline: auto;
   padding-inline: 1rem;
 }
 @media (min-width: 640px) {
-  main.max-w-xl.mx-auto.px-4.sm\\:px-5.pb-16.space-y-4 { padding-inline: 1.5rem; }
+  .employee-home-page { padding-inline: 1.5rem; }
 }
 @media (min-width: 1024px) {
-  main.max-w-xl.mx-auto.px-4.sm\\:px-5.pb-16.space-y-4 { padding-inline: 2.5rem; }
+  .employee-home-page { padding-inline: 2.5rem; }
 }
 
 /* Unified mobile canvas: keep OWNER and EMPLOYEE content wide on phones without touching desktop layout. */
@@ -132,8 +132,8 @@ main.max-w-xl.mx-auto.px-4.sm\\:px-5.pb-16.space-y-4 {
   }
 
   /* Do not let legacy max-w-xl utility combinations recreate the narrow mobile canvas. */
-  main.max-w-xl.mx-auto.px-4.sm\\:px-5.pb-16.space-y-4,
-  main.max-w-xl.mx-auto.px-5.pb-16.space-y-5 {
+  .employee-home-page,
+  .employee-scan-content {
     width: 100%;
     max-width: 100%;
     margin-inline: 0;

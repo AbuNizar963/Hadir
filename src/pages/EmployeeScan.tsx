@@ -247,7 +247,7 @@ export default function EmployeeScan() {
         </button>
       </div>
 
-      <div className="w-full pb-10">
+      <div className="employee-scan-content w-full pb-10">
         <section className="mb-4 text-center">
           <div className="text-xs font-bold tracking-widest text-muted-foreground">
             {action === "check-in" ? "CHECK IN" : "CHECK OUT"}
