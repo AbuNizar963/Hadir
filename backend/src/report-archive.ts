@@ -84,6 +84,7 @@ function statusArabic(status: string) {
     PERMISSION: "استئذان",
     ESCAPED: "هارب",
     NOT_STARTED: "لم يبدأ",
+    HOLIDAY: "عطلة رسمية",
     INVALID: "غير صالح",
   };
   return map[status] || status;
@@ -286,25 +287,11 @@ function makeWorkbook(report: any) {
           },
         };
     }
-    for (let r = 1; r <= range.e.r; r++)
-      for (let c = range.s.c; c <= range.e.c; c++) {
-        const cell = ws[XLSX.utils.encode_cell({ r, c })];
-        if (cell)
-          cell.s = {
-            ...(cell.s || {}),
-            font: { name: "Arial", sz: 10 },
-            alignment: {
-              horizontal: "center",
-              vertical: "center",
-              wrapText: true,
-            },
-          };
-      }
     XLSX.utils.book_append_sheet(wb, ws, name);
   }
   wb.Workbook = wb.Workbook || {};
   wb.Workbook.Views = [{ RTL: true }];
-  return XLSX.write(wb, { bookType: "xlsx", type: "array", compression: true });
+  return XLSX.write(wb, { bookType: "xlsx", type: "array", compression: false });
 }
 function archiveKey(period: { year: number; month: number }) {
   const mm = String(period.month).padStart(2, "0");
