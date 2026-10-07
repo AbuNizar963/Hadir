@@ -505,7 +505,9 @@ export async function listReportArchives(env: Env, limit = 25) {
 }
 
 export async function repairArchiveManifest(env: Env, id: string) {
-  const row = await env.DB.prepare("SELECT * FROM report_archives WHERE report_id=? LIMIT 1")
+  const row = await env.DB.prepare(
+    "SELECT * FROM report_archives WHERE report_id=? LIMIT 1",
+  )
     .bind(id)
     .first<ArchiveRow>();
   if (!row) return { ok: false, reason: "not_found" as const };
