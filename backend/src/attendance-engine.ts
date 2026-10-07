@@ -460,7 +460,9 @@ export async function handleDailyStatus(
         schedule.work &&
         !leaveIds.has(id) &&
         !permissionIds.has(id);
-      const isAdminHoliday = schedule.work && Boolean(publicHolidayName);
+      // Official holidays apply only to administrative schedules. Rotation employees
+      // keep their planned on/off cycle even when a date is a public holiday.
+      const isAdminHoliday = !isRotation && schedule.work && Boolean(publicHolidayName);
       const latestEscape = latestEscapeByEmployee.get(id);
       let status: Status;
       if (
