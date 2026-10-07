@@ -45,6 +45,7 @@ type FactRow = {
 const MAX_DAYS = 366;
 type BuildOptions = {
   rebuildStaleFacts?: boolean;
+  asOf?: Date;
 };
 const VALID_STATUSES = new Set([
   "PRESENT",
@@ -126,6 +127,8 @@ function shouldIncludeReportRow(
   >,
   meta: ScheduleMeta | undefined,
   dailyReport: boolean,
+  timeZone = DEFAULT_SYSTEM_TIME_ZONE,
+  asOf = new Date(),
 ): boolean {
   const status = String(row.status || "")
     .trim()
@@ -157,6 +160,8 @@ function shouldIncludeReportRow(
         rotationDaysOff: meta.rotationDaysOff,
       },
       row.attendanceDay,
+      timeZone,
+      asOf,
     );
   }
 
@@ -176,6 +181,8 @@ export function isReportableEmployeeDay(
   dailyReport: boolean,
   scheduledStart: string | null = null,
   scheduledEnd: string | null = null,
+  timeZone = DEFAULT_SYSTEM_TIME_ZONE,
+  asOf = new Date(),
 ): boolean {
   return shouldIncludeReportRow(
     {
@@ -187,6 +194,8 @@ export function isReportableEmployeeDay(
     },
     meta,
     dailyReport,
+    timeZone,
+    asOf,
   );
 }
 
@@ -194,6 +203,8 @@ async function filterReportableRows(
   env: Env,
   rows: FactRow[],
   dailyReport: boolean,
+  timeZone = DEFAULT_SYSTEM_TIME_ZONE,
+  asOf = new Date(),
 ): Promise<FactRow[]> {
   if (!rows.length) return [];
 
@@ -235,6 +246,8 @@ async function filterReportableRows(
       row,
       scheduleByEmployee.get(row.employeeId),
       dailyReport,
+      timeZone,
+      asOf,
     ),
   );
 }
@@ -448,8 +461,9 @@ async function loadLiveTodayFacts(
   employeeId: string | undefined,
   actor: any,
   timezone: string,
+  asOf = new Date(),
 ): Promise<FactRow[] | null> {
-  if (day !== systemDay(new Date(), timezone) || !actor) return null;
+  if (day !== systemDay(asOf, timezone) || !actor) return null;
 
   try {
     const response = await handleDailyStatus(
@@ -462,6 +476,7 @@ async function loadLiveTodayFacts(
       actor,
       false,
       timezone,
+      asOf,
     );
 
     if (!response.ok) return null;
@@ -687,6 +702,7 @@ export async function buildProfessionalAttendanceReport(
     env.DB,
     env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
   );
+  const asOf = options.asOf || new Date();
   let sourceRows = await loadFacts(env, from, to, employeeId);
   const employeeFilter = employeeId ? " AND employee_id=?" : "";
   const staleQuery = env.DB.prepare(
@@ -731,6 +747,7 @@ export async function buildProfessionalAttendanceReport(
         actor,
         employeeId,
         timezone,
+        asOf,
       );
     sourceRows = await loadFacts(env, from, to, employeeId);
   }
@@ -738,11 +755,20 @@ export async function buildProfessionalAttendanceReport(
     env,
     sourceRows,
     dayCount === 1,
+    timezone,
+    asOf,
   );
-  const currentDay = systemDay(new Date(), timezone);
+  const currentDay = systemDay(asOf, timezone);
   const liveRows =
     from <= currentDay && currentDay <= to
-      ? await loadLiveTodayFacts(env, currentDay, employeeId, actor, timezone)
+      ? await loadLiveTodayFacts(
+          env,
+          currentDay,
+          employeeId,
+          actor,
+          timezone,
+          asOf,
+        )
       : null;
 
   // Historical facts are authoritative for completed days. For the current day
@@ -761,6 +787,8 @@ export async function buildProfessionalAttendanceReport(
       env,
       liveRows,
       dayCount === 1,
+      timezone,
+      asOf,
     );
 
     for (const row of filteredLiveRows) {

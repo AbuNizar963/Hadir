@@ -361,8 +361,10 @@ export default {
         origin,
       );
     }
-    if (path === "/api/attendance")
-      return handleEmployeeAttendance(req, env, actor, origin);
+    if (path === "/api/attendance") {
+      const response = await handleEmployeeAttendance(req, env, actor, origin);
+      return response || json({ error: "غير مصرح" }, actor ? 403 : 401, origin);
+    }
     if (path === "/api/audit" && req.method === "GET") {
       if (!actor || !["owner", "manager", "supervisor"].includes(actor.role))
         return json({ error: "غير مصرح" }, 403, origin);

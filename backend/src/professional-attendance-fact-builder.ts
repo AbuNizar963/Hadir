@@ -14,7 +14,7 @@ type Env = { DB: D1Database; APP_TIMEZONE?: string };
 const TZ = "Asia/Damascus";
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const PROFESSIONAL_FACT_CALCULATION_VERSION =
-  "central-engine-timezone-v5-rotation-grace-checkout";
+  "central-engine-timezone-v6-shift-start-visibility";
 const dayNumber = (day: string) =>
   Date.UTC(
     Number(day.slice(0, 4)),
@@ -75,6 +75,7 @@ export async function materializeDay(
   actor: any,
   employeeId?: string,
   configuredTimeZone?: string,
+  evaluationTime: Date = new Date(),
 ) {
   const timezone =
     configuredTimeZone ||
@@ -95,6 +96,7 @@ export async function materializeDay(
     actor,
     false,
     timezone,
+    evaluationTime,
   );
   if (!response.ok) throw new Error(`تعذر حساب حالة الدوام لليوم ${day}`);
   const payload = (await response.json()) as any;
@@ -440,6 +442,7 @@ export async function ensureProfessionalAttendanceFacts(
   actor: any,
   employeeId?: string,
   configuredTimeZone?: string,
+  evaluationTime: Date = new Date(),
 ) {
   if (!DAY_RE.test(from) || !DAY_RE.test(to))
     throw new Error("الفترة الزمنية غير صالحة");
@@ -460,6 +463,7 @@ export async function ensureProfessionalAttendanceFacts(
       actor,
       employeeId,
       timezone,
+      evaluationTime,
     );
   return written;
 }

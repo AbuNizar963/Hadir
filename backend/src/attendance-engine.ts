@@ -296,6 +296,7 @@ export function isRotationVisibleDay(
   >,
   day: string,
   timeZone = TZ,
+  asOf = new Date(),
 ) {
   const kind = String(employee.scheduleType || "")
     .trim()
@@ -306,7 +307,10 @@ export function isRotationVisibleDay(
     localDateTimeUtc(day, employee.workStartTime || "09:00", timeZone),
     timeZone,
   );
-  if (schedule.work) return true;
+  if (schedule.start && asOf.getTime() < schedule.start.getTime()) return false;
+  if (schedule.work) {
+    return true;
+  }
   return (
     schedule.status === "REST" &&
     !!schedule.end &&
@@ -450,6 +454,7 @@ export async function handleDailyStatus(
   actor: any,
   persist = false,
   timezoneOverride?: string,
+  asOfOverride?: Date,
 ) {
   if (req.method === "OPTIONS")
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -465,11 +470,12 @@ export async function handleDailyStatus(
       env.DB,
       env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
     ));
+  const evaluationTime = asOfOverride || new Date();
   const url = new URL(req.url),
     requestedDay = String(url.searchParams.get("date") || "").trim(),
     day = /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
       ? requestedDay
-      : dayKey(new Date(), timezone),
+      : dayKey(evaluationTime, timezone),
     nextDay = addDays(day, 1),
     requestedEmployeeId = String(
       url.searchParams.get("employeeId") || "",
@@ -491,7 +497,7 @@ export async function handleDailyStatus(
     )
       .bind(day, day, requestedEmployeeId, day, requestedEmployeeId)
       .all<any>();
-    const now = new Date(),
+    const now = evaluationTime,
       today = dayKey(now, timezone),
       escapeCutoff =
         day === today ? now : localDateTimeUtc(nextDay, "00:00", timezone);
@@ -533,7 +539,7 @@ export async function handleDailyStatus(
       localHolidayName ||
       publicHolidayForDay(day, String(holidayCountry || ""));
     const scopedEmployees = employees.filter((employee) =>
-      isRotationVisibleDay(employee, day, timezone),
+      isRotationVisibleDay(employee, day, timezone, now),
     );
     const requestActive = (r: any) => {
       const start = String(r.startDate || r.createdAt || "").slice(0, 10);

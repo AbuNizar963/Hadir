@@ -7,7 +7,6 @@ import {
 import {
   buildProfessionalAttendanceReport,
   isReportableEmployeeDay,
-  type ScheduleMeta,
 } from "./professional-attendance-report-engine";
 
 type Env = {
@@ -185,16 +184,29 @@ async function assertCurrentDayCompleteness(
   report: { rows: Array<{ attendanceDay: string; employeeId: string }> },
   dailyPayload: { employees?: unknown[] },
   timezone: string,
+  asOf: Date,
 ) {
-  const today = systemDay(new Date(), timezone);
+  const today = systemDay(asOf, timezone);
   if (today < from || today > to) return;
 
-  // The daily-status engine is the canonical current-day roster. The report
-  // intentionally exposes that complete roster, including REST and
-  // NOT_STARTED rows, so completeness must compare employee IDs directly
-  // rather than re-applying schedule-day filters here.
+  // Match the report's workday policy: REST/HOLIDAY rows and leave/permission
+  // rows without a scheduled interval are intentionally omitted. Rotations
+  // that have not reached their employee-specific start time are already
+  // excluded from the canonical live roster.
   const expectedIds = new Set(
     (Array.isArray(dailyPayload.employees) ? dailyPayload.employees : [])
+      .filter((row: any) =>
+        isReportableEmployeeDay(
+          today,
+          String(row?.status || ""),
+          undefined,
+          true,
+          row?.scheduledStart ? String(row.scheduledStart) : null,
+          row?.scheduledEnd ? String(row.scheduledEnd) : null,
+          timezone,
+          asOf,
+        ),
+      )
       .map((row: any) => String(row?.employeeId || ""))
       .filter(Boolean),
   );
@@ -254,6 +266,7 @@ export async function handleAttendanceCenter(
     env.DB,
     env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
   );
+  const asOf = new Date();
   const date = dayFromRequest(url);
   const from = fromRequest(url);
   const to = toRequest(url);
@@ -296,6 +309,7 @@ export async function handleAttendanceCenter(
       actor,
       false,
       timezone,
+      asOf,
     );
     if (!dailyStatus.ok) {
       const payload = await dailyStatus
@@ -304,14 +318,21 @@ export async function handleAttendanceCenter(
       return json(payload, dailyStatus.status, origin);
     }
 
-    // A daily report must be a complete roster for the requested day, not
-    // merely the subset already materialized by background refreshes. Build the
-    // canonical facts for the requested day first so employees with no
-    // attendance event yet still receive their scheduled status (for example
-    // NOT_STARTED or ABSENT). The materializer is read-only with respect to
-    // raw attendance events; it only upserts reporting facts.
+    // A daily report must include every employee reportable at this request's
+    // evaluation time, not merely facts already materialized by background
+    // refreshes. Build canonical facts first so scheduled employees without an
+    // attendance event still receive their status, while rotations before their
+    // configured start time remain outside the report. Raw attendance is read-only.
     if (from === to) {
-      await ensureProfessionalAttendanceFacts(env, from, to, actor, employeeId);
+      await ensureProfessionalAttendanceFacts(
+        env,
+        from,
+        to,
+        actor,
+        employeeId,
+        timezone,
+        asOf,
+      );
     }
 
     const report = await buildProfessionalAttendanceReport(
@@ -320,12 +341,13 @@ export async function handleAttendanceCenter(
       to,
       employeeId,
       actor,
+      { asOf },
     );
 
     const live = (await dailyStatus.json().catch(() => ({}))) as {
       employees?: unknown[];
     };
-    await assertCurrentDayCompleteness(from, to, report, live, timezone);
+    await assertCurrentDayCompleteness(from, to, report, live, timezone, asOf);
 
     return json(
       {
