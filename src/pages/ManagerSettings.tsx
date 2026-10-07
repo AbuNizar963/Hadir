@@ -23,13 +23,12 @@ function SettingsSection({ type, code, title, description, children, defaultOpen
 const PROJECT_LOGO = `${import.meta.env.BASE_URL}favicon.svg`;
 const HOLIDAY_COUNTRIES = [["", "بدون عطلات رسمية"], ["SA", "السعودية"], ["AE", "الإمارات العربية المتحدة"], ["JO", "الأردن"], ["EG", "مصر"], ["QA", "قطر"], ["KW", "الكويت"], ["BH", "البحرين"], ["OM", "عُمان"], ["GB", "المملكة المتحدة"], ["US", "الولايات المتحدة"], ["SY", "سوريا"]] as const;
 
-type SettingsTab = "general" | "locations" | "security" | "advanced" | "time";
+type SettingsTab = "general" | "locations" | "security" | "advanced";
 type SettingsIcon = "accounts" | "profile" | "locations" | "diagnostics" | "clock";
 const tabs: Array<{ id: SettingsTab; label: string; hint: string; icon: SettingsIcon; code: string }> = [
-  { id: "general", label: "الجهة والوصول", hint: "المنشأة والحسابات", icon: "profile", code: "01" },
+  { id: "general", label: "الملف الشخصي للشركة", hint: "الاسم والشعار والتخصصات والوقت", icon: "profile", code: "01" },
   { id: "locations", label: "مواقع الدوام", hint: "المقر والفروع", icon: "locations", code: "02" },
   { id: "security", label: "إدارة الموظفين", hint: "سياسات الموظفين", icon: "accounts", code: "03" },
-  { id: "time", label: "التاريخ والوقت", hint: "المنطقة الزمنية", icon: "clock", code: "04" },
   { id: "advanced", label: "صيانة النظام", hint: "التشخيص والصيانة", icon: "diagnostics", code: "05" },
 ];
 
@@ -197,10 +196,10 @@ export default function ManagerSettings() {
           </header>
           <div className="settings-panels">
       {section("general", <div className="space-y-6">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+        <div className="space-y-5">
           <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
             <div className="border-b border-border/60 px-5 py-5 sm:px-6">
-              <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V5.5A1.5 1.5 0 0 1 5.5 4H18a2 2 0 0 1 2 2v14"/><path d="M4 18h16M8 8h8M8 12h5"/><circle cx="17" cy="16" r="2"/></svg></span><div><div className="text-[10px] font-black text-primary mono">01 · IDENTITY</div><h2 className="mt-0.5 text-lg font-black">بيانات المنشأة</h2><p className="settings-card-description mt-1 text-xs text-muted-foreground">اسم الجهة وشعارها وتخصصات العمل.</p></div></div>
+              <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V5.5A1.5 1.5 0 0 1 5.5 4H18a2 2 0 0 1 2 2v14"/><path d="M4 18h16M8 8h8M8 12h5"/><circle cx="17" cy="16" r="2"/></svg></span><div><div className="text-[10px] font-black text-primary mono">01 · COMPANY PROFILE</div><h2 className="mt-0.5 text-lg font-black">الملف الشخصي للشركة</h2><p className="settings-card-description mt-1 text-xs text-muted-foreground">الهوية، التخصصات، المنطقة الزمنية والعطل الرسمية.</p></div></div>
             </div>
             <div className="company-specialties-host p-4 sm:p-6"><CompanySpecialtiesPanel /></div><style>{".company-specialties-host > details > summary,.company-specialties-host > details > div > div:first-child{display:none!important}.company-specialties-host > details{border:0!important;background:transparent!important;box-shadow:none!important}"}</style>
           </div>
@@ -208,6 +207,17 @@ export default function ManagerSettings() {
             <div className="border-b border-border/60 px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M19 4h3v3"/></svg></span><div><div className="text-[10px] font-black text-primary mono">02 · ACCESS</div><h2 className="mt-0.5 text-lg font-black">حسابات الإدارة</h2><p className="settings-card-description mt-1 text-xs text-muted-foreground">المديرون والمشرفون وصلاحيات الوصول.</p></div></div></div>
             <div className="p-4 sm:p-6"><AdminAccountsPanel /></div>
           </div>
+        <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
+          <div className="border-b border-border/60 px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><TabIcon type="clock" /></span><div><div className="text-[10px] font-black text-primary mono">COMPANY PROFILE · TIME</div><h2 className="mt-0.5 text-lg font-black">المنطقة الزمنية والعطل الرسمية</h2><p className="mt-1 text-xs text-muted-foreground">تُستخدم في الدوام والتقارير والعطل الرسمية.</p></div></div></div>
+          <div className="space-y-4 p-4 sm:p-6">
+            <Field label="ابحث عن منطقة أو مدينة"><input type="search" className="input mt-1" value={timezoneSearch} onChange={(event) => setTimezoneSearch(event.target.value)} placeholder="مثال: دمشق، Asia/Damascus، Tokyo أو Europe/Paris" /></Field>
+            <Field label="اختر المنطقة الزمنية"><select className="input mt-1" value={isValidSystemTimeZone(s.timezone) ? s.timezone : DEFAULT_SYSTEM_TIME_ZONE} onChange={(event) => setS({ ...s, timezone: event.target.value })} aria-describedby="system-timezone-help">
+              {filteredTimeZones.map((zone) => <option key={zone} value={zone}>{getTimeZoneOptionLabel(zone)}</option>)}
+            </select></Field>
+            <div id="system-timezone-help" className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-xs leading-6 text-muted-foreground"><span className="font-bold text-foreground">الإعداد الحالي:</span> {isValidSystemTimeZone(s.timezone) ? s.timezone : DEFAULT_SYSTEM_TIME_ZONE} · {getTimeZoneOffsetLabel(isValidSystemTimeZone(s.timezone) ? s.timezone : DEFAULT_SYSTEM_TIME_ZONE)}<br />اختر المنطقة التي يعتمد عليها النظام في الدوام والتقارير. احفظ التغيير لتطبيقه؛ لا تتغير السجلات السابقة.</div>
+            <div className="rounded-2xl border border-border/60 bg-background/30 p-4"><Field label="الدولة المعتمدة للعطل الرسمية"><select className="input mt-1" value={s.holidayCountry || ""} onChange={event => setS({ ...s, holidayCountry: event.target.value })}>{HOLIDAY_COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></Field><p className="mt-2 text-xs leading-5 text-muted-foreground">تُطبَّق العطل الرسمية على الموظفين الإداريين فقط.</p></div>
+          </div>
+        </div>
         </div>
       </div>)}
 
@@ -280,20 +290,6 @@ export default function ManagerSettings() {
       {section("security", <div className="space-y-6">
         <div className="rounded-3xl border border-border/70 bg-card shadow-sm"><div className="border-b border-border/60 px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M16 4h5v5"/></svg></span><div><div className="text-[10px] font-black text-primary mono">03 · OWNER</div><h2 className="mt-0.5 text-lg font-black">بيانات مالك النظام</h2><p className="mt-1 text-xs text-muted-foreground">تحديث اسم المستخدم وكلمة المرور الخاصة بحساب المالك.</p></div></div></div><div className="p-4 sm:p-6"><div className="grid gap-4 md:grid-cols-3"><Field label="اسم المالك"><input className="input mt-1" value={s.ownerName || ""} onChange={e => setS({ ...s, ownerName: e.target.value })} placeholder="اسم المالك" /></Field><Field label="اسم المستخدم"><input className="input mono mt-1" value={s.ownerUsername || ""} onChange={e => setS({ ...s, ownerUsername: e.target.value })} placeholder="اسم المستخدم" /></Field><Field label="كلمة مرور جديدة"><input type="password" className="input mt-1" value={password} onChange={e => setPassword(e.target.value)} placeholder="12 محرفًا على الأقل" /></Field></div><div className="mt-4 rounded-2xl border border-border/60 bg-muted/25 px-4 py-3 text-xs text-muted-foreground">يتم تطبيق بيانات المالك من خلال مسار الحفظ المركزي نفسه؛ لن يتم تعديل الحساب بمجرد الكتابة.</div></div></div>
         {isOwner && <div className="rounded-3xl border border-border/70 bg-card shadow-sm"><div className="border-b border-border/60 px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/><path d="M18 15v5M15.5 17.5h5"/></svg></span><div><div className="text-[10px] font-black text-primary mono">03 · BULK OPERATIONS</div><h2 className="mt-0.5 text-lg font-black">ضوابط الموظفين الجماعية</h2><p className="mt-1 text-xs text-muted-foreground">تطبيق إعدادات الدوام والحسابات على مجموعة الموظفين.</p></div></div></div><div className="p-4 sm:p-6"><OwnerBulkSettingsPanel /></div></div>}
-      </div>)}
-
-      {section("time", <div className="space-y-6">
-        <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
-          <div className="border-b border-border/60 px-5 py-5 sm:px-6"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><TabIcon type="clock" /></span><div><div className="text-[10px] font-black text-primary mono">04 · TIME &amp; REGION</div><h2 className="mt-0.5 text-lg font-black">المنطقة الزمنية للنظام</h2><p className="mt-1 text-xs text-muted-foreground">تُستخدم في جداول الدوام وتحديد يوم الحضور وعرض التوقيت في التقارير.</p></div></div></div>
-          <div className="space-y-4 p-4 sm:p-6">
-            <Field label="ابحث عن منطقة أو مدينة"><input type="search" className="input mt-1" value={timezoneSearch} onChange={(event) => setTimezoneSearch(event.target.value)} placeholder="مثال: دمشق، Asia/Damascus، Tokyo أو Europe/Paris" /></Field>
-            <Field label="اختر المنطقة الزمنية"><select className="input mt-1" value={isValidSystemTimeZone(s.timezone) ? s.timezone : DEFAULT_SYSTEM_TIME_ZONE} onChange={(event) => setS({ ...s, timezone: event.target.value })} aria-describedby="system-timezone-help">
-              {filteredTimeZones.map((zone) => <option key={zone} value={zone}>{getTimeZoneOptionLabel(zone)}</option>)}
-            </select></Field>
-            <div id="system-timezone-help" className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-xs leading-6 text-muted-foreground"><span className="font-bold text-foreground">الإعداد الحالي:</span> {isValidSystemTimeZone(s.timezone) ? s.timezone : DEFAULT_SYSTEM_TIME_ZONE} · {getTimeZoneOffsetLabel(isValidSystemTimeZone(s.timezone) ? s.timezone : DEFAULT_SYSTEM_TIME_ZONE)}<br />القائمة تشمل المناطق الزمنية المعروفة وفق قاعدة IANA في المتصفح، مع إضافة دمشق وUTC صراحةً. تتكيف فروق التوقيت تلقائيًا مع التوقيت الصيفي حيث يُطبّق. احفظ التغييرات لتطبيقها؛ تبقى الطوابع الزمنية المسجلة كما هي، وتُعاد حساب حقائق التقارير عند طلب الفترة.</div>
-            <div className="rounded-2xl border border-border/60 bg-background/30 p-4"><Field label="الدولة المعتمدة للعطل الرسمية"><select className="input mt-1" value={s.holidayCountry || ""} onChange={event => setS({ ...s, holidayCountry: event.target.value })}>{HOLIDAY_COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></Field><p className="mt-2 text-xs leading-5 text-muted-foreground">تُطبَّق العطل الرسمية تلقائيًا على الموظفين الإداريين فقط، وبحسب المنطقة الزمنية المختارة. الموظفون التناوبيون لا يتأثرون بهذا الخيار.</p></div>
-          </div>
-        </div>
       </div>)}
 
       {section("advanced", <div className="space-y-6">
