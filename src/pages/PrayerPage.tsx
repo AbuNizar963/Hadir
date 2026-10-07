@@ -5,10 +5,8 @@ import {
   Check,
   CloudSun,
   Compass,
-  Crosshair,
   MapPin,
   Moon,
-  RefreshCw,
   Share2,
   Sun,
   Sunrise,
@@ -32,6 +30,7 @@ type OrientationConstructor = typeof DeviceOrientationEvent & {
 };
 type OrientationSource = "apple" | "absolute";
 type PrayerItem = { key: PrayerKey; name: string; icon: typeof Moon };
+type OrientationReading = { heading: number; flat: boolean };
 
 const PRAYERS: PrayerItem[] = [
   { key: "fajr", name: "الفجر", icon: Moon },
@@ -45,36 +44,43 @@ const PRAYERS: PrayerItem[] = [
 const normalize = (value: number) => ((value % 360) + 360) % 360;
 const shortestDelta = (target: number, current: number) =>
   ((target - current + 540) % 360) - 180;
-function absoluteCompassHeading(event: DeviceOrientationEvent) {
+function absoluteCompassHeading(
+  event: DeviceOrientationEvent,
+): OrientationReading | null {
   if (typeof event.alpha !== "number" || !Number.isFinite(event.alpha))
     return null;
   const screenAngle = window.screen.orientation?.angle ?? 0;
   const beta = event.beta;
   const gamma = event.gamma;
+  const flat =
+    typeof beta === "number" &&
+    typeof gamma === "number" &&
+    Math.abs(beta) <= 25 &&
+    Math.abs(gamma) <= 25;
   if (
     typeof beta !== "number" ||
     !Number.isFinite(beta) ||
     typeof gamma !== "number" ||
     !Number.isFinite(gamma)
   ) {
-    return normalize(360 - event.alpha + screenAngle);
+    return { heading: normalize(360 - event.alpha + screenAngle), flat };
   }
 
   // Use the full rotation matrix when tilt data is available. A plain
   // `360 - alpha` heading drifts badly when the phone is held at an angle.
   const toRad = Math.PI / 180;
   const x = beta * toRad;
-  const y = gamma * toRad;
   const z = event.alpha * toRad;
   const cX = Math.cos(x),
     sX = Math.sin(x);
-  const cY = Math.cos(y),
-    sY = Math.sin(y);
   const cZ = Math.cos(z),
     sZ = Math.sin(z);
   const m12 = -cX * sZ;
   const m22 = cZ * cX;
-  return normalize((Math.atan2(m12, m22) * 180) / Math.PI + screenAngle);
+  return {
+    heading: normalize((Math.atan2(m12, m22) * 180) / Math.PI + screenAngle),
+    flat,
+  };
 }
 const toMinutes = (value: string) => {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value);
@@ -142,6 +148,45 @@ function hasIOSPermissionApi() {
   return typeof ctor.requestPermission === "function";
 }
 
+function isPhoneFlat(event: DeviceOrientationEvent) {
+  return (
+    typeof event.beta === "number" &&
+    typeof event.gamma === "number" &&
+    Math.abs(event.beta) <= 25 &&
+    Math.abs(event.gamma) <= 25
+  );
+}
+function KaabaIcon({ className = "h-6 w-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <path
+        d="m8 15 16-7 16 7-16 8-16-8Z"
+        fill="#171717"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M8 15v18l16 8V23L8 15Z"
+        fill="#252525"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M40 15v18l-16 8V23l16-8Z"
+        fill="#0b0b0b"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="m8 20 16 8 16-8M8 28l16 8 16-8"
+        fill="none"
+        stroke="#d8ad55"
+        strokeWidth="2"
+      />
+      <path d="M19 13h10v5H19z" fill="#d8ad55" />
+    </svg>
+  );
+}
 export default function PrayerPage() {
   const navigate = useNavigate();
   const [position, setPosition] = useState<GeolocationPosition | null>(null);
@@ -150,6 +195,7 @@ export default function PrayerPage() {
   const [heading, setHeading] = useState(0);
   const [city, setCity] = useState("موقعك الحالي");
   const [sensorEnabled, setSensorEnabled] = useState(false);
+  const [phoneFlat, setPhoneFlat] = useState(false);
   const [permissionNeeded, setPermissionNeeded] = useState(false);
   const [sensorMessage, setSensorMessage] = useState("");
   const [error, setError] = useState("");
@@ -228,6 +274,7 @@ export default function PrayerPage() {
     const timestamp = Date.now();
     let next: number | null = null;
     let source: OrientationSource | null = null;
+    let flat = isPhoneFlat(event);
 
     if (
       typeof e.webkitCompassHeading === "number" &&
@@ -242,7 +289,8 @@ export default function PrayerPage() {
     ) {
       const absoluteHeading = absoluteCompassHeading(event);
       if (absoluteHeading != null) {
-        next = absoluteHeading;
+        next = absoluteHeading.heading;
+        flat = absoluteHeading.flat;
         source = "absolute";
         lastAbsoluteAtRef.current = timestamp;
       }
@@ -250,6 +298,12 @@ export default function PrayerPage() {
 
     if (next == null || source == null) return;
     if (sourceRef.current === "absolute" && source !== "absolute") return;
+    if (!flat) {
+      setPhoneFlat(false);
+      setSensorEnabled(false);
+      setSensorMessage("ضع الهاتف أفقياً على سطح مستوٍ لقراءة القبلة بدقة.");
+      return;
+    }
     rawHeadingRef.current = next;
     sourceRef.current = source;
     lastSensorAtRef.current = timestamp;
@@ -261,6 +315,7 @@ export default function PrayerPage() {
       setHeading(next);
     }
     setSensorEnabled(true);
+    setPhoneFlat(true);
     setPermissionNeeded(false);
     setSensorMessage("");
   }, []);
@@ -301,7 +356,7 @@ export default function PrayerPage() {
       window.addEventListener("deviceorientation", readOrientation, true);
       setPermissionNeeded(false);
       setSensorMessage(
-        "ثبّت الهاتف أفقياً وحرّكه ببطء على شكل رقم 8 لمعايرة البوصلة؛ المؤشر الوردي يتجه نحو القبلة.",
+        "جاري تحديد الاتجاه تلقائياً… ضع الهاتف أفقياً وحرّكه ببطء على شكل رقم 8.",
       );
     } catch {
       setSensorMessage(
@@ -309,25 +364,6 @@ export default function PrayerPage() {
       );
     }
   }, [readOrientation]);
-
-  const resetCompass = useCallback(() => {
-    rawHeadingRef.current = 0;
-    targetHeadingRef.current = 0;
-    smoothHeadingRef.current = 0;
-    initializedRef.current = false;
-    sourceRef.current = null;
-    lastAbsoluteAtRef.current = 0;
-    lastSensorAtRef.current = 0;
-    setHeading(0);
-    setSensorEnabled(false);
-    setSensorMessage("");
-    if (!window.isSecureContext) {
-      setSensorMessage("البوصلة الحية تحتاج إلى HTTPS أو localhost.");
-      return;
-    }
-    if (hasIOSPermissionApi()) setPermissionNeeded(true);
-    else void enableCompass();
-  }, [enableCompass]);
 
   useEffect(() => {
     if (!window.isSecureContext) {
@@ -348,6 +384,15 @@ export default function PrayerPage() {
       window.removeEventListener("deviceorientation", readOrientation, true);
     };
   }, [enableCompass, readOrientation]);
+
+  useEffect(() => {
+    const retryPermissionOnGesture = () => {
+      if (permissionNeeded) void enableCompass();
+    };
+    window.addEventListener("pointerdown", retryPermissionOnGesture);
+    return () =>
+      window.removeEventListener("pointerdown", retryPermissionOnGesture);
+  }, [enableCompass, permissionNeeded]);
 
   useEffect(() => {
     const tick = () => {
@@ -378,8 +423,9 @@ export default function PrayerPage() {
     const id = window.setInterval(() => {
       if (sensorEnabled && Date.now() - lastSensorAtRef.current > 3000) {
         setSensorEnabled(false);
+        setPhoneFlat(false);
         setSensorMessage(
-          "لم تصل بيانات الحساس. حرّك الهاتف ببطء أو أعد تفعيل البوصلة.",
+          "لم تصل قراءة ثابتة. ضع الهاتف أفقياً وسيُعاد التحديد تلقائياً.",
         );
       }
     }, 1000);
@@ -450,11 +496,8 @@ export default function PrayerPage() {
           <div className="p-5 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <div className="text-sm text-emerald-200/80">
-                  {greeting()} 👋
-                </div>
                 <h1 className="mt-1 text-2xl font-black sm:text-3xl">
-                  الصلاة القادمة: {nextPrayer?.prayer.name || "—"}
+                  مواقيت الصلاة والقبلة
                 </h1>
                 <p className="mt-1 text-sm leading-6 text-slate-300">
                   <MapPin className="mr-1 inline h-4 w-4" />
@@ -466,6 +509,10 @@ export default function PrayerPage() {
                   <span className="whitespace-nowrap">
                     {formatHijriDate(data?.meta.hijri || "")}
                   </span>
+                </p>
+                <p className="mt-2 text-xs text-emerald-200/70">
+                  الصلاة القادمة:{" "}
+                  {nextPrayer?.prayer.name || "جارٍ تحديد الموقع"}
                 </p>
               </div>
               <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-5 py-3 text-center">
@@ -490,13 +537,17 @@ export default function PrayerPage() {
                   <div
                     className={`rounded-full px-3 py-1 text-xs ${sensorEnabled ? "bg-emerald-400/10 text-emerald-300" : "bg-amber-400/10 text-amber-200"}`}
                   >
-                    {sensorEnabled ? "● حساس مباشر" : "○ بانتظار الحساس"}
+                    {sensorEnabled
+                      ? "● الاتجاه دقيق"
+                      : phoneFlat
+                        ? "○ جارٍ التحديد"
+                        : "○ ضع الهاتف أفقياً"}
                   </div>
                 </div>
                 <div className="relative mx-auto mt-3 aspect-square w-full max-w-[360px]">
                   <div className="absolute -top-1 left-1/2 z-20 -translate-x-1/2 -translate-y-full text-center">
                     <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-rose-300/30 bg-rose-500/15 text-rose-200 shadow-[0_0_24px_rgba(251,113,133,.25)]">
-                      <Crosshair className="h-6 w-6" />
+                      <KaabaIcon className="h-7 w-7" />
                     </div>
                     <div className="mt-2 rounded-full border border-rose-300/30 bg-rose-500/10 px-3 py-1 text-xs font-black text-rose-200">
                       القبلة •{" "}
@@ -553,11 +604,13 @@ export default function PrayerPage() {
                     {aligned && <Check className="h-4 w-4 text-emerald-300" />}
                     {aligned
                       ? "أنت تواجه القبلة"
-                      : !sensorEnabled
-                        ? "فعّل الحساس لتوجيه المؤشر بدقة"
-                        : bearing == null
-                          ? "جارٍ تحديد الاتجاه"
-                          : `${bearingLabel(bearing)} نحو مكة`}
+                      : !phoneFlat
+                        ? "سطّح الهاتف ليقرأ الاتجاه بدقة"
+                        : !sensorEnabled
+                          ? "جاري تحديد اتجاه الهاتف تلقائياً"
+                          : bearing == null
+                            ? "جارٍ تحديد الاتجاه"
+                            : `${bearingLabel(bearing)} نحو مكة`}
                   </div>
                   <div className="mt-2 text-xs text-slate-500">
                     {sensorEnabled
@@ -574,27 +627,6 @@ export default function PrayerPage() {
                   >
                     <Share2 className="h-4 w-4" />
                     مشاركة اتجاه مدينتي
-                  </button>
-                  <button
-                    onClick={locate}
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    إعادة تحديد الموقع
-                  </button>
-                  {permissionNeeded && (
-                    <button
-                      onClick={() => void enableCompass()}
-                      className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm font-bold text-emerald-100"
-                    >
-                      تفعيل البوصلة الحية
-                    </button>
-                  )}
-                  <button
-                    onClick={resetCompass}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold"
-                  >
-                    إعادة ضبط
                   </button>
                 </div>
                 {sensorMessage && (
