@@ -2,7 +2,7 @@ name: Auto Retry Failed Apps Actions
 
 on:
   push:
-    branches: [Apps]
+    branches: [flutter-mobile-app]
   workflow_dispatch:
 
 permissions:

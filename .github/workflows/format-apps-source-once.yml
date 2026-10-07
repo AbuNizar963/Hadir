@@ -2,7 +2,7 @@ name: Format Apps source once
 
 on:
   push:
-    branches: [work/apps-web-parity]
+    branches: [work/flutter-web-parity-pre-sync-2026-09-13]
     paths:
       - 'lib/features/employee/pages/employee_premium_page_implementation.dart'
   workflow_dispatch:

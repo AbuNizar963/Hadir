@@ -3,7 +3,7 @@ name: Deploy Hadir API
 on:
   workflow_dispatch:
   push:
-    branches: [main, Apps]
+    branches: [main, flutter-mobile-app]
 
 permissions:
   contents: read

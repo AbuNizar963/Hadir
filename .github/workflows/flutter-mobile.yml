@@ -3,7 +3,7 @@ name: Flutter App
 on:
   workflow_dispatch:
   push:
-    branches: [Apps]
+    branches: [flutter-mobile-app]
     paths:
       - 'android/**'
       - 'ios/**'
