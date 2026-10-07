@@ -53,7 +53,15 @@ const statusLabels: Record<string, string> = {
   ESCAPED: "هارب",
   NOT_STARTED: "لم يبدأ",
   INVALID: "غير صالح",
+  MISSING_CHECKOUT: "انصراف معلق",
 };
+const reportStatus = (
+  row: Pick<
+    ProfessionalAttendanceReport["rows"][number],
+    "status" | "exceptionCode"
+  >,
+) =>
+  row.exceptionCode === "MISSING_CHECKOUT" ? "MISSING_CHECKOUT" : row.status;
 const sourceLabels: Record<string, string> = {
   AUTOMATIC_VIP: "تلقائي VIP",
   AUTOMATIC: "تلقائي",
@@ -227,7 +235,7 @@ export default function ProfessionalAttendanceReports() {
         specialty: sourceLabels[x.attendanceSource] || x.attendanceSource,
         date: x.attendanceDay,
         day: x.attendanceDay,
-        status: statusLabels[x.status] || x.status,
+        status: statusLabels[reportStatus(x)] || reportStatus(x),
         checkIn: x.checkInAt || "—",
         checkOut: x.checkOutAt || "—",
         worked: fmtMinutes(x.workedMinutes || 0),
@@ -236,7 +244,10 @@ export default function ProfessionalAttendanceReports() {
         detail:
           x.status === "ESCAPED"
             ? "هرب من العمل"
-            : exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || "",
+            : x.notes ||
+              exceptionLabels[x.exceptionCode || ""] ||
+              x.exceptionCode ||
+              "",
       })),
       chartData: statusData.map(({ name, value }) => ({
         label: String(name),
@@ -268,7 +279,7 @@ export default function ProfessionalAttendanceReports() {
       x.attendanceDay,
       x.employeeName,
       x.jobNumber || "",
-      statusLabels[x.status] || x.status,
+      statusLabels[reportStatus(x)] || reportStatus(x),
       sourceLabels[x.attendanceSource] || x.attendanceSource,
       x.checkInAt || "",
       x.checkOutAt || "",
@@ -276,7 +287,10 @@ export default function ProfessionalAttendanceReports() {
       x.lateMinutes,
       x.earlyLeaveMinutes,
       x.overtimeMinutes,
-      exceptionLabels[x.exceptionCode || ""] || x.exceptionCode || "",
+      x.notes ||
+        exceptionLabels[x.exceptionCode || ""] ||
+        x.exceptionCode ||
+        "",
     ]);
     downloadCSV(
       `HADIR-attendance-${report.from}-${report.to}.csv`,
@@ -719,8 +733,11 @@ export default function ProfessionalAttendanceReports() {
                               </div>
                             </td>
                             <td className="p-3">
-                              <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-bold">
-                                {statusLabels[r.status] || r.status}
+                              <span
+                                className={`rounded-full px-2 py-1 text-xs font-bold ${r.exceptionCode === "MISSING_CHECKOUT" ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200" : "bg-primary/10 text-primary"}`}
+                              >
+                                {statusLabels[reportStatus(r)] ||
+                                  reportStatus(r)}
                               </span>
                             </td>
                             <td className="p-3">
@@ -853,7 +870,11 @@ export default function ProfessionalAttendanceReports() {
                             </td>
                             <td className="p-3">{x.code}</td>
                             <td className="p-3">
-                              {statusLabels[x.status] || x.status}
+                              {statusLabels[
+                                x.code === "MISSING_CHECKOUT"
+                                  ? "MISSING_CHECKOUT"
+                                  : x.status
+                              ] || x.status}
                             </td>
                             <td className="p-3">
                               <span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold">

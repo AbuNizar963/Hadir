@@ -60,7 +60,13 @@ const labels: Record<string, string> = {
   NOT_STARTED: "لم يبدأ",
   HOLIDAY: "عطلة رسمية",
   INVALID: "غير صالح",
+  MISSING_CHECKOUT: "انصراف معلق",
 };
+
+const reportStatus = (
+  row: Pick<ProfessionalAttendanceRow, "status" | "exceptionCode">,
+) =>
+  row.exceptionCode === "MISSING_CHECKOUT" ? "MISSING_CHECKOUT" : row.status;
 
 const statusBadgeClasses: Record<string, string> = {
   PRESENT:
@@ -76,6 +82,8 @@ const statusBadgeClasses: Record<string, string> = {
   HOLIDAY:
     "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200",
   INVALID: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+  MISSING_CHECKOUT:
+    "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200",
 };
 
 const exceptionLabels: Record<string, string> = {
@@ -300,13 +308,13 @@ export default function GlobalAttendanceReports() {
         jobNumber: row.jobNumber,
         date: row.attendanceDay,
         day: row.attendanceDay,
-        status: labels[row.status] || row.status,
+        status: labels[reportStatus(row)] || reportStatus(row),
         checkIn: row.checkInAt || "—",
         checkOut: row.checkOutAt || "—",
         worked: fmt(row.workedMinutes || 0),
         late: row.lateMinutes,
         early: row.earlyLeaveMinutes,
-        detail: getExceptionLabel(row.exceptionCode, row.status),
+        detail: row.notes || getExceptionLabel(row.exceptionCode, row.status),
       })),
       chartData: statusData.map(({ name, value }) => ({ label: name, value })),
       absenceRows: rows
@@ -358,14 +366,14 @@ export default function GlobalAttendanceReports() {
         row.attendanceDay,
         row.employeeName,
         row.jobNumber || "",
-        labels[row.status] || row.status,
+        labels[reportStatus(row)] || reportStatus(row),
         row.checkInAt || "",
         row.checkOutAt || "",
         fmt(row.workedMinutes || 0),
         row.lateMinutes,
         row.earlyLeaveMinutes,
         row.overtimeMinutes,
-        getExceptionLabel(row.exceptionCode, row.status),
+        row.notes || getExceptionLabel(row.exceptionCode, row.status),
       ]),
     );
   };
@@ -423,6 +431,7 @@ export default function GlobalAttendanceReports() {
         .global-attendance-print-center { text-align: center; }
         .global-attendance-print-status { display: inline-block; border-radius: 999px; padding: 1.2mm 3mm; font-weight: 800; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .global-attendance-print-status-present { background: #d1fae5 !important; color: #047857 !important; }
+        .global-attendance-print-status-missing-checkout { background: #fee2e2 !important; color: #b91c1c !important; }
         .global-attendance-print-status-late { background: #fef3c7 !important; color: #b45309 !important; }
         .global-attendance-print-status-absent { background: #fee2e2 !important; color: #b91c1c !important; }
         .global-attendance-print-status-leave { background: #ede9fe !important; color: #6d28d9 !important; }
@@ -561,26 +570,29 @@ export default function GlobalAttendanceReports() {
                     );
                   })
                   .map((r, i) => {
+                    const displayStatus = reportStatus(r);
                     const statusClass =
-                      r.status === "PRESENT"
-                        ? "present"
-                        : r.status === "LATE"
-                          ? "late"
-                          : r.status === "ABSENT"
-                            ? "absent"
-                            : r.status === "LEAVE"
-                              ? "leave"
-                              : r.status === "PERMISSION"
-                                ? "permission"
-                                : r.status === "ESCAPED"
-                                  ? "escaped"
-                                  : r.status === "REST"
-                                    ? "rest"
-                                    : r.status === "HOLIDAY"
-                                      ? "holiday"
-                                      : r.status === "NOT_STARTED"
-                                        ? "not-started"
-                                        : "invalid";
+                      displayStatus === "MISSING_CHECKOUT"
+                        ? "missing-checkout"
+                        : r.status === "PRESENT"
+                          ? "present"
+                          : r.status === "LATE"
+                            ? "late"
+                            : r.status === "ABSENT"
+                              ? "absent"
+                              : r.status === "LEAVE"
+                                ? "leave"
+                                : r.status === "PERMISSION"
+                                  ? "permission"
+                                  : r.status === "ESCAPED"
+                                    ? "escaped"
+                                    : r.status === "REST"
+                                      ? "rest"
+                                      : r.status === "HOLIDAY"
+                                        ? "holiday"
+                                        : r.status === "NOT_STARTED"
+                                          ? "not-started"
+                                          : "invalid";
                     const noteLabels: Record<string, string> = {
                       CHECKOUT_WITHOUT_CHECKIN: "انصراف دون حضور",
                       ESCAPED: "هرب من العمل",
@@ -607,7 +619,7 @@ export default function GlobalAttendanceReports() {
                           <span
                             className={`global-attendance-print-status global-attendance-print-status-${statusClass}`}
                           >
-                            {labels[r.status] || r.status}
+                            {labels[displayStatus] || displayStatus}
                           </span>
                         </td>
                         <td className="global-attendance-print-center">
@@ -949,9 +961,9 @@ export default function GlobalAttendanceReports() {
                           <td className="p-3">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span
-                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[row.status] || "bg-primary/10 text-primary"}`}
+                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[reportStatus(row)] || "bg-primary/10 text-primary"}`}
                               >
-                                {labels[row.status] || row.status}
+                                {labels[reportStatus(row)] || reportStatus(row)}
                               </span>
                             </div>
                           </td>
@@ -1089,7 +1101,11 @@ export default function GlobalAttendanceReports() {
                           </td>
                           <td className="p-3">{item.code}</td>
                           <td className="p-3">
-                            {labels[item.status] || item.status}
+                            {labels[
+                              item.code === "MISSING_CHECKOUT"
+                                ? "MISSING_CHECKOUT"
+                                : item.status
+                            ] || item.status}
                           </td>
                           <td className="p-3">{item.minutes}د</td>
                           <td className="p-3">
@@ -1184,9 +1200,13 @@ export default function GlobalAttendanceReports() {
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[detail.fact.status] || "bg-primary/10 text-primary"}`}
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClasses[detail.fact.exceptionCode === "MISSING_CHECKOUT" ? "MISSING_CHECKOUT" : detail.fact.status] || "bg-primary/10 text-primary"}`}
                       >
-                        {labels[detail.fact.status] || detail.fact.status}
+                        {labels[
+                          detail.fact.exceptionCode === "MISSING_CHECKOUT"
+                            ? "MISSING_CHECKOUT"
+                            : detail.fact.status
+                        ] || detail.fact.status}
                       </span>
                     </div>
                   </CardContent>

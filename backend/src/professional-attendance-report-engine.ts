@@ -30,6 +30,7 @@ type FactRow = {
   overtimeMinutes: number;
   open: number;
   exceptionCode: string | null;
+  notes?: string;
   attendanceEventIdsJson: string;
   requestIdsJson: string;
   auditIdsJson: string;
@@ -126,6 +127,16 @@ function shouldIncludeReportRow(
   meta: ScheduleMeta | undefined,
   dailyReport: boolean,
 ): boolean {
+  const status = String(row.status || "")
+    .trim()
+    .toUpperCase();
+  if (status === "REST" || status === "HOLIDAY") return false;
+  if (
+    (status === "LEAVE" || status === "PERMISSION") &&
+    (!row.scheduledStart || !row.scheduledEnd)
+  )
+    return false;
+
   // Daily reports follow the canonical rotation visibility rule: a rotating
   // employee is visible while the work block is active and on the local
   // calendar day containing its actual end. The following day is not a
@@ -149,8 +160,8 @@ function shouldIncludeReportRow(
     );
   }
 
-  // Non-rotation daily rows and historical period reports remain roster
-  // complete; the canonical attendance engine determines their status.
+  // Rest days, holidays, and days without a scheduled shift are not workdays.
+  // Scheduled absences and approved leave remain reportable.
   return true;
 }
 
@@ -163,11 +174,15 @@ export function isReportableEmployeeDay(
   status: string,
   meta: ScheduleMeta | undefined,
   dailyReport: boolean,
+  scheduledStart: string | null = null,
+  scheduledEnd: string | null = null,
 ): boolean {
   return shouldIncludeReportRow(
     {
       attendanceDay,
       status,
+      scheduledStart,
+      scheduledEnd,
       scheduleType: meta?.scheduleType || "",
     },
     meta,
@@ -336,25 +351,61 @@ async function loadFacts(
 function deriveNotes(
   row: Pick<
     FactRow,
+    | "attendanceDay"
     | "status"
     | "scheduleType"
     | "checkInAt"
     | "checkOutAt"
     | "scheduledEnd"
     | "exceptionCode"
+    | "lateMinutes"
+    | "timezone"
   >,
 ) {
   if (row.status === "HOLIDAY") return "عطلة رسمية";
+  if (row.exceptionCode === "MISSING_CHECKOUT") return "لم يسجل انصراف";
+  if (row.status === "ABSENT") return "لم يسجل حضور لهذا اليوم";
+  if (
+    row.scheduleType === "ROTATION" &&
+    row.checkOutAt &&
+    row.scheduledEnd &&
+    row.attendanceDay === systemDay(new Date(row.scheduledEnd), row.timezone)
+  )
+    return Date.parse(row.checkOutAt) < Date.parse(row.scheduledEnd)
+      ? "سُجل الانصراف قبل نهاية المناوبة"
+      : "انتهت المناوبة · سُجل الانصراف";
+  if (row.status === "LATE" && row.lateMinutes > 0) {
+    const hours = Math.floor(row.lateMinutes / 60);
+    const minutes = row.lateMinutes % 60;
+    const formatHours = (value: number) =>
+      value === 1
+        ? "ساعة"
+        : value === 2
+          ? "ساعتين"
+          : value <= 10
+            ? `${value} ساعات`
+            : `${value} ساعة`;
+    const formatMinutes = (value: number) =>
+      value === 1
+        ? "دقيقة"
+        : value === 2
+          ? "دقيقتين"
+          : value <= 10
+            ? `${value} دقائق`
+            : `${value} دقيقة`;
+    return hours
+      ? `تأخر ${formatHours(hours)}${minutes ? ` و${formatMinutes(minutes)}` : ""}`
+      : `تأخر ${formatMinutes(minutes)}`;
+  }
   if (row.scheduleType === "ROTATION" && row.checkInAt && row.scheduledEnd) {
     const ended = Date.now() >= Date.parse(row.scheduledEnd);
-    if (ended)
+    const endDay = systemDay(new Date(row.scheduledEnd), row.timezone);
+    if (ended && row.attendanceDay === endDay)
       return row.checkOutAt
         ? "انتهت المناوبة · سُجل الانصراف"
-        : "انتهت المناوبة · لم يُسجل الانصراف";
+        : "لم يسجل انصراف";
     return "حضور مستمر حتى نهاية المناوبة";
   }
-  if (row.exceptionCode === "MISSING_CHECKOUT")
-    return "حضر ولم يسجل الانصراف بعد";
   return "";
 }
 
@@ -488,35 +539,50 @@ async function loadLiveTodayFacts(
       const checkOutAt = row.checkOutAt || null;
       const expectedStart = row.scheduledStart || null;
       const expectedEnd = row.scheduledEnd || null;
-      const expectedMinutes =
-        expectedStart && expectedEnd
-          ? Math.max(
-              0,
-              Math.round(
-                (Date.parse(expectedEnd) - Date.parse(expectedStart)) / 60000,
-              ),
-            )
-          : 0;
+      const isRotation =
+        String(row.scheduleType || "").toUpperCase() === "ROTATION";
+      const dailyRotationAttendance =
+        isRotation && Boolean(row.rotationDailyAttendanceEnabled);
+      const isRotationStartDay =
+        isRotation &&
+        !!expectedStart &&
+        systemDay(new Date(expectedStart), timezone) === day;
+      const isRotationEndDay =
+        isRotation &&
+        !!expectedEnd &&
+        systemDay(new Date(expectedEnd), timezone) === day;
+      const periodCheckInAt = row.rotationPeriodCheckInAt || checkInAt;
+      const expectedMinutes = dailyRotationAttendance
+        ? 0
+        : isRotation && !isRotationStartDay
+          ? 0
+          : expectedStart && expectedEnd
+            ? Math.max(
+                0,
+                Math.round(
+                  (Date.parse(expectedEnd) - Date.parse(expectedStart)) / 60000,
+                ),
+              )
+            : 0;
       const workedMinutes =
-        checkInAt && checkOutAt
+        !dailyRotationAttendance &&
+        (isRotation ? isRotationEndDay && periodCheckInAt : checkInAt) &&
+        checkOutAt
           ? Math.max(
               0,
               Math.round(
-                (Date.parse(checkOutAt) - Date.parse(checkInAt)) / 60000,
+                (Date.parse(checkOutAt) -
+                  Date.parse(isRotation ? periodCheckInAt : checkInAt)) /
+                  60000,
               ),
             )
           : null;
-      const lateMinutes =
-        row.status === "LATE" && checkInAt && expectedStart
-          ? Math.max(
-              0,
-              Math.round(
-                (Date.parse(checkInAt) - Date.parse(expectedStart)) / 60000,
-              ),
-            )
-          : 0;
+      const lateMinutes = Math.max(0, Math.floor(Number(row.lateMinutes) || 0));
       const earlyLeaveMinutes =
-        checkOutAt && expectedEnd
+        !dailyRotationAttendance &&
+        (!isRotation || isRotationEndDay) &&
+        checkOutAt &&
+        expectedEnd
           ? Math.max(
               0,
               Math.round(
@@ -525,7 +591,10 @@ async function loadLiveTodayFacts(
             )
           : 0;
       const overtimeMinutes =
-        checkOutAt && expectedEnd
+        !dailyRotationAttendance &&
+        (!isRotation || isRotationEndDay) &&
+        checkOutAt &&
+        expectedEnd
           ? Math.max(
               0,
               Math.round(
@@ -534,14 +603,17 @@ async function loadLiveTodayFacts(
             )
           : 0;
       const shiftEnded =
-        !!checkInAt &&
-        !checkOutAt &&
-        !!expectedEnd &&
-        Date.now() >= Date.parse(expectedEnd);
+        String(row.exceptionCode || "") === "MISSING_CHECKOUT" ||
+        (!dailyRotationAttendance &&
+          !!checkInAt &&
+          !checkOutAt &&
+          !!expectedEnd &&
+          Date.now() >= Date.parse(expectedEnd));
       const exceptionCode =
-        row.status === "ABSENT"
+        row.exceptionCode ||
+        (row.status === "ABSENT"
           ? "ABSENT_NO_APPROVED_REASON"
-          : checkOutAt && !checkInAt
+          : checkOutAt && !checkInAt && !isRotationEndDay
             ? "CHECKOUT_WITHOUT_CHECKIN"
             : shiftEnded && (row.status === "PRESENT" || row.status === "LATE")
               ? "MISSING_CHECKOUT"
@@ -551,7 +623,7 @@ async function loadLiveTodayFacts(
                   ? "EARLY_LEAVE"
                   : overtimeMinutes
                     ? "OVERTIME"
-                    : null;
+                    : null);
 
       return {
         attendanceDay: day,
@@ -573,12 +645,15 @@ async function loadLiveTodayFacts(
         open: exceptionCode === "MISSING_CHECKOUT" ? 1 : 0,
         exceptionCode,
         notes: deriveNotes({
+          attendanceDay: day,
           status: String(row.status || "INVALID"),
           scheduleType: String(row.scheduleType || "ADMIN"),
           checkInAt,
           checkOutAt,
           scheduledEnd: expectedEnd,
           exceptionCode,
+          lateMinutes,
+          timezone,
         }),
         attendanceEventIdsJson: JSON.stringify(
           events.map((event) => String(event.id)),
@@ -587,7 +662,7 @@ async function loadLiveTodayFacts(
         auditIdsJson: "[]",
         attendanceSource: classifySource(events),
         calculationSource: "attendance-engine-live",
-        calculationVersion: "central-engine-timezone-v3-holidays-notes",
+        calculationVersion: PROFESSIONAL_FACT_CALCULATION_VERSION,
         historicalDataQuality: "exact",
         timezone,
         computedAt: String(payload.computedAt || new Date().toISOString()),

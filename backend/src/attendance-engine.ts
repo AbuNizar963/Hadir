@@ -35,6 +35,29 @@ const statusLabel = (status: Status) =>
     HOLIDAY: "عطلة رسمية",
     INVALID: "غير صالح",
   })[status];
+function lateNote(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  const hourLabel = (value: number) =>
+    value === 1
+      ? "ساعة"
+      : value === 2
+        ? "ساعتين"
+        : value <= 10
+          ? `${value} ساعات`
+          : `${value} ساعة`;
+  const minuteLabel = (value: number) =>
+    value === 1
+      ? "دقيقة"
+      : value === 2
+        ? "دقيقتين"
+        : value <= 10
+          ? `${value} دقائق`
+          : `${value} دقيقة`;
+  return hours
+    ? `تأخر ${hourLabel(hours)}${remainingMinutes ? ` و${minuteLabel(remainingMinutes)}` : ""}`
+    : `تأخر ${minuteLabel(remainingMinutes)}`;
+}
 type EmployeeRow = {
   id: string;
   name: string;
@@ -61,6 +84,14 @@ type DailyStatusStoredRow = {
   checkInAt: string | null;
   checkOutAt: string | null;
   scheduleType: string;
+};
+type ScheduleResult = {
+  work: boolean;
+  status: "WORK" | "REST" | "NOT_STARTED" | "INVALID";
+  start: Date | null;
+  end: Date | null;
+  dailyAttendanceStart?: Date | null;
+  dailyAttendanceDeadline?: Date | null;
 };
 const CORS_HEADERS = {
   "access-control-allow-origin": "*",
@@ -286,38 +317,46 @@ function rotationDailyScheduleFor(
   employee: EmployeeRow,
   day: string,
   timeZone = TZ,
-) {
+): ScheduleResult {
   const p = rotationParams(employee, timeZone);
   if (!p)
     return { work: false, status: "INVALID" as const, start: null, end: null };
-  const checkpoint = localDateTimeUtc(
+  const dayAnchor = localDateTimeUtc(
+    day,
+    employee.workStartTime || "09:00",
+    timeZone,
+  );
+  const active = rotationScheduleAt(employee, dayAnchor, timeZone);
+  if (!active.work || !active.start || !active.end) {
+    if (
+      active.status === "REST" &&
+      active.start &&
+      active.end &&
+      dayKey(active.end, timeZone) === day
+    )
+      return {
+        work: true,
+        status: "WORK",
+        start: active.start,
+        end: active.end,
+        dailyAttendanceStart: null,
+        dailyAttendanceDeadline: null,
+      };
+    return {
+      work: false,
+      status: active.status,
+      start: active.start,
+      end: active.end,
+      dailyAttendanceStart: null,
+      dailyAttendanceDeadline: null,
+    };
+  }
+  const configuredCheckpoint = localDateTimeUtc(
     day,
     employee.rotationDailyAttendanceTime || "12:00",
     timeZone,
   );
-  const active = rotationScheduleAt(employee, checkpoint, timeZone);
-  if (
-    !active.work ||
-    !active.start ||
-    !active.end ||
-    checkpoint.getTime() < active.start.getTime() ||
-    checkpoint.getTime() >= active.end.getTime()
-  )
-    return {
-      work: false,
-      status: active.status,
-      start: checkpoint,
-      end: new Date(
-        checkpoint.getTime() +
-          Math.max(
-            0,
-            Math.floor(
-              Number(employee.rotationDailyAttendanceGraceMinutes ?? 0),
-            ),
-          ) *
-            60000,
-      ),
-    };
+  const checkpoint = configuredCheckpoint;
   const grace = Math.min(
     180,
     Math.max(
@@ -328,11 +367,17 @@ function rotationDailyScheduleFor(
   return {
     work: true,
     status: "WORK" as const,
-    start: checkpoint,
-    end: new Date(checkpoint.getTime() + grace * 60000),
+    start: active.start,
+    end: active.end,
+    dailyAttendanceStart: checkpoint,
+    dailyAttendanceDeadline: new Date(checkpoint.getTime() + grace * 60000),
   };
 }
-function scheduleFor(employee: EmployeeRow, day: string, timeZone = TZ) {
+function scheduleFor(
+  employee: EmployeeRow,
+  day: string,
+  timeZone = TZ,
+): ScheduleResult {
   const kind = String(employee.scheduleType || "ADMIN")
     .trim()
     .toUpperCase();
@@ -579,23 +624,48 @@ export async function handleDailyStatus(
       const rows = historicalByEmployee.get(id) || [];
       let checkIn = null;
       let checkOut = null;
+      let periodCheckIn = null;
       if (isRotation) {
         const periodStart = schedule.start;
         const periodEnd = schedule.end;
         if (schedule.work && periodStart && periodEnd) {
+          const periodAttendanceStart = dailyRotationAttendance
+            ? localDateTimeUtc(dayKey(periodStart, timezone), "00:00", timezone)
+            : periodStart;
           const periodEvents = (historicalByEmployee.get(id) || []).filter(
             (r: any) => {
               const ts = Date.parse(String(r.timestamp));
               return (
                 Number.isFinite(ts) &&
-                ts >= periodStart.getTime() &&
+                ts >= periodAttendanceStart.getTime() &&
                 ts < periodEnd.getTime()
               );
             },
           );
-          checkIn =
+          periodCheckIn =
             periodEvents.find((r: any) => String(r.type) === "check-in") ||
             null;
+          if (
+            dailyRotationAttendance &&
+            schedule.dailyAttendanceStart &&
+            schedule.dailyAttendanceDeadline
+          ) {
+            const checkpointStart = schedule.dailyAttendanceStart.getTime();
+            const checkInDayEnd = localDateTimeUtc(
+              addDays(day, 1),
+              "00:00",
+              timezone,
+            ).getTime();
+            checkIn =
+              periodEvents.find((r: any) => {
+                const ts = Date.parse(String(r.timestamp));
+                return (
+                  String(r.type) === "check-in" &&
+                  ts >= checkpointStart &&
+                  ts < checkInDayEnd
+                );
+              }) || null;
+          }
           const checkoutCutoffAt = checkoutCutoff(
             employee,
             { start: periodStart, end: periodEnd },
@@ -607,7 +677,7 @@ export async function handleDailyStatus(
               const ts = Date.parse(String(r.timestamp));
               return (
                 Number.isFinite(ts) &&
-                ts >= periodStart.getTime() &&
+                ts >= periodAttendanceStart.getTime() &&
                 ts < checkoutCutoffAt
               );
             },
@@ -616,6 +686,10 @@ export async function handleDailyStatus(
             [...checkoutEvents]
               .reverse()
               .find((r: any) => String(r.type) === "check-out") || null;
+          if (dayKey(periodEnd, timezone) !== day) checkOut = null;
+          if (!dailyRotationAttendance)
+            checkIn =
+              dayKey(periodStart, timezone) === day ? periodCheckIn : null;
         }
       } else {
         const checkInRows =
@@ -680,21 +754,37 @@ export async function handleDailyStatus(
           .toLowerCase() === "escaped"
       )
         status = "ESCAPED";
-      else if (leaveIds.has(id)) status = "LEAVE";
-      else if (permissionIds.has(id)) status = "PERMISSION";
       else if (isAdminHoliday) status = "HOLIDAY";
       else if (schedule.status === "REST") status = "REST";
       else if (schedule.status === "NOT_STARTED") status = "NOT_STARTED";
       else if (schedule.status === "INVALID") status = "INVALID";
-      else if (checkIn) {
+      else if (leaveIds.has(id)) status = "LEAVE";
+      else if (permissionIds.has(id)) status = "PERMISSION";
+      else if (
+        checkIn ||
+        (isRotation && !dailyRotationAttendance && periodCheckIn)
+      ) {
         const grace = Number.isFinite(Number(employee.gracePeriodMinutes))
           ? Math.max(0, Number(employee.gracePeriodMinutes))
           : 10;
-        const arrivalStatus = isRotation
-          ? "PRESENT"
-          : schedule.start &&
-              Date.parse(String(checkIn.timestamp)) >
-                schedule.start.getTime() + grace * 60000
+        const lateDeadline =
+          isRotation && dailyRotationAttendance
+            ? schedule.dailyAttendanceDeadline?.getTime()
+            : schedule.start
+              ? schedule.start.getTime() + grace * 60000
+              : undefined;
+        const arrivalAt =
+          checkIn?.timestamp ||
+          (isRotation &&
+          !dailyRotationAttendance &&
+          schedule.start &&
+          dayKey(schedule.start, timezone) === day
+            ? periodCheckIn?.timestamp
+            : null);
+        const arrivalStatus =
+          lateDeadline !== undefined &&
+          arrivalAt &&
+          Date.parse(String(arrivalAt)) > lateDeadline
             ? "LATE"
             : "PRESENT";
 
@@ -704,12 +794,31 @@ export async function handleDailyStatus(
         status = arrivalStatus;
       } else if (isScheduledVip) status = "PRESENT";
       else if (
+        isRotation &&
+        dailyRotationAttendance &&
+        schedule.work &&
+        schedule.dailyAttendanceStart &&
+        schedule.dailyAttendanceDeadline &&
+        now.getTime() <= schedule.dailyAttendanceDeadline.getTime()
+      )
+        status = "NOT_STARTED";
+      else if (
+        isRotation &&
+        dailyRotationAttendance &&
+        schedule.work &&
+        schedule.dailyAttendanceDeadline &&
+        now.getTime() > schedule.dailyAttendanceDeadline.getTime()
+      )
+        status = "ABSENT";
+      else if (
+        isRotation &&
         dailyRotationAttendance &&
         schedule.work &&
         schedule.end &&
-        now.getTime() >= schedule.end.getTime()
+        dayKey(schedule.end, timezone) === day &&
+        periodCheckIn
       )
-        status = "ABSENT";
+        status = "PRESENT";
       else if (
         day >= today &&
         schedule.start &&
@@ -720,30 +829,68 @@ export async function handleDailyStatus(
       else status = "ABSENT";
       const vipCheckIn =
         isScheduledVip && !checkIn
-          ? schedule.start?.toISOString() || null
+          ? isRotation &&
+            schedule.start &&
+            dayKey(schedule.start, timezone) !== day
+            ? null
+            : schedule.start?.toISOString() || null
           : checkIn?.timestamp || null;
       const vipCheckOut =
         isScheduledVip &&
         Number(employee.autoCheckOut) === 1 &&
         !checkOut &&
         schedule.end &&
-        (day < today ||
-          (day === today && now.getTime() >= schedule.end.getTime()))
+        (isRotation
+          ? dayKey(schedule.end, timezone) === day &&
+            now.getTime() >= schedule.end.getTime()
+          : day < today ||
+            (day === today && now.getTime() >= schedule.end.getTime()))
           ? schedule.end.toISOString()
           : checkOut?.timestamp || null;
       const centralCheckInAt = vipCheckIn;
       const centralCheckOutAt = vipCheckOut;
+      const rotationStartDay =
+        isRotation &&
+        !!schedule.start &&
+        dayKey(schedule.start, timezone) === day;
+      const rotationEndDay =
+        isRotation && !!schedule.end && dayKey(schedule.end, timezone) === day;
+      const rotationPeriodCheckInAt =
+        isRotation && periodCheckIn
+          ? String(periodCheckIn.timestamp || "") || null
+          : isRotation && isScheduledVip
+            ? schedule.start?.toISOString() || null
+            : null;
       const workedMinutes = dailyRotationAttendance
         ? null
-        : minutesBetween(centralCheckInAt, centralCheckOutAt);
+        : isRotation
+          ? rotationEndDay && centralCheckOutAt
+            ? minutesBetween(rotationPeriodCheckInAt, centralCheckOutAt)
+            : null
+          : minutesBetween(centralCheckInAt, centralCheckOutAt);
       const expectedMinutes = dailyRotationAttendance
         ? 0
-        : minutesBetween(
-            schedule.start?.toISOString() || null,
-            schedule.end?.toISOString() || null,
-          );
+        : isRotation
+          ? rotationStartDay
+            ? minutesBetween(
+                schedule.start?.toISOString() || null,
+                schedule.end?.toISOString() || null,
+              )
+            : 0
+          : minutesBetween(
+              schedule.start?.toISOString() || null,
+              schedule.end?.toISOString() || null,
+            );
       const lateMinutes = dailyRotationAttendance
-        ? 0
+        ? status === "LATE" && schedule.dailyAttendanceStart && centralCheckInAt
+          ? Math.max(
+              0,
+              minutesBetween(
+                schedule.dailyAttendanceStart.toISOString(),
+                centralCheckInAt,
+              ) || 0,
+            )
+          : 0
         : status === "LATE" && schedule.start && centralCheckInAt
           ? Math.max(
               0,
@@ -753,7 +900,7 @@ export async function handleDailyStatus(
           : 0;
       const earlyLeaveMinutes = dailyRotationAttendance
         ? 0
-        : schedule.end && centralCheckOutAt
+        : schedule.end && centralCheckOutAt && (!isRotation || rotationEndDay)
           ? Math.max(
               0,
               minutesBetween(centralCheckOutAt, schedule.end.toISOString()) ||
@@ -762,21 +909,29 @@ export async function handleDailyStatus(
           : 0;
       const overtimeMinutes = dailyRotationAttendance
         ? 0
-        : schedule.end && centralCheckOutAt
+        : schedule.end && centralCheckOutAt && (!isRotation || rotationEndDay)
           ? Math.max(
               0,
               minutesBetween(schedule.end.toISOString(), centralCheckOutAt) ||
                 0,
             )
           : 0;
-      const shiftEnded =
-        !!checkIn &&
-        !checkOut &&
-        !!schedule.end &&
-        (day < today ||
-          (day === today && now.getTime() >= schedule.end.getTime()));
+      const hasShiftCheckIn = isRotation
+        ? !!periodCheckIn || isScheduledVip
+        : !!checkIn;
+      const shiftEnded = isRotation
+        ? hasShiftCheckIn &&
+          !checkOut &&
+          rotationEndDay &&
+          !!schedule.end &&
+          now.getTime() >= schedule.end.getTime()
+        : !!checkIn &&
+          !checkOut &&
+          !!schedule.end &&
+          (day < today ||
+            (day === today && now.getTime() >= schedule.end.getTime()));
       const exceptionCode =
-        checkOut && !checkIn
+        checkOut && !hasShiftCheckIn
           ? "CHECKOUT_WITHOUT_CHECKIN"
           : shiftEnded && (status === "PRESENT" || status === "LATE")
             ? "MISSING_CHECKOUT"
@@ -795,18 +950,26 @@ export async function handleDailyStatus(
       const notes =
         publicHolidayName && status === "HOLIDAY"
           ? publicHolidayName
-          : isRotation &&
-              checkIn &&
-              schedule.end &&
-              now.getTime() >= schedule.end.getTime()
-            ? checkOut
-              ? "انتهت المناوبة · سُجل الانصراف"
-              : "انتهت المناوبة · لم يُسجل الانصراف"
-            : isRotation && checkIn
-              ? "حضور مستمر حتى نهاية المناوبة"
-              : exceptionCode === "MISSING_CHECKOUT"
-                ? "حضر ولم يسجل الانصراف بعد"
-                : "";
+          : status === "LATE" && lateMinutes > 0
+            ? lateNote(lateMinutes)
+            : dailyRotationAttendance &&
+                status === "ABSENT" &&
+                schedule.dailyAttendanceDeadline &&
+                now.getTime() > schedule.dailyAttendanceDeadline.getTime()
+              ? "لم يسجل حضور لهذا اليوم"
+              : shiftEnded
+                ? "لم يسجل انصراف"
+                : isRotation &&
+                    rotationEndDay &&
+                    schedule.end &&
+                    now.getTime() >= schedule.end.getTime() &&
+                    checkOut
+                  ? "انتهت المناوبة · سُجل الانصراف"
+                  : isRotation && hasShiftCheckIn
+                    ? "حضور مستمر حتى نهاية المناوبة"
+                    : exceptionCode === "MISSING_CHECKOUT"
+                      ? "لم يسجل انصراف"
+                      : "";
       return {
         attendanceDay: day,
         employeeId: id,
@@ -817,6 +980,7 @@ export async function handleDailyStatus(
         scheduleType: String(employee.scheduleType || "ADMIN").toUpperCase(),
         checkInAt: centralCheckInAt,
         checkOutAt: centralCheckOutAt,
+        rotationPeriodCheckInAt,
         scheduledStart: schedule.start?.toISOString() || null,
         scheduledEnd: schedule.end?.toISOString() || null,
         rotationDailyAttendanceEnabled: dailyRotationAttendance,

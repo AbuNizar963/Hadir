@@ -14,7 +14,7 @@ type Env = { DB: D1Database; APP_TIMEZONE?: string };
 const TZ = "Asia/Damascus";
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const PROFESSIONAL_FACT_CALCULATION_VERSION =
-  "central-engine-timezone-v3-holidays-notes";
+  "central-engine-timezone-v5-rotation-grace-checkout";
 const dayNumber = (day: string) =>
   Date.UTC(
     Number(day.slice(0, 4)),

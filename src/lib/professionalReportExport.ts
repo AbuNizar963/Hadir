@@ -132,7 +132,7 @@ function finishSheet(ws: XLSX.WorkSheet, freeze = "A4") {
 function statusTone(
   value: string,
 ): "neutral" | "success" | "danger" | "warning" {
-  if (value.includes("غياب")) return "danger";
+  if (value.includes("غياب") || value.includes("انصراف معلق")) return "danger";
   if (
     value.includes("تأخر") ||
     value.includes("مبكر") ||

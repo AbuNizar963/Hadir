@@ -2,6 +2,7 @@ import {
   dateKey,
   getAttendanceShift,
   getAttendanceShiftForDay,
+  localDateTime,
 } from "./attendance-period";
 import { handleDailyStatus } from "./attendance-engine";
 import { refreshProfessionalAttendanceFact } from "./professional-attendance-fact-builder";
@@ -268,16 +269,9 @@ function checkoutRows(
 function dailyAttendanceWindow(employee: any, now: Date, timeZone = TZ) {
   const day = dateKey(now, timeZone);
   const time = String(employee.rotationDailyAttendanceTime || "12:00");
-  if (!/^(\d{1,2}):(\d{2})$/.test(time)) return null;
+  if (!/^\d{1,2}:\d{2}$/.test(time)) return null;
   const checkpoint = localDateTime(day, time, timeZone);
-  const grace = Math.min(
-    180,
-    Math.max(
-      0,
-      Math.floor(Number(employee.rotationDailyAttendanceGraceMinutes ?? 0)),
-    ),
-  );
-  return { checkpoint, end: new Date(checkpoint.getTime() + grace * 60000) };
+  return { checkpoint };
 }
 async function expectedQrCode(db: D1Database) {
   const row = await db
@@ -501,6 +495,17 @@ export async function handleEmployeeAttendance(
     earlyWindowStart,
   );
   const localDay = dateKey(now, timezone);
+  const [localYear, localMonth, localDate] = localDay.split("-").map(Number);
+  const nextLocalDay = new Date(
+    Date.UTC(localYear, localMonth - 1, localDate + 1),
+  )
+    .toISOString()
+    .slice(0, 10);
+  const attendanceDayEnd = localDateTime(
+    nextLocalDay,
+    "00:00",
+    timezone,
+  ).getTime();
   const dailyMode =
     String(fresh.employee.scheduleType || "").toUpperCase() === "ROTATION" &&
     Number(fresh.employee.rotationDailyAttendanceEnabled) === 1;
@@ -542,9 +547,9 @@ export async function handleEmployeeAttendance(
           403,
           origin,
         );
-      if (now.getTime() > window.end.getTime())
+      if (now.getTime() >= attendanceDayEnd)
         return json(
-          { error: "انتهت مهلة التسجيل اليومي لهذا اليوم" },
+          { error: "انتهى اليوم ولا يمكن تسجيل حضور يومي إضافي" },
           403,
           origin,
         );
@@ -623,10 +628,7 @@ export async function handleEmployeeAttendance(
           timezone,
         )?.checkpoint.getTime() ?? shift.start.getTime())
       : earlyWindowStart.getTime();
-    const guardEnd = dailyMode
-      ? (dailyAttendanceWindow(fresh.employee, now, timezone)?.end.getTime() ??
-        shift.end.getTime() + 60000)
-      : shift.end.getTime() + 60000;
+    const guardEnd = dailyMode ? attendanceDayEnd : shift.end.getTime() + 60000;
     insertResult = await env.DB.prepare(
       "INSERT INTO attendance(id,employee_id,job_number,employee_name,type,timestamp,lat,lng,distance_meters,device_id,ip,qr_code,location_id) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM attendance WHERE employee_id=? AND type='check-in' AND timestamp>=? AND timestamp<=?)",
     )
