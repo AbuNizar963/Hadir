@@ -180,7 +180,9 @@ export default {
         const to = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
         const day = new Date(Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth(), 1 + cursor)).toISOString().slice(0, 10);
         if (day > to) return json({ ok: true, done: true, cursor, from, to }, 200, o);
-        const employees = await env.DB.prepare("SELECT id FROM employees ORDER BY id LIMIT 2 OFFSET ?").bind(employeeCursor).all<{ id: string }>();
+        // Keep each Worker invocation bounded: one employee/day is safer than
+        // pairing two large attendance histories in the same CPU budget.
+        const employees = await env.DB.prepare("SELECT id FROM employees ORDER BY id LIMIT 1 OFFSET ?").bind(employeeCursor).all<{ id: string }>();
         const ids = (employees.results || []).map((row) => String(row.id));
         if (!ids.length)
           return json({ ok: true, done: false, dayDone: true, cursor, nextCursor: cursor + 1, employeeCursor: 0, day, from, to }, 200, o);

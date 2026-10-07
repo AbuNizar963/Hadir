@@ -115,7 +115,7 @@ export default function ReportArchive() {
           cursor = Number(batch.nextCursor ?? cursor + 1);
           employeeCursor = 0;
         } else {
-          employeeCursor = Number(batch.nextEmployeeCursor ?? employeeCursor + 2);
+          employeeCursor = Number(batch.nextEmployeeCursor ?? employeeCursor + 1);
         }
       }
       await refreshReportArchive();

@@ -99,13 +99,24 @@ export async function refreshReportArchive() {
 }
 
 export async function prepareReportArchive(cursor: number, employeeCursor = 0) {
-  const response = await fetch(`${API_URL}/api/reports/archive/prepare`, {
-    method: "POST",
-    headers: { ...adminHeaders(), "content-type": "application/json" },
-    body: JSON.stringify({ cursor, employeeCursor }),
-    credentials: "include",
-    cache: "no-store",
-  });
+  let response: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      response = await fetch(`${API_URL}/api/reports/archive/prepare`, {
+        method: "POST",
+        headers: { ...adminHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ cursor, employeeCursor }),
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (response.ok || ![502, 503, 504].includes(response.status)) break;
+    } catch (error) {
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
+    }
+  }
+  if (!response) {
+    throw new Error("تعذر الاتصال بخادم الأرشيف. أعد المحاولة؛ ستستكمل العملية من آخر دفعة ناجحة.");
+  }
   const data = (await response.json().catch(() => null)) as {
     error?: string;
     done?: boolean;
@@ -116,7 +127,7 @@ export async function prepareReportArchive(cursor: number, employeeCursor = 0) {
   } | null;
   if (!response.ok)
     throw new Error(String(data?.error || `HTTP ${response.status}`));
-  return data || { done: false, nextCursor: cursor, nextEmployeeCursor: employeeCursor + 2 };
+  return data || { done: false, nextCursor: cursor, nextEmployeeCursor: employeeCursor + 1 };
 }
 
 export async function downloadArchivedReport(
