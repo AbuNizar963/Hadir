@@ -84,8 +84,8 @@ export default function OwnerBulkSettingsPanel() {
 
   return <section dir="rtl" className="hud-card p-5 sm:p-6 border-primary/30 bg-primary/5">
     <div className="text-xs mono text-primary font-bold mb-1">OWNER CONTROL · BULK EMPLOYEE SETTINGS</div>
-    <h2 className="text-lg font-bold mb-1">إدارة الموظفين دفعة واحدة</h2>
-    <p className="text-sm text-muted-foreground mb-5">مركز تحكم موحد للمالك، مع قوائم منسدلة لتجميع العمليات وتقليل الازدحام ومنع التغييرات غير المقصودة.</p>
+    <h2 className="text-lg font-bold mb-1">العمليات الجماعية</h2>
+    <p className="text-sm text-muted-foreground mb-5">إدارة قواعد الدوام وحسابات الموظفين وأجهزتهم من قائمة واحدة متاحة للمالك.</p>
 
     <div className="rounded-2xl border bg-background/70 p-3 sm:p-4">
       <div className="flex items-center gap-3 mb-3">
@@ -99,14 +99,14 @@ export default function OwnerBulkSettingsPanel() {
             <option value="password">تغيير كلمة مرور جميع الموظفين</option>
             <option value="avatar">تغيير الصورة الشخصية للجميع</option>
           </optgroup>
-          <optgroup label="الدوام والحضور">
+          <optgroup label="جداول العمل والمهل">
             <option value="grace">مهلة التأخر</option>
             <option value="earlyCheckout">مهلة الانصراف المبكر</option>
             <option value="adminWorkHours">أوقات دوام الموظفين الإداريين</option>
             <option value="rotationWorkHours">أوقات دوام الموظفين التناوبيين</option>
             <option value="rotationDays">أيام التناوب للموظفين التناوبيين</option>
           </optgroup>
-          <optgroup label="الأجهزة والجلسات">
+          <optgroup label="الأجهزة وتسجيل الدخول">
             <option value="unlinkDevices">فك ربط جميع الأجهزة</option>
             <option value="revokeSessions">تسجيل خروج جميع الموظفين</option>
           </optgroup>
