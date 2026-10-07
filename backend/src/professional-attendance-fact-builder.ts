@@ -80,8 +80,11 @@ export async function materializeDay(
       env.DB,
       env.APP_TIMEZONE || DEFAULT_SYSTEM_TIME_ZONE,
     ));
+  const employeeQuery = employeeId
+    ? `&employeeId=${encodeURIComponent(employeeId)}`
+    : "";
   const request = new Request(
-    `https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}`,
+    `https://internal/api/manager/daily-status?date=${encodeURIComponent(day)}${employeeQuery}`,
     { method: "GET" },
   );
   const response = await handleDailyStatus(
