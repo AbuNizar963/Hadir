@@ -1,25 +1,5 @@
-/* HADIR · simple dark settings screen, inspired by the supplied reference. */
+/* HADIR · simple, theme-aware settings screen, inspired by the supplied reference. */
 .settings-page {
-  --background: 211 38% 12%;
-  --foreground: 210 24% 96%;
-  --card: 211 31% 16%;
-  --card-foreground: 210 24% 96%;
-  --popover: 211 31% 16%;
-  --popover-foreground: 210 24% 96%;
-  --primary: 199 86% 56%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 211 25% 21%;
-  --secondary-foreground: 210 24% 96%;
-  --muted: 211 23% 22%;
-  --muted-foreground: 211 13% 66%;
-  --accent: 211 22% 24%;
-  --accent-foreground: 210 24% 96%;
-  --destructive: 350 76% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 211 20% 25%;
-  --input: 211 20% 25%;
-  --ring: 199 86% 56%;
-
   box-sizing: border-box;
   width: min(100%, 980px);
   margin: 0 auto;
@@ -28,7 +8,7 @@
   border-radius: 22px;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  color-scheme: dark;
+  color-scheme: light;
   direction: rtl;
 }
 .settings-page *, .settings-page *::before, .settings-page *::after { box-sizing: border-box; }
@@ -188,13 +168,13 @@
 .settings-page .btn-secondary { border-color: hsl(var(--border)); background-color: hsl(var(--secondary)); color: hsl(var(--foreground)); }
 .settings-page .btn-danger { background-color: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
 .settings-page .btn-primary, .settings-page .btn-secondary, .settings-page .btn-danger { min-height: 40px; border-radius: 10px; font-weight: 700; }
-.settings-save-bar { position: fixed; z-index: 50; inset-inline: 0; bottom: 0; padding-bottom: max(.6rem, env(safe-area-inset-bottom)); border-top: 1px solid #30404d; background: #17212b; color: #f2f5f8; }
+.settings-save-bar { position: fixed; z-index: 50; inset-inline: 0; bottom: 0; padding-bottom: max(.6rem, env(safe-area-inset-bottom)); border-top: 1px solid hsl(var(--border)); background: hsl(var(--background) / .97); color: hsl(var(--foreground)); }
 .settings-save-bar[hidden] { display: none !important; }
 .settings-save-bar__inner { display: flex; width: min(100%, 980px); min-height: 52px; align-items: center; justify-content: space-between; gap: 12px; margin-inline: auto; padding-inline: 16px; }
 .settings-save-bar__copy { min-width: 0; }
 .settings-save-bar__actions { display: flex; align-items: center; gap: 12px; }
-.settings-save-bar .text-muted-foreground { color: #97a8b5 !important; }
-.settings-save-bar .btn-primary { background: #229ed9 !important; color: #fff !important; }
+.settings-save-bar .text-muted-foreground { color: hsl(var(--muted-foreground)) !important; }
+.settings-save-bar .btn-primary { background: hsl(var(--primary)) !important; color: hsl(var(--primary-foreground)) !important; }
 .settings-save-button { min-width: 144px; min-height: 40px; border-radius: 10px; font-weight: 750; }
 .settings-saved-status { color: #54c77a; font-size: 12px; font-weight: 750; }
 
