@@ -25,7 +25,9 @@ import {
   backendMe,
   resetBackendTestData,
   getHolidayCountries,
+  refreshHolidayCalendar,
 } from "@/lib/backend";
+import { setD1View } from "@/lib/d1View";
 import {
   getDiagnostics,
   clearDiagnostics,
@@ -333,7 +335,11 @@ export default function ManagerSettings() {
         } as Settings;
         if (!isValidSystemTimeZone(merged.timezone))
           merged.timezone = DEFAULT_SYSTEM_TIME_ZONE;
-        saveSettings(merged);
+        setD1View({
+          settings: merged,
+          locations: merged.locations || [],
+          admins: merged.adminAccounts || [],
+        });
         setSystemTimeZone(merged.timezone || DEFAULT_SYSTEM_TIME_ZONE);
         setS(merged);
         setLocLat(merged.workSiteLat);
@@ -444,6 +450,17 @@ export default function ManagerSettings() {
           return;
         }
         await saveBackendSettings(next);
+        if (next.holidayCountry) {
+          try {
+            await refreshHolidayCalendar(
+              next.holidayCountry,
+              new Date().getFullYear(),
+            );
+          } catch (holidayError) {
+            console.warn("تعذر تحديث تقويم العطل بعد الحفظ:", holidayError);
+            setError("تم حفظ الإعدادات، لكن تعذر تحديث تقويم العطل الآن.");
+          }
+        }
       }
       if (backendEnabled) {
         await saveBackendLocation({

@@ -359,6 +359,9 @@ async function ensureSchema(env: Env) {
         "CREATE INDEX IF NOT EXISTS idx_official_holidays_year ON official_holidays(country_code,year,holiday_date)",
       ),
       env.DB.prepare(
+        "CREATE TABLE IF NOT EXISTS holiday_countries(code TEXT PRIMARY KEY,name TEXT NOT NULL,name_en TEXT NOT NULL,source_version TEXT NOT NULL,updated_at TEXT NOT NULL)",
+      ),
+      env.DB.prepare(
         "CREATE TABLE IF NOT EXISTS auth_sessions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL,user_type TEXT NOT NULL CHECK(user_type IN ('admin','employee')),role TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,last_seen_at TEXT NOT NULL,revoked_at TEXT)",
       ),
       env.DB.prepare(

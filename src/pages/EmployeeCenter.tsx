@@ -147,7 +147,7 @@ export default function EmployeeCenter() {
     return () => {
       alive = false;
     };
-  }, [session?.employeeId]);
+  }, [session, session?.employeeId]);
 
   const copyJobNumber = async () => {
     const value = String(employee?.jobNumber || "").trim();

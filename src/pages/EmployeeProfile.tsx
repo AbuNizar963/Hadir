@@ -166,6 +166,8 @@ export default function EmployeeProfile() {
   };
   useEffect(() => {
     void loadProfile();
+    // loadProfile intentionally uses the current authenticated session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const openPhotoPicker = () => {
     setError("");

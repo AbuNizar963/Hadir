@@ -258,6 +258,8 @@ export default function WeatherPage() {
       if (timer !== undefined) window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
+    // Location polling intentionally starts once and manages its own timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const chart = useMemo(() => w?.hours.slice(0, 12) ?? [], [w]);
   const vals = chart.map((x) =>

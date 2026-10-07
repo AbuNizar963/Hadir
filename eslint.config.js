@@ -52,4 +52,14 @@ export default [
       "no-useless-escape": "off",
     },
   },
+  {
+    files: [
+      "src/components/ui/**/*.tsx",
+      "src/components/system/ToastProvider.tsx",
+    ],
+    rules: {
+      // These primitives intentionally export variants alongside components.
+      "react-refresh/only-export-components": "off",
+    },
+  },
 ];

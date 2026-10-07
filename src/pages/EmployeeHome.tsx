@@ -304,7 +304,7 @@ export default function EmployeeHome() {
   );
   const currentRecords = useMemo(
     () => periodRecords(attendance, emp?.id || "", period.start, period.end),
-    [attendance, emp?.id, period.start?.getTime(), period.end?.getTime()],
+    [attendance, emp?.id, period.start, period.end],
   );
   const latest = useMemo(
     () =>

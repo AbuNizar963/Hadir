@@ -72,9 +72,10 @@ export function getSettings(): Settings {
   };
 }
 
-export function saveSettings(next: Settings): void {
+export async function saveSettings(next: Settings): Promise<void> {
   if (backendEnabled) {
-    void saveBackendSettings(next).then(() => hydrateLocalData());
+    await saveBackendSettings(next);
+    await hydrateLocalData();
     return;
   }
 

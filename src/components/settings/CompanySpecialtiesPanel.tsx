@@ -11,7 +11,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import type { Settings } from "@/types";
-import { getSettings, saveSettings } from "@/lib/storage";
+import { getSettings } from "@/lib/storage";
 import { getBackendSettings, saveBackendSettings } from "@/lib/backend";
 import { setD1View } from "@/lib/d1View";
 import { compressProfileImageDataUrl } from "@/lib/imageCompression";
@@ -79,8 +79,12 @@ async function deleteCompanyLogo() {
     credentials: "include",
     cache: "no-store",
   });
-  const d = (await r.json().catch(() => ({}))) as { error?: string };
+  const d = (await r.json().catch(() => ({}))) as {
+    error?: string;
+    settingsCleaned?: boolean;
+  };
   if (!r.ok) throw new Error(d.error || "تعذر إزالة الشعار من R2.");
+  return d;
 }
 
 export default function CompanySpecialtiesPanel() {
@@ -93,7 +97,6 @@ export default function CompanySpecialtiesPanel() {
   const [message, setMessage] = useState<string | null>(null);
 
   const applyRemoteSettings = (remote: Settings) => {
-    saveSettings(remote);
     setD1View({
       settings: remote,
       locations: remote.locations || [],
@@ -214,7 +217,7 @@ export default function CompanySpecialtiesPanel() {
     try {
       // R2 deletion is authoritative. Clear the UI immediately after the
       // successful DELETE and do not let a stale D1 response restore the old logo.
-      await deleteCompanyLogo();
+      const result = await deleteCompanyLogo();
       setBrandLogo(null);
       if (typeof window !== "undefined")
         window.dispatchEvent(new Event("hadir:settings-changed"));
@@ -229,7 +232,11 @@ export default function CompanySpecialtiesPanel() {
         // R2 deletion already succeeded; keep the logo removed locally even
         // if D1 is temporarily unavailable or still serving an older setting.
       }
-      setMessage("تم حذف الشعار نهائيًا من R2 وتحديث الواجهة.");
+      setMessage(
+        result.settingsCleaned === false
+          ? "تم حذف الشعار من R2، لكن تعذر تنظيف مرجعه في D1. أعد المحاولة لاحقًا."
+          : "تم حذف الشعار نهائيًا من R2 وتحديث الواجهة.",
+      );
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "تعذر إزالة الشعار");
     } finally {

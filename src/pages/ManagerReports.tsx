@@ -808,7 +808,7 @@ export default function ManagerReports() {
             dailyStatusMap,
           )
         : [],
-    [mode, summaries, dates, index, settings, requests, dailyStatusMap],
+    [mode, summaries, dates, index, settings, requests, dailyStatusMap, date],
   );
   const groups = useMemo(() => {
     const map = new Map<string, ServiceRow[]>();

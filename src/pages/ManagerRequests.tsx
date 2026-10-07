@@ -221,6 +221,8 @@ export default function ManagerRequests() {
       window.removeEventListener("online", scheduleRefresh);
       document.removeEventListener("visibilitychange", onVisibility);
     };
+    // The timer and event listeners intentionally use the initial load closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pending = useMemo(

@@ -92,7 +92,7 @@ export default function EmployeePremium() {
     return () => {
       alive = false;
     };
-  }, [session?.employeeId]);
+  }, [session, session?.employeeId]);
 
   const pairs = useMemo(() => {
     const map = new Map<string, any>();

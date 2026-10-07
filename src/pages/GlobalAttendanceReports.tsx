@@ -238,11 +238,16 @@ export default function GlobalAttendanceReports() {
 
   useEffect(() => {
     void load();
+    // load intentionally captures the selected report range.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const daily = report?.analytics.dailySeries || [];
   const rows = report?.rows || [];
-  const employeeSummary = report?.analytics.employeeSummaries || [];
+  const employeeSummary = useMemo(
+    () => report?.analytics.employeeSummaries || [],
+    [report?.analytics.employeeSummaries],
+  );
   const exceptions = report?.analytics.exceptions || [];
 
   const statusData = report

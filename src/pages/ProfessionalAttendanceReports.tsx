@@ -171,10 +171,15 @@ export default function ProfessionalAttendanceReports() {
   }, []);
   useEffect(() => {
     void load();
+    // load intentionally captures the selected report range.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const daily = report?.analytics.dailySeries || [];
-  const employeesSummary = report?.analytics.employeeSummaries || [];
+  const employeesSummary = useMemo(
+    () => report?.analytics.employeeSummaries || [],
+    [report?.analytics.employeeSummaries],
+  );
   const exceptions = report?.analytics.exceptions || [];
   const topEmployees = useMemo(
     () =>
