@@ -7,7 +7,7 @@ import {
   listReportArchives,
   repairArchiveManifest,
 } from "./report-archive";
-import { refreshProfessionalAttendanceFacts } from "./professional-attendance-fact-builder";
+import { materializeDay } from "./professional-attendance-fact-builder";
 export { HadirRealtime };
 
 type Env = {
@@ -177,10 +177,10 @@ export default {
         const from = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}-01`;
         const lastDay = new Date(Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth() + 1, 0)).getUTCDate();
         const to = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-        const row = await env.DB.prepare("SELECT id FROM employees ORDER BY id LIMIT 1 OFFSET ?").bind(cursor).first<{ id: string }>();
-        if (!row) return json({ ok: true, done: true, cursor, from, to }, 200, o);
-        const written = await refreshProfessionalAttendanceFacts(env, from, to, { id: a.id, role: a.role }, String(row.id));
-        return json({ ok: true, done: false, cursor, nextCursor: cursor + 1, employeeId: row.id, written, from, to }, 200, o);
+        const day = new Date(Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth(), 1 + cursor)).toISOString().slice(0, 10);
+        if (day > to) return json({ ok: true, done: true, cursor, from, to }, 200, o);
+        const written = await materializeDay(env, day, { id: a.id, role: a.role }, undefined, timezone);
+        return json({ ok: true, done: false, cursor, nextCursor: cursor + 1, day, written, from, to }, 200, o);
       } catch (error) {
         console.error("[report-archive] batch preparation failed", error);
         return json({ error: error instanceof Error ? error.message : "تعذر تجهيز دفعة الأرشيف" }, 500, o);
