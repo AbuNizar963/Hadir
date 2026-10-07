@@ -5,6 +5,7 @@ import {
   deleteReportArchive,
   getReportArchive,
   listReportArchives,
+  repairArchiveManifest,
 } from "./report-archive";
 export { HadirRealtime };
 
@@ -135,6 +136,24 @@ export default {
                 ? error.message
                 : "تعذر إنشاء أرشيف الشهر المغلق",
           },
+          500,
+          o,
+        );
+      }
+    }
+
+    if (path === "/api/reports/archive/repair" && request.method === "POST") {
+      const a = await archiveActor(request, env);
+      if (!archiveDeleteAllowed(a))
+        return json({ error: "إصلاح الأرشيف متاح للمالك فقط" }, 403, o);
+      try {
+        const body = await request.json().catch(() => ({} as any));
+        const id = String(body?.reportId || "attendance_period_2026-09-01");
+        return json(await repairArchiveManifest(env, id), 200, o);
+      } catch (error) {
+        console.error("[report-archive] safe manifest repair failed", error);
+        return json(
+          { error: error instanceof Error ? error.message : "تعذر التحقق من الأرشيف" },
           500,
           o,
         );

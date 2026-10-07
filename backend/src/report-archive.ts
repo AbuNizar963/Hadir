@@ -503,6 +503,52 @@ export async function listReportArchives(env: Env, limit = 25) {
 
   return result.results || [];
 }
+
+export async function repairArchiveManifest(env: Env, id: string) {
+  const row = await env.DB.prepare("SELECT * FROM report_archives WHERE report_id=? LIMIT 1")
+    .bind(id)
+    .first<ArchiveRow>();
+  if (!row) return { ok: false, reason: "not_found" as const };
+  if (row.status === "LOCKED")
+    return { ok: true, repaired: false, reason: "already_locked", row };
+  if (!env.REPORT_ARCHIVES || !row.file_key)
+    return { ok: false, reason: "missing_storage_binding_or_key", row };
+  const head = await env.REPORT_ARCHIVES.head(row.file_key);
+  const hash = head?.customMetadata?.sha256 || "";
+  if (
+    !head ||
+    !row.file_sha256 ||
+    head.size !== Number(row.file_size) ||
+    hash !== row.file_sha256
+  )
+    return {
+      ok: false,
+      reason: "r2_object_not_verified",
+      row: {
+        report_id: row.report_id,
+        status: row.status,
+        file_key: row.file_key,
+        file_size: row.file_size,
+        file_sha256: row.file_sha256,
+      },
+      r2: head ? { size: head.size, sha256: hash } : null,
+    };
+  const lockedAt = new Date().toISOString();
+  await env.DB.prepare(
+    "UPDATE report_archives SET status='LOCKED',locked_at=?,locked_by='system' WHERE report_id=? AND status<>'LOCKED'",
+  )
+    .bind(lockedAt, id)
+    .run();
+  return {
+    ok: true,
+    repaired: true,
+    reportId: id,
+    lockedAt,
+    fileKey: row.file_key,
+    size: head.size,
+    sha256: hash,
+  };
+}
 export async function getReportArchive(env: Env, id: string) {
   return await env.DB.prepare(
     "SELECT * FROM report_archives WHERE report_id=? AND status='LOCKED' LIMIT 1",
