@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ManagerLayout from "@/components/layout/ManagerLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,17 +40,16 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import {
   ResponsiveContainer,
-  AreaChart,
-  Area,
+  ComposedChart,
   CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
+  Line,
   Cell,
+  LabelList,
   Legend,
 } from "recharts";
 import type { Employee } from "@/types";
@@ -108,6 +113,15 @@ const exceptionLabels: Record<string, string> = {
   OVERTIME: "عمل إضافي",
 };
 
+const exceptionChartColors: Record<string, string> = {
+  MISSING_CHECKOUT: "#b91c1c",
+  CHECKOUT_WITHOUT_CHECKIN: "#7c3aed",
+  ABSENT_NO_APPROVED_REASON: "#dc2626",
+  LATE_ARRIVAL: "#d97706",
+  EARLY_LEAVE: "#ea580c",
+  OVERTIME: "#0284c7",
+};
+
 const getExceptionLabel = (
   code: string | null | undefined,
   status?: string | null,
@@ -125,6 +139,17 @@ const damascusToday = () =>
   new Intl.DateTimeFormat("en-CA", { timeZone: getSystemTimeZone() }).format(
     new Date(),
   );
+
+const formatChartDate = (value: string) => {
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("ar", {
+    timeZone: getSystemTimeZone(),
+    day: "numeric",
+    month: "short",
+  }).format(date);
+};
 
 const formatDateTime = (value: unknown) =>
   value
@@ -296,55 +321,99 @@ export default function GlobalAttendanceReports() {
   );
   const exceptions = report?.analytics.exceptions || [];
 
-  const statusData = report
-    ? [
-        {
-          name: labels.PRESENT,
-          value: report.summary.present,
-          color: chartStatusColors.PRESENT,
-        },
-        {
-          name: labels.LATE,
-          value: report.summary.late,
-          color: chartStatusColors.LATE,
-        },
-        {
-          name: labels.ABSENT,
-          value: report.summary.absent,
-          color: chartStatusColors.ABSENT,
-        },
-        {
-          name: labels.LEAVE,
-          value: report.summary.leave,
-          color: chartStatusColors.LEAVE,
-        },
-        {
-          name: labels.PERMISSION,
-          value: report.summary.permission,
-          color: chartStatusColors.PERMISSION,
-        },
-        {
-          name: labels.REST,
-          value: report.summary.rest,
-          color: chartStatusColors.REST,
-        },
-        {
-          name: labels.ESCAPED,
-          value: report.summary.escaped,
-          color: chartStatusColors.ESCAPED,
-        },
-        {
-          name: labels.NOT_STARTED,
-          value: report.summary.notStarted,
-          color: chartStatusColors.NOT_STARTED,
-        },
-        {
-          name: labels.INVALID,
-          value: report.summary.invalid,
-          color: chartStatusColors.INVALID,
-        },
-      ].filter((item) => item.value > 0)
-    : [];
+  const statusData = useMemo(
+    () =>
+      report
+        ? [
+            {
+              name: labels.PRESENT,
+              value: report.summary.present,
+              color: chartStatusColors.PRESENT,
+            },
+            {
+              name: labels.LATE,
+              value: report.summary.late,
+              color: chartStatusColors.LATE,
+            },
+            {
+              name: labels.ABSENT,
+              value: report.summary.absent,
+              color: chartStatusColors.ABSENT,
+            },
+            {
+              name: labels.LEAVE,
+              value: report.summary.leave,
+              color: chartStatusColors.LEAVE,
+            },
+            {
+              name: labels.PERMISSION,
+              value: report.summary.permission,
+              color: chartStatusColors.PERMISSION,
+            },
+            {
+              name: labels.REST,
+              value: report.summary.rest,
+              color: chartStatusColors.REST,
+            },
+            {
+              name: labels.ESCAPED,
+              value: report.summary.escaped,
+              color: chartStatusColors.ESCAPED,
+            },
+            {
+              name: labels.NOT_STARTED,
+              value: report.summary.notStarted,
+              color: chartStatusColors.NOT_STARTED,
+            },
+            {
+              name: labels.INVALID,
+              value: report.summary.invalid,
+              color: chartStatusColors.INVALID,
+            },
+          ].filter((item) => item.value > 0)
+        : [],
+    [report],
+  );
+
+  const attendanceTrend = useMemo(
+    () =>
+      daily.map((day) => {
+        const scheduled = day.present + day.late + day.absent;
+        const attended = day.present + day.late;
+        return {
+          ...day,
+          attendanceRate: scheduled ? (attended / scheduled) * 100 : 0,
+          punctualityRate: attended ? (day.present / attended) * 100 : 0,
+        };
+      }),
+    [daily],
+  );
+
+  const statusChartData = useMemo(() => {
+    const total = report?.summary.employeeDays || 0;
+    return [...statusData]
+      .sort((a, b) => b.value - a.value)
+      .map((item) => {
+        const percentage = total ? (item.value / total) * 100 : 0;
+        return {
+          ...item,
+          displayValue: `${item.value.toLocaleString("ar")} · ${percentage.toFixed(1)}%`,
+        };
+      });
+  }, [report?.summary.employeeDays, statusData]);
+
+  const exceptionChartData = useMemo(
+    () =>
+      Object.entries(report?.analytics.exceptionCounts || {})
+        .map(([code, value]) => ({
+          code,
+          name: exceptionLabels[code] || code,
+          value,
+          color: exceptionChartColors[code] || "#475569",
+        }))
+        .sort((a, b) => b.value - a.value),
+    [report?.analytics.exceptionCounts],
+  );
 
   const rankedEmployees = useMemo(
     () =>
@@ -884,152 +953,378 @@ export default function GlobalAttendanceReports() {
             </div>
 
             {tab === "overview" && (
-              <>
-                <div className="grid gap-5 lg:grid-cols-3">
+              <div className="space-y-5">
+                <div className="grid gap-5 lg:grid-cols-5">
+                  <Card className="lg:col-span-3">
+                    <CardHeader>
+                      <CardTitle className="text-lg">
+                        الحضور والانضباط حسب اليوم
+                      </CardTitle>
+                      <CardDescription className="leading-6">
+                        الأعمدة تعرض الأعداد اليومية. معدل الحضور = (حاضر +
+                        متأخر) ÷ (حاضر + متأخر + غياب)، والانضباط بالوقت = حاضر
+                        ÷ (حاضر + متأخر).
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[350px]">
+                      {attendanceTrend.length ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart
+                            data={attendanceTrend}
+                            margin={{ top: 12, right: 8, left: 0, bottom: 8 }}
+                          >
+                            <CartesianGrid
+                              vertical={false}
+                              stroke="#e2e8f0"
+                              strokeDasharray="3 3"
+                            />
+                            <XAxis
+                              dataKey="attendanceDay"
+                              tickFormatter={formatChartDate}
+                              tick={{ fontSize: 11, fill: "#64748b" }}
+                              axisLine={false}
+                              tickLine={false}
+                              minTickGap={16}
+                            />
+                            <YAxis
+                              yAxisId="count"
+                              allowDecimals={false}
+                              tick={{ fontSize: 11, fill: "#64748b" }}
+                              axisLine={false}
+                              tickLine={false}
+                              width={34}
+                            />
+                            <YAxis
+                              yAxisId="rate"
+                              orientation="right"
+                              domain={[0, 100]}
+                              tickFormatter={(value) =>
+                                `${Math.round(Number(value))}%`
+                              }
+                              tick={{ fontSize: 11, fill: "#64748b" }}
+                              axisLine={false}
+                              tickLine={false}
+                              width={42}
+                            />
+                            <Tooltip
+                              labelFormatter={(value) =>
+                                formatChartDate(String(value))
+                              }
+                              formatter={(value, name) => {
+                                const label = String(name);
+                                const isRate =
+                                  label.includes("معدل") ||
+                                  label.includes("الانضباط");
+                                return [
+                                  isRate
+                                    ? `${Number(value).toFixed(1)}%`
+                                    : Number(value).toLocaleString("ar"),
+                                  label,
+                                ];
+                              }}
+                              contentStyle={{
+                                borderRadius: 12,
+                                borderColor: "#cbd5e1",
+                                boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
+                              }}
+                            />
+                            <Legend
+                              wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                            />
+                            <Bar
+                              yAxisId="count"
+                              dataKey="present"
+                              name="حاضر"
+                              stackId="attendance"
+                              fill="#059669"
+                              barSize={22}
+                            />
+                            <Bar
+                              yAxisId="count"
+                              dataKey="late"
+                              name="متأخر"
+                              stackId="attendance"
+                              fill="#d97706"
+                              barSize={22}
+                            />
+                            <Bar
+                              yAxisId="count"
+                              dataKey="absent"
+                              name="غياب"
+                              stackId="attendance"
+                              fill="#dc2626"
+                              radius={[4, 4, 0, 0]}
+                              barSize={22}
+                            />
+                            <Line
+                              yAxisId="rate"
+                              type="monotone"
+                              dataKey="attendanceRate"
+                              name="معدل الحضور"
+                              stroke="#0f766e"
+                              strokeWidth={2.5}
+                              dot={{ r: 3, fill: "#0f766e", stroke: "#fff" }}
+                              activeDot={{ r: 5 }}
+                            />
+                            <Line
+                              yAxisId="rate"
+                              type="monotone"
+                              dataKey="punctualityRate"
+                              name="الانضباط بالمواعيد"
+                              stroke="#4f46e5"
+                              strokeWidth={2.5}
+                              strokeDasharray="5 4"
+                              dot={{ r: 3, fill: "#4f46e5", stroke: "#fff" }}
+                              activeDot={{ r: 5 }}
+                            />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                          لا توجد بيانات حضور ضمن الفترة المحددة.
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
                   <Card className="lg:col-span-2">
                     <CardHeader>
                       <CardTitle className="text-lg">
-                        اتجاه الحضور والغياب
+                        توزيع حالات الدوام
                       </CardTitle>
+                      <CardDescription>
+                        عدد سجلات الموظف/اليوم ونسبتها من الإجمالي؛ الحالات غير
+                        المجدولة مثل الراحة و«لم يبدأ» ليست غياباً.
+                      </CardDescription>
                     </CardHeader>
-                    <CardContent className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={daily}
-                          margin={{ top: 8, right: 12, left: 8, bottom: 8 }}
-                        >
-                          <CartesianGrid
-                            stroke="#e2e8f0"
-                            strokeDasharray="3 3"
-                          />
-                          <XAxis
-                            dataKey="attendanceDay"
-                            tick={{ fontSize: 11, fill: "#64748b" }}
-                          />
-                          <YAxis
-                            allowDecimals={false}
-                            tick={{ fill: "#64748b" }}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              borderRadius: 12,
-                              borderColor: "#cbd5e1",
-                            }}
-                          />
-                          <Legend wrapperStyle={{ fontSize: 12 }} />
-                          <Area
-                            type="monotone"
-                            dataKey="present"
-                            name="حاضر"
-                            stroke="#059669"
-                            fill="#059669"
-                            fillOpacity={0.18}
-                            strokeWidth={2}
-                            dot={{ r: 4, strokeWidth: 1, fill: "#ffffff" }}
-                            activeDot={{ r: 6 }}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="late"
-                            name="متأخر"
-                            stroke="#d97706"
-                            fill="#d97706"
-                            fillOpacity={0.14}
-                            strokeWidth={2}
-                            dot={{ r: 4, strokeWidth: 1, fill: "#ffffff" }}
-                            activeDot={{ r: 6 }}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="absent"
-                            name="غياب"
-                            stroke="#dc2626"
-                            fill="#dc2626"
-                            fillOpacity={0.14}
-                            strokeWidth={2}
-                            dot={{ r: 4, strokeWidth: 1, fill: "#ffffff" }}
-                            activeDot={{ r: 6 }}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">توزيع الحالات</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={statusData}
-                            dataKey="value"
-                            nameKey="name"
-                            innerRadius={55}
-                            outerRadius={90}
-                            paddingAngle={2}
-                            label={({ value }) => String(value)}
-                            labelLine={false}
+                    <CardContent className="h-[350px]">
+                      {statusChartData.length ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={statusChartData}
+                            layout="vertical"
+                            margin={{ top: 8, right: 88, left: 4, bottom: 8 }}
                           >
-                            {statusData.map((item) => (
-                              <Cell
-                                key={item.name}
-                                fill={item.color}
-                                stroke="#ffffff"
-                                strokeWidth={2}
+                            <CartesianGrid
+                              horizontal={false}
+                              stroke="#e2e8f0"
+                              strokeDasharray="3 3"
+                            />
+                            <XAxis
+                              type="number"
+                              allowDecimals={false}
+                              tick={{ fontSize: 11, fill: "#64748b" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              type="category"
+                              dataKey="name"
+                              width={98}
+                              tick={{ fontSize: 11, fill: "#475569" }}
+                              axisLine={false}
+                              tickLine={false}
+                              interval={0}
+                            />
+                            <Tooltip
+                              formatter={(value) => [
+                                `${Number(value).toLocaleString("ar")} سجل`,
+                                "العدد",
+                              ]}
+                              contentStyle={{
+                                borderRadius: 12,
+                                borderColor: "#cbd5e1",
+                              }}
+                            />
+                            <Bar
+                              dataKey="value"
+                              name="عدد السجلات"
+                              radius={[0, 6, 6, 0]}
+                              barSize={18}
+                            >
+                              {statusChartData.map((item) => (
+                                <Cell key={item.name} fill={item.color} />
+                              ))}
+                              <LabelList
+                                dataKey="displayValue"
+                                position="right"
+                                fill="#475569"
+                                fontSize={10}
                               />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                          <Legend wrapperStyle={{ fontSize: 12 }} />
-                        </PieChart>
-                      </ResponsiveContainer>
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                          لا توجد سجلات لتوزيعها.
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      الساعات الفعلية مقابل المتوقعة
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={daily}
-                        margin={{ top: 8, right: 12, left: 8, bottom: 8 }}
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">
+                        الساعات المجدولة مقابل المثبتة
+                      </CardTitle>
+                      <CardDescription>
+                        الساعات المثبتة تُحتسب بعد تسجيل الانصراف؛ وقد تقل أثناء
+                        اليوم أو عند وجود مناوبات مفتوحة.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[310px]">
+                      {daily.length ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={daily}
+                            margin={{ top: 12, right: 12, left: 4, bottom: 8 }}
+                          >
+                            <CartesianGrid
+                              vertical={false}
+                              stroke="#e2e8f0"
+                              strokeDasharray="3 3"
+                            />
+                            <XAxis
+                              dataKey="attendanceDay"
+                              tickFormatter={formatChartDate}
+                              tick={{ fontSize: 11, fill: "#64748b" }}
+                              axisLine={false}
+                              tickLine={false}
+                              minTickGap={16}
+                            />
+                            <YAxis
+                              tick={{ fontSize: 11, fill: "#64748b" }}
+                              tickFormatter={(value) =>
+                                `${Math.round(Number(value) / 60)}س`
+                              }
+                              axisLine={false}
+                              tickLine={false}
+                              width={42}
+                            />
+                            <Tooltip
+                              labelFormatter={(value) =>
+                                formatChartDate(String(value))
+                              }
+                              formatter={(value, name) => [
+                                fmt(Number(value)),
+                                String(name),
+                              ]}
+                              contentStyle={{
+                                borderRadius: 12,
+                                borderColor: "#cbd5e1",
+                              }}
+                            />
+                            <Legend wrapperStyle={{ fontSize: 12 }} />
+                            <Bar
+                              dataKey="expectedMinutes"
+                              name="ساعات مجدولة"
+                              fill="#94a3b8"
+                              radius={[4, 4, 0, 0]}
+                            />
+                            <Bar
+                              dataKey="workedMinutes"
+                              name="ساعات مثبتة بانصراف"
+                              fill="#0f766e"
+                              radius={[4, 4, 0, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                          لا توجد ساعات مجدولة ضمن الفترة.
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="flex flex-row items-start justify-between gap-3">
+                      <div className="space-y-1.5">
+                        <CardTitle className="text-lg">
+                          الاستثناءات التي تحتاج متابعة
+                        </CardTitle>
+                        <CardDescription>
+                          مرتبة من الأكثر تكراراً؛ افتح السجل لمراجعة الحالات
+                          والموظفين المعنيين.
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTab("exceptions")}
+                        disabled={!exceptionChartData.length}
                       >
-                        <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="attendanceDay"
-                          tick={{ fontSize: 11, fill: "#64748b" }}
-                        />
-                        <YAxis
-                          tick={{ fill: "#64748b" }}
-                          tickFormatter={(value) =>
-                            `${(Number(value) / 60).toFixed(1)}س`
-                          }
-                        />
-                        <Tooltip formatter={(value) => fmt(Number(value))} />
-                        <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar
-                          dataKey="expectedMinutes"
-                          name="المتوقع"
-                          fill="#94a3b8"
-                          radius={[4, 4, 0, 0]}
-                        />
-                        <Bar
-                          dataKey="workedMinutes"
-                          name="الفعلي"
-                          fill="#2563eb"
-                          radius={[4, 4, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </>
+                        فتح السجل
+                      </Button>
+                    </CardHeader>
+                    <CardContent className="h-[310px]">
+                      {exceptionChartData.length ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={exceptionChartData}
+                            layout="vertical"
+                            margin={{ top: 8, right: 40, left: 8, bottom: 8 }}
+                          >
+                            <CartesianGrid
+                              horizontal={false}
+                              stroke="#e2e8f0"
+                              strokeDasharray="3 3"
+                            />
+                            <XAxis
+                              type="number"
+                              allowDecimals={false}
+                              tick={{ fontSize: 11, fill: "#64748b" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              type="category"
+                              dataKey="name"
+                              width={150}
+                              tick={{ fontSize: 11, fill: "#475569" }}
+                              axisLine={false}
+                              tickLine={false}
+                              interval={0}
+                            />
+                            <Tooltip
+                              formatter={(value) => [
+                                `${Number(value).toLocaleString("ar")} مرة`,
+                                "التكرار",
+                              ]}
+                              contentStyle={{
+                                borderRadius: 12,
+                                borderColor: "#cbd5e1",
+                              }}
+                            />
+                            <Bar
+                              dataKey="value"
+                              name="عدد الحالات"
+                              radius={[0, 6, 6, 0]}
+                              barSize={20}
+                            >
+                              {exceptionChartData.map((item) => (
+                                <Cell key={item.code} fill={item.color} />
+                              ))}
+                              <LabelList
+                                dataKey="value"
+                                position="right"
+                                fill="#475569"
+                                fontSize={11}
+                              />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex h-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+                          لا توجد استثناءات مسجلة في الفترة المحددة.
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             )}
 
             {tab === "daily" && (
