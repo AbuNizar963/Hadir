@@ -242,9 +242,6 @@ export default function ReportArchive() {
                 <div className="text-xs font-bold text-primary">
                   HADIR · REPORT ARCHIVE
                 </div>
-                <h1 className="mt-2 text-2xl font-black">
-                  أرشيف التقارير الرسمي
-                </h1>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
                   الأرشيف يعتمد على نفس محرك التقارير الرسمي المستخدم في
                   التقرير اليومي والشهري، ثم يقفل نسخة Excel في R2 للتحقق
