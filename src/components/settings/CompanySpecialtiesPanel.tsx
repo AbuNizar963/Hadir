@@ -178,8 +178,12 @@ export default function CompanySpecialtiesPanel() {
       <div className="border-t-0 p-5 sm:p-7">
         <div className="space-y-4">
           <div className="space-y-4">
-            <label className="block text-xs font-bold text-muted-foreground">اسم الشركة / الجهة<input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void persist({ brandName: brandName.trim() }); } }} maxLength={120} className="input mt-2 h-11 w-full rounded-xl" placeholder="مثال: شركة أو مؤسسة" /></label>
-            <button type="button" disabled={saving || !hydrated || !brandName.trim()} onClick={() => void persist({ brandName: brandName.trim() })} className="btn-primary inline-flex items-center gap-2 rounded-xl px-4"><Check className="h-4 w-4" />حفظ اسم الجهة</button>
+            <label className="block text-xs font-bold text-muted-foreground">اسم الشركة / الجهة
+              <div className="relative mt-2">
+                <input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void persist({ brandName: brandName.trim() }); } }} maxLength={120} className="input h-11 w-full rounded-xl pl-12" placeholder="مثال: شركة أو مؤسسة" />
+                <button type="button" disabled={saving || !hydrated || !brandName.trim()} onClick={() => void persist({ brandName: brandName.trim() })} className="absolute left-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40" title="حفظ اسم الشركة" aria-label="حفظ اسم الشركة"><Check className="h-4 w-4" /></button>
+              </div>
+            </label>
             <div className="flex flex-col items-center rounded-2xl border border-border/70 bg-background/50 p-4 text-center">
               <div className="text-sm font-black">شعار الشركة</div>
               <div className="mt-3 grid h-24 w-24 place-items-center overflow-hidden rounded-2xl border border-border bg-background shadow-inner">
