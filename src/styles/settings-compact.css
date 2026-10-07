@@ -1,30 +1,117 @@
-/* HADIR · Compact settings controls, scoped to the settings workspace. */
-.settings-page details.hud-card.group { overflow: hidden !important; border-radius: 15px !important; }
-.settings-page details.hud-card.group > summary { display: flex; min-height: 58px !important; align-items: center; gap: 10px !important; padding: 12px 15px !important; }
-.settings-page details.hud-card.group > summary > div:first-child { min-width: 0 !important; }
-.settings-page details.hud-card.group > summary > div:first-child > span:first-child { width: 36px !important; height: 36px !important; border-radius: 11px !important; }
-.settings-page details.hud-card.group > summary .text-base { font-size: .92rem !important; line-height: 1.35 !important; }
-.settings-page details.hud-card.group > summary .text-muted-foreground { display: block !important; margin-top: 3px !important; color: hsl(var(--muted-foreground)) !important; font-size: 10px !important; line-height: 1.45 !important; }
-.settings-page details.hud-card.group > summary > svg:last-child { width: 18px !important; height: 18px !important; flex: 0 0 auto; }
-.settings-page details.hud-card.group > div:last-child { padding: 15px !important; }
-.settings-page details.hud-card.group[open] > summary { border-bottom: 1px solid hsl(var(--border) / .5); }
-.settings-page details.hud-card.group:not([open]) { box-shadow: 0 4px 15px hsl(var(--foreground) / .045) !important; }
-.settings-page details.hud-card.group[open] { box-shadow: 0 9px 24px hsl(var(--foreground) / .07) !important; }
-.settings-page input:not([type="checkbox"]), .settings-page select, .settings-page textarea { min-height: 42px; }
-.settings-page button { touch-action: manipulation; }
-.settings-page .btn-primary, .settings-page .btn-secondary, .settings-page .btn-danger { min-height: 42px; border-radius: 11px; font-weight: 750; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
-.settings-page .btn-primary:hover, .settings-page .btn-secondary:hover, .settings-page .btn-danger:hover { transform: translateY(-1px); }
-.settings-page .border-dashed { min-height: 52px; border-width: 1.5px; }
-.settings-page .text-destructive { font-weight: 700; }
-.settings-save-bar button { min-height: 42px !important; border-radius: 11px !important; }
-.settings-save-bar .btn-primary { font-size: 12px !important; font-weight: 850 !important; }
-
+/* HADIR · calm, consistent controls inside settings subpages. */
+.settings-page .settings-tab-panel [class*="grid-cols-"] { grid-template-columns: minmax(0, 1fr) !important; }
+.settings-page .settings-tab-panel > div[class*="space-y-"] { gap: 10px; }
+.settings-page .settings-tab-panel .rounded-3xl.border,
+.settings-page .settings-tab-panel .rounded-2xl.border,
+.settings-page .settings-tab-panel .rounded-xl.border { border-color: hsl(var(--border) / .8) !important; border-radius: 14px !important; box-shadow: none !important; }
+.settings-page .settings-tab-panel .rounded-3xl.border:not(#hadir-qr-print-sheet),
+.settings-page .settings-tab-panel .rounded-2xl.border:not(#hadir-qr-print-sheet),
+.settings-page .settings-tab-panel .rounded-xl.border:not(#hadir-qr-print-sheet) { background-color: hsl(var(--card)); }
+.settings-page #hadir-qr-print-sheet { border-color: #15803d !important; border-radius: 16px !important; background: #fff !important; color: #111 !important; }
+.settings-page #hadir-qr-print-sheet * { color: inherit; }
+.settings-page .settings-tab-panel details.hud-card.group { overflow: hidden !important; border: 1px solid hsl(var(--border) / .75) !important; border-radius: 16px !important; background: hsl(var(--card)) !important; }
+.settings-page .settings-tab-panel details.hud-card.group > summary { display: flex; min-height: 66px; align-items: center; gap: 12px; padding: 12px 15px !important; border: 0; background: transparent; }
+.settings-page .settings-tab-panel details.hud-card.group[open] > summary { border-bottom: 1px solid hsl(var(--border) / .75); }
+.settings-page .settings-tab-panel details.hud-card.group > summary > div:first-child { min-width: 0; }
+.settings-page .settings-tab-panel details.hud-card.group > summary > div:first-child > span:first-child { width: 38px !important; height: 38px !important; border-radius: 11px !important; background: #229ed9 !important; color: #fff !important; }
+.settings-page .settings-tab-panel details.hud-card.group > summary .text-base { font-size: 14px !important; line-height: 1.4 !important; }
+.settings-page .settings-tab-panel details.hud-card.group > summary .text-muted-foreground { display: block !important; margin-top: 3px !important; color: hsl(var(--muted-foreground)) !important; font-size: 10px !important; line-height: 1.45 !important; }
+.settings-page .settings-tab-panel details.hud-card.group > summary > svg:last-child { width: 18px; height: 18px; color: hsl(var(--muted-foreground)); }
+.settings-page .settings-tab-panel details.hud-card.group > div:last-child { padding: 14px !important; border-top: 0; background: hsl(var(--card)); }
+.settings-page .settings-tab-panel .company-specialties-host { padding: 8px !important; }
+.settings-page .settings-tab-panel .company-specialties-host > details > div:last-child { padding: 8px !important; }
+.settings-page .settings-tab-panel .company-specialties-host > details > div:last-child > div { min-width: 0; }
+.settings-page .settings-tab-panel .company-specialties-host .rounded-2xl.border { background-color: hsl(var(--background)); }
+.settings-page .settings-tab-panel label.block.text-xs.text-muted-foreground { display: flex; flex-direction: column; gap: 4px; color: hsl(var(--foreground)); font-weight: 600; }
+.settings-page .settings-tab-panel label > input,
+.settings-page .settings-tab-panel label > select,
+.settings-page .settings-tab-panel label > textarea { margin-top: 5px; }
+.settings-page .settings-tab-panel .text-destructive { font-weight: 650; }
+.settings-page .settings-tab-panel .btn-primary,
+.settings-page .settings-tab-panel .btn-secondary,
+.settings-page .settings-tab-panel .btn-danger { transition: filter .15s ease, background-color .15s ease; }
+.settings-page .settings-tab-panel .btn-primary:hover,
+.settings-page .settings-tab-panel .btn-secondary:hover,
+.settings-page .settings-tab-panel .btn-danger:hover { filter: brightness(1.06); }
+.settings-page .settings-tab-panel [class*="text-[10px]"][class*="font-black"][class*="mono"] { letter-spacing: 0; }
+.settings-page .settings-tab-panel [data-hadir-qr-settings] #hadir-qr-print-sheet { box-shadow: none !important; }
+.settings-save-bar button { min-height: 40px !important; border-radius: 10px !important; }
 @media (max-width: 640px) {
-  .settings-page details.hud-card.group > summary { min-height: 54px !important; padding: 10px 11px !important; gap: 8px !important; }
-  .settings-page details.hud-card.group > summary > div:first-child > span:first-child { width: 32px !important; height: 32px !important; border-radius: 10px !important; }
-  .settings-page details.hud-card.group > summary .text-base { font-size: .86rem !important; }
-  .settings-page details.hud-card.group > summary .text-muted-foreground { font-size: 9px !important; }
-  .settings-page details.hud-card.group > summary > svg:last-child { width: 16px !important; height: 16px !important; }
-  .settings-page details.hud-card.group > div:last-child { padding: 12px !important; }
-  .settings-save-bar { padding: 7px 9px max(7px, env(safe-area-inset-bottom)) !important; }
+  .settings-page .settings-tab-panel details.hud-card.group > summary { min-height: 58px; padding: 10px 11px !important; gap: 9px; }
+  .settings-page .settings-tab-panel details.hud-card.group > summary > div:first-child > span:first-child { width: 34px !important; height: 34px !important; }
+  .settings-page .settings-tab-panel details.hud-card.group > div:last-child { padding: 11px !important; }
 }
+
+
+/* Scope the dark palette to the manager shell only while Settings is open. */
+.manager-shell:has(.settings-page) {
+  --background: 211 38% 12%;
+  --foreground: 210 24% 96%;
+  --card: 211 31% 16%;
+  --card-foreground: 210 24% 96%;
+  --popover: 211 31% 16%;
+  --popover-foreground: 210 24% 96%;
+  --primary: 199 86% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 211 25% 21%;
+  --secondary-foreground: 210 24% 96%;
+  --muted: 211 23% 22%;
+  --muted-foreground: 211 13% 66%;
+  --accent: 211 22% 24%;
+  --accent-foreground: 210 24% 96%;
+  --destructive: 350 76% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 211 20% 25%;
+  --input: 211 20% 25%;
+  --ring: 199 86% 56%;
+  background: hsl(var(--background)) !important;
+  color: hsl(var(--foreground));
+}
+.manager-shell:has(.settings-page) > .manager-topbar {
+  border-color: hsl(var(--border)) !important;
+  background: hsl(var(--background) / .97) !important;
+  color: hsl(var(--foreground)) !important;
+  box-shadow: 0 8px 24px hsl(0 0% 0% / .22) !important;
+}
+.manager-shell:has(.settings-page) .manager-topbar .manager-tool {
+  border-color: hsl(var(--border)) !important;
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  box-shadow: none !important;
+}
+.manager-shell:has(.settings-page) .manager-topbar .manager-nav a {
+  color: hsl(var(--foreground) / .82) !important;
+}
+.manager-shell:has(.settings-page) .manager-topbar .manager-nav a[aria-current="page"] {
+  border-color: hsl(var(--primary) / .36) !important;
+  background: hsl(var(--primary) / .16) !important;
+  color: hsl(var(--primary)) !important;
+  box-shadow: none !important;
+}
+.manager-shell:has(.settings-page) .manager-page-header {
+  border-bottom-color: hsl(var(--border)) !important;
+  color: hsl(var(--foreground));
+}
+.manager-shell:has(.settings-page) .manager-page-header .text-muted-foreground {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+
+/* Preserve the document title for assistive technology; remove only visual duplication. */
+.manager-shell:has(.settings-page) .manager-page-header {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.settings-page .settings-navigation,
+.settings-page .settings-content-header { scroll-margin-top: calc(var(--hadir-manager-topbar-h, 138px) + 12px); }
+
+.settings-page .settings-tab-panel [class*="text-[10px]"][class*="font-black"][class*="text-primary"][class*="mono"] { display: none !important; }
+
+.settings-page .settings-tab-panel [class*="text-[10px]"][class*="text-destructive"][class*="mono"] { display: none !important; }
