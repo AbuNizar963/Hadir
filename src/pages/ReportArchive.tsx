@@ -75,7 +75,10 @@ export default function ReportArchive() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshingArchive, setRefreshingArchive] = useState(false);
+  const [archiveProgress, setArchiveProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const archiveCursorKey = "hadir.archive.cursor.attendance-period";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -108,18 +111,37 @@ export default function ReportArchive() {
     try {
       let cursor = 0;
       let employeeCursor = 0;
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(archiveCursorKey) || "null");
+        if (Number.isInteger(saved?.cursor) && Number.isInteger(saved?.employeeCursor)) {
+          cursor = Math.max(0, saved.cursor);
+          employeeCursor = Math.max(0, saved.employeeCursor);
+        }
+      } catch {
+        // Ignore malformed local progress and safely start from the beginning.
+      }
       for (;;) {
         const batch = await prepareReportArchive(cursor, employeeCursor);
-        if (batch.done) break;
+        if (batch.done) {
+          sessionStorage.removeItem(archiveCursorKey);
+          setArchiveProgress("اكتملت جميع دفعات الشهر، جارٍ تثبيت الأرشيف…");
+          break;
+        }
+        setArchiveProgress(
+          `جارٍ تجهيز يوم ${batch.day || "…"} · تمت معالجة ${Number(batch.nextEmployeeCursor ?? employeeCursor)} موظفًا في هذا اليوم`,
+        );
         if (batch.dayDone) {
           cursor = Number(batch.nextCursor ?? cursor + 1);
           employeeCursor = 0;
         } else {
           employeeCursor = Number(batch.nextEmployeeCursor ?? employeeCursor + 1);
         }
+        sessionStorage.setItem(archiveCursorKey, JSON.stringify({ cursor, employeeCursor }));
       }
       await refreshReportArchive();
       await refresh();
+      sessionStorage.removeItem(archiveCursorKey);
+      setArchiveProgress("تم إنشاء أرشيف الشهر وإقفاله بنجاح.");
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -242,6 +264,24 @@ export default function ReportArchive() {
           <Card className="border-destructive/30">
             <CardContent className="p-4 text-sm text-destructive">
               {error}
+            </CardContent>
+          </Card>
+        )}
+
+        {refreshingArchive && archiveProgress && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="flex items-center gap-3 p-4 text-sm font-semibold text-primary">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span>{archiveProgress}</span>
+            </CardContent>
+          </Card>
+        )}
+
+        {!refreshingArchive && archiveProgress?.startsWith("تم إنشاء") && (
+          <Card className="border-emerald-500/30 bg-emerald-500/5">
+            <CardContent className="flex items-center gap-3 p-4 text-sm font-semibold text-emerald-700">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>{archiveProgress}</span>
             </CardContent>
           </Card>
         )}

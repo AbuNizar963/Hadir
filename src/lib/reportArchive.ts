@@ -124,6 +124,7 @@ export async function prepareReportArchive(cursor: number, employeeCursor = 0) {
     nextCursor?: number;
     nextEmployeeCursor?: number;
     employeeId?: string;
+    day?: string;
   } | null;
   if (!response.ok)
     throw new Error(String(data?.error || `HTTP ${response.status}`));
