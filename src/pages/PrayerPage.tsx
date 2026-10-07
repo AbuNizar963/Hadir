@@ -544,17 +544,17 @@ export default function PrayerPage() {
                         : "○ ضع الهاتف أفقياً"}
                   </div>
                 </div>
-                <div className="relative mx-auto mt-3 aspect-square w-full max-w-[360px]">
-                  <div className="absolute -top-1 left-1/2 z-20 -translate-x-1/2 -translate-y-full text-center">
-                    <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-rose-300/30 bg-rose-500/15 text-rose-200 shadow-[0_0_24px_rgba(251,113,133,.25)]">
+                <div className="mx-auto mt-3 w-full max-w-[360px]">
+                  <div className="mb-3 flex items-center justify-center gap-2 text-center">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-rose-300/30 bg-rose-500/15 text-rose-200 shadow-[0_0_24px_rgba(251,113,133,.25)]">
                       <KaabaIcon className="h-7 w-7" />
                     </div>
-                    <div className="mt-2 rounded-full border border-rose-300/30 bg-rose-500/10 px-3 py-1 text-xs font-black text-rose-200">
+                    <div className="rounded-full border border-rose-300/30 bg-rose-500/10 px-3 py-1 text-xs font-black text-rose-200">
                       القبلة •{" "}
                       {bearing == null ? "--" : `${Math.round(bearing)}°`}
                     </div>
                   </div>
-                  <div className="absolute inset-0 rounded-full border-[8px] border-emerald-400/45 bg-[radial-gradient(circle_at_center,#102f4d_0,#07182a_55%,#020a12_100%)] shadow-[inset_0_0_55px_rgba(0,0,0,.8),0_0_40px_rgba(52,211,153,.14)]">
+                  <div className="relative aspect-square rounded-full border-[8px] border-emerald-400/45 bg-[radial-gradient(circle_at_center,#102f4d_0,#07182a_55%,#020a12_100%)] shadow-[inset_0_0_55px_rgba(0,0,0,.8),0_0_40px_rgba(52,211,153,.14)]">
                     <div className="absolute inset-4 rounded-full border border-emerald-300/20" />
                     <div className="absolute inset-8 rounded-full border border-dashed border-emerald-300/10" />
                     <div className="absolute inset-0">
