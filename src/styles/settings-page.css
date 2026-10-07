@@ -53,7 +53,7 @@
   place-items: center;
   border: 2px solid hsl(var(--background));
   border-radius: 50%;
-  background: #229ed9;
+  background: #15803d;
   color: white;
 }
 .settings-brand-upload:hover { filter: brightness(1.08); }
@@ -108,11 +108,11 @@
   place-items: center;
   border: 0;
   border-radius: 12px;
-  background: #229ed9;
+  background: #15803d;
   color: white;
 }
 .settings-nav-icon svg { width: 22px; height: 22px; }
-.settings-nav-item[data-settings-tab="general"] .settings-nav-icon { background: #229ed9; }
+.settings-nav-item[data-settings-tab="general"] .settings-nav-icon { background: #15803d; }
 .settings-nav-item[data-settings-tab="locations"] .settings-nav-icon { background: #ee9f18; }
 .settings-nav-item[data-settings-tab="security"] .settings-nav-icon { background: #42bb64; }
 .settings-nav-item[data-settings-tab="advanced"] .settings-nav-icon { background: #9c61da; }
@@ -279,3 +279,6 @@ main > section.hud-card { width: 100%; min-width: 0; }
 
 /* Settings categories stay in one clear vertical column on every viewport. */
 .settings-navigation-list { grid-template-columns: minmax(0, 1fr) !important; }
+
+/* Use the HADIR identity green consistently across settings categories. */
+.settings-page .settings-nav-icon { background: #15803d !important; color: #fff !important; }

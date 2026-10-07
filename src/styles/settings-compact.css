@@ -13,7 +13,7 @@
 .settings-page .settings-tab-panel details.hud-card.group > summary { display: flex; min-height: 66px; align-items: center; gap: 12px; padding: 12px 15px !important; border: 0; background: transparent; }
 .settings-page .settings-tab-panel details.hud-card.group[open] > summary { border-bottom: 1px solid hsl(var(--border) / .75); }
 .settings-page .settings-tab-panel details.hud-card.group > summary > div:first-child { min-width: 0; }
-.settings-page .settings-tab-panel details.hud-card.group > summary > div:first-child > span:first-child { width: 38px !important; height: 38px !important; border-radius: 11px !important; background: #229ed9 !important; color: #fff !important; }
+.settings-page .settings-tab-panel details.hud-card.group > summary > div:first-child > span:first-child { width: 38px !important; height: 38px !important; border-radius: 11px !important; background: #15803d !important; color: #fff !important; }
 .settings-page .settings-tab-panel details.hud-card.group > summary .text-base { font-size: 14px !important; line-height: 1.4 !important; }
 .settings-page .settings-tab-panel details.hud-card.group > summary .text-muted-foreground { display: none !important; }
 .settings-page .settings-tab-panel details.hud-card.group > summary > svg:last-child { width: 18px; height: 18px; color: hsl(var(--muted-foreground)); }
@@ -45,9 +45,9 @@
 
 /* Keep the settings workspace aligned with the selected app theme. */
 .manager-shell:has(.settings-page) {
-  --primary: 199 86% 42%;
+  --primary: 158 65% 38%;
   --primary-foreground: 0 0% 100%;
-  --ring: 199 86% 42%;
+  --ring: 158 65% 38%;
   background: hsl(var(--background)) !important;
   color: hsl(var(--foreground));
 }
@@ -58,7 +58,7 @@ html.dark .manager-shell:has(.settings-page) {
   --card-foreground: 210 24% 96%;
   --popover: 211 31% 16%;
   --popover-foreground: 210 24% 96%;
-  --primary: 199 86% 56%;
+  --primary: 158 65% 48%;
   --primary-foreground: 0 0% 100%;
   --secondary: 211 25% 21%;
   --secondary-foreground: 210 24% 96%;
@@ -70,7 +70,7 @@ html.dark .manager-shell:has(.settings-page) {
   --destructive-foreground: 0 0% 100%;
   --border: 211 20% 25%;
   --input: 211 20% 25%;
-  --ring: 199 86% 56%;
+  --ring: 158 65% 48%;
 }
 html.dark .manager-shell:has(.settings-page) .settings-page { color-scheme: dark; }
 .manager-shell:has(.settings-page) > .manager-topbar {
