@@ -731,13 +731,13 @@ export default function ManagerLayout({
         </div>
       )}
 
-      <header className="manager-page-header mx-auto max-w-7xl border-b border-border/40 px-4 pb-5 pt-7 sm:px-6 lg:px-10">
+      <header className="manager-page-header mx-auto max-w-7xl border-b border-border/40 px-4 pb-4 pt-5 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="text-xs font-semibold tracking-widest text-muted-foreground mono">
               HADIR · {currentRole.toUpperCase()}
             </div>
-            <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
+            <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
               {title}
             </h1>
             {subtitle && (
