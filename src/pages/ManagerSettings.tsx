@@ -32,7 +32,7 @@ const tabs: Array<{ id: SettingsTab; label: string; hint: string; icon: Settings
 
 export default function ManagerSettings() {
   const [s, setS] = useState<Settings>(getSettings()); const [saved, setSaved] = useState(false); const [savingSettings, setSavingSettings] = useState(false); const [savingLocation, setSavingLocation] = useState(false); const [deletingLocationId, setDeletingLocationId] = useState<string | null>(null); const [error, setError] = useState<string | null>(null); const [password, setPassword] = useState(""); const [showLocation, setShowLocation] = useState(false); const [editingLocationId, setEditingLocationId] = useState<string | null>(null); const [locName, setLocName] = useState(""); const [locLat, setLocLat] = useState(s.workSiteLat); const [locLng, setLocLng] = useState(s.workSiteLng); const [locRadius, setLocRadius] = useState(s.radiusMeters); const printRef = useRef<HTMLDivElement>(null); const settingsRef = useRef<HTMLDivElement>(null); const [loginUrl, setLoginUrl] = useState(""); const [showDiagnostics, setShowDiagnostics] = useState(false); const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]); const [resettingCloud, setResettingCloud] = useState(false); const [resetCloudResult, setResetCloudResult] = useState<string | null>(null);   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null); const manager = currentManager(); const navigate = useNavigate(); const isOwner = manager?.role === "owner" || manager?.accountId === "bootstrap"; const extraLocations = (s.locations || []).filter((location) => String(location.name || "").trim() !== "المقر الرئيسي");
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null); const [categoryListOpen, setCategoryListOpen] = useState(true); const manager = currentManager(); const navigate = useNavigate(); const isOwner = manager?.role === "owner" || manager?.accountId === "bootstrap"; const extraLocations = (s.locations || []).filter((location) => String(location.name || "").trim() !== "المقر الرئيسي");
   useEffect(() => { setLoginUrl(`${window.location.origin}${import.meta.env.BASE_URL}login`); }, []);
   useEffect(() => { if (!backendEnabled) return; let cancelled = false; void (async () => { try { const cloud = await getBackendSettings(); if (cancelled) return; const merged = { ...getSettings(), ...cloud, adminAccounts: Array.isArray(cloud.adminAccounts) ? cloud.adminAccounts : getSettings().adminAccounts } as Settings; saveSettings(merged); setS(merged); setLocLat(merged.workSiteLat); setLocLng(merged.workSiteLng); setLocRadius(merged.radiusMeters); } catch (e) { console.warn("تعذر تحميل إعدادات الخادم:", e); } })(); return () => { cancelled = true; }; }, []);
   useEffect(() => { const root = settingsRef.current; if (!root) return; const onToggle = (event: Event) => { const opened = event.target as HTMLDetailsElement; if (!(opened instanceof HTMLDetailsElement) || !opened.open || !opened.matches("[data-settings-accordion]")) return; const panel = opened.closest(".settings-tab-panel"); if (!panel) return; panel.querySelectorAll<HTMLDetailsElement>("[data-settings-accordion][open]").forEach((item) => { if (item !== opened) item.open = false; }); }; root.addEventListener("toggle", onToggle, true); return () => root.removeEventListener("toggle", onToggle, true); }, []);
@@ -118,9 +118,12 @@ export default function ManagerSettings() {
   const uploadBrandLogoInline = async (file?: File) => { if (!file) return; try { if (!file.type.startsWith("image/")) throw new Error("يرجى اختيار ملف صورة صالح."); const raw = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("تعذر قراءة الصورة.")); reader.onerror = () => reject(new Error("تعذر قراءة الصورة.")); reader.readAsDataURL(file); }); const compressed = await compressProfileImageDataUrl(raw, { maxWidth: 768, maxHeight: 768, quality: 0.84, type: "image/webp", maxBytes: 100 * 1024 }); const form = new FormData(); form.append("file", dataUrlToBlob(compressed), "company-logo.webp"); const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "") + "/api/company/logo"; const token = localStorage.getItem("hadir.api.token.admin") || ""; const response = await fetch(api, { method: "POST", headers: token ? { authorization: "Bearer " + token } : undefined, body: form, credentials: "include", cache: "no-store" }); const payload = await response.json().catch(() => ({})) as { error?: string; url?: string }; if (!response.ok || typeof payload.url !== "string") throw new Error(payload.error || "تعذر حفظ شعار الشركة."); const uploadedUrl = payload.url; const immediate = { ...getSettings(), brandLogo: uploadedUrl } as Settings; setS(immediate); window.dispatchEvent(new Event("hadir:settings-changed")); try { const remote = await getBackendSettings(); const merged = { ...immediate, ...remote, brandLogo: uploadedUrl } as Settings; saveSettings(merged); setS(merged); } catch { setS(immediate); } toast.success("تم حفظ شعار الشركة وتحديثه فورًا"); } catch (e) { toast.error("تعذر حفظ الشعار", userFacingError(e, "تعذر حفظ شعار الشركة.")); } finally { if (brandLogoInputRef.current) brandLogoInputRef.current.value = ""; } };
   const removeBrandLogoInline = async () => { if (!s.brandLogo) return; try { const api = String(import.meta.env.VITE_API_URL || "https://hadir-api.abunizar963.workers.dev").replace(/\/$/, "") + "/api/company/logo"; const token = localStorage.getItem("hadir.api.token.admin") || ""; const response = await fetch(api, { method: "DELETE", headers: token ? { authorization: "Bearer " + token } : undefined, credentials: "include", cache: "no-store" }); const payload = await response.json().catch(() => ({})) as { error?: string }; if (!response.ok) throw new Error(payload.error || "تعذر إزالة الشعار."); const remote = await getBackendSettings(); const merged = { ...getSettings(), ...remote } as Settings; saveSettings(merged); setS(merged); window.dispatchEvent(new Event("hadir:settings-changed")); toast.success("تمت إزالة شعار الشركة"); } catch (e) { toast.error("تعذر إزالة الشعار", userFacingError(e, "تعذر إزالة شعار الشركة.")); } };
   const activeTabInfo = tabs.find((tab) => tab.id === activeTab) || tabs[0];
-  const section = (id: SettingsTab, children: React.ReactNode) => <div id={`settings-panel-${id}`} role="tabpanel" aria-labelledby={`settings-tab-${id}`} tabIndex={activeTab === id ? 0 : -1} hidden={activeTab !== id} className={`settings-tab-panel ${activeTab === id ? "block" : "hidden"}`}>{children}</div>;
-  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
+  const section = (id: SettingsTab, children: React.ReactNode) => <div id={`settings-panel-${id}`} role="region" aria-labelledby="settings-content-title" tabIndex={activeTab === id ? 0 : -1} hidden={activeTab !== id} className={`settings-tab-panel ${activeTab === id ? "block" : "hidden"}`}>{children}</div>;
+  const handleCategoryKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-settings-tab]");
+    if (!button) return;
+    const currentIndex = tabs.findIndex((tab) => tab.id === button.dataset.settingsTab);
+    if (currentIndex < 0) return;
     let nextIndex = currentIndex;
     if (event.key === "ArrowDown" || event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
     else if (event.key === "ArrowUp" || event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
@@ -128,9 +131,14 @@ export default function ManagerSettings() {
     else if (event.key === "End") nextIndex = tabs.length - 1;
     else return;
     event.preventDefault();
-    const nextTab = tabs[nextIndex];
-    setActiveTab(nextTab.id);
-    window.requestAnimationFrame(() => document.getElementById(`settings-tab-${nextTab.id}`)?.focus());
+    document.getElementById(`settings-tab-${tabs[nextIndex].id}`)?.focus();
+  };
+  const returnToCategories = () => {
+    setCategoryListOpen(true);
+    window.setTimeout(() => {
+      document.getElementById("settings-navigation")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.querySelector<HTMLButtonElement>(`[data-settings-tab="${activeTab}"]`)?.focus();
+    }, 0);
   };
 
   return <ManagerLayout title="الإعدادات" subtitle="إدارة النظام والهوية والمواقع والحسابات والأمان">
@@ -160,22 +168,22 @@ export default function ManagerSettings() {
       </section>
 
       <div className="settings-workspace">
-        <aside className="settings-navigation" aria-label="التنقل في الإعدادات">
+        <aside id="settings-navigation" className="settings-navigation" aria-label="التنقل في الإعدادات" hidden={!categoryListOpen}>
           <div className="settings-navigation-heading"><span className="settings-eyebrow">لوحة التحكم</span><h2>أقسام الإعدادات</h2><p>اختر القسم المطلوب؛ ستبقى بقية الخيارات محفوظة كما هي.</p></div>
-          <div className="settings-navigation-list" role="tablist" aria-label="أقسام الإعدادات" onKeyDown={handleTabKeyDown}>
-            {tabs.map((tab) => <button key={tab.id} id={`settings-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => setActiveTab(tab.id)} className={`settings-nav-item ${activeTab === tab.id ? "is-active" : ""}`}>
+          <nav className="settings-navigation-list" aria-label="أقسام الإعدادات" onKeyDown={handleCategoryKeyDown}>
+            {tabs.map((tab) => <button key={tab.id} id={`settings-tab-${tab.id}`} type="button" data-settings-tab={tab.id} aria-controls={`settings-panel-${tab.id}`} aria-expanded={!categoryListOpen && activeTab === tab.id} onClick={() => { setActiveTab(tab.id); setCategoryListOpen(false); window.setTimeout(() => { const header = document.getElementById("settings-content-header"); header?.scrollIntoView({ behavior: "smooth", block: "start" }); header?.focus(); }, 0); }} className="settings-nav-item">
               <span className="settings-nav-icon"><SectionIcon type={tab.icon} /></span>
               <span className="settings-nav-copy"><span className="settings-nav-code">{tab.code}</span><span className="settings-nav-label">{tab.label}</span><span className="settings-nav-hint">{tab.hint}</span></span>
               <svg viewBox="0 0 24 24" aria-hidden="true" className="settings-nav-chevron" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>)}
-          </div>
+          </nav>
           <div className="settings-navigation-note"><span className="settings-navigation-note__icon">i</span><span>تُحفظ إعدادات النظام من الزر الثابت أسفل الشاشة. بعض الأقسام لها إجراءات حفظ مستقلة.</span></div>
         </aside>
 
-        <section className="settings-content" aria-label="محتوى الإعدادات">
-          <header className="settings-content-header">
-            <div className="settings-content-title"><span className="settings-content-icon"><SectionIcon type={activeTabInfo.icon} /></span><div><span className="settings-eyebrow">القسم {activeTabInfo.code} من {tabs.length}</span><h2>{activeTabInfo.label}</h2><p>{activeTabInfo.hint}</p></div></div>
-            <span className="settings-content-chip">إعدادات النظام</span>
+        <section className="settings-content" aria-label="محتوى الإعدادات" hidden={categoryListOpen}>
+          <header id="settings-content-header" tabIndex={-1} className="settings-content-header">
+            <div className="settings-content-title"><span className="settings-content-icon"><SectionIcon type={activeTabInfo.icon} /></span><div><span className="settings-eyebrow">القسم {activeTabInfo.code} من {tabs.length}</span><h2 id="settings-content-title">{activeTabInfo.label}</h2><p>{activeTabInfo.hint}</p></div></div>
+            <button type="button" className="settings-back-button" onClick={returnToCategories} aria-label="العودة إلى أقسام الإعدادات"><svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg><span>الأقسام</span></button>
           </header>
           <div className="settings-panels">
       {section("general", <div className="space-y-6">
@@ -278,6 +286,6 @@ export default function ManagerSettings() {
       {error && <div className="mt-6 flex items-start gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"><svg viewBox="0 0 24 24" aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 3.5 20h17L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg><span>{error}</span></div>}
     </div>
 
-    <div className="settings-save-bar border-t border-border/70 bg-background/95 px-3 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,.12)] backdrop-blur-xl sm:px-6"><div className="settings-save-bar__inner"><div className="settings-save-bar__copy"><div className="text-xs font-black">تغييرات الإعدادات</div><div className="text-[10px] text-muted-foreground">احفظ التعديلات لتطبيقها على النظام.</div></div><div className="settings-save-bar__actions">{saved && <span className="settings-saved-status">تم الحفظ ✓</span>}<button type="button" className="btn-primary settings-save-button" onClick={() => void save()} disabled={savingSettings}>{savingSettings ? "جارٍ الحفظ..." : "حفظ الإعدادات"}</button></div></div></div>
+    <div hidden={categoryListOpen} className="settings-save-bar border-t border-border/70 bg-background/95 px-3 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,.12)] backdrop-blur-xl sm:px-6"><div className="settings-save-bar__inner"><div className="settings-save-bar__copy"><div className="text-xs font-black">تغييرات الإعدادات</div><div className="text-[10px] text-muted-foreground">احفظ التعديلات لتطبيقها على النظام.</div></div><div className="settings-save-bar__actions">{saved && <span className="settings-saved-status">تم الحفظ ✓</span>}<button type="button" className="btn-primary settings-save-button" onClick={() => void save()} disabled={savingSettings}>{savingSettings ? "جارٍ الحفظ..." : "حفظ الإعدادات"}</button></div></div></div>
   </ManagerLayout>;
 }
