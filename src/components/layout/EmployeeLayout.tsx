@@ -75,6 +75,9 @@ function applyTheme(theme: Theme) {
 
   document.documentElement.classList.toggle("dark", dark);
   document.documentElement.style.colorScheme = dark ? "dark" : "light";
+  document
+    .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    ?.setAttribute("content", dark ? "#0b0f14" : "#f9fafb");
 }
 
 async function loadEmployeeUnreadCount(employeeId: string) {

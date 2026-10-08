@@ -93,15 +93,15 @@ const statusBadgeClasses: Record<string, string> = {
 };
 
 const chartStatusColors: Record<string, string> = {
-  PRESENT: "#059669",
-  LATE: "#d97706",
-  ABSENT: "#dc2626",
-  LEAVE: "#7c3aed",
-  PERMISSION: "#0891b2",
-  REST: "#64748b",
-  ESCAPED: "#991b1b",
-  NOT_STARTED: "#2563eb",
-  INVALID: "#475569",
+  PRESENT: "hsl(var(--chart-present))",
+  LATE: "hsl(var(--chart-late))",
+  ABSENT: "hsl(var(--chart-absent))",
+  LEAVE: "hsl(var(--chart-leave))",
+  PERMISSION: "hsl(var(--chart-permission))",
+  REST: "hsl(var(--chart-rest))",
+  ESCAPED: "hsl(var(--chart-escaped))",
+  NOT_STARTED: "hsl(var(--chart-not-started))",
+  INVALID: "hsl(var(--chart-invalid))",
 };
 
 const exceptionLabels: Record<string, string> = {
@@ -114,12 +114,12 @@ const exceptionLabels: Record<string, string> = {
 };
 
 const exceptionChartColors: Record<string, string> = {
-  MISSING_CHECKOUT: "#b91c1c",
-  CHECKOUT_WITHOUT_CHECKIN: "#7c3aed",
-  ABSENT_NO_APPROVED_REASON: "#dc2626",
-  LATE_ARRIVAL: "#d97706",
-  EARLY_LEAVE: "#ea580c",
-  OVERTIME: "#0284c7",
+  MISSING_CHECKOUT: "hsl(var(--chart-absent))",
+  CHECKOUT_WITHOUT_CHECKIN: "hsl(var(--chart-violet))",
+  ABSENT_NO_APPROVED_REASON: "hsl(var(--chart-absent))",
+  LATE_ARRIVAL: "hsl(var(--chart-late))",
+  EARLY_LEAVE: "hsl(var(--chart-orange))",
+  OVERTIME: "hsl(var(--chart-sky))",
 };
 
 const getExceptionLabel = (
@@ -134,6 +134,19 @@ const getExceptionLabel = (
 
 const fmt = (minutes: number) =>
   `${Math.floor(Math.max(0, minutes) / 60)}س ${Math.round(Math.max(0, minutes) % 60)}د`;
+
+const chartTooltipStyle = {
+  backgroundColor: "hsl(var(--popover))",
+  borderColor: "hsl(var(--border))",
+  borderRadius: 12,
+  color: "hsl(var(--popover-foreground))",
+  boxShadow: "0 8px 24px hsl(var(--foreground) / 0.16)",
+};
+
+const chartTooltipLabelStyle = {
+  color: "hsl(var(--popover-foreground))",
+  fontWeight: 700,
+};
 
 const damascusToday = () =>
   new Intl.DateTimeFormat("en-CA", { timeZone: getSystemTimeZone() }).format(
@@ -390,17 +403,17 @@ export default function GlobalAttendanceReports() {
   );
 
   const statusChartData = useMemo(() => {
-    const total = report?.summary.employeeDays || 0;
+    const total = statusData.reduce((sum, item) => sum + item.value, 0);
     return [...statusData]
       .sort((a, b) => b.value - a.value)
       .map((item) => {
         const percentage = total ? (item.value / total) * 100 : 0;
         return {
           ...item,
-          displayValue: `${item.value.toLocaleString("ar")} · ${percentage.toFixed(1)}%`,
+          percentage,
         };
       });
-  }, [report?.summary.employeeDays, statusData]);
+  }, [statusData]);
 
   const exceptionChartData = useMemo(
     () =>
@@ -409,7 +422,7 @@ export default function GlobalAttendanceReports() {
           code,
           name: exceptionLabels[code] || code,
           value,
-          color: exceptionChartColors[code] || "#475569",
+          color: exceptionChartColors[code] || "hsl(var(--muted-foreground))",
         }))
         .sort((a, b) => b.value - a.value),
     [report?.analytics.exceptionCounts],
@@ -1023,20 +1036,24 @@ export default function GlobalAttendanceReports() {
                                 ];
                               }}
                               contentStyle={{
-                                borderRadius: 12,
-                                borderColor: "#cbd5e1",
-                                boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
+                                ...chartTooltipStyle,
                               }}
+                              labelStyle={chartTooltipLabelStyle}
                             />
                             <Legend
-                              wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                              iconSize={8}
+                              wrapperStyle={{
+                                color: "hsl(var(--muted-foreground))",
+                                fontSize: 11,
+                                paddingTop: 8,
+                              }}
                             />
                             <Bar
                               yAxisId="count"
                               dataKey="present"
                               name="حاضر"
                               stackId="attendance"
-                              fill="#059669"
+                              fill="hsl(var(--chart-present))"
                               barSize={22}
                             />
                             <Bar
@@ -1044,7 +1061,7 @@ export default function GlobalAttendanceReports() {
                               dataKey="late"
                               name="متأخر"
                               stackId="attendance"
-                              fill="#d97706"
+                              fill="hsl(var(--chart-late))"
                               barSize={22}
                             />
                             <Bar
@@ -1052,7 +1069,7 @@ export default function GlobalAttendanceReports() {
                               dataKey="absent"
                               name="غياب"
                               stackId="attendance"
-                              fill="#dc2626"
+                              fill="hsl(var(--chart-absent))"
                               radius={[4, 4, 0, 0]}
                               barSize={22}
                             />
@@ -1061,20 +1078,28 @@ export default function GlobalAttendanceReports() {
                               type="monotone"
                               dataKey="attendanceRate"
                               name="معدل الحضور"
-                              stroke="#0f766e"
+                              stroke="hsl(var(--chart-present))"
                               strokeWidth={2.5}
-                              dot={{ r: 3, fill: "#0f766e", stroke: "#fff" }}
+                              dot={{
+                                r: 3,
+                                fill: "hsl(var(--chart-present))",
+                                stroke: "hsl(var(--card))",
+                              }}
                               activeDot={{ r: 5 }}
                             />
                             <Line
                               yAxisId="rate"
                               type="monotone"
                               dataKey="punctualityRate"
-                              name="الانضباط بالمواعيد"
-                              stroke="#4f46e5"
+                              name="الانضباط"
+                              stroke="hsl(var(--chart-punctuality))"
                               strokeWidth={2.5}
                               strokeDasharray="5 4"
-                              dot={{ r: 3, fill: "#4f46e5", stroke: "#fff" }}
+                              dot={{
+                                r: 3,
+                                fill: "hsl(var(--chart-punctuality))",
+                                stroke: "hsl(var(--card))",
+                              }}
                               activeDot={{ r: 5 }}
                             />
                           </ComposedChart>
@@ -1093,8 +1118,9 @@ export default function GlobalAttendanceReports() {
                         توزيع حالات الدوام
                       </CardTitle>
                       <CardDescription>
-                        عدد سجلات الموظف/اليوم ونسبتها من الإجمالي؛ الحالات غير
-                        المجدولة مثل الراحة و«لم يبدأ» ليست غياباً.
+                        الأشرطة تعرض عدد السجلات؛ تظهر النسبة من الإجمالي عند
+                        تمرير المؤشر أو لمس الشريط. الراحة و«لم يبدأ» ليست
+                        غياباً.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="h-[350px]">
@@ -1103,7 +1129,7 @@ export default function GlobalAttendanceReports() {
                           <BarChart
                             data={statusChartData}
                             layout="vertical"
-                            margin={{ top: 8, right: 88, left: 4, bottom: 8 }}
+                            margin={{ top: 8, right: 48, left: 4, bottom: 8 }}
                           >
                             <CartesianGrid
                               horizontal={false}
@@ -1127,14 +1153,14 @@ export default function GlobalAttendanceReports() {
                               interval={0}
                             />
                             <Tooltip
-                              formatter={(value) => [
-                                `${Number(value).toLocaleString("ar")} سجل`,
-                                "العدد",
+                              formatter={(value, _name, entry) => [
+                                `${Number(value).toLocaleString("ar")} سجل · ${Number((entry.payload as { percentage?: number } | undefined)?.percentage || 0).toFixed(1)}%`,
+                                "الحصة من الإجمالي",
                               ]}
                               contentStyle={{
-                                borderRadius: 12,
-                                borderColor: "#cbd5e1",
+                                ...chartTooltipStyle,
                               }}
+                              labelStyle={chartTooltipLabelStyle}
                             />
                             <Bar
                               dataKey="value"
@@ -1146,10 +1172,10 @@ export default function GlobalAttendanceReports() {
                                 <Cell key={item.name} fill={item.color} />
                               ))}
                               <LabelList
-                                dataKey="displayValue"
+                                dataKey="value"
                                 position="right"
-                                fill="#475569"
-                                fontSize={10}
+                                fill="hsl(var(--foreground))"
+                                fontSize={12}
                               />
                             </Bar>
                           </BarChart>
@@ -1212,21 +1238,27 @@ export default function GlobalAttendanceReports() {
                                 String(name),
                               ]}
                               contentStyle={{
-                                borderRadius: 12,
-                                borderColor: "#cbd5e1",
+                                ...chartTooltipStyle,
+                              }}
+                              labelStyle={chartTooltipLabelStyle}
+                            />
+                            <Legend
+                              iconSize={8}
+                              wrapperStyle={{
+                                color: "hsl(var(--muted-foreground))",
+                                fontSize: 12,
                               }}
                             />
-                            <Legend wrapperStyle={{ fontSize: 12 }} />
                             <Bar
                               dataKey="expectedMinutes"
                               name="ساعات مجدولة"
-                              fill="#94a3b8"
+                              fill="hsl(var(--chart-scheduled))"
                               radius={[4, 4, 0, 0]}
                             />
                             <Bar
                               dataKey="workedMinutes"
                               name="ساعات مثبتة بانصراف"
-                              fill="#0f766e"
+                              fill="hsl(var(--chart-present))"
                               radius={[4, 4, 0, 0]}
                             />
                           </BarChart>
@@ -1294,9 +1326,9 @@ export default function GlobalAttendanceReports() {
                                 "التكرار",
                               ]}
                               contentStyle={{
-                                borderRadius: 12,
-                                borderColor: "#cbd5e1",
+                                ...chartTooltipStyle,
                               }}
+                              labelStyle={chartTooltipLabelStyle}
                             />
                             <Bar
                               dataKey="value"

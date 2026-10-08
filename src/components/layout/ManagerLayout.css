@@ -97,15 +97,6 @@
   transform: none;
 }
 
-.manager-shell .manager-utility-menu::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: hsl(0 0% 0% / 0.5);
-  pointer-events: none;
-}
-
 .manager-shell .manager-utility-menu > div {
   min-height: 0;
   width: max-content;

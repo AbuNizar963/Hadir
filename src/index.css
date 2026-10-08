@@ -11,6 +11,11 @@
     --warning: 38 92% 55%; --warning-foreground: 38 90% 8%; --border: 222 20% 20%; --input: 222 20% 18%; --ring: 158 65% 48%; --radius: .75rem;
     --sidebar-background: 222 26% 9%; --sidebar-foreground: 210 25% 96%; --sidebar-primary: 158 65% 48%; --sidebar-primary-foreground: 158 90% 7%;
     --sidebar-accent: 222 20% 15%; --sidebar-accent-foreground: 210 25% 96%; --sidebar-border: 222 20% 20%; --sidebar-ring: 158 65% 48%;
+    --chart-present: 158 72% 54%; --chart-late: 38 92% 59%; --chart-absent: 0 83% 66%;
+    --chart-leave: 263 80% 74%; --chart-permission: 190 86% 63%; --chart-rest: 215 17% 65%;
+    --chart-escaped: 0 78% 72%; --chart-not-started: 216 90% 69%; --chart-invalid: 215 16% 76%;
+    --chart-punctuality: 250 92% 78%; --chart-scheduled: 215 18% 66%;
+    --chart-orange: 22 90% 64%; --chart-violet: 270 85% 75%; --chart-sky: 195 90% 64%;
   }
   .dark {
     --background: 222 32% 7%; --foreground: 210 25% 96%; --card: 222 26% 11%; --card-foreground: 210 25% 96%;
@@ -26,12 +31,32 @@
     --warning: 38 90% 46%; --warning-foreground: 0 0% 100%; --border: 214 20% 84%; --input: 214 20% 88%; --ring: 158 65% 38%;
     --sidebar-background: 210 22% 96%; --sidebar-foreground: 222 30% 12%; --sidebar-primary: 158 65% 38%; --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 18% 91%; --sidebar-accent-foreground: 222 25% 18%; --sidebar-border: 214 20% 84%; --sidebar-ring: 158 65% 38%;
+    --chart-present: 158 64% 34%; --chart-late: 36 92% 42%; --chart-absent: 0 72% 47%;
+    --chart-leave: 263 70% 48%; --chart-permission: 190 87% 34%; --chart-rest: 215 16% 47%;
+    --chart-escaped: 0 70% 40%; --chart-not-started: 216 76% 49%; --chart-invalid: 215 16% 43%;
+    --chart-punctuality: 250 65% 54%; --chart-scheduled: 215 16% 56%;
+    --chart-orange: 22 85% 43%; --chart-violet: 270 65% 50%; --chart-sky: 195 84% 36%;
   }
   * { @apply border-border; }
   html, body, #root { height: 100%; }
   body { @apply bg-background text-foreground; font-family:'Cairo',system-ui,sans-serif; -webkit-font-smoothing:antialiased; background-image:radial-gradient(circle at 20% 0%,hsl(158 65% 48%/.08),transparent 45%),radial-gradient(circle at 100% 100%,hsl(195 85% 55%/.06),transparent 40%); background-attachment:fixed; transition:background-color .2s ease,color .2s ease; }
   .dark body { background-image:radial-gradient(circle at 20% 0%,hsl(158 65% 48%/.08),transparent 45%),radial-gradient(circle at 100% 100%,hsl(195 85% 55%/.06),transparent 40%); }
   .mono { font-family:'JetBrains Mono',ui-monospace,monospace; }
+  .recharts-cartesian-grid line { stroke: hsl(var(--border)) !important; }
+  .recharts-cartesian-axis-tick-value { fill: hsl(var(--muted-foreground)) !important; }
+  .recharts-label-list text { fill: hsl(var(--foreground)) !important; }
+  .recharts-tooltip-cursor { fill: hsl(var(--muted) / 0.72) !important; }
+  .recharts-default-tooltip {
+    background-color: hsl(var(--popover)) !important;
+    border-color: hsl(var(--border)) !important;
+    border-radius: 0.75rem !important;
+    color: hsl(var(--popover-foreground)) !important;
+  }
+  .recharts-default-tooltip .recharts-tooltip-label,
+  .recharts-default-tooltip .recharts-tooltip-item {
+    color: hsl(var(--popover-foreground)) !important;
+  }
+  .recharts-legend-item-text { color: hsl(var(--muted-foreground)) !important; }
 }
 @layer components {
   .hud-card { @apply relative rounded-2xl border border-border/70 bg-card/90 backdrop-blur-sm; overflow:visible; box-shadow:0 10px 30px hsl(222 40% 3%/.14); transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,background-color .2s ease; }

@@ -470,59 +470,63 @@ export default function PrayerPage() {
     bearing != null &&
     Math.abs(shortestDelta(bearing, heading)) <= 5;
   return (
-    <main dir="rtl" className="min-h-screen bg-[#06101c] p-3 text-white sm:p-6">
+    <main
+      dir="rtl"
+      className="min-h-screen bg-background p-3 text-foreground sm:p-6"
+    >
       <div className="mx-auto max-w-5xl space-y-4">
         <button
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold"
+          className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold hover:bg-secondary"
         >
           <ArrowRight className="h-4 w-4" />
           العودة
         </button>
-        <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#0d2743] via-[#08192b] to-[#040b14] shadow-2xl">
+        <section className="overflow-hidden rounded-[2rem] border border-border/70 bg-gradient-to-br from-card via-background to-muted shadow-2xl">
           <div className="p-5 sm:p-7">
             <div className="flex flex-col items-center gap-4 text-center">
               <div className="w-full">
                 <h1 className="mt-1 text-2xl font-black sm:text-3xl">
                   مواقيت الصلاة والقبلة
                 </h1>
-                <p className="mt-1 text-sm leading-6 text-slate-300">
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
                   <MapPin className="mr-1 inline h-4 w-4" />
-                  {city} <span className="mx-1 text-slate-500">•</span>
+                  {city}{" "}
+                  <span className="mx-1 text-muted-foreground/70">•</span>
                   <span className="whitespace-nowrap">
                     {formatGregorianDate(data?.meta.gregorian || "", now)}
                   </span>
-                  <span className="mx-1 text-slate-500">•</span>
+                  <span className="mx-1 text-muted-foreground/70">•</span>
                   <span className="whitespace-nowrap">
                     {formatHijriDate(data?.meta.hijri || "")}
                   </span>
                 </p>
-                <p className="mt-2 text-xs text-emerald-200/70">
+                <p className="mt-2 text-xs text-primary">
                   الصلاة القادمة:{" "}
                   {nextPrayer?.prayer.name || "جارٍ تحديد الموقع"}
                 </p>
               </div>
-              <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-7 py-3 text-center shadow-[0_0_24px_rgba(52,211,153,.08)]">
-                <div className="text-xs text-emerald-100/70">المتبقي</div>
-                <div className="font-mono text-3xl font-black tracking-wider text-emerald-100">
+              <div className="rounded-2xl border border-primary/25 bg-primary/10 px-7 py-3 text-center shadow-[0_0_24px_hsl(var(--primary)/.08)]">
+                <div className="text-xs text-primary/80">المتبقي</div>
+                <div className="font-mono text-3xl font-black tracking-wider text-primary">
                   {timer}
                 </div>
               </div>
             </div>
             {error && (
-              <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-200">
+              <div className="mt-4 rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
             <div className="mt-6 grid gap-5 lg:grid-cols-[1.08fr_.92fr]">
-              <div className="rounded-3xl border border-white/10 bg-black/10 p-5">
+              <div className="rounded-3xl border border-border/70 bg-card/70 p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2 font-black">
-                    <Compass className="h-5 w-5 text-emerald-300" />
+                    <Compass className="h-5 w-5 text-primary" />
                     بوصلة القبلة
                   </div>
                   <div
-                    className={`rounded-full px-3 py-1 text-xs ${sensorEnabled ? "bg-emerald-400/10 text-emerald-300" : "bg-amber-400/10 text-amber-200"}`}
+                    className={`rounded-full px-3 py-1 text-xs ${sensorEnabled ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/10 text-amber-800 dark:text-amber-200"}`}
                   >
                     {sensorEnabled
                       ? "● الاتجاه دقيق"
@@ -533,22 +537,22 @@ export default function PrayerPage() {
                 </div>
                 <div className="mx-auto mt-6 w-full max-w-[360px]">
                   <div className="mb-4 flex flex-col items-center justify-center gap-2 text-center">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-rose-300/30 bg-rose-500/15 text-rose-200 shadow-[0_0_24px_rgba(251,113,133,.25)]">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-rose-300/50 bg-rose-500/10 text-rose-700 shadow-[0_0_24px_rgba(251,113,133,.18)] dark:border-rose-300/30 dark:text-rose-200">
                       <KaabaIcon className="h-7 w-7" />
                     </div>
-                    <div className="rounded-full border border-rose-300/30 bg-rose-500/10 px-3 py-1 text-xs font-black text-rose-200">
+                    <div className="rounded-full border border-rose-300/50 bg-rose-500/10 px-3 py-1 text-xs font-black text-rose-700 dark:border-rose-300/30 dark:text-rose-200">
                       القبلة •{" "}
                       {bearing == null ? "--" : `${Math.round(bearing)}°`}
                     </div>
                   </div>
-                  <div className="relative aspect-square rounded-full border-[8px] border-emerald-400/45 bg-[radial-gradient(circle_at_center,#102f4d_0,#07182a_55%,#020a12_100%)] shadow-[inset_0_0_55px_rgba(0,0,0,.8),0_0_40px_rgba(52,211,153,.14)]">
-                    <div className="absolute inset-4 rounded-full border border-emerald-300/20" />
-                    <div className="absolute inset-8 rounded-full border border-dashed border-emerald-300/10" />
+                  <div className="relative aspect-square rounded-full border-[8px] border-primary/45 bg-[radial-gradient(circle_at_center,#ffffff_0,#eaf3f1_55%,#dbeafe_100%)] shadow-[inset_0_0_40px_rgba(15,23,42,.08),0_0_40px_rgba(52,211,153,.12)] dark:bg-[radial-gradient(circle_at_center,#102f4d_0,#07182a_55%,#020a12_100%)] dark:shadow-[inset_0_0_55px_rgba(0,0,0,.8),0_0_40px_rgba(52,211,153,.14)]">
+                    <div className="absolute inset-4 rounded-full border border-primary/20" />
+                    <div className="absolute inset-8 rounded-full border border-dashed border-primary/15" />
                     <div className="absolute inset-0">
                       {Array.from({ length: 72 }, (_, i) => (
                         <span
                           key={i}
-                          className="absolute left-1/2 top-1/2 block origin-bottom bg-slate-300/35"
+                          className="absolute left-1/2 top-1/2 block origin-bottom bg-foreground/25"
                           style={{
                             height: i % 3 === 0 ? "8%" : "4%",
                             width: i % 3 === 0 ? 2 : 1,
@@ -556,16 +560,16 @@ export default function PrayerPage() {
                           }}
                         />
                       ))}
-                      <span className="absolute inset-x-0 top-7 text-center text-sm font-black text-white">
+                      <span className="absolute inset-x-0 top-7 text-center text-sm font-black text-foreground">
                         شمال
                       </span>
-                      <span className="absolute inset-x-0 bottom-7 text-center text-sm text-slate-400">
+                      <span className="absolute inset-x-0 bottom-7 text-center text-sm text-muted-foreground">
                         جنوب
                       </span>
-                      <span className="absolute right-7 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                      <span className="absolute right-7 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                         شرق
                       </span>
-                      <span className="absolute left-7 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                      <span className="absolute left-7 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                         غرب
                       </span>
                     </div>
@@ -579,16 +583,18 @@ export default function PrayerPage() {
                       >
                         <span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 -translate-y-full border-x-[9px] border-b-[18px] border-x-transparent border-b-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,.9)]" />
                       </div>
-                      <div className="absolute h-10 w-10 rounded-full border border-white/15 bg-[#071a2c] shadow-xl" />
+                      <div className="absolute h-10 w-10 rounded-full border border-border bg-background shadow-xl" />
                     </div>
                   </div>
                 </div>
                 <div className="mt-5 text-center">
-                  <div className="font-mono text-3xl font-black text-rose-300">
+                  <div className="font-mono text-3xl font-black text-rose-700 dark:text-rose-300">
                     {bearing == null ? "--" : `${Math.round(bearing)}°`}
                   </div>
-                  <div className="mt-1 flex items-center justify-center gap-1 text-sm text-slate-300">
-                    {aligned && <Check className="h-4 w-4 text-emerald-300" />}
+                  <div className="mt-1 flex items-center justify-center gap-1 text-sm text-muted-foreground">
+                    {aligned && (
+                      <Check className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
+                    )}
                     {aligned
                       ? "أنت تواجه القبلة"
                       : !phoneFlat
@@ -599,7 +605,7 @@ export default function PrayerPage() {
                             ? "جارٍ تحديد الاتجاه"
                             : `${bearingLabel(bearing)} نحو مكة`}
                   </div>
-                  <div className="mt-2 text-xs text-slate-500">
+                  <div className="mt-2 text-xs text-muted-foreground">
                     {sensorEnabled
                       ? `اتجاه الجهاز ${Math.round(heading)}°`
                       : "اتجاه الجهاز غير متاح"}{" "}
@@ -608,15 +614,15 @@ export default function PrayerPage() {
                   </div>
                 </div>
                 {sensorMessage && (
-                  <p className="mt-3 text-center text-xs text-amber-200">
+                  <p className="mt-3 text-center text-xs text-amber-800 dark:text-amber-200">
                     {sensorMessage}
                   </p>
                 )}
               </div>
-              <div className="rounded-3xl border border-white/10 bg-white/[.03] p-5">
+              <div className="rounded-3xl border border-border/70 bg-muted/30 p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="font-black">مواقيت الصلاة</h2>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-muted-foreground">
                     رابطة العالم الإسلامي
                   </span>
                 </div>
@@ -627,17 +633,17 @@ export default function PrayerPage() {
                     return (
                       <div
                         key={prayer.key}
-                        className={`flex items-center justify-between rounded-2xl px-4 py-3 ${active ? "bg-emerald-400/15 ring-1 ring-emerald-300/30" : "bg-white/[.03]"}`}
+                        className={`flex items-center justify-between rounded-2xl px-4 py-3 ${active ? "bg-primary/10 ring-1 ring-primary/30" : "bg-background/60"}`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5">
+                          <span className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-secondary">
                             <Icon className="h-5 w-5" aria-hidden="true" />
                           </span>
                           <span
                             className={
                               active
-                                ? "font-black text-emerald-200"
-                                : "text-slate-200"
+                                ? "font-black text-primary"
+                                : "text-foreground"
                             }
                           >
                             {prayer.name}
@@ -650,9 +656,9 @@ export default function PrayerPage() {
                     );
                   })}
                 </div>
-                <div className="mt-5 rounded-2xl border border-white/10 bg-black/10 p-4 text-sm text-slate-300">
+                <div className="mt-5 rounded-2xl border border-border/70 bg-muted/40 p-4 text-sm text-muted-foreground">
                   يتم حساب المواقيت حسب موقعك وبطريقة{" "}
-                  <b className="text-white">Muslim World League</b>.
+                  <b className="text-foreground">Muslim World League</b>.
                 </div>
               </div>
             </div>

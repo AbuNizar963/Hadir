@@ -32,15 +32,6 @@
   animation: hadir-employee-menu-in 0.18s ease-out both;
 }
 
-.employee-shell .employee-utility-menu::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: hsl(0 0% 0% / 0.5);
-  pointer-events: none;
-}
-
 .employee-shell .employee-utility-menu > div {
   min-width: 10rem;
   width: max-content;

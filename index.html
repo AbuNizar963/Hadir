@@ -27,6 +27,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./report-print.css" media="print" />
+    <script>
+      try {
+        const preference = localStorage.getItem("hadir.theme");
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const dark = preference === "dark" || (preference !== "light" && systemDark);
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0b0f14" : "#f9fafb");
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
