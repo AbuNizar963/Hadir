@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Keeps the app theme choice persistent without changing authentication data.
@@ -20,7 +21,24 @@ class HadirThemeController extends ChangeNotifier {
   bool get loaded => _loaded;
 
   Future<void> load() async {
-    final saved = await _storage.read(key: _storageKey);
+    String? saved;
+    try {
+      saved = await _storage.read(key: _storageKey);
+    } on PlatformException catch (error) {
+      final message = '${error.code} ${error.message ?? ''}'.toLowerCase();
+      final corrupted = message.contains('badpadding') ||
+          message.contains('bad decrypt') ||
+          message.contains('bad_decrypt') ||
+          message.contains('invalidkey') ||
+          message.contains('key permanently invalidated') ||
+          message.contains('keystore');
+      if (!corrupted) rethrow;
+      try {
+        await _storage.deleteAll();
+      } on PlatformException {
+        // The session layer performs the same recovery before login.
+      }
+    }
     if (saved == 'light') {
       _mode = ThemeMode.light;
     } else if (saved == 'dark') {
