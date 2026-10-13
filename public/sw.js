@@ -6,6 +6,9 @@ const APP_SHELL = [
   new URL("./", self.registration.scope).href,
   new URL("./manifest.webmanifest", self.registration.scope).href,
   new URL("./favicon.svg", self.registration.scope).href,
+  new URL("./pwa-icon-180.png", self.registration.scope).href,
+  new URL("./pwa-icon-192.png", self.registration.scope).href,
+  new URL("./pwa-icon-512.png", self.registration.scope).href,
   new URL("./pwa-icon.svg", self.registration.scope).href,
 ];
 

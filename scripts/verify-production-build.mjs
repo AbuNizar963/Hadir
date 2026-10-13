@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 
 const dist = new URL("../dist/", import.meta.url);
+const configuredBasePath = process.env.VITE_BASE_PATH || "/";
+const expectedBasePath = `/${configuredBasePath.replace(/^\/+|\/+$/g, "")}/`.replace("//", "/");
 const requiredFiles = [
   "index.html",
   "manifest.webmanifest",
@@ -20,13 +22,19 @@ if (!indexHtml.includes('<div id="root"></div>')) {
 }
 
 const manifest = JSON.parse(readFileSync(new URL("manifest.webmanifest", dist), "utf8"));
-if (manifest.id !== "/" || manifest.start_url !== "/" || manifest.scope !== "/" || manifest.display !== "standalone") {
+if (manifest.id !== expectedBasePath || manifest.start_url !== expectedBasePath || manifest.scope !== expectedBasePath || manifest.display !== "standalone") {
   throw new Error("Production build validation failed: PWA manifest identity/start/scope/display is invalid.");
 }
 
 const icons = Array.isArray(manifest.icons) ? manifest.icons : [];
-if (icons.length < 2 || !icons.every((icon) => String(icon.src || "").includes("/pwa-icon.svg"))) {
-  throw new Error("Production build validation failed: canonical PWA icons are missing from the manifest.");
+const iconSources = icons.map((icon) => String(icon.src || ""));
+if (
+  icons.length < 3 ||
+  !iconSources.some((src) => src.includes("pwa-icon-192.png")) ||
+  !iconSources.some((src) => src.includes("pwa-icon-512.png")) ||
+  !iconSources.some((src) => src.includes("pwa-icon.svg"))
+) {
+  throw new Error("Production build validation failed: PNG and SVG PWA icons are missing from the manifest.");
 }
 
 const serviceWorker = readFileSync(new URL("sw.js", dist), "utf8");

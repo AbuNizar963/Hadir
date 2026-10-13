@@ -168,14 +168,23 @@ jobs:
           assert manifest.get("display") == "standalone", manifest
           assert manifest.get("prefer_related_applications") is False, manifest
           icons = manifest.get("icons")
-          assert isinstance(icons, list) and len(icons) >= 2, manifest
+          assert isinstance(icons, list) and len(icons) >= 3, manifest
           icon_sources = [str(icon.get("src", "")) for icon in icons]
-          assert all("/pwa-icon.svg" in src for src in icon_sources), manifest
-          assert all(icon.get("type") == "image/svg+xml" for icon in icons), manifest
+          assert any("pwa-icon-192.png" in src for src in icon_sources), manifest
+          assert any("pwa-icon-512.png" in src for src in icon_sources), manifest
+          assert any("pwa-icon.svg" in src for src in icon_sources), manifest
           purposes = [str(icon.get("purpose", "")) for icon in icons]
           assert "any" in purposes and "maskable" in purposes, manifest
-          print("Production PWA manifest verified with the canonical Hadir SVG app icon.")
+          print("Production PWA manifest verified with iOS/Android PNG icons and SVG fallback.")
           PY
+
+          for icon in pwa-icon-180.png pwa-icon-192.png pwa-icon-512.png; do
+            curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
+              -H 'Cache-Control: no-cache, no-store' \
+              "$PAGES_PRODUCTION_URL/$icon?hadir_ci=$GITHUB_SHA" \
+              -o "/tmp/$icon"
+            test -s "/tmp/$icon"
+          done
 
           curl -fsS --retry 8 --retry-delay 2 --retry-all-errors \
             -H 'Cache-Control: no-cache, no-store' \

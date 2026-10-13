@@ -29,6 +29,20 @@ const deploymentUrl = process.env.CF_PAGES_URL || "";
 
 run("npx", ["vite", "build"]);
 
+// Keep the install identity correct when the app is hosted below the domain
+// root (for example on GitHub Pages at /Hadir/). Relative icon URLs remain
+// portable across both root and sub-path deployments.
+const configuredBasePath = process.env.VITE_BASE_PATH || "/";
+const basePath = `/${configuredBasePath.replace(/^\/+|\/+$/g, "")}/`.replace("//", "/");
+const manifestUrl = new URL("../dist/manifest.webmanifest", import.meta.url);
+if (existsSync(manifestUrl)) {
+  const manifest = JSON.parse(readFileSync(manifestUrl, "utf8"));
+  manifest.id = basePath;
+  manifest.start_url = basePath;
+  manifest.scope = basePath;
+  writeFileSync(manifestUrl, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+}
+
 const sourceHeaderScan = spawnSync("grep", ["-RIlE", "خدمة الدوام اليومية|settings\\.brandName", "src/pages/ManagerReports.tsx", "dist"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 if (sourceHeaderScan.status !== 0 || !sourceHeaderScan.stdout?.trim()) {
   throw new Error("Production build validation failed: canonical daily report branding was not found in source or dist.");
