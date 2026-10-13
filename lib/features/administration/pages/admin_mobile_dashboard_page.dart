@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api.dart';
+import '../../../core/hadir_brand.dart';
 import '../../../core/session.dart';
 
 class AdminMobileDashboardPage extends StatefulWidget {
   const AdminMobileDashboardPage({super.key});
 
   @override
-  State<AdminMobileDashboardPage> createState() => _AdminMobileDashboardPageState();
+  State<AdminMobileDashboardPage> createState() =>
+      _AdminMobileDashboardPageState();
 }
 
 class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
@@ -146,12 +148,12 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
 
   Color _statusColor(Map<String, dynamic> row) {
     final label = _statusLabel(row);
-    if (label == 'هارب' || label == 'غائب') return const Color(0xFFB42318);
-    if (label == 'متأخر') return const Color(0xFFB54708);
+    if (label == 'هارب' || label == 'غائب') return HadirBrand.lightDanger;
+    if (label == 'متأخر') return HadirBrand.lightWarning;
     if (label == 'حاضر') return _primary;
-    if (label == 'إجازة') return const Color(0xFF9B72D0);
-    if (label == 'إذن') return const Color(0xFF4CC9F0);
-    return const Color(0xFF2563A6);
+    if (label == 'إجازة') return HadirBrand.lightAccent;
+    if (label == 'إذن') return HadirBrand.lightAccent;
+    return HadirBrand.lightMuted;
   }
 
   Color _statusCardColor(_StatusCardData card) {
@@ -159,16 +161,16 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
       case 'present':
         return _primary;
       case 'late':
-        return const Color(0xFFB54708);
+        return HadirBrand.lightWarning;
       case 'absent':
       case 'escaped':
-        return const Color(0xFFB42318);
+        return HadirBrand.lightDanger;
       case 'leave':
-        return const Color(0xFF9B72D0);
+        return HadirBrand.lightAccent;
       case 'permission':
-        return const Color(0xFF4CC9F0);
+        return HadirBrand.lightAccent;
       case 'rest':
-        return const Color(0xFF2563A6);
+        return HadirBrand.lightMuted;
       default:
         return _primary;
     }
@@ -224,7 +226,8 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
             Text(
               'الحالة التشغيلية الحالية',
               textAlign: TextAlign.right,
-              style: TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                  color: _ink, fontSize: 14, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             Row(
@@ -250,16 +253,21 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.errorContainer,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Theme.of(context).colorScheme.error.withValues(alpha: .35)),
+          border: Border.all(
+              color:
+                  Theme.of(context).colorScheme.error.withValues(alpha: .35)),
         ),
         child: Row(
           children: [
-            Icon(Icons.error_outline_rounded, color: Theme.of(context).colorScheme.error),
+            Icon(Icons.error_outline_rounded,
+                color: Theme.of(context).colorScheme.error),
             const SizedBox(width: 9),
             Expanded(
               child: Text(
                 _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer, fontSize: 11),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                    fontSize: 11),
               ),
             ),
             TextButton(onPressed: _load, child: const Text('إعادة')),
@@ -269,14 +277,17 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
 
   Widget _statusGrid() {
     final cards = <_StatusCardData>[
-      _StatusCardData('إجمالي الموظفين', _employees.length, Icons.groups_rounded, 'all'),
+      _StatusCardData(
+          'إجمالي الموظفين', _employees.length, Icons.groups_rounded, 'all'),
       _StatusCardData('الحضور', _present, Icons.person_rounded, 'present'),
       _StatusCardData('الغياب', _absent, Icons.person_off_rounded, 'absent'),
       _StatusCardData('المتأخرون', _late, Icons.schedule_rounded, 'late'),
       _StatusCardData('الراحة', _rest, Icons.coffee_rounded, 'rest'),
-      _StatusCardData('الإجازات', _leave, Icons.event_available_rounded, 'leave'),
+      _StatusCardData(
+          'الإجازات', _leave, Icons.event_available_rounded, 'leave'),
       _StatusCardData('الهروب', _escaped, Icons.shield_outlined, 'escaped'),
-      _StatusCardData('الاستئذان', _permission, Icons.lightbulb_outline_rounded, 'permission'),
+      _StatusCardData('الاستئذان', _permission, Icons.lightbulb_outline_rounded,
+          'permission'),
     ];
     return GridView.builder(
       shrinkWrap: true,
@@ -298,7 +309,8 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
           child: Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
-              color: Color.alphaBlend(color.withValues(alpha: active ? .08 : .025), _surface),
+              color: Color.alphaBlend(
+                  color.withValues(alpha: active ? .08 : .025), _surface),
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
                 color: color.withValues(alpha: active ? .65 : .48),
@@ -313,7 +325,8 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                      color: color, fontSize: 12, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -331,14 +344,20 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
                     const SizedBox(width: 12),
                     Text(
                       '${card.value}',
-                      style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                          color: color,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900),
                     ),
                   ],
                 ),
                 const SizedBox(height: 5),
                 Text(
                   'عرض القائمة',
-                  style: TextStyle(color: color.withValues(alpha: .78), fontSize: 10, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                      color: color.withValues(alpha: .78),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -429,9 +448,10 @@ class _AdminMobileDashboardPageState extends State<AdminMobileDashboardPage> {
     final color = _statusColor(row);
     final name = '${row['employeeName'] ?? 'موظف'}';
     final jobNumber = '${row['jobNumber'] ?? ''}';
-    final schedule = '${row['scheduleType'] ?? 'ADMIN'}'.toUpperCase() == 'ROTATION'
-        ? 'تناوبي'
-        : 'ثابت';
+    final schedule =
+        '${row['scheduleType'] ?? 'ADMIN'}'.toUpperCase() == 'ROTATION'
+            ? 'تناوبي'
+            : 'ثابت';
     return Container(
       margin: const EdgeInsets.only(top: 7),
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),

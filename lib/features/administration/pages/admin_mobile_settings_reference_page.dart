@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-
 import '../../../core/api.dart';
+import '../../../core/hadir_brand.dart';
 import '../../../core/session.dart';
 
 enum SettingsRefView { home, identity, locations, security, diagnostics }
@@ -19,14 +19,14 @@ class AdminMobileSettingsReferencePage extends StatefulWidget {
 
 class _AdminMobileSettingsReferencePageState
     extends State<AdminMobileSettingsReferencePage> {
-  static const bg = Color(0xFF080D18);
-  static const card = Color(0xFF111827);
-  static const inner = Color(0xFF151E30);
-  static const green = Color(0xFF17D7A1);
-  static const cyan = Color(0xFF10E7FF);
-  static const muted = Color(0xFF8B97AA);
-  static const line = Color(0xFF263146);
-  static const red = Color(0xFFFF4D55);
+  static const bg = HadirBrand.darkBackground;
+  static const card = HadirBrand.darkCard;
+  static const inner = HadirBrand.darkPanel;
+  static const green = HadirBrand.darkPrimary;
+  static const cyan = HadirBrand.darkAccent;
+  static const muted = HadirBrand.darkMuted;
+  static const line = HadirBrand.darkBorder;
+  static const red = HadirBrand.darkDanger;
 
   final session = HadirSession();
   final ownerName = TextEditingController();

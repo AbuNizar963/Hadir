@@ -5,46 +5,46 @@ import 'package:google_fonts/google_fonts.dart';
 /// Keep these values shared so every Flutter page inherits the same visual language.
 class HadirBrand {
   // Website dark CSS tokens converted from HSL.
-  static const darkBackground = Color(0xFF0C1017);
-  static const darkCard = Color(0xFF151A22);
+  static const darkBackground = Color(0xFF0C1018);
+  static const darkCard = Color(0xFF151923);
   static const darkPanel = Color(0xFF1F232E);
-  static const darkText = Color(0xFFF1F4F7);
+  static const darkText = Color(0xFFF2F5F7);
   static const darkMuted = Color(0xFFA4AAB7);
-  static const darkBorder = Color(0xFF292E3D);
-  static const darkInput = Color(0xFF252A36);
-  static const darkPrimary = Color(0xFF2AC991);
-  static const darkPrimaryForeground = Color(0xFF031F15);
+  static const darkBorder = Color(0xFF292F3D);
+  static const darkInput = Color(0xFF252A37);
+  static const darkPrimary = Color(0xFF2BCA90);
+  static const darkPrimaryForeground = Color(0xFF022216);
   static const darkSecondary = Color(0xFF1F232E);
-  static const darkAccent = Color(0xFF32BEEB);
-  static const darkWarning = Color(0xFFF4A91F);
-  static const darkDanger = Color(0xFFE33D3D);
+  static const darkAccent = Color(0xFF2BBDEE);
+  static const darkWarning = Color(0xFFF6A823);
+  static const darkDanger = Color(0xFFDF3A3A);
 
   // Website light CSS tokens converted from HSL.
-  static const lightBackground = Color(0xFFF7F9FC);
+  static const lightBackground = Color(0xFFF9FAFB);
   static const lightCard = Color(0xFFFFFFFF);
   static const lightPanel = Color(0xFFEFF2F5);
   static const lightText = Color(0xFF151B28);
-  static const lightMuted = Color(0xFF5C6471);
+  static const lightMuted = Color(0xFF5C697A);
   static const lightBorder = Color(0xFFCED5DE);
-  static const lightInput = Color(0xFFDCE1E7);
-  static const lightPrimary = Color(0xFF229F70);
-  static const lightAccent = Color(0xFF2092B5);
-  static const lightDanger = Color(0xFFD52A38);
-  static const lightWarning = Color(0xFFDE9E0B);
+  static const lightInput = Color(0xFFDAE0E7);
+  static const lightPrimary = Color(0xFF22A072);
+  static const lightAccent = Color(0xFF2091B6);
+  static const lightDanger = Color(0xFFD32222);
+  static const lightWarning = Color(0xFFDF910C);
 
   // Backward-compatible aliases used by existing pages.
-  static const background = darkBackground;
-  static const card = darkCard;
-  static const panel = darkPanel;
-  static const text = darkText;
-  static const muted = darkMuted;
-  static const border = darkBorder;
-  static const input = darkInput;
-  static const primary = darkPrimary;
-  static const primaryDark = darkPrimary;
-  static const soft = darkPanel;
-  static const warning = darkWarning;
-  static const danger = darkDanger;
+  static const background = lightBackground;
+  static const card = lightCard;
+  static const panel = lightPanel;
+  static const text = lightText;
+  static const muted = lightMuted;
+  static const border = lightBorder;
+  static const input = lightInput;
+  static const primary = lightPrimary;
+  static const primaryDark = lightPrimary;
+  static const soft = lightPanel;
+  static const warning = lightWarning;
+  static const danger = lightDanger;
 
   static const radiusSm = 12.0;
   static const radiusMd = 16.0;
@@ -120,7 +120,9 @@ class HadirBrand {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: dark ? darkInput.withValues(alpha: .50) : lightPanel.withValues(alpha: .72),
+        fillColor: dark
+            ? darkInput.withValues(alpha: .50)
+            : lightPanel.withValues(alpha: .72),
         hintStyle: TextStyle(color: secondaryText),
         labelStyle: TextStyle(color: secondaryText),
         border: OutlineInputBorder(
@@ -135,7 +137,8 @@ class HadirBrand {
           borderRadius: const BorderRadius.all(Radius.circular(radiusSm)),
           borderSide: BorderSide(color: primaryColor, width: 1.8),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -178,7 +181,8 @@ class HadirBrand {
         surfaceTintColor: Colors.transparent,
         indicatorColor: primaryColor.withValues(alpha: .16),
         labelTextStyle: WidgetStatePropertyAll(
-          TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: secondaryText),
+          TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700, color: secondaryText),
         ),
       ),
       dialogTheme: DialogThemeData(

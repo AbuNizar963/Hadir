@@ -3,5 +3,8 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - third_party/hr_geo_attendance_reference/**
+    - build/**
+    - android/**
+    - ios/**
   errors:
     curly_braces_in_flow_control_structures: ignore

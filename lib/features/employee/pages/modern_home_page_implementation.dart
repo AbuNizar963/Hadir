@@ -6,17 +6,18 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../core/api.dart';
+import '../../../core/hadir_brand.dart';
 import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
 
-const _brand = Color(0xFF0B6B5A);
-const _brandDark = Color(0xFF064B40);
-const _brandSoft = Color(0xFFE8F5F0);
-const _canvas = Color(0xFFF5F7F6);
-const _ink = Color(0xFF142D27);
-const _muted = Color(0xFF73827E);
-const _line = Color(0xFFDCE6E2);
-const _danger = Color(0xFFB94A3D);
+const _brand = HadirBrand.lightPrimary;
+const _brandDark = HadirBrand.lightPrimary;
+const _brandSoft = HadirBrand.lightPanel;
+const _canvas = HadirBrand.lightBackground;
+const _ink = HadirBrand.lightText;
+const _muted = HadirBrand.lightMuted;
+const _line = HadirBrand.lightBorder;
+const _danger = HadirBrand.lightDanger;
 
 class ModernHomePage extends StatefulWidget {
   const ModernHomePage({super.key});
@@ -92,13 +93,11 @@ class _ModernHomePageState extends State<ModernHomePage> {
   Map<String, dynamic>? _extractDailyStatus(Map<String, dynamic> response) {
     final employees = response['employees'];
     if (employees is! List) return null;
-    final row = employees
-        .whereType<Map>()
-        .map(Map<String, dynamic>.from)
-        .firstWhere(
-          (item) => item['employeeId'] != null,
-          orElse: () => <String, dynamic>{},
-        );
+    final row =
+        employees.whereType<Map>().map(Map<String, dynamic>.from).firstWhere(
+              (item) => item['employeeId'] != null,
+              orElse: () => <String, dynamic>{},
+            );
     return row.isEmpty ? null : row;
   }
 
@@ -115,17 +114,28 @@ class _ModernHomePageState extends State<ModernHomePage> {
 
   String get _statusLabel {
     switch (_canonicalStatus) {
-      case 'PRESENT': return 'حاضر';
-      case 'LATE': return 'متأخر';
-      case 'ABSENT': return 'غياب';
-      case 'REST': return 'راحة';
-      case 'LEAVE': return 'إجازة';
-      case 'PERMISSION': return 'استئذان';
-      case 'ESCAPED': return 'هروب من العمل';
-      case 'NOT_STARTED': return 'لم يبدأ';
-      case 'INVALID': return 'غير صالح';
-      case 'OPEN': return 'انصراف معلق';
-      default: return _clockedIn ? 'على رأس العمل' : 'خارج الدوام';
+      case 'PRESENT':
+        return 'حاضر';
+      case 'LATE':
+        return 'متأخر';
+      case 'ABSENT':
+        return 'غياب';
+      case 'REST':
+        return 'راحة';
+      case 'LEAVE':
+        return 'إجازة';
+      case 'PERMISSION':
+        return 'استئذان';
+      case 'ESCAPED':
+        return 'هروب من العمل';
+      case 'NOT_STARTED':
+        return 'لم يبدأ';
+      case 'INVALID':
+        return 'غير صالح';
+      case 'OPEN':
+        return 'انصراف معلق';
+      default:
+        return _clockedIn ? 'على رأس العمل' : 'خارج الدوام';
     }
   }
 
@@ -142,13 +152,17 @@ class _ModernHomePageState extends State<ModernHomePage> {
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .where((item) {
-          final value = HadirTime.fromTimestamp(item['timestamp']);
-          return value != null && value.year == today.year && value.month == today.month && value.day == today.day;
-        })
-        .toList();
+      final value = HadirTime.fromTimestamp(item['timestamp']);
+      return value != null &&
+          value.year == today.year &&
+          value.month == today.month &&
+          value.day == today.day;
+    }).toList();
     records.sort((a, b) {
-      final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final at = DateTime.tryParse('${a['timestamp']}') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bt = DateTime.tryParse('${b['timestamp']}') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
       return at.compareTo(bt);
     });
     return records;
@@ -214,13 +228,22 @@ class _ModernHomePageState extends State<ModernHomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('مرحباً $firstName', style: const TextStyle(color: _ink, fontSize: 18, fontWeight: FontWeight.w900)),
+                          Text('مرحباً $firstName',
+                              style: const TextStyle(
+                                  color: _ink,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900)),
                           const SizedBox(height: 2),
-                          Text(intl.DateFormat('EEEE، d MMMM', 'ar').format(now), style: const TextStyle(color: _muted, fontSize: 10.5)),
+                          Text(
+                              intl.DateFormat('EEEE، d MMMM', 'ar').format(now),
+                              style: const TextStyle(
+                                  color: _muted, fontSize: 10.5)),
                         ],
                       ),
                     ),
-                    _HeaderButton(icon: Icons.notifications_none_rounded, onTap: () => context.push('/notifications')),
+                    _HeaderButton(
+                        icon: Icons.notifications_none_rounded,
+                        onTap: () => context.push('/notifications')),
                     const SizedBox(width: 8),
                     _HeaderAvatar(onTap: () => context.push('/profile')),
                   ],
@@ -240,7 +263,10 @@ class _ModernHomePageState extends State<ModernHomePage> {
                     const SizedBox(height: 14),
                     _dashboardActions(),
                     const SizedBox(height: 18),
-                    _sectionHeader('آخر الحركات', action: TextButton(onPressed: () => context.push('/history'), child: const Text('عرض الكل'))),
+                    _sectionHeader('آخر الحركات',
+                        action: TextButton(
+                            onPressed: () => context.push('/history'),
+                            child: const Text('عرض الكل'))),
                     const SizedBox(height: 8),
                     _recentActivity(),
                     const SizedBox(height: 14),
@@ -259,9 +285,17 @@ class _ModernHomePageState extends State<ModernHomePage> {
   Widget _dashboardFilter(DateTime now) {
     return Row(
       children: [
-        Expanded(child: _FilterPill(icon: Icons.calendar_today_outlined, label: 'اليوم', value: intl.DateFormat('d MMM', 'ar').format(now))),
+        Expanded(
+            child: _FilterPill(
+                icon: Icons.calendar_today_outlined,
+                label: 'اليوم',
+                value: intl.DateFormat('d MMM', 'ar').format(now))),
         const SizedBox(width: 8),
-        Expanded(child: _FilterPill(icon: Icons.person_outline_rounded, label: 'الموظف', value: _name.trim().split(RegExp(r'\s+')).first)),
+        Expanded(
+            child: _FilterPill(
+                icon: Icons.person_outline_rounded,
+                label: 'الموظف',
+                value: _name.trim().split(RegExp(r'\s+')).first)),
       ],
     );
   }
@@ -270,32 +304,67 @@ class _ModernHomePageState extends State<ModernHomePage> {
     final active = _clockedIn;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _line)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(children: [
             const Icon(Icons.access_time_rounded, color: _ink, size: 20),
             const SizedBox(width: 8),
-            const Expanded(child: Text('ساعة الدوام', style: TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900))),
+            const Expanded(
+                child: Text('ساعة الدوام',
+                    style: TextStyle(
+                        color: _ink,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900))),
             _StatusPill(label: _statusLabel, active: active),
           ]),
           const SizedBox(height: 15),
-          Text(_trackedHours, textAlign: TextAlign.center, style: const TextStyle(color: _ink, fontSize: 32, height: 1, fontWeight: FontWeight.w900, letterSpacing: .3)),
+          Text(_trackedHours,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: _ink,
+                  fontSize: 32,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: .3)),
           const SizedBox(height: 8),
-          Text(active ? 'الوقت المتتبع اليوم' : 'إجمالي الوقت المتتبع اليوم', textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 10.5, fontWeight: FontWeight.w600)),
+          Text(active ? 'الوقت المتتبع اليوم' : 'إجمالي الوقت المتتبع اليوم',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: _muted, fontSize: 10.5, fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
-          if (_lastActivityTime != null) Text('${active ? 'آخر دخول' : 'آخر حركة'} · ${intl.DateFormat('HH:mm', 'ar').format(_lastActivityTime!)}', textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 10)),
+          if (_lastActivityTime != null)
+            Text(
+                '${active ? 'آخر دخول' : 'آخر حركة'} · ${intl.DateFormat('HH:mm', 'ar').format(_lastActivityTime!)}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _muted, fontSize: 10)),
           const SizedBox(height: 14),
-          Text(active ? 'يمكنك تسجيل الانصراف عند انتهاء دوامك.' : 'استخدم الموقع والجهاز وQR لإكمال عملية التحقق.', textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 11, height: 1.4)),
+          Text(
+              active
+                  ? 'يمكنك تسجيل الانصراف عند انتهاء دوامك.'
+                  : 'استخدم الموقع والجهاز وQR لإكمال عملية التحقق.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _muted, fontSize: 11, height: 1.4)),
           const SizedBox(height: 16),
           SizedBox(
             height: 52,
             child: FilledButton.icon(
-              onPressed: () => context.push('/attendance?type=${active ? 'check-out' : 'check-in'}'),
-              style: FilledButton.styleFrom(backgroundColor: _brand, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-              icon: Icon(active ? Icons.logout_rounded : Icons.play_arrow_rounded, size: 22),
-              label: Text(active ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(fontWeight: FontWeight.w900)),
+              onPressed: () => context.push(
+                  '/attendance?type=${active ? 'check-out' : 'check-in'}'),
+              style: FilledButton.styleFrom(
+                  backgroundColor: _brand,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14))),
+              icon: Icon(
+                  active ? Icons.logout_rounded : Icons.play_arrow_rounded,
+                  size: 22),
+              label: Text(active ? 'تسجيل الانصراف' : 'تسجيل الحضور',
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
             ),
           ),
         ],
@@ -305,20 +374,46 @@ class _ModernHomePageState extends State<ModernHomePage> {
 
   Widget _trackedHoursCard() {
     return Row(children: [
-      Expanded(child: _MetricCard(icon: Icons.timer_outlined, title: 'الساعات المتتبعة', value: _loading ? '—' : _trackedHours)),
+      Expanded(
+          child: _MetricCard(
+              icon: Icons.timer_outlined,
+              title: 'الساعات المتتبعة',
+              value: _loading ? '—' : _trackedHours)),
       const SizedBox(width: 9),
-      Expanded(child: _MetricCard(icon: Icons.event_available_outlined, title: 'حركات اليوم', value: '${_todayRecords.length}')),
+      Expanded(
+          child: _MetricCard(
+              icon: Icons.event_available_outlined,
+              title: 'حركات اليوم',
+              value: '${_todayRecords.length}')),
     ]);
   }
 
   Widget _scheduleCard() {
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: _line)),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _line)),
       child: Row(children: [
-        Container(width: 42, height: 42, decoration: BoxDecoration(color: _brandSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.schedule_outlined, color: _brand, size: 21)),
+        Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+                color: _brandSoft, borderRadius: BorderRadius.circular(13)),
+            child:
+                const Icon(Icons.schedule_outlined, color: _brand, size: 21)),
         const SizedBox(width: 12),
-        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('جدول العمل', style: TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w900)), SizedBox(height: 3), Text('يتم تحديد الجدول والحالة من نظام الدوام المركزي.', style: TextStyle(color: _muted, fontSize: 10.5))])),
+        const Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('جدول العمل',
+              style: TextStyle(
+                  color: _ink, fontSize: 13, fontWeight: FontWeight.w900)),
+          SizedBox(height: 3),
+          Text('يتم تحديد الجدول والحالة من نظام الدوام المركزي.',
+              style: TextStyle(color: _muted, fontSize: 10.5))
+        ])),
         const Icon(Icons.chevron_left_rounded, color: _muted),
       ]),
     );
@@ -326,26 +421,60 @@ class _ModernHomePageState extends State<ModernHomePage> {
 
   Widget _dashboardActions() {
     return Row(children: [
-      Expanded(child: _ActionCard(icon: Icons.history_rounded, label: 'السجل', onTap: () => context.push('/history'))),
+      Expanded(
+          child: _ActionCard(
+              icon: Icons.history_rounded,
+              label: 'السجل',
+              onTap: () => context.push('/history'))),
       const SizedBox(width: 8),
-      Expanded(child: _ActionCard(icon: Icons.description_outlined, label: 'الطلبات', onTap: () => context.push('/requests'))),
+      Expanded(
+          child: _ActionCard(
+              icon: Icons.description_outlined,
+              label: 'الطلبات',
+              onTap: () => context.push('/requests'))),
       const SizedBox(width: 8),
-      Expanded(child: _ActionCard(icon: Icons.insights_outlined, label: 'الإحصاءات', onTap: () => context.push('/insights'))),
+      Expanded(
+          child: _ActionCard(
+              icon: Icons.insights_outlined,
+              label: 'الإحصاءات',
+              onTap: () => context.push('/insights'))),
       const SizedBox(width: 8),
-      Expanded(child: _ActionCard(icon: Icons.apps_rounded, label: 'الخدمات', onTap: () => context.push('/services'))),
+      Expanded(
+          child: _ActionCard(
+              icon: Icons.apps_rounded,
+              label: 'الخدمات',
+              onTap: () => context.push('/services'))),
     ]);
   }
 
-  Widget _sectionHeader(String title, {Widget? action}) => Row(children: [Expanded(child: Text(title, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900))), if (action != null) action]);
+  Widget _sectionHeader(String title, {Widget? action}) => Row(children: [
+        Expanded(
+            child: Text(title,
+                style: const TextStyle(
+                    color: _ink, fontSize: 15, fontWeight: FontWeight.w900))),
+        if (action != null) action
+      ]);
 
   Widget _recentActivity() {
-    if (_loading) return const Column(children: [_ActivitySkeleton(), SizedBox(height: 8), _ActivitySkeleton()]);
+    if (_loading)
+      return const Column(children: [
+        _ActivitySkeleton(),
+        SizedBox(height: 8),
+        _ActivitySkeleton()
+      ]);
     if (_error != null) return _errorCard();
-    if (_attendance.isEmpty) return _emptyCard('لا توجد حركات مسجلة بعد.', Icons.event_available_outlined);
-    final recent = _attendance.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+    if (_attendance.isEmpty)
+      return _emptyCard(
+          'لا توجد حركات مسجلة بعد.', Icons.event_available_outlined);
+    final recent = _attendance
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
     recent.sort((a, b) {
-      final at = DateTime.tryParse('${a['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bt = DateTime.tryParse('${b['timestamp']}') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final at = DateTime.tryParse('${a['timestamp']}') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bt = DateTime.tryParse('${b['timestamp']}') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
       return bt.compareTo(at);
     });
     return Column(children: recent.take(4).map(_activityTile).toList());
@@ -359,48 +488,109 @@ class _ModernHomePageState extends State<ModernHomePage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: _line)),
       child: Row(children: [
-        Container(width: 40, height: 40, decoration: BoxDecoration(color: checkout ? const Color(0xFFFFEFED) : _brandSoft, borderRadius: BorderRadius.circular(12)), child: Icon(checkout ? Icons.logout_rounded : Icons.login_rounded, color: checkout ? _danger : _brand, size: 20)),
+        Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+                color: checkout ? const Color(0xFFFFEFED) : _brandSoft,
+                borderRadius: BorderRadius.circular(12)),
+            child: Icon(checkout ? Icons.logout_rounded : Icons.login_rounded,
+                color: checkout ? _danger : _brand, size: 20)),
         const SizedBox(width: 10),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(checkout ? 'تسجيل الانصراف' : 'تسجيل الحضور', style: const TextStyle(color: _ink, fontSize: 12.5, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(time == null ? 'وقت غير معروف' : intl.DateFormat('EEEE · HH:mm', 'ar').format(time), style: const TextStyle(color: _muted, fontSize: 10))])),
-        if (distance != null) Text('${distance.toStringAsFixed(0)} م', style: const TextStyle(color: _muted, fontSize: 9.5, fontWeight: FontWeight.w800)),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(checkout ? 'تسجيل الانصراف' : 'تسجيل الحضور',
+              style: const TextStyle(
+                  color: _ink, fontSize: 12.5, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 3),
+          Text(
+              time == null
+                  ? 'وقت غير معروف'
+                  : intl.DateFormat('EEEE · HH:mm', 'ar').format(time),
+              style: const TextStyle(color: _muted, fontSize: 10))
+        ])),
+        if (distance != null)
+          Text('${distance.toStringAsFixed(0)} م',
+              style: const TextStyle(
+                  color: _muted, fontSize: 9.5, fontWeight: FontWeight.w800)),
       ]),
     );
   }
 
-  Widget _errorCard() => _emptyCard(_error ?? 'تعذر تحميل البيانات.', Icons.cloud_off_rounded, action: TextButton(onPressed: _load, child: const Text('إعادة')));
+  Widget _errorCard() =>
+      _emptyCard(_error ?? 'تعذر تحميل البيانات.', Icons.cloud_off_rounded,
+          action: TextButton(onPressed: _load, child: const Text('إعادة')));
 
   Widget _emptyCard(String text, IconData icon, {Widget? action}) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)),
-    child: Row(children: [Icon(icon, color: _brand), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(color: _muted, fontSize: 11))), if (action != null) action]),
-  );
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: _line)),
+        child: Row(children: [
+          Icon(icon, color: _brand),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(text,
+                  style: const TextStyle(color: _muted, fontSize: 11))),
+          if (action != null) action
+        ]),
+      );
 
   Widget _securityNote() => Container(
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(color: _brandSoft, borderRadius: BorderRadius.circular(17)),
-    child: const Row(children: [Icon(Icons.verified_user_outlined, color: _brand, size: 20), SizedBox(width: 9), Expanded(child: Text('الحضور في HADIR يعتمد على التحقق من الموقع والجهاز ورمز QR قبل اعتماد الحركة.', style: TextStyle(color: _brandDark, fontSize: 10, height: 1.45, fontWeight: FontWeight.w600)))]),
-  );
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+            color: _brandSoft, borderRadius: BorderRadius.circular(17)),
+        child: const Row(children: [
+          Icon(Icons.verified_user_outlined, color: _brand, size: 20),
+          SizedBox(width: 9),
+          Expanded(
+              child: Text(
+                  'الحضور في HADIR يعتمد على التحقق من الموقع والجهاز ورمز QR قبل اعتماد الحركة.',
+                  style: TextStyle(
+                      color: _brandDark,
+                      fontSize: 10,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600)))
+        ]),
+      );
 
   Widget _bottomNavigation(BuildContext context) => NavigationBar(
-    height: 70,
-    backgroundColor: Colors.white,
-    surfaceTintColor: Colors.transparent,
-    elevation: 6,
-    selectedIndex: 0,
-    onDestinationSelected: (index) {
-      if (index == 1) context.push('/history');
-      if (index == 2) context.push('/requests');
-      if (index == 3) context.push('/profile');
-    },
-    destinations: const [
-      NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'الرئيسية'),
-      NavigationDestination(icon: Icon(Icons.access_time_outlined), selectedIcon: Icon(Icons.access_time_filled), label: 'السجل'),
-      NavigationDestination(icon: Icon(Icons.description_outlined), selectedIcon: Icon(Icons.description_rounded), label: 'الطلبات'),
-      NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'حسابي'),
-    ],
-  );
+        height: 70,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 6,
+        selectedIndex: 0,
+        onDestinationSelected: (index) {
+          if (index == 1) context.push('/history');
+          if (index == 2) context.push('/requests');
+          if (index == 3) context.push('/profile');
+        },
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
+              label: 'الرئيسية'),
+          NavigationDestination(
+              icon: Icon(Icons.access_time_outlined),
+              selectedIcon: Icon(Icons.access_time_filled),
+              label: 'السجل'),
+          NavigationDestination(
+              icon: Icon(Icons.description_outlined),
+              selectedIcon: Icon(Icons.description_rounded),
+              label: 'الطلبات'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline_rounded),
+              selectedIcon: Icon(Icons.person_rounded),
+              label: 'حسابي'),
+        ],
+      );
 }
 
 class _HeaderButton extends StatelessWidget {
@@ -408,23 +598,56 @@ class _HeaderButton extends StatelessWidget {
   final VoidCallback onTap;
   const _HeaderButton({required this.icon, required this.onTap});
   @override
-  Widget build(BuildContext context) => Material(color: Colors.white, shape: const CircleBorder(), child: InkWell(onTap: onTap, customBorder: const CircleBorder(), child: Padding(padding: const EdgeInsets.all(10), child: Icon(icon, color: _ink, size: 20))));
+  Widget build(BuildContext context) => Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Icon(icon, color: _ink, size: 20))));
 }
 
 class _HeaderAvatar extends StatelessWidget {
   final VoidCallback onTap;
   const _HeaderAvatar({required this.onTap});
   @override
-  Widget build(BuildContext context) => Material(color: _brandSoft, shape: const CircleBorder(), child: InkWell(onTap: onTap, customBorder: const CircleBorder(), child: const SizedBox(width: 40, height: 40, child: Icon(Icons.person_rounded, color: _brand, size: 21))));
+  Widget build(BuildContext context) => Material(
+      color: _brandSoft,
+      shape: const CircleBorder(),
+      child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: const SizedBox(
+              width: 40,
+              height: 40,
+              child: Icon(Icons.person_rounded, color: _brand, size: 21))));
 }
 
 class _FilterPill extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _FilterPill({required this.icon, required this.label, required this.value});
+  const _FilterPill(
+      {required this.icon, required this.label, required this.value});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _line)), child: Row(children: [Icon(icon, color: _muted, size: 17), const SizedBox(width: 8), Expanded(child: Text(label, style: const TextStyle(color: _muted, fontSize: 9.5))), Text(value, style: const TextStyle(color: _ink, fontSize: 10.5, fontWeight: FontWeight.w900))]));
+  Widget build(BuildContext context) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _line)),
+      child: Row(children: [
+        Icon(icon, color: _muted, size: 17),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text(label,
+                style: const TextStyle(color: _muted, fontSize: 9.5))),
+        Text(value,
+            style: const TextStyle(
+                color: _ink, fontSize: 10.5, fontWeight: FontWeight.w900))
+      ]));
 }
 
 class _StatusPill extends StatelessWidget {
@@ -432,29 +655,100 @@ class _StatusPill extends StatelessWidget {
   final bool active;
   const _StatusPill({required this.label, required this.active});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: active ? _brandSoft : const Color(0xFFF0F2F1), borderRadius: BorderRadius.circular(20)), child: Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 6, height: 6, decoration: BoxDecoration(color: active ? _brand : _muted, shape: BoxShape.circle)), const SizedBox(width: 5), Text(label, style: TextStyle(color: active ? _brand : _muted, fontSize: 8.5, fontWeight: FontWeight.w900))]));
+  Widget build(BuildContext context) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+          color: active ? _brandSoft : const Color(0xFFF0F2F1),
+          borderRadius: BorderRadius.circular(20)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+                color: active ? _brand : _muted, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text(label,
+            style: TextStyle(
+                color: active ? _brand : _muted,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w900))
+      ]));
 }
 
 class _MetricCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
-  const _MetricCard({required this.icon, required this.title, required this.value});
+  const _MetricCard(
+      {required this.icon, required this.title, required this.value});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _line)), child: Row(children: [Container(width: 38, height: 38, decoration: BoxDecoration(color: _brandSoft, borderRadius: BorderRadius.circular(11)), child: Icon(icon, color: _brand, size: 19)), const SizedBox(width: 9), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 9.5)), const SizedBox(height: 3), Text(value, style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900))]))]));
+  Widget build(BuildContext context) => Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _line)),
+      child: Row(children: [
+        Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+                color: _brandSoft, borderRadius: BorderRadius.circular(11)),
+            child: Icon(icon, color: _brand, size: 19)),
+        const SizedBox(width: 9),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _muted, fontSize: 9.5)),
+          const SizedBox(height: 3),
+          Text(value,
+              style: const TextStyle(
+                  color: _ink, fontSize: 15, fontWeight: FontWeight.w900))
+        ]))
+      ]));
 }
 
 class _ActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _ActionCard({required this.icon, required this.label, required this.onTap});
+  const _ActionCard(
+      {required this.icon, required this.label, required this.onTap});
   @override
-  Widget build(BuildContext context) => Material(color: Colors.white, borderRadius: BorderRadius.circular(17), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(17), child: Container(padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 2), decoration: BoxDecoration(borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)), child: Column(children: [Icon(icon, color: _brand, size: 20), const SizedBox(height: 6), Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _ink, fontSize: 9.5, fontWeight: FontWeight.w900))]))));
+  Widget build(BuildContext context) => Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(17),
+      child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(17),
+          child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 2),
+              decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(color: _line)),
+              child: Column(children: [
+                Icon(icon, color: _brand, size: 20),
+                const SizedBox(height: 6),
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: _ink,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900))
+              ]))));
 }
 
 class _ActivitySkeleton extends StatelessWidget {
   const _ActivitySkeleton();
   @override
-  Widget build(BuildContext context) => Container(height: 64, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: _line)));
+  Widget build(BuildContext context) => Container(
+      height: 64,
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: _line)));
 }

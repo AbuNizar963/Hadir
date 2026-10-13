@@ -13,8 +13,8 @@ import '../../../core/session.dart';
 import '../../../services/attendance_service.dart';
 
 const _brand = HadirBrand.lightPrimary;
-const _brandDark = Color(0xFF187A57);
-const _brandSoft = Color(0xFFE5F5EE);
+const _brandDark = HadirBrand.lightPrimary;
+const _brandSoft = HadirBrand.lightPanel;
 const _canvas = HadirBrand.lightBackground;
 const _ink = HadirBrand.lightText;
 const _muted = HadirBrand.lightMuted;
@@ -62,7 +62,10 @@ class _AttendancePageState extends State<AttendancePage>
   String get _actionLabel => _isCheckIn ? 'الحضور' : 'الانصراف';
   double get _radius => double.tryParse('${_place?['radiusMeters']}') ?? 0;
   bool get _inRange =>
-      _distance != null && _place != null && _radius > 0 && _distance! <= _radius;
+      _distance != null &&
+      _place != null &&
+      _radius > 0 &&
+      _distance! <= _radius;
   bool get _challengeActive => _challenge != null && _remainingSeconds > 0;
   bool get _hasQr => _qr.text.trim().isNotEmpty;
 
@@ -269,13 +272,12 @@ class _AttendancePageState extends State<AttendancePage>
   void _startTimer(DateTime expiresAt) {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
-      final seconds = ((expiresAt
-                          .difference(DateTime.now().toUtc())
-                          .inMilliseconds +
+      final seconds =
+          ((expiresAt.difference(DateTime.now().toUtc()).inMilliseconds +
                       999) ~/
-              1000)
-          .clamp(0, 60)
-          .toInt();
+                  1000)
+              .clamp(0, 60)
+              .toInt();
 
       if (!mounted) return;
 
@@ -691,7 +693,11 @@ class _AttendancePageState extends State<AttendancePage>
   Widget _heroStatus() {
     final ready = _challengeActive;
     final inside = _inRange;
-    final text = ready ? 'جاهز' : inside ? 'موقعك سليم' : 'يلزم الموقع';
+    final text = ready
+        ? 'جاهز'
+        : inside
+            ? 'موقعك سليم'
+            : 'يلزم الموقع';
     final icon = ready
         ? Icons.verified_rounded
         : inside
@@ -880,9 +886,8 @@ class _AttendancePageState extends State<AttendancePage>
           ],
           const SizedBox(height: 13),
           OutlinedButton.icon(
-            onPressed: _locating || _checking || _submitting
-                ? null
-                : _refreshLocation,
+            onPressed:
+                _locating || _checking || _submitting ? null : _refreshLocation,
             icon: _locating
                 ? const SizedBox.square(
                     dimension: 17,
@@ -1104,9 +1109,8 @@ class _AttendancePageState extends State<AttendancePage>
           SizedBox(
             height: 38,
             child: FilledButton.icon(
-              onPressed: _inRange && !_checking && !_submitting
-                  ? _startScanner
-                  : null,
+              onPressed:
+                  _inRange && !_checking && !_submitting ? _startScanner : null,
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: _ink,
@@ -1231,9 +1235,8 @@ class _AttendancePageState extends State<AttendancePage>
           )
         else
           FilledButton.icon(
-            onPressed: _inRange && _hasQr && !_submitting
-                ? _prepareChallenge
-                : null,
+            onPressed:
+                _inRange && _hasQr && !_submitting ? _prepareChallenge : null,
             icon: const Icon(Icons.shield_outlined, size: 20),
             label: const Text('تحقق واستمر'),
           ),
@@ -1276,7 +1279,8 @@ class _AttendancePageState extends State<AttendancePage>
 
   Widget _successView() {
     final result = _result;
-    final time = result == null ? '—' : intl.DateFormat('HH:mm').format(result.time);
+    final time =
+        result == null ? '—' : intl.DateFormat('HH:mm').format(result.time);
 
     return SafeArea(
       child: Center(

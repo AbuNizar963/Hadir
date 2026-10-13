@@ -34,22 +34,22 @@ class _AdminManagementPageState extends State<AdminManagementPage> {
 
   Color _statusColor(String status,
       {bool escaped = false, bool hasDevice = false}) {
-    if (escaped) return const Color(0xFFDC2626);
+    if (escaped) return HadirBrand.lightDanger;
     switch (status.toLowerCase()) {
       case 'active':
       case 'online':
-        return const Color(0xFF16A34A);
+        return HadirBrand.lightPrimary;
       case 'suspended':
       case 'inactive':
       case 'rejected':
-        return const Color(0xFFDC2626);
+        return HadirBrand.lightDanger;
       case 'pending':
-        return const Color(0xFFD97706);
+        return HadirBrand.lightWarning;
       case 'approved':
       case 'returned':
-        return const Color(0xFF16A34A);
+        return HadirBrand.lightPrimary;
       default:
-        return hasDevice ? const Color(0xFF16A34A) : const Color(0xFFD97706);
+        return hasDevice ? HadirBrand.lightPrimary : HadirBrand.lightWarning;
     }
   }
 

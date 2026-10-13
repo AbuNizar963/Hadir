@@ -3,16 +3,17 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' as intl;
 
 import '../../../core/api.dart';
+import '../../../core/hadir_brand.dart';
 import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
 
-const _green = Color(0xFF0B6B5A);
-const _greenDark = Color(0xFF064B40);
-const _soft = Color(0xFFE8F5F0);
-const _bg = Color(0xFFF6F8F7);
-const _ink = Color(0xFF142D27);
-const _muted = Color(0xFF71817C);
-const _line = Color(0xFFE0E8E5);
+const _green = HadirBrand.lightPrimary;
+const _greenDark = HadirBrand.lightPrimary;
+const _soft = HadirBrand.lightPanel;
+const _bg = HadirBrand.lightBackground;
+const _ink = HadirBrand.lightText;
+const _muted = HadirBrand.lightMuted;
+const _line = HadirBrand.lightBorder;
 
 class JibbleWorkspacePage extends StatefulWidget {
   const JibbleWorkspacePage({super.key});
@@ -280,7 +281,8 @@ class _JibbleWorkspacePageState extends State<JibbleWorkspacePage> {
 
   List<dynamic> _todayAttendance(DateTime now) {
     return _attendance.where((item) {
-      final date = HadirTime.fromTimestamp(item is Map ? item['timestamp'] : null);
+      final date =
+          HadirTime.fromTimestamp(item is Map ? item['timestamp'] : null);
       return date != null &&
           date.year == now.year &&
           date.month == now.month &&
