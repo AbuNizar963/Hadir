@@ -26,6 +26,8 @@ class UpdateInstaller(private val context: Context) {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong()
     }
 
+    fun preferredAbi(): String? = Build.SUPPORTED_ABIS.firstOrNull()
+
     fun downloadAndInstall(versionCode: Long, downloadUrl: String, proxyUrl: String?, sink: EventChannel.EventSink?) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
             throw InstallPermissionRequiredException()

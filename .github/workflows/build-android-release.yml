@@ -116,9 +116,14 @@ jobs:
             -PhadirVersionCode=${{ github.run_number }} \
             -PhadirVersionName=1.0.${{ github.run_number }} \
             --stacktrace
-          test -f app/build/outputs/apk/release/app-release.apk
+          for abi in armeabi-v7a arm64-v8a x86_64 universal; do
+            test -f "app/build/outputs/apk/release/app-${abi}-release.apk"
+          done
           mkdir -p ../build/app/outputs/flutter-apk
-          cp app/build/outputs/apk/release/app-release.apk ../build/app/outputs/flutter-apk/app-release.apk
+          cp app/build/outputs/apk/release/app-universal-release.apk ../build/app/outputs/flutter-apk/app-release.apk
+          for abi in armeabi-v7a arm64-v8a x86_64; do
+            cp "app/build/outputs/apk/release/app-${abi}-release.apk" "../build/app/outputs/flutter-apk/app-${abi}-release.apk"
+          done
       - name: Verify target SDK, package name and version
         shell: bash
         run: |
@@ -154,7 +159,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hadir-android-flutter-production-api36-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
           retention-days: 14
       - name: Publish production APK release for in-app updater
@@ -164,9 +169,9 @@ jobs:
         run: |
           TAG="android-v1.0.${{ github.run_number }}"
           TITLE="HADIR Android 1.0.${{ github.run_number }}"
-          APK="build/app/outputs/flutter-apk/app-release.apk"
+          APK_DIR="build/app/outputs/flutter-apk"
           if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK" --repo "${{ github.repository }}" --clobber
+            gh release upload "$TAG" "$APK_DIR"/*.apk --repo "${{ github.repository }}" --clobber
           else
-            gh release create "$TAG" "$APK" --repo "${{ github.repository }}" --title "$TITLE" --target "${{ github.sha }}" --notes "تحديث تلقائي لتطبيق حاضر Android Flutter. versionCode=${{ github.run_number }}."
+            gh release create "$TAG" "$APK_DIR"/*.apk --repo "${{ github.repository }}" --title "$TITLE" --target "${{ github.sha }}" --notes "تحديث تلقائي لتطبيق حاضر Android Flutter. versionCode=${{ github.run_number }}. يتوفر APK مناسب لكل معمارية مع نسخة شاملة احتياطية."
           fi

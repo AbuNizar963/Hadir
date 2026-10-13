@@ -26,6 +26,15 @@ android {
         versionName project.findProperty('hadirVersionName')?.toString() ?: '1.0.0'
     }
 
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a', 'x86_64'
+            universalApk true
+        }
+    }
+
     def releaseKeystore = System.getenv('HADIR_RELEASE_KEYSTORE')
     def releaseStorePassword = System.getenv('HADIR_RELEASE_STORE_PASSWORD')
     def releaseKeyAlias = System.getenv('HADIR_RELEASE_KEY_ALIAS')

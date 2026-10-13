@@ -76,20 +76,26 @@ class UpdaterService {
     return value?.toInt() ?? 1;
   }
 
+  Future<String?> preferredAbi() async {
+    final value = await _channel.invokeMethod<String>('preferredAbi');
+    return value?.trim().isEmpty == true ? null : value?.trim();
+  }
+
   Future<UpdateInfo?> check() async {
     final currentCode = await currentVersionCode();
+    final abi = await preferredAbi();
 
     // Scan every release page. GitHub orders releases by publication/update
     // time, not by the numeric Android version, so a fixed first page is not
     // sufficient for a repository with a long release history.
     try {
-      final update = await _checkAllReleasePages(currentCode);
+      final update = await _checkAllReleasePages(currentCode, abi);
       if (update != null) return update;
     } catch (_) {}
 
     // If the paginated API is temporarily unavailable, try the latest-release API.
     try {
-      final latest = await _checkLatestRelease(currentCode);
+      final latest = await _checkLatestRelease(currentCode, abi);
       if (latest != null) return latest;
     } catch (_) {}
 
@@ -103,7 +109,10 @@ class UpdaterService {
     }
   }
 
-  Future<UpdateInfo?> _checkAllReleasePages(int currentCode) async {
+  Future<UpdateInfo?> _checkAllReleasePages(
+    int currentCode,
+    String? abi,
+  ) async {
     const perPage = 100;
     UpdateInfo? best;
 
@@ -127,7 +136,7 @@ class UpdaterService {
 
       if (rawReleases.isEmpty) break;
 
-      final pageBest = _selectApiRelease(rawReleases, currentCode);
+      final pageBest = _selectApiRelease(rawReleases, currentCode, abi);
       if (pageBest != null &&
           (best == null || pageBest.versionCode > best.versionCode)) {
         best = pageBest;
@@ -141,7 +150,7 @@ class UpdaterService {
     return best;
   }
 
-  Future<UpdateInfo?> _checkLatestRelease(int currentCode) async {
+  Future<UpdateInfo?> _checkLatestRelease(int currentCode, String? abi) async {
     final response = await _dio.get<dynamic>(
       _latestReleaseUrl,
       queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
@@ -158,10 +167,14 @@ class UpdaterService {
     final release = Map<String, dynamic>.from(rawRelease);
     if (release['draft'] == true || release['prerelease'] == true) return null;
 
-    return _releaseToUpdate(release, currentCode);
+    return _releaseToUpdate(release, currentCode, abi);
   }
 
-  UpdateInfo? _selectApiRelease(List<dynamic> rawReleases, int currentCode) {
+  UpdateInfo? _selectApiRelease(
+    List<dynamic> rawReleases,
+    int currentCode,
+    String? abi,
+  ) {
     Map<String, dynamic>? bestRelease;
     int? bestCode;
     String? bestDownloadUrl;
@@ -171,7 +184,7 @@ class UpdaterService {
       final release = Map<String, dynamic>.from(rawRelease);
       if (release['draft'] == true || release['prerelease'] == true) continue;
 
-      final candidate = _releaseToUpdate(release, currentCode);
+      final candidate = _releaseToUpdate(release, currentCode, abi);
       if (candidate == null) continue;
       if (bestCode != null && candidate.versionCode <= bestCode) continue;
 
@@ -195,6 +208,7 @@ class UpdaterService {
   UpdateInfo? _releaseToUpdate(
     Map<String, dynamic> release,
     int currentCode,
+    String? abi,
   ) {
     final tag = (release['tag_name'] ?? '').toString().trim();
     final match = RegExp(r'^android-v1\.0\.(\d+)$').firstMatch(tag);
@@ -202,21 +216,32 @@ class UpdaterService {
     if (code == null || code <= currentCode) return null;
 
     final assets = (release['assets'] as List<dynamic>?) ?? const [];
-    String? downloadUrl;
+    String? universalDownloadUrl;
+    String? abiDownloadUrl;
     for (final item in assets) {
       if (item is! Map) continue;
       final asset = Map<String, dynamic>.from(item);
       final name = (asset['name'] ?? '').toString().trim();
-      if (name != 'app-release.apk' && name != 'app-release-signed.apk') {
+      if (name != 'app-release.apk' &&
+          name != 'app-universal-release.apk' &&
+          name != 'app-release-signed.apk' &&
+          !name.endsWith('-release.apk')) {
         continue;
       }
       final candidate = asset['browser_download_url']?.toString().trim();
       if (candidate != null && candidate.isNotEmpty) {
-        downloadUrl = candidate;
-        break;
+        if (name == 'app-release.apk' ||
+            name == 'app-universal-release.apk' ||
+            name == 'app-release-signed.apk') {
+          universalDownloadUrl ??= candidate;
+        }
+        if (abi != null && name == 'app-$abi-release.apk') {
+          abiDownloadUrl = candidate;
+        }
       }
     }
 
+    final downloadUrl = abiDownloadUrl ?? universalDownloadUrl;
     if (downloadUrl == null || downloadUrl.isEmpty) return null;
 
     return UpdateInfo(
@@ -262,7 +287,8 @@ class UpdaterService {
       final entry = match.group(0) ?? '';
       final tagMatch = tagPattern.firstMatch(entry);
       final code = int.tryParse(tagMatch?.group(2) ?? '');
-      if (code == null || code <= currentCode ||
+      if (code == null ||
+          code <= currentCode ||
           (bestCode != null && code <= bestCode)) {
         continue;
       }

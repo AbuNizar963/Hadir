@@ -30,6 +30,7 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler, EventCh
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "currentVersionCode" -> result.success(installer.currentVersionCode())
+            "preferredAbi" -> result.success(installer.preferredAbi())
             "downloadAndInstall" -> {
                 val versionCode = (call.argument<Number>("versionCode"))?.toLong()
                 val downloadUrl = call.argument<String>("downloadUrl")
