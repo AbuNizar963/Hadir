@@ -174,7 +174,8 @@ jobs:
           assert any("pwa-icon-512.png" in src for src in icon_sources), manifest
           assert any("pwa-icon.svg" in src for src in icon_sources), manifest
           purposes = [str(icon.get("purpose", "")) for icon in icons]
-          assert "any" in purposes and "maskable" in purposes, manifest
+          assert any("any" in purpose.split() for purpose in purposes), manifest
+          assert any("maskable" in purpose.split() for purpose in purposes), manifest
           print("Production PWA manifest verified with iOS/Android PNG icons and SVG fallback.")
           PY
 
