@@ -115,6 +115,7 @@
 .settings-nav-item[data-settings-tab="general"] .settings-nav-icon { background: #15803d; }
 .settings-nav-item[data-settings-tab="locations"] .settings-nav-icon { background: #ee9f18; }
 .settings-nav-item[data-settings-tab="security"] .settings-nav-icon { background: #42bb64; }
+.settings-nav-item[data-settings-tab="updates"] .settings-nav-icon { background: #2d8cff; }
 .settings-nav-item[data-settings-tab="advanced"] .settings-nav-icon { background: #9c61da; }
 .settings-nav-copy { display: flex; min-width: 0; flex-direction: column; gap: 4px; text-align: right; }
 .settings-nav-code, .settings-nav-chevron { display: none !important; }

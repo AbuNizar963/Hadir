@@ -7,6 +7,7 @@ import CompanySpecialtiesPanel from "@/components/settings/CompanySpecialtiesPan
 import AdminAccountsPanel from "@/components/AdminAccountsPanel";
 import OwnerBulkSettingsPanel from "@/components/OwnerBulkSettingsPanel";
 import LocationPicker from "@/components/settings/LocationPicker";
+import ReleaseDownloadStatsPanel from "@/components/settings/ReleaseDownloadStatsPanel";
 import { getCurrentPosition } from "@/lib/geo";
 import {
   getSettings,
@@ -79,7 +80,14 @@ function Chevron() {
 function SectionIcon({
   type,
 }: {
-  type: "accounts" | "profile" | "locations" | "qr" | "diagnostics" | "danger";
+  type:
+    | "accounts"
+    | "profile"
+    | "locations"
+    | "qr"
+    | "updates"
+    | "diagnostics"
+    | "danger";
 }) {
   const common = {
     viewBox: "0 0 24 24",
@@ -123,6 +131,14 @@ function SectionIcon({
         <path d="M14 14h3v3h-3zM20 17v3M17 20h3" />
       </svg>
     );
+  if (type === "updates")
+    return (
+      <svg {...common}>
+        <path d="M4 19V5M4 19h16" />
+        <path d="m7 15 3-4 3 2 5-7" />
+        <path d="M15 6h3v3" />
+      </svg>
+    );
   if (type === "diagnostics")
     return (
       <svg {...common}>
@@ -147,7 +163,14 @@ function SettingsSection({
   defaultOpen = false,
   tone = "normal",
 }: {
-  type: "accounts" | "profile" | "locations" | "qr" | "diagnostics" | "danger";
+  type:
+    | "accounts"
+    | "profile"
+    | "locations"
+    | "qr"
+    | "updates"
+    | "diagnostics"
+    | "danger";
   code: string;
   title: string;
   description: string;
@@ -197,12 +220,18 @@ const displayHolidayCountry = (country: { code: string; name: string }) => {
     return country.name;
   }
 };
-type SettingsTab = "profile" | "locations" | "security" | "advanced";
+type SettingsTab =
+  | "profile"
+  | "locations"
+  | "security"
+  | "updates"
+  | "advanced";
 type SettingsIcon =
   | "accounts"
   | "profile"
   | "locations"
   | "diagnostics"
+  | "updates"
   | "clock";
 const tabs: Array<{
   id: SettingsTab;
@@ -231,6 +260,13 @@ const tabs: Array<{
     hint: "سياسات الموظفين",
     icon: "accounts",
     code: "03",
+  },
+  {
+    id: "updates",
+    label: "إحصائيات التحديثات",
+    hint: "تنزيلات الإصدارات ومعماريات الأجهزة",
+    icon: "updates",
+    code: "04",
   },
   {
     id: "advanced",
@@ -1647,6 +1683,35 @@ export default function ManagerSettings() {
                       </div>
                     </div>
                   )}
+                </div>,
+              )}
+
+              {section(
+                "updates",
+                <div className="space-y-6">
+                  <div className="rounded-3xl border border-border/70 bg-card shadow-sm">
+                    <div className="border-b border-border/60 px-5 py-5 sm:px-6">
+                      <div className="flex items-center gap-3">
+                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary">
+                          <SectionIcon type="updates" />
+                        </span>
+                        <div>
+                          <div className="text-[10px] font-black text-primary mono">
+                            04 · RELEASE ANALYTICS
+                          </div>
+                          <h2 className="mt-0.5 text-lg font-black">
+                            إحصائيات تنزيلات التطبيق
+                          </h2>
+                          <p className="settings-card-description mt-1 text-xs text-muted-foreground">
+                            متابعة استخدام الإصدارات ومعماريات Android المنشورة.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-4 sm:p-6">
+                      <ReleaseDownloadStatsPanel />
+                    </div>
+                  </div>
                 </div>,
               )}
 
