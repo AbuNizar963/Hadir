@@ -192,7 +192,7 @@ class _AttendancePageState extends State<AttendancePage>
   }
 
   void _startScanner() {
-    if (!_inRange || _submitting || _checking) return;
+    if (_submitting || _checking) return;
     setState(() {
       _scanning = true;
       _error = null;
@@ -213,11 +213,20 @@ class _AttendancePageState extends State<AttendancePage>
     for (final barcode in capture.barcodes) {
       final value = barcode.rawValue?.trim();
       if (value == null || value.isEmpty) continue;
-      _qr.text = value;
-      _stopScanner();
-      _prepareChallenge();
+      unawaited(_verifyScannedQr(value));
       return;
     }
+  }
+
+  /// The web flow reads the workplace QR before requesting location access.
+  /// Keeping that order avoids asking for GPS until the employee has supplied
+  /// a valid attendance code and matches the browser experience.
+  Future<void> _verifyScannedQr(String value) async {
+    _qr.text = value;
+    _stopScanner();
+    _clearChallenge();
+    await _refreshLocation();
+    if (mounted && _inRange) await _prepareChallenge();
   }
 
   Future<void> _prepareChallenge() async {
@@ -963,7 +972,7 @@ class _AttendancePageState extends State<AttendancePage>
       title: 'رمز موقع العمل',
       subtitle: _inRange
           ? 'امسح الرمز الموجود داخل مقر العمل.'
-          : 'تحقق من موقعك أولًا لفتح المسح.',
+          : 'امسح الرمز أولًا، وسيتم تحديد موقعك بعد قراءته.',
       trailing: _challengeActive
           ? _statusPill('تم التحقق', _brand, _brandSoft)
           : null,
@@ -1110,7 +1119,7 @@ class _AttendancePageState extends State<AttendancePage>
             height: 38,
             child: FilledButton.icon(
               onPressed:
-                  _inRange && !_checking && !_submitting ? _startScanner : null,
+                  !_checking && !_submitting ? _startScanner : null,
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: _ink,
