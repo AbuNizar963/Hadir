@@ -1,6 +1,6 @@
 const API_ORIGIN = "https://hadir-api.abunizar963.workers.dev";
 const GITHUB_RELEASES_API = "https://api.github.com/repos/AbuNizar963/Hadir/releases/latest";
-const GITHUB_ASSET_NAME = "app-release-signed.apk";
+const GITHUB_ASSET_NAMES = ["app-release.apk", "app-release-signed.apk"];
 
 function upstreamUrl(request: Request, path?: string): URL {
   const suffix = String(path || "").replace(/^\/+/, "");
@@ -33,7 +33,9 @@ async function latestApkProxy(): Promise<Response> {
   }
 
   const asset = Array.isArray(release?.assets)
-    ? release.assets.find((item: any) => item?.name === GITHUB_ASSET_NAME)
+    ? release.assets.find((item: any) =>
+        GITHUB_ASSET_NAMES.includes(String(item?.name || "").trim()),
+      )
     : null;
   const downloadUrl = String(asset?.browser_download_url || "").trim();
   if (!downloadUrl) {
