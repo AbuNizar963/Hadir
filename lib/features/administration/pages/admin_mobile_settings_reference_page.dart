@@ -366,10 +366,34 @@ class _AdminMobileSettingsReferencePageState
       IconData icon,
       SettingsRefView target,
     })>[
-      (code: '01', title: 'الملف الشخصي للشركة', subtitle: 'الهوية والتخصصات والمنطقة الزمنية والعطل', icon: Icons.business_outlined, target: SettingsRefView.identity),
-      (code: '02', title: 'مواقع الدوام', subtitle: 'المقر والفروع ونطاق GPS ورموز QR', icon: Icons.location_on_outlined, target: SettingsRefView.locations),
-      (code: '03', title: 'إدارة الموظفين', subtitle: 'الصلاحيات والسياسات والعمليات الجماعية', icon: Icons.groups_outlined, target: SettingsRefView.security),
-      (code: '05', title: 'صيانة النظام', subtitle: 'التشخيص وإعادة التهيئة وحالة الخادم', icon: Icons.health_and_safety_outlined, target: SettingsRefView.diagnostics),
+      (
+        code: '01',
+        title: 'الملف الشخصي للشركة',
+        subtitle: 'الهوية والتخصصات والمنطقة الزمنية والعطل',
+        icon: Icons.business_outlined,
+        target: SettingsRefView.identity
+      ),
+      (
+        code: '02',
+        title: 'مواقع الدوام',
+        subtitle: 'المقر والفروع ونطاق GPS ورموز QR',
+        icon: Icons.location_on_outlined,
+        target: SettingsRefView.locations
+      ),
+      (
+        code: '03',
+        title: 'إدارة الموظفين',
+        subtitle: 'الصلاحيات والسياسات والعمليات الجماعية',
+        icon: Icons.groups_outlined,
+        target: SettingsRefView.security
+      ),
+      (
+        code: '05',
+        title: 'صيانة النظام',
+        subtitle: 'التشخيص وإعادة التهيئة وحالة الخادم',
+        icon: Icons.health_and_safety_outlined,
+        target: SettingsRefView.diagnostics
+      ),
     ];
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 92),
@@ -379,7 +403,8 @@ class _AdminMobileSettingsReferencePageState
           decoration: BoxDecoration(
             color: scheme.surface,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: .72)),
+            border:
+                Border.all(color: scheme.outlineVariant.withValues(alpha: .72)),
           ),
           child: Row(
             children: [
@@ -393,9 +418,14 @@ class _AdminMobileSettingsReferencePageState
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: (settings['brandLogo']?.toString().trim().isNotEmpty ?? false)
-                      ? Image.network(settings['brandLogo'].toString(), fit: BoxFit.contain, errorBuilder: (_, __, ___) => Image.asset('assets/branding/hadir_logo_transparent.png'))
-                      : Image.asset('assets/branding/hadir_logo_transparent.png'),
+                  child: (settings['brandLogo']?.toString().trim().isNotEmpty ??
+                          false)
+                      ? Image.network(settings['brandLogo'].toString(),
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/branding/hadir_logo_transparent.png'))
+                      : Image.asset(
+                          'assets/branding/hadir_logo_transparent.png'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -403,22 +433,46 @@ class _AdminMobileSettingsReferencePageState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('HADIR · OWNER', style: TextStyle(color: scheme.primary, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
+                    Text('HADIR · OWNER',
+                        style: TextStyle(
+                            color: scheme.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.1)),
                     const SizedBox(height: 4),
-                    Text('الإعدادات', style: TextStyle(color: scheme.onSurface, fontSize: 25, fontWeight: FontWeight.w900)),
+                    Text('الإعدادات',
+                        style: TextStyle(
+                            color: scheme.onSurface,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w900)),
                     const SizedBox(height: 3),
-                    Text(brandName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)),
+                    Text(brandName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: scheme.onSurfaceVariant, fontSize: 11)),
                   ],
                 ),
               ),
-              IconButton(onPressed: loading ? null : () => load(withAdmins: true), icon: Icon(Icons.refresh_rounded, color: scheme.onSurfaceVariant)),
+              IconButton(
+                  onPressed: loading ? null : () => load(withAdmins: true),
+                  icon: Icon(Icons.refresh_rounded,
+                      color: scheme.onSurfaceVariant)),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        Text('تنظيم النظام', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w800)),
+        Text('تنظيم النظام',
+            style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 11,
+                fontWeight: FontWeight.w800)),
         const SizedBox(height: 7),
-        Text('اختر قسمًا لإدارة إعدادات حاضر', style: TextStyle(color: scheme.onSurface, fontSize: 18, fontWeight: FontWeight.w900)),
+        Text('اختر قسمًا لإدارة إعدادات حاضر',
+            style: TextStyle(
+                color: scheme.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.w900)),
         const SizedBox(height: 10),
         for (final category in categories) ...[
           _modernCategoryCard(category, scheme),
@@ -426,14 +480,35 @@ class _AdminMobileSettingsReferencePageState
         ],
         Container(
           padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .08), borderRadius: BorderRadius.circular(16), border: Border.all(color: scheme.primary.withValues(alpha: .18))),
-          child: Row(children: [Icon(Icons.info_outline_rounded, color: scheme.primary, size: 19), const SizedBox(width: 9), Expanded(child: Text('تُحفظ التغييرات من زر الحفظ الثابت أسفل الشاشة. بعض الأقسام تحتوي على حفظ مستقل.', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5, height: 1.5)))]),
+          decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: scheme.primary.withValues(alpha: .18))),
+          child: Row(children: [
+            Icon(Icons.info_outline_rounded, color: scheme.primary, size: 19),
+            const SizedBox(width: 9),
+            Expanded(
+                child: Text(
+                    'تُحفظ التغييرات من زر الحفظ الثابت أسفل الشاشة. بعض الأقسام تحتوي على حفظ مستقل.',
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 10.5,
+                        height: 1.5)))
+          ]),
         ),
       ],
     );
   }
 
-  Widget _modernCategoryCard(({String code, String title, String subtitle, IconData icon, SettingsRefView target}) category, ColorScheme scheme) {
+  Widget _modernCategoryCard(
+      ({
+        String code,
+        String title,
+        String subtitle,
+        IconData icon,
+        SettingsRefView target
+      }) category,
+      ColorScheme scheme) {
     return InkWell(
       onTap: () {
         setState(() => view = category.target);
@@ -442,11 +517,36 @@ class _AdminMobileSettingsReferencePageState
       borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(color: scheme.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: scheme.outlineVariant.withValues(alpha: .72))),
+        decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: .72))),
         child: Row(children: [
-          Container(width: 40, height: 40, decoration: BoxDecoration(color: scheme.primary.withValues(alpha: .12), borderRadius: BorderRadius.circular(12)), child: Icon(category.icon, color: scheme.primary, size: 21)),
+          Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(category.icon, color: scheme.primary, size: 21)),
           const SizedBox(width: 11),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${category.code} · ${category.title}', style: TextStyle(color: scheme.onSurface, fontSize: 13, fontWeight: FontWeight.w900)), const SizedBox(height: 3), Text(category.subtitle, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10, height: 1.35))])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text('${category.code} · ${category.title}',
+                    style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(category.subtitle,
+                    style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 10,
+                        height: 1.35))
+              ])),
           Icon(Icons.chevron_left_rounded, color: scheme.onSurfaceVariant),
         ]),
       ),
