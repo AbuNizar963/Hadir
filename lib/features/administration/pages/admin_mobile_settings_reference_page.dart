@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/api.dart';
 import '../../../core/hadir_brand.dart';
@@ -478,6 +479,8 @@ class _AdminMobileSettingsReferencePageState
           _modernCategoryCard(category, scheme),
           const SizedBox(height: 9),
         ],
+        _appUpdateCard(scheme),
+        const SizedBox(height: 9),
         Container(
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
@@ -497,6 +500,66 @@ class _AdminMobileSettingsReferencePageState
           ]),
         ),
       ],
+    );
+  }
+
+  Widget _appUpdateCard(ColorScheme scheme) {
+    return InkWell(
+      onTap: () => context.push('/app/about-update'),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: scheme.primary.withValues(alpha: .28),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.system_update_alt_rounded,
+                color: scheme.primary,
+                size: 21,
+              ),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'حول التطبيق والتحديثات',
+                    style: TextStyle(
+                      color: scheme.onSurface,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'معلومات النسخة والتحقق من أحدث إصدار رسمي',
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 10,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_left_rounded, color: scheme.onSurfaceVariant),
+          ],
+        ),
+      ),
     );
   }
 
