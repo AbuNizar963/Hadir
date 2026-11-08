@@ -166,8 +166,14 @@ String? resolveAuthenticatedRedirect({
 GoRouter buildAppRouter() => GoRouter(
       initialLocation: '/',
       redirect: (_, state) async {
-        final employeeToken = await _session.token();
-        final adminToken = await _session.adminToken();
+        // Read both secure-storage keys concurrently and reuse this snapshot
+        // throughout the guard instead of performing additional native reads.
+        final tokens = await Future.wait<String?>([
+          _session.token(),
+          _session.adminToken(),
+        ]);
+        var employeeToken = tokens[0];
+        var adminToken = tokens[1];
         final location = state.matchedLocation;
 
         if (employeeToken == null || employeeToken.isEmpty) {
@@ -181,13 +187,17 @@ GoRouter buildAppRouter() => GoRouter(
         if (employeeToken != null &&
             employeeToken.isNotEmpty &&
             employeeToken != _validatedEmployeeToken) {
-          final validation = await _validateToken(employeeToken, role: 'employee');
+          final validation = await _validateToken(
+            employeeToken,
+            role: 'employee',
+          );
           if (!validation.valid) {
             _validatedEmployeeToken = null;
             await _session.clearEmployee();
+            employeeToken = null;
             return resolveAuthenticatedRedirect(
               location: location,
-              adminToken: await _session.adminToken(),
+              adminToken: adminToken,
             );
           }
           _validatedEmployeeToken = employeeToken;
@@ -196,14 +206,18 @@ GoRouter buildAppRouter() => GoRouter(
         if (adminToken != null &&
             adminToken.isNotEmpty &&
             adminToken != _validatedAdminToken) {
-          final validation = await _validateToken(adminToken, role: 'admin');
+          final validation = await _validateToken(
+            adminToken,
+            role: 'admin',
+          );
           if (!validation.valid) {
             _validatedAdminToken = null;
             _validatedAdminRole = null;
             await _session.clearAdmin();
+            adminToken = null;
             return resolveAuthenticatedRedirect(
               location: location,
-              employeeToken: await _session.token(),
+              employeeToken: employeeToken,
             );
           }
 
@@ -220,8 +234,8 @@ GoRouter buildAppRouter() => GoRouter(
 
         return resolveAuthenticatedRedirect(
           location: location,
-          employeeToken: await _session.token(),
-          adminToken: await _session.adminToken(),
+          employeeToken: employeeToken,
+          adminToken: adminToken,
         );
       },
       errorBuilder: (_, __) => const _NotFoundPage(),
