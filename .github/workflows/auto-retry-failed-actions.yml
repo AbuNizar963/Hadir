@@ -3,8 +3,6 @@ name: Auto Retry Failed Flutter CI
 on:
   push:
     branches: [flutter-mobile-app]
-    paths:
-      - ".github/workflows/auto-retry-failed-actions.yml"
   workflow_dispatch:
 
 permissions:
