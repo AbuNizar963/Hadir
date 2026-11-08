@@ -173,7 +173,7 @@ export default function ReleaseDownloadStatsPanel() {
       .map((release) => ({
         release,
         versionCode: Number(
-          /^android-v1\\.0\\.(\\d+)$/.exec(release.tag)?.[1] ?? NaN,
+          /^android-v1\.0\.(\d+)$/.exec(release.tag)?.[1] ?? NaN,
         ),
       }))
       .filter(
