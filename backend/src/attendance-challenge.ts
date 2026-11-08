@@ -31,14 +31,6 @@ function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number) 
   return Number((EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(safeH), Math.sqrt(1 - safeH))).toFixed(2));
 }
 
-async function ensureAttendanceChallengeSchema(db: D1Database) {
-  await db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS attendance_challenges(id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, device_id TEXT NOT NULL, type TEXT NOT NULL, qr_code TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, location_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_attendance_challenges_employee_created ON attendance_challenges(employee_id,created_at DESC)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_attendance_challenges_expiry ON attendance_challenges(expires_at,used_at)"),
-  ]);
-}
-
 async function employeeLocation(db: D1Database, employeeId: string) {
   const employee = await db.prepare("SELECT id,location_id AS locationId,status FROM employees WHERE id=? LIMIT 1").bind(employeeId).first<any>();
   if (!employee || String(employee.status) !== "active") return null;
@@ -104,7 +96,6 @@ export async function createAttendanceChallenge(req: Request, env: ChallengeEnv,
   if (!requestedDeviceId || requestedDeviceId !== deviceId) return json({ ok: false, error: "هوية الجهاز غير صالحة" }, 403, origin);
   if (actor.deviceId && String(actor.deviceId).trim() && String(actor.deviceId).trim() !== requestedDeviceId) return json({ ok: false, error: "هذا الجهاز غير مرتبط بحساب الموظف" }, 403, origin);
 
-  await ensureAttendanceChallengeSchema(env.DB);
   const location = await employeeLocation(env.DB, String(actor.id));
   if (!location) return json({ ok: false, error: "لا يوجد موقع عمل صالح محفوظ في D1" }, 409, origin);
   const distance = distanceMeters(lat, lng, location.lat, location.lng);
