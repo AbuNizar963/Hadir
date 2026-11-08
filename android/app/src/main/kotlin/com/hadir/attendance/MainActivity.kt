@@ -30,17 +30,32 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler, EventCh
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "currentVersionCode" -> result.success(installer.currentVersionCode())
+            "currentVersionName" -> result.success(installer.currentVersionName())
             "preferredAbi" -> result.success(installer.preferredAbi())
             "downloadAndInstall" -> {
                 val versionCode = (call.argument<Number>("versionCode"))?.toLong()
                 val downloadUrl = call.argument<String>("downloadUrl")
                 val proxyUrl = call.argument<String>("proxyUrl")
-                if (versionCode == null || downloadUrl.isNullOrBlank()) {
-                    result.error("INVALID_UPDATE", "بيانات التحديث غير مكتملة", null)
+                val expectedSize = (call.argument<Number>("expectedSize"))?.toLong()
+                val expectedSha256 = call.argument<String>("expectedSha256")
+                if (versionCode == null ||
+                    downloadUrl.isNullOrBlank() ||
+                    expectedSize == null ||
+                    expectedSize <= 0 ||
+                    expectedSha256.isNullOrBlank()
+                ) {
+                    result.error("INVALID_UPDATE", "بيانات التحديث والتحقق غير مكتملة", null)
                     return
                 }
                 try {
-                    installer.downloadAndInstall(versionCode, downloadUrl, proxyUrl, progressSink)
+                    installer.downloadAndInstall(
+                        versionCode,
+                        downloadUrl,
+                        proxyUrl,
+                        expectedSize,
+                        expectedSha256,
+                        progressSink
+                    )
                     result.success(null)
                 } catch (_: InstallPermissionRequiredException) {
                     result.error(UpdateInstaller.PERMISSION_ERROR, "يلزم السماح بتثبيت التطبيقات من هذا المصدر", null)

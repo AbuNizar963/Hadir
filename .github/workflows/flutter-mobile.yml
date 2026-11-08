@@ -17,6 +17,7 @@ on:
       - 'analysis_options.yaml'
       - 'pubspec.yaml'
       - '.github/workflows/flutter-mobile.yml'
+      - '.github/workflows/android-release.yml'
   pull_request:
     paths:
       - 'android/**'
@@ -31,6 +32,7 @@ on:
       - 'analysis_options.yaml'
       - 'pubspec.yaml'
       - '.github/workflows/flutter-mobile.yml'
+      - '.github/workflows/android-release.yml'
 
 permissions:
   contents: write

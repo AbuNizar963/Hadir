@@ -13,6 +13,7 @@ import io.flutter.plugin.common.EventChannel
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import kotlin.math.max
 
 class UpdateInstaller(private val context: Context) {
@@ -26,11 +27,29 @@ class UpdateInstaller(private val context: Context) {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong()
     }
 
+    fun currentVersionName(): String {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        return info.versionName?.takeIf { it.isNotBlank() } ?: "—"
+    }
+
     fun preferredAbi(): String? = Build.SUPPORTED_ABIS.firstOrNull()
 
-    fun downloadAndInstall(versionCode: Long, downloadUrl: String, proxyUrl: String?, sink: EventChannel.EventSink?) {
+    fun downloadAndInstall(
+        versionCode: Long,
+        downloadUrl: String,
+        proxyUrl: String?,
+        expectedSize: Long,
+        expectedSha256: String,
+        sink: EventChannel.EventSink?
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
             throw InstallPermissionRequiredException()
+        }
+        if (expectedSize <= 0 || !expectedSha256.matches(Regex("^[a-fA-F0-9]{64}$"))) {
+            throw IllegalArgumentException("بيانات التحقق من سلامة التحديث غير صالحة")
+        }
+        if (!isTrustedReleaseUrl(downloadUrl)) {
+            throw IllegalArgumentException("رابط ملف التحديث غير موثوق")
         }
 
         val thread = Thread {
@@ -41,7 +60,14 @@ class UpdateInstaller(private val context: Context) {
                 for ((index, url) in listOfNotNull(downloadUrl, proxyUrl).withIndex()) {
                     try {
                         download(url, apk, sink)
-                        validateDownloadedApk(apk, versionCode)
+                        validateDownloadedApk(apk, versionCode, expectedSize, expectedSha256)
+                        sink?.success(mapOf(
+                            "downloadedBytes" to apk.length(),
+                            "totalBytes" to expectedSize,
+                            "percent" to 100,
+                            "elapsedSeconds" to 0L,
+                            "etaSeconds" to 0L,
+                        ))
                         install(apk)
                         return@Thread
                     } catch (failure: Throwable) {
@@ -58,6 +84,13 @@ class UpdateInstaller(private val context: Context) {
         }
         thread.name = "hadir-updater"
         thread.start()
+    }
+
+    private fun isTrustedReleaseUrl(value: String): Boolean {
+        val uri = Uri.parse(value)
+        return uri.scheme == "https" &&
+            uri.host == "github.com" &&
+            uri.path?.contains("/releases/download/") == true
     }
 
     private fun download(url: String, apk: File, sink: EventChannel.EventSink?) {
@@ -89,7 +122,7 @@ class UpdateInstaller(private val context: Context) {
                             val elapsed = max(1L, (now - started) / 1000L)
                             val speed = downloaded.toDouble() / elapsed.toDouble()
                             val eta = if (total > 0 && speed > 0) ((total - downloaded).coerceAtLeast(0) / speed).toLong() else null
-                            val percent = if (total > 0) ((downloaded * 100L) / total).coerceIn(0L, 100L).toInt() else -1
+                            val percent = if (total > 0) ((downloaded * 100L) / total).coerceIn(0L, 99L).toInt() else -1
                             sink?.success(mapOf(
                                 "downloadedBytes" to downloaded,
                                 "totalBytes" to total,
@@ -103,21 +136,27 @@ class UpdateInstaller(private val context: Context) {
                 }
             }
             if (!apk.exists() || apk.length() < 1024) error("ملف التحديث الذي تم تنزيله غير صالح")
-            sink?.success(mapOf(
-                "downloadedBytes" to apk.length(),
-                "totalBytes" to if (total > 0) total else apk.length(),
-                "percent" to 100,
-                "elapsedSeconds" to max(1L, (System.currentTimeMillis() - started) / 1000L),
-                "etaSeconds" to 0L,
-            ))
         } finally {
             connection.disconnect()
         }
     }
 
-    private fun validateDownloadedApk(apk: File, expectedVersionCode: Long) {
+    private fun validateDownloadedApk(
+        apk: File,
+        expectedVersionCode: Long,
+        expectedSize: Long,
+        expectedSha256: String
+    ) {
         if (!apk.exists() || apk.length() < 1024) {
             throw IllegalStateException("ملف التحديث غير موجود أو تالف")
+        }
+        if (apk.length() != expectedSize) {
+            throw IllegalStateException("حجم ملف التحديث لا يطابق الإصدار المنشور")
+        }
+
+        val actualSha256 = calculateSha256(apk)
+        if (!actualSha256.equals(expectedSha256, ignoreCase = true)) {
+            throw IllegalStateException("فشل التحقق من بصمة SHA-256؛ أُوقف التثبيت حفاظًا على سلامة التطبيق")
         }
 
         val archiveInfo = context.packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
@@ -141,6 +180,21 @@ class UpdateInstaller(private val context: Context) {
         val installedVersion = currentVersionCode()
         if (archiveVersionCode <= installedVersion) {
             throw IllegalStateException("الإصدار الموجود على الجهاز أحدث أو مساوي للتحديث")
+        }
+    }
+
+    private fun calculateSha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { byte ->
+            (byte.toInt() and 0xff).toString(16).padStart(2, '0')
         }
     }
 
