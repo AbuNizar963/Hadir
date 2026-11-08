@@ -351,11 +351,12 @@ export async function createAttendanceChallenge(
 }
 
 export async function claimAttendanceChallenge(
-  db: D1Database,
+  env: ChallengeEnv,
   actor: any,
   deviceId: string,
   body: any,
 ): Promise<ChallengeResult> {
+  const db = env.DB;
   if (!actor || String(actor.role).toLowerCase() !== "staff") {
     return {
       ok: false,
@@ -482,7 +483,7 @@ export async function claimAttendanceChallenge(
   }
 
   if (String(challenge.type) === "check-out") {
-    const configuredTimezone = await timezone(db);
+    const configuredTimezone = await timezone(db, env.APP_TIMEZONE);
     const window = await checkoutWindow(
       db,
       String(actor.id),
