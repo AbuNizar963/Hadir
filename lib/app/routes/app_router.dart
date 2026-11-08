@@ -9,6 +9,7 @@ import '../../features/administration/administration.dart';
 import '../../features/administration/widgets/admin_mobile_shell.dart';
 import '../../features/employee/employee.dart';
 import '../../features/employee/widgets/employee_mobile_shell.dart';
+import '../../features/app_info/app_update_page.dart';
 
 final _session = HadirSession();
 String? _validatedEmployeeToken;
@@ -101,6 +102,7 @@ String? resolveAuthenticatedRedirect({
     '/weather',
     '/prayer',
     '/ai',
+    '/app/about-update',
     ...authEntryLocations,
   };
   final hasEmployeeToken = employeeToken != null && employeeToken.isNotEmpty;
@@ -232,6 +234,12 @@ GoRouter buildAppRouter() => GoRouter(
         GoRoute(
           path: '/',
           builder: (_, __) => const LandingPage(),
+        ),
+        GoRoute(
+          path: '/app/about-update',
+          builder: (_, __) => const SwipeBackPage(
+            child: AppUpdatePage(),
+          ),
         ),
         GoRoute(
           path: '/login',
