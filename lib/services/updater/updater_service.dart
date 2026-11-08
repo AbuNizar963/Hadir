@@ -301,7 +301,7 @@ class UpdaterService {
     return UpdateInfo(
       versionCode: bestCode,
       versionName: '1.0.$bestCode',
-      downloadUrl: '$_releaseDownloadBase/$bestTag/app-release.apk',
+      downloadUrl: '$_releaseDownloadBase/$bestTag/app-universal-release.apk',
       releaseNotes: '',
     );
   }
