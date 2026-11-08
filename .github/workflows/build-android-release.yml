@@ -182,8 +182,14 @@ jobs:
         shell: bash
         working-directory: mobile/android
         run: |
-          TARGET_SDK="$(command -v apkanalyzer >/dev/null 2>&1 && apkanalyzer manifest target-sdk app-release-signed.apk || "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer" manifest target-sdk app-release-signed.apk)"
-          PACKAGE_NAME="$(command -v apkanalyzer >/dev/null 2>&1 && apkanalyzer manifest application-id app-release-signed.apk || "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer" manifest application-id app-release-signed.apk)"
+          if command -v apkanalyzer >/dev/null 2>&1; then
+            APKANALYZER="$(command -v apkanalyzer)"
+          else
+            APKANALYZER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer"
+          fi
+          test -x "$APKANALYZER" || { echo "apkanalyzer was not found"; exit 1; }
+          TARGET_SDK="$("$APKANALYZER" manifest target-sdk app-release-signed.apk)"
+          PACKAGE_NAME="$("$APKANALYZER" manifest application-id app-release-signed.apk)"
           echo "Hadir APK targetSdkVersion=$TARGET_SDK"
           echo "Hadir APK applicationId=$PACKAGE_NAME"
           test "$TARGET_SDK" = "36"
@@ -232,7 +238,6 @@ jobs:
           generate_release_notes: true
           make_latest: true
           fail_on_unmatched_files: true
-          overwrite_files: true
           files: |
             release-assets/app-release.apk
             release-assets/SHA256SUMS.txt
