@@ -10,7 +10,7 @@ The numeric suffix `N` is both the Android `versionCode` and the final component
 
 1. Complete and merge the Flutter changes into `flutter-mobile-app`.
 2. Confirm the Flutter Actions checks pass.
-3. Create a new tag on the intended Flutter commit, for example `android-v1.0.2` (choose the next unused build number).
+3. Create a new tag on the intended Flutter commit using the next unused number greater than every existing Android release tag (the latest published release currently uses `1043`, so the next number must be at least `1044`): for example, `android-v1.0.1044`.
 4. Push the tag to GitHub. The `Publish Android Release` workflow runs analysis, tests, builds the Android APKs, verifies package identity/version/signatures, and publishes the GitHub Release.
 5. Confirm the published release contains `app-universal-release.apk`, any ABI-specific APKs, and `SHA256SUMS`.
 
