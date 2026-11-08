@@ -14,7 +14,7 @@ type Env = {
   PROFILE_IMAGES?: R2Bucket;
   JWT_SECRET?: string;
   OWNER_RECOVERY_CODE?: string;
-    BROWSER?: BrowserRun;
+  BROWSER?: BrowserRun;
 };
 
 function allowedOrigin(request: Request, env: Env) {
