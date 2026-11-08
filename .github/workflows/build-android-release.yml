@@ -1,6 +1,12 @@
 name: Build Hadir Android Release
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/android/**'
+      - '.github/workflows/build-android-release.yml'
   workflow_dispatch:
     inputs:
       release_version:
@@ -11,6 +17,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: hadir-main-android-release
+  cancel-in-progress: false
 
 jobs:
   build-android-release:
