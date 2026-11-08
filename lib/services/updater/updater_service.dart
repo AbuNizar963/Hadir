@@ -9,12 +9,16 @@ class UpdateInfo {
     required this.versionName,
     required this.downloadUrl,
     required this.releaseNotes,
+    required this.expectedSize,
+    required this.expectedSha256,
   });
 
   final int versionCode;
   final String versionName;
   final String downloadUrl;
   final String releaseNotes;
+  final int expectedSize;
+  final String expectedSha256;
 }
 
 class UpdateProgress {
@@ -42,10 +46,6 @@ class UpdaterService {
       'https://api.github.com/repos/AbuNizar963/Hadir/releases';
   static const _latestReleaseUrl =
       'https://api.github.com/repos/AbuNizar963/Hadir/releases/latest';
-  static const _releasesAtomUrl =
-      'https://github.com/AbuNizar963/Hadir/releases.atom';
-  static const _releaseDownloadBase =
-      'https://github.com/AbuNizar963/Hadir/releases/download';
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 10),
@@ -76,6 +76,12 @@ class UpdaterService {
     return value?.toInt() ?? 1;
   }
 
+  Future<String> currentVersionName() async {
+    final value = await _channel.invokeMethod<String>('currentVersionName');
+    final version = value?.trim();
+    return version == null || version.isEmpty ? '—' : version;
+  }
+
   Future<String?> preferredAbi() async {
     final value = await _channel.invokeMethod<String>('preferredAbi');
     return value?.trim().isEmpty == true ? null : value?.trim();
@@ -85,27 +91,19 @@ class UpdaterService {
     final currentCode = await currentVersionCode();
     final abi = await preferredAbi();
 
-    // Scan every release page. GitHub orders releases by publication/update
-    // time, not by the numeric Android version, so a fixed first page is not
-    // sufficient for a repository with a long release history.
     try {
-      final update = await _checkAllReleasePages(currentCode, abi);
-      if (update != null) return update;
-    } catch (_) {}
-
-    // If the paginated API is temporarily unavailable, try the latest-release API.
-    try {
-      final latest = await _checkLatestRelease(currentCode, abi);
-      if (latest != null) return latest;
-    } catch (_) {}
-
-    // Final network fallback for environments where GitHub's API is blocked.
-    try {
-      final fallback = await _checkAtomFeed(currentCode);
-      if (fallback != null) return fallback;
-      return null;
+      // GitHub orders releases by publication time, not numeric Android
+      // version. Scan the paginated history and select the highest versionCode.
+      return await _checkAllReleasePages(currentCode, abi);
     } catch (_) {
-      return null;
+      // Keep a smaller fallback request for temporary pagination/API failures.
+      try {
+        return await _checkLatestRelease(currentCode, abi);
+      } catch (_) {
+        throw StateError(
+          'تعذر الاتصال بخدمة تحديث حاضر على GitHub. تحقق من الإنترنت ثم أعد المحاولة.',
+        );
+      }
     }
   }
 
@@ -142,8 +140,6 @@ class UpdaterService {
         best = pageBest;
       }
 
-      // A short page is the end of the collection. This also prevents
-      // unnecessary requests when the repository has fewer than 100 releases.
       if (rawReleases.length < perPage) break;
     }
 
@@ -175,9 +171,7 @@ class UpdaterService {
     int currentCode,
     String? abi,
   ) {
-    Map<String, dynamic>? bestRelease;
-    int? bestCode;
-    String? bestDownloadUrl;
+    UpdateInfo? best;
 
     for (final rawRelease in rawReleases) {
       if (rawRelease is! Map) continue;
@@ -186,23 +180,11 @@ class UpdaterService {
 
       final candidate = _releaseToUpdate(release, currentCode, abi);
       if (candidate == null) continue;
-      if (bestCode != null && candidate.versionCode <= bestCode) continue;
-
-      bestCode = candidate.versionCode;
-      bestRelease = release;
-      bestDownloadUrl = candidate.downloadUrl;
+      if (best != null && candidate.versionCode <= best.versionCode) continue;
+      best = candidate;
     }
 
-    if (bestCode == null || bestRelease == null || bestDownloadUrl == null) {
-      return null;
-    }
-
-    return UpdateInfo(
-      versionCode: bestCode,
-      versionName: '1.0.$bestCode',
-      downloadUrl: bestDownloadUrl,
-      releaseNotes: (bestRelease['body'] ?? '').toString().trim(),
-    );
+    return best;
   }
 
   UpdateInfo? _releaseToUpdate(
@@ -216,93 +198,66 @@ class UpdaterService {
     if (code == null || code <= currentCode) return null;
 
     final assets = (release['assets'] as List<dynamic>?) ?? const [];
-    String? universalDownloadUrl;
-    String? abiDownloadUrl;
+    Map<String, dynamic>? universalAsset;
+    Map<String, dynamic>? abiAsset;
+
     for (final item in assets) {
       if (item is! Map) continue;
       final asset = Map<String, dynamic>.from(item);
       final name = (asset['name'] ?? '').toString().trim();
-      if (name != 'app-release.apk' &&
-          name != 'app-universal-release.apk' &&
-          name != 'app-release-signed.apk' &&
-          !name.endsWith('-release.apk')) {
+      final isUniversal = name == 'app-universal-release.apk' ||
+          name == 'app-release.apk' ||
+          name == 'app-release-signed.apk';
+      final isAbi = abi != null && name == 'app-$abi-release.apk';
+      if (!isUniversal && !isAbi) continue;
+
+      final downloadUrl = Uri.tryParse(
+        (asset['browser_download_url'] ?? '').toString().trim(),
+      );
+      final digest = (asset['digest'] ?? '').toString().trim();
+      final digestMatch =
+          RegExp(r'^sha256:([a-f0-9]{64})$', caseSensitive: false)
+              .firstMatch(digest);
+      final size = (asset['size'] as num?)?.toInt();
+
+      // Do not offer an APK unless GitHub provides its SHA-256 and size.
+      if (downloadUrl == null ||
+          downloadUrl.scheme != 'https' ||
+          downloadUrl.host != 'github.com' ||
+          !downloadUrl.path.contains('/releases/download/') ||
+          digestMatch == null ||
+          size == null ||
+          size <= 0) {
         continue;
       }
-      final candidate = asset['browser_download_url']?.toString().trim();
-      if (candidate != null && candidate.isNotEmpty) {
-        if (name == 'app-release.apk' ||
-            name == 'app-universal-release.apk' ||
-            name == 'app-release-signed.apk') {
-          universalDownloadUrl ??= candidate;
-        }
-        if (abi != null && name == 'app-$abi-release.apk') {
-          abiDownloadUrl = candidate;
-        }
+
+      if (isAbi) {
+        abiAsset = asset;
+      } else if (universalAsset == null ||
+          name == 'app-universal-release.apk') {
+        universalAsset = asset;
       }
     }
 
-    final downloadUrl = abiDownloadUrl ?? universalDownloadUrl;
-    if (downloadUrl == null || downloadUrl.isEmpty) return null;
+    final selectedAsset = abiAsset ?? universalAsset;
+    if (selectedAsset == null) return null;
+
+    final downloadUrl =
+        (selectedAsset['browser_download_url'] ?? '').toString().trim();
+    final digest = (selectedAsset['digest'] ?? '').toString().trim();
+    final digestMatch =
+        RegExp(r'^sha256:([a-f0-9]{64})$', caseSensitive: false)
+            .firstMatch(digest);
+    final size = (selectedAsset['size'] as num?)?.toInt();
+    if (digestMatch == null || size == null || size <= 0) return null;
 
     return UpdateInfo(
       versionCode: code,
       versionName: '1.0.$code',
       downloadUrl: downloadUrl,
       releaseNotes: (release['body'] ?? '').toString().trim(),
-    );
-  }
-
-  Future<UpdateInfo?> _checkAtomFeed(int currentCode) async {
-    final response = await _dio.get<dynamic>(
-      _releasesAtomUrl,
-      queryParameters: {'_t': DateTime.now().millisecondsSinceEpoch},
-      options: Options(
-        responseType: ResponseType.plain,
-        headers: {
-          'Accept': 'application/atom+xml, application/xml, text/xml, */*',
-          'User-Agent': 'Hadir-Flutter-Updater',
-          'Cache-Control': 'no-cache, no-store, max-age=0',
-          'Pragma': 'no-cache',
-        },
-      ),
-    );
-
-    final responseData = response.data;
-    final xml = responseData is String ? responseData : responseData.toString();
-    if (xml.isEmpty) throw StateError('استجابة قناة التحديث فارغة');
-
-    final entryPattern = RegExp(
-      r'<entry\b[\s\S]*?</entry>',
-      caseSensitive: false,
-    );
-    final tagPattern = RegExp(
-      r'(?:/|%2F)(android-v1\.0\.(\d+))(?:<|&|"|\?)',
-      caseSensitive: false,
-    );
-
-    int? bestCode;
-    String? bestTag;
-
-    for (final match in entryPattern.allMatches(xml)) {
-      final entry = match.group(0) ?? '';
-      final tagMatch = tagPattern.firstMatch(entry);
-      final code = int.tryParse(tagMatch?.group(2) ?? '');
-      if (code == null ||
-          code <= currentCode ||
-          (bestCode != null && code <= bestCode)) {
-        continue;
-      }
-      bestCode = code;
-      bestTag = tagMatch?.group(1);
-    }
-
-    if (bestCode == null || bestTag == null) return null;
-
-    return UpdateInfo(
-      versionCode: bestCode,
-      versionName: '1.0.$bestCode',
-      downloadUrl: '$_releaseDownloadBase/$bestTag/app-universal-release.apk',
-      releaseNotes: '',
+      expectedSize: size,
+      expectedSha256: digestMatch.group(1)!.toLowerCase(),
     );
   }
 
@@ -311,6 +266,8 @@ class UpdaterService {
       await _channel.invokeMethod<void>('downloadAndInstall', {
         'versionCode': update.versionCode,
         'downloadUrl': update.downloadUrl,
+        'expectedSize': update.expectedSize,
+        'expectedSha256': update.expectedSha256,
         'proxyUrl':
             'https://hadir-api.abunizar963.workers.dev/api/mobile/update/apk',
       });
