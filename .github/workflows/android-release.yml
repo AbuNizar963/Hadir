@@ -1,4 +1,4 @@
-name: Publish Android Release
+name: Publish Android APK Release
 
 on:
   push:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   publish-android:
-    name: Build, verify, and publish Android APKs
+    name: Publish Android APK Release
     runs-on: ubuntu-latest
     env:
       HADIR_RELEASE_KEYSTORE_BASE64: ${{ secrets.HADIR_RELEASE_KEYSTORE_BASE64 }}
