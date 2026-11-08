@@ -23,7 +23,6 @@ import { startRealtimeSync } from "@/lib/realtime";
 import { installApiCredentials } from "@/lib/apiCredentials";
 import { installDeviceDirectoryEnhancer } from "./deviceDirectoryEnhancer";
 import { installNavigationScrollPersistence } from "@/lib/navigationScrollPersistence";
-import "@/lib/qrPolyfill";
 
 installApiCredentials();
 seedIfEmpty();
