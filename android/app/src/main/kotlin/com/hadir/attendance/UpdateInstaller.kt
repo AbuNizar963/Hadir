@@ -61,6 +61,13 @@ class UpdateInstaller(private val context: Context) {
                     try {
                         download(url, apk, sink)
                         validateDownloadedApk(apk, versionCode, expectedSize, expectedSha256)
+                        sink?.success(mapOf(
+                            "downloadedBytes" to apk.length(),
+                            "totalBytes" to expectedSize,
+                            "percent" to 100,
+                            "elapsedSeconds" to 0L,
+                            "etaSeconds" to 0L,
+                        ))
                         install(apk)
                         return@Thread
                     } catch (failure: Throwable) {
@@ -115,7 +122,7 @@ class UpdateInstaller(private val context: Context) {
                             val elapsed = max(1L, (now - started) / 1000L)
                             val speed = downloaded.toDouble() / elapsed.toDouble()
                             val eta = if (total > 0 && speed > 0) ((total - downloaded).coerceAtLeast(0) / speed).toLong() else null
-                            val percent = if (total > 0) ((downloaded * 100L) / total).coerceIn(0L, 100L).toInt() else -1
+                            val percent = if (total > 0) ((downloaded * 100L) / total).coerceIn(0L, 99L).toInt() else -1
                             sink?.success(mapOf(
                                 "downloadedBytes" to downloaded,
                                 "totalBytes" to total,
@@ -129,13 +136,6 @@ class UpdateInstaller(private val context: Context) {
                 }
             }
             if (!apk.exists() || apk.length() < 1024) error("ملف التحديث الذي تم تنزيله غير صالح")
-            sink?.success(mapOf(
-                "downloadedBytes" to apk.length(),
-                "totalBytes" to if (total > 0) total else apk.length(),
-                "percent" to 100,
-                "elapsedSeconds" to max(1L, (System.currentTimeMillis() - started) / 1000L),
-                "etaSeconds" to 0L,
-            ))
         } finally {
             connection.disconnect()
         }
