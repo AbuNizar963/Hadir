@@ -50,7 +50,7 @@ jobs:
           if [ -n "$requested" ]; then
             release_version="$requested"
           else
-            base_version="$(sed -nE 's/^[[:space:]]*versionName.*"([0-9]+\.[0-9]+\.[0-9]+)".*$/\1/p' mobile/android/app/build.gradle | head -n 1)"
+            base_version="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([0-9]+\.[0-9]+\.[0-9]+)".*$/\1/p' mobile/android/app/build.gradle | head -n 1)"
             if ! [[ "$base_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "::error::Could not read a valid Android versionName from build.gradle."
               exit 1
