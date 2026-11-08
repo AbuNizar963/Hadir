@@ -1,7 +1,9 @@
--- Repair stale derived attendance cache rows reintroduced by the legacy API worker.
--- Keep the canonical status model used by the reporting-facts layer:
--- a row with a recorded check-in is PRESENT; a row without one is INVALID.
--- This is an idempotent data normalization and does not delete attendance history.
+-- Repair stale derived OPEN attendance rows reintroduced by the legacy API worker.
+-- Preserve raw attendance events and normalize only the derived reporting layers.
+-- A recorded check-in is PRESENT; an OPEN row without check-in is INVALID.
+-- The open flag is recalculated from the check-in/check-out timestamps so it
+-- cannot remain true for an invalid row or a completed attendance session.
+-- This migration is idempotent and does not delete attendance history.
 
 UPDATE daily_attendance_status
 SET status = CASE
@@ -18,10 +20,11 @@ SET
   END,
   open = CASE
     WHEN check_in_at IS NOT NULL AND check_out_at IS NULL THEN 1
-    ELSE open
+    ELSE 0
   END,
   exception_code = CASE
     WHEN check_in_at IS NOT NULL AND check_out_at IS NULL THEN 'MISSING_CHECKOUT'
+    WHEN exception_code = 'MISSING_CHECKOUT' THEN NULL
     ELSE exception_code
   END
 WHERE status = 'OPEN';
