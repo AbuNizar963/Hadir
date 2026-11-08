@@ -1,4 +1,4 @@
-name: Flutter App
+name: Verify Flutter mobile app
 
 on:
   workflow_dispatch:
@@ -39,6 +39,7 @@ permissions:
 
 jobs:
   android:
+    name: Verify Flutter mobile app
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -147,6 +148,8 @@ jobs:
           path: android/app/build/outputs/bundle/release/app-release.aab
 
   ios:
+    name: Verify iOS build
+    needs: android
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
