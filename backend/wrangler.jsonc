@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hadir-api",
-  "main": "src/worker-entry.ts",
+  "main": "src/attendance-challenge-gateway.ts",
   "compatibility_date": "2026-08-18",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
