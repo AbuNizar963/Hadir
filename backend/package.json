@@ -18,7 +18,7 @@
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
-    "wrangler": "4.148.0"
+    "wrangler": "^4.158.0"
   },
   "overrides": {
     "sharp": "0.35.5"
