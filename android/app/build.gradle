@@ -38,9 +38,11 @@ android {
         applicationId 'com.hadir.attendance'
         minSdk 24
         targetSdk flutter.targetSdkVersion
-        versionCode versionCodeOverride
-            ? versionCodeOverride.toInteger()
-            : flutter.versionCode
+        versionCode(
+            versionCodeOverride
+                ? versionCodeOverride.toInteger()
+                : flutter.versionCode
+        )
         versionName versionNameOverride ?: flutter.versionName
     }
 
