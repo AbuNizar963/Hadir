@@ -1,9 +1,7 @@
 name: Build Hadir Android Flutter Release
 
 on:
-  push:
-    branches:
-      - flutter-mobile-app
+  # Publishing a signed production release is intentionally manual.
   workflow_dispatch:
 
 permissions:
