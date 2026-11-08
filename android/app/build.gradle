@@ -4,6 +4,19 @@ plugins {
     id 'dev.flutter.flutter-gradle-plugin'
 }
 
+def releaseKeystore = System.getenv('HADIR_RELEASE_KEYSTORE')
+def releaseStorePassword = System.getenv('HADIR_RELEASE_STORE_PASSWORD')
+def releaseKeyAlias = System.getenv('HADIR_RELEASE_KEY_ALIAS')
+def releaseKeyPassword = System.getenv('HADIR_RELEASE_KEY_PASSWORD')
+def versionCodeOverride = project.findProperty('hadirVersionCode')?.toString() ?: System.getenv('HADIR_VERSION_CODE')
+def versionNameOverride = project.findProperty('hadirVersionName')?.toString() ?: System.getenv('HADIR_VERSION_NAME')
+def releaseSigningConfigured = [
+    releaseKeystore,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+].every { value -> value != null && !value.trim().isEmpty() }
+
 android {
     namespace 'com.hadir.attendance'
     compileSdk flutter.compileSdkVersion
@@ -22,8 +35,10 @@ android {
         applicationId 'com.hadir.attendance'
         minSdk 24
         targetSdk flutter.targetSdkVersion
-        versionCode project.findProperty('hadirVersionCode')?.toString()?.toInteger() ?: 1
-        versionName project.findProperty('hadirVersionName')?.toString() ?: '1.0.0'
+        versionCode versionCodeOverride
+            ? versionCodeOverride.toInteger()
+            : flutter.versionCode
+        versionName versionNameOverride ?: flutter.versionName
     }
 
     splits {
@@ -35,26 +50,24 @@ android {
         }
     }
 
-    def releaseKeystore = System.getenv('HADIR_RELEASE_KEYSTORE')
-    def releaseStorePassword = System.getenv('HADIR_RELEASE_STORE_PASSWORD')
-    def releaseKeyAlias = System.getenv('HADIR_RELEASE_KEY_ALIAS')
-    def releaseKeyPassword = System.getenv('HADIR_RELEASE_KEY_PASSWORD')
-
-    if (releaseKeystore && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
-        signingConfigs {
-            release {
+    signingConfigs {
+        release {
+            if (releaseSigningConfigured) {
                 storeFile rootProject.file(releaseKeystore)
                 storePassword releaseStorePassword
                 keyAlias releaseKeyAlias
                 keyPassword releaseKeyPassword
             }
         }
-        buildTypes {
-            release {
+    }
+
+    buildTypes {
+        release {
+            if (releaseSigningConfigured) {
                 signingConfig signingConfigs.release
-                minifyEnabled true
-                shrinkResources true
             }
+            minifyEnabled true
+            shrinkResources true
         }
     }
 }
