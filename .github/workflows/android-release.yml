@@ -150,7 +150,7 @@ jobs:
           fi
 
           for apk in "${apks[@]}"; do
-            metadata="$("$aapt" dump badging "$apk" | head -n 1)"
+            metadata="$("$aapt" dump badging "$apk" | sed -n '1p')"
             package_name="$(sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p" <<< "$metadata")"
             version_code="$(sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p" <<< "$metadata")"
             version_name="$(sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p" <<< "$metadata")"
@@ -192,11 +192,11 @@ jobs:
           cat > release-notes.md <<EOF
           ## حاضر ${HADIR_VERSION_NAME} — Build ${HADIR_VERSION_CODE}
 
-          - حزمة Android: `com.hadir.attendance`
+          - حزمة Android: com.hadir.attendance
           - رقم الإصدار ورقم البناء متوافقان مع فاحص التحديث داخل التطبيق.
           - يتضمن الإصدار APK شاملًا ونسخًا مخصصة لمعمارية الجهاز عند توفرها.
           - تم التحقق من توقيع ملفات APK وتطابق شهادة التوقيع بينها.
-          - ملف `SHA256SUMS` مرفق للتحقق من سلامة التنزيل.
+          - ملف SHA256SUMS مرفق للتحقق من سلامة التنزيل.
           EOF
 
       - name: Publish GitHub Release and APK assets
