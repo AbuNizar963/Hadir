@@ -182,7 +182,7 @@ export default {
 
       try {
         const claim = await claimAttendanceChallenge(
-          env.DB,
+          env,
           actor,
           deviceId,
           body,
