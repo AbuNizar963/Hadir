@@ -1,8 +1,10 @@
-name: Auto Retry Failed Apps Actions
+name: Auto Retry Failed Flutter CI
 
 on:
   push:
     branches: [flutter-mobile-app]
+    paths:
+      - ".github/workflows/auto-retry-failed-actions.yml"
   workflow_dispatch:
 
 permissions:
@@ -10,66 +12,67 @@ permissions:
   contents: read
 
 concurrency:
-  group: auto-retry-failed-apps
+  group: auto-retry-failed-flutter-ci
   cancel-in-progress: false
 
 jobs:
   retry-failed:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Retry all failed jobs from recent Apps runs
+      - name: Retry recent failed Flutter CI runs only
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
 
-          cutoff=$(date -u -d '60 minutes ago' +%s)
-          page=1
+          cutoff="$(date -u -d '60 minutes ago' +%s)"
+          json="$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${REPO}/actions/runs?branch=flutter-mobile-app&status=failure&per_page=100")"
+
           retried=0
           skipped=0
 
-          while [ "$page" -le 5 ]; do
-            if ! json=$(gh api \
-              -H 'Accept: application/vnd.github+json' \
-              "/repos/${REPO}/actions/runs?branch=Apps&status=failure&per_page=100&page=${page}" \
-              --paginate=false); then
-              echo "Could not read failed Apps workflow runs on page ${page}; continuing."
-              page=$((page + 1))
+          while IFS=$'\t' read -r run_id name created_at head_branch; do
+            [ -n "${run_id:-}" ] || continue
+
+            if [ "${head_branch:-}" != "flutter-mobile-app" ]; then
+              echo "Skipping run from unexpected branch: ${run_id}"
+              skipped=$((skipped + 1))
               continue
             fi
 
-            count=$(jq '.workflow_runs | length' <<< "$json")
-            [ "$count" -gt 0 ] || break
-
-            while IFS=$'\t' read -r run_id name created_at; do
-              [ -n "${run_id:-}" ] || continue
-              created_epoch=$(date -u -d "$created_at" +%s)
-              [ "$created_epoch" -ge "$cutoff" ] || continue
-              [ "$name" != "Auto Retry Failed Apps Actions" ] || continue
-
-              case "$name" in
-                Repair\ *|.github/workflows/repair-*|Apply\ *|.github/workflows/_*)
-                  echo "Skipping historical temporary repair workflow: ${name} (${run_id})"
-                  skipped=$((skipped + 1))
-                  continue
-                  ;;
-              esac
-
-              echo "Retrying all failed jobs: ${name} (${run_id})"
-              if gh api --method POST \
-                -H 'Accept: application/vnd.github+json' \
-                "/repos/${REPO}/actions/runs/${run_id}/rerun-failed-jobs"; then
-                retried=$((retried + 1))
-              else
-                echo "Run ${run_id} could not be retried now; it may already be running. Continuing."
+            case "$name" in
+              "Flutter App"|"Hadir Backend Check")
+                ;;
+              *)
+                echo "Skipping non-CI workflow: ${name} (${run_id})"
                 skipped=$((skipped + 1))
-              fi
-            done < <(jq -r '.workflow_runs[] | [.id,.name,.created_at] | @tsv' <<< "$json")
+                continue
+                ;;
+            esac
 
-            page=$((page + 1))
-          done
+            created_epoch="$(date -u -d "$created_at" +%s)"
+            if [ "$created_epoch" -lt "$cutoff" ]; then
+              continue
+            fi
 
-          echo "Retried failed Apps workflow runs: ${retried}; skipped for retry conflict/error: ${skipped}"
-          exit 0
+            echo "Retrying failed CI jobs: ${name} (${run_id})"
+            if gh api --method POST \
+              -H 'Accept: application/vnd.github+json' \
+              "/repos/${REPO}/actions/runs/${run_id}/rerun-failed-jobs"; then
+              retried=$((retried + 1))
+            else
+              echo "Run ${run_id} could not be retried; continuing."
+              skipped=$((skipped + 1))
+            fi
+          done < <(
+            jq -r '.workflow_runs[]
+              | [.id, .name, .created_at, .head_branch]
+              | @tsv' <<< "$json"
+          )
+
+          echo "Retried failed Flutter CI runs: ${retried}; skipped: ${skipped}"
