@@ -60,8 +60,8 @@ jobs:
             exit 1
           fi
 
-          git fetch --no-tags origin flutter-mobile-app
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/flutter-mobile-app; then
+          git fetch --no-tags origin refs/heads/flutter-mobile-app:refs/remotes/origin/flutter-mobile-app
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/flutter-mobile-app; then
             echo "Android releases must be tagged from a commit already present on flutter-mobile-app."
             exit 1
           fi
