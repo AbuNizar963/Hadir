@@ -56,7 +56,28 @@ jobs:
 
           version_code="${BASH_REMATCH[1]}"
           if (( version_code <= 1 )); then
-            echo "The release versionCode must be greater than the current baseline (1)."
+            echo "The release versionCode must be greater than the initial baseline (1)."
+            exit 1
+          fi
+
+          # Never publish a numerically older build than an existing Android tag.
+          # The triggering tag is excluded because GitHub exposes it before this job runs.
+          latest_tag_code=1
+          while IFS= read -r existing_tag; do
+            [[ "$existing_tag" == "$GITHUB_REF_NAME" ]] && continue
+            if [[ "$existing_tag" =~ ^android-v1\.0\.([0-9]+)$ ]]; then
+              existing_code="${BASH_REMATCH[1]}"
+              if (( existing_code > latest_tag_code )); then
+                latest_tag_code="$existing_code"
+              fi
+            fi
+          done < <(
+            git ls-remote --tags --refs origin 'refs/tags/android-v1.0.*' |
+              awk '{ sub("refs/tags/", "", $2); print $2 }'
+          )
+
+          if (( version_code <= latest_tag_code )); then
+            echo "Release versionCode $version_code must be greater than the highest existing Android tag ($latest_tag_code)."
             exit 1
           fi
 
