@@ -3,14 +3,14 @@ name: Build Hadir Android Release
 on:
   workflow_dispatch:
     inputs:
-      source_ref:
-        description: 'Git ref containing the Android TWA project to build'
-        required: true
-        default: 'fix/android-webapk-warning'
+      release_version:
+        description: 'Version to publish (x.y.z); leave empty to increment automatically'
+        required: false
+        default: ''
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-android-release:
@@ -18,11 +18,60 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source ref
+      - name: Checkout main branch
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.source_ref }}
-          fetch-depth: 1
+          ref: main
+          fetch-depth: 0
+
+      - name: Determine release version
+        id: release_version
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.release_version }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Releases can only be published from the main branch."
+            exit 1
+          fi
+
+          requested="${REQUESTED_VERSION//[[:space:]]/}"
+          if [ -n "$requested" ]; then
+            release_version="$requested"
+          else
+            base_version="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([0-9]+\.[0-9]+\.[0-9]+)".*$/\1/p' mobile/android/app/build.gradle | head -n 1)"
+            if ! [[ "$base_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Could not read a valid Android versionName from build.gradle."
+              exit 1
+            fi
+
+            latest_version="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sed -nE 's/^v([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' | sort -V | tail -n 1)"
+            if [ -z "$latest_version" ]; then
+              release_version="$base_version"
+            else
+              newest="$(printf '%s\n%s\n' "$base_version" "$latest_version" | sort -V | tail -n 1)"
+              if [ "$newest" != "$latest_version" ]; then
+                release_version="$base_version"
+              else
+                IFS='.' read -r major minor patch <<< "$latest_version"
+                release_version="${major}.${minor}.$((patch + 1))"
+              fi
+            fi
+          fi
+
+          if ! [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release version must use x.y.z format (for example 1.2.3)."
+            exit 1
+          fi
+          release_tag="v${release_version}"
+          if git rev-parse -q --verify "refs/tags/${release_tag}" >/dev/null; then
+            echo "::error::Release tag ${release_tag} already exists; choose a newer version."
+            exit 1
+          fi
+          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "Publishing Hadir $release_version ($release_tag)"
 
       - name: Verify Android project files
         shell: bash
@@ -107,7 +156,9 @@ jobs:
 
       - name: Build unsigned release APK
         working-directory: mobile/android
-        run: gradle --no-daemon --stacktrace :app:assembleRelease
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.release_version }}
+        run: gradle --no-daemon --stacktrace -PreleaseVersionName="$RELEASE_VERSION" -PreleaseVersionCode="$GITHUB_RUN_NUMBER" :app:assembleRelease
 
       - name: Sign production APK
         shell: bash
@@ -157,3 +208,31 @@ jobs:
           path: mobile/android/app-release-signed.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Prepare release assets and checksum
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          cp mobile/android/app-release-signed.apk release-assets/app-release.apk
+          printf '%s  %s\n' "$(sha256sum release-assets/app-release.apk | cut -d' ' -f1)" app-release.apk > release-assets/SHA256SUMS.txt
+          printf 'Hadir Android %s\n\n' "$RELEASE_VERSION" > release-assets/RELEASE_NOTES.md
+          printf 'التثبيت: نزّل app-release.apk من الأصول أدناه.\n\n' >> release-assets/RELEASE_NOTES.md
+          printf 'تحقق من سلامة الملف باستخدام: sha256sum --check SHA256SUMS.txt\n' >> release-assets/RELEASE_NOTES.md
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_version.outputs.release_tag }}
+          target_commitish: main
+          name: Hadir ${{ steps.release_version.outputs.release_version }}
+          body_path: release-assets/RELEASE_NOTES.md
+          generate_release_notes: true
+          make_latest: true
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          files: |
+            release-assets/app-release.apk
+            release-assets/SHA256SUMS.txt
