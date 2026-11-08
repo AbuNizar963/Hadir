@@ -368,6 +368,10 @@ class _EmployeeReferenceShellState extends State<EmployeeReferenceShell> {
               icon: const Icon(LucideIcons.palette, size: 18),
               label: const Text('المظهر')),
           TextButton.icon(
+              onPressed: () => context.push('/app/about-update'),
+              icon: const Icon(LucideIcons.info, size: 18),
+              label: const Text('حول التطبيق والتحديثات')),
+          TextButton.icon(
               onPressed: _logout,
               icon: Icon(LucideIcons.logOut, color: scheme.error, size: 18),
               label: Text('تسجيل خروج',
