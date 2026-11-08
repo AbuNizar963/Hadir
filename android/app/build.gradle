@@ -16,6 +16,9 @@ def releaseSigningConfigured = [
     releaseKeyAlias,
     releaseKeyPassword,
 ].every { value -> value != null && !value.trim().isEmpty() }
+def isAppBundleBuild = gradle.startParameter.taskNames.any { taskName ->
+    taskName.toLowerCase().contains('bundle')
+}
 
 android {
     namespace 'com.hadir.attendance'
@@ -43,7 +46,10 @@ android {
 
     splits {
         abi {
-            enable true
+            // ABI splits are useful for APK distribution. App Bundles already
+            // generate optimized splits and must not combine with per-ABI APK
+            // resource-shrinker outputs in the same bundle task.
+            enable !isAppBundleBuild
             reset()
             include 'armeabi-v7a', 'arm64-v8a', 'x86_64'
             universalApk true
