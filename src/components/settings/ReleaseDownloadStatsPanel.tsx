@@ -28,6 +28,7 @@ type ReleaseRow = {
     label: string;
     downloads: number;
     size: number;
+    downloadUrl: string;
   }>;
 };
 
@@ -88,6 +89,7 @@ function normalizeReleases(payload: unknown): ReleaseRow[] {
             ? asset.download_count
             : 0,
           size: Number.isFinite(asset.size) ? asset.size : 0,
+          downloadUrl: asset.browser_download_url,
         }));
 
       return {
@@ -166,6 +168,32 @@ export default function ReleaseDownloadStatsPanel() {
     };
   }, [releases]);
 
+  const latestAndroidRelease = useMemo(() => {
+    const candidates = releases
+      .map((release) => ({
+        release,
+        versionCode: Number(
+          /^android-v1\\.0\\.(\\d+)$/.exec(release.tag)?.[1] ?? NaN,
+        ),
+      }))
+      .filter(
+        (candidate) =>
+          Number.isSafeInteger(candidate.versionCode) &&
+          candidate.versionCode > 0,
+      )
+      .sort((a, b) => b.versionCode - a.versionCode);
+
+    return candidates[0]?.release ?? null;
+  }, [releases]);
+
+  const latestUniversalApk = latestAndroidRelease?.assets.find((asset) =>
+    [
+      "app-universal-release.apk",
+      "app-release.apk",
+      "app-release-signed.apk",
+    ].includes(asset.name),
+  );
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
@@ -185,6 +213,30 @@ export default function ReleaseDownloadStatsPanel() {
           {refreshing ? "جارٍ التحديث…" : "تحديث الإحصائيات"}
         </button>
       </div>
+
+      {latestAndroidRelease && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/5 px-4 py-4">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-primary">
+              أحدث إصدار لتطبيق حاضر
+            </p>
+            <p className="mt-1 text-lg font-black">
+              {latestAndroidRelease.name || latestAndroidRelease.tag}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {latestAndroidRelease.tag} · {formatDate(latestAndroidRelease.publishedAt)}
+            </p>
+          </div>
+          <a
+            href={latestUniversalApk?.downloadUrl ?? latestAndroidRelease.url}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary inline-flex shrink-0 items-center gap-2"
+          >
+            {latestUniversalApk ? "تنزيل APK" : "عرض الإصدار"}
+          </a>
+        </div>
+      )}
 
       {error && (
         <div
