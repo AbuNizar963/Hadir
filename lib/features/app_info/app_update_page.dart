@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 import '../../services/updater/updater_service.dart';
 
 class AppUpdatePage extends StatefulWidget {
-  const AppUpdatePage({super.key});
+  const AppUpdatePage({super.key, this.androidSupportOverride});
+
+  @visibleForTesting
+  final bool? androidSupportOverride;
 
   @override
   State<AppUpdatePage> createState() => _AppUpdatePageState();
@@ -27,7 +30,8 @@ class _AppUpdatePageState extends State<AppUpdatePage> {
   String? _status;
 
   bool get _supportsAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+      widget.androidSupportOverride ??
+      (!kIsWeb && defaultTargetPlatform == TargetPlatform.android);
 
   @override
   void initState() {
