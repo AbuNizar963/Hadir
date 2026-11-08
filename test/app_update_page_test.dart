@@ -10,7 +10,6 @@ void main() {
   const progressChannel = MethodChannel('hadir/updater_progress');
 
   setUp(() {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(updaterChannel, (call) async {
       switch (call.method) {
@@ -29,7 +28,6 @@ void main() {
   });
 
   tearDown(() {
-    debugDefaultTargetPlatformOverride = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(updaterChannel, null);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -38,7 +36,7 @@ void main() {
 
   testWidgets('shows app identity and installed Android version', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: AppUpdatePage()),
+      const MaterialApp(home: AppUpdatePage(androidSupportOverride: true)),
     );
     await tester.pumpAndSettle();
 
