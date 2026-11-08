@@ -5,12 +5,6 @@ on:
     branches:
       - flutter-mobile-app
   workflow_dispatch:
-    inputs:
-      source_ref:
-        description: 'Git ref containing the Flutter project to build'
-        required: true
-        default: 'flutter-mobile-app'
-        type: string
 
 permissions:
   contents: write
@@ -24,10 +18,18 @@ jobs:
     name: Build signed Flutter Android APK
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source ref
+      - name: Validate release source branch
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/flutter-mobile-app" ]; then
+            echo "Android releases may only be built from flutter-mobile-app."
+            echo "Selected ref: ${GITHUB_REF}"
+            exit 1
+          fi
+      - name: Checkout Flutter release source
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.source_ref || github.ref_name }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
       - name: Set up Flutter
         uses: subosito/flutter-action@v2

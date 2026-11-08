@@ -1,34 +1,41 @@
 # Android releases and in-app updates
 
-Hadir Android updates are distributed through GitHub Releases in this repository. The Flutter updater reads public releases and accepts tags in this exact format:
+Hadir Android APK releases are built and published by one GitHub Actions workflow:
 
-`android-v1.0.N`
+`.github/workflows/build-android-release.yml`
 
-The numeric suffix `N` is both the Android `versionCode` and the final component of `versionName` (`1.0.N`). It must be greater than the version already installed on devices. The release workflow rejects malformed tags and tags that do not point to a commit already present on `flutter-mobile-app`.
+The workflow is the single publishing path for the in-app updater. It runs automatically when changes are pushed to `flutter-mobile-app`. It can also be started manually, but only when the selected workflow branch is `flutter-mobile-app`.
 
-## Publishing a release
+## Versioning
 
-1. Complete and merge the Flutter changes into `flutter-mobile-app`.
-2. Confirm the Flutter Actions checks pass.
-3. Create a new tag on the intended Flutter commit using the next unused number greater than every existing Android release tag (the latest published release currently uses `1043`, so the next number must be at least `1044`): for example, `android-v1.0.1044`.
-4. Push the tag to GitHub. The `Publish Android Release` workflow runs analysis, tests, builds the Android APKs, verifies package identity/version/signatures, and publishes the GitHub Release.
-5. Confirm the published release contains `app-universal-release.apk`, any ABI-specific APKs, and `SHA256SUMS`.
+Each workflow run uses its GitHub Actions run number as the Android `versionCode` and publishes the matching `versionName` (`1.0.N`) under the release tag `android-v1.0.N`. The release is created against the exact commit checked out by the workflow.
 
-The app updater chooses an ABI-specific APK when available and falls back to the universal APK. The Atom-feed fallback also downloads the universal APK.
+Do not create Android release tags manually. Do not run the release workflow from `main` or another branch. The workflow checks the source branch before building.
+
+## Build and publication checks
+
+Before publishing, the workflow:
+
+1. Installs the pinned Flutter stable version and Android SDK 36 build tools.
+2. Runs `flutter pub get`, `flutter analyze`, and `flutter test`.
+3. Confirms the production signing secrets are present without printing their values.
+4. Builds the signed APKs for the supported ABIs and a universal APK.
+5. Verifies the package name (`com.hadir.attendance`), target SDK (36), version code, version name, and APK signature.
+6. Uploads the APK files as a workflow artifact and publishes them to the matching GitHub Release.
+
+The universal APK is published as `app-release.apk`, with ABI-specific assets named `app-arm64-v8a-release.apk`, `app-armeabi-v7a-release.apk`, and `app-x86_64-release.apk`. The in-app updater selects a compatible ABI asset when available and otherwise uses the universal APK. GitHub's Release API supplies each asset's size and SHA-256 digest; the updater requires both before offering the download.
 
 ## Required GitHub Actions secrets
 
-Configure these repository Actions secrets before publishing:
+The workflow uses the existing repository Actions secrets:
 
-- `HADIR_RELEASE_KEYSTORE_BASE64`: Base64-encoded Android release keystore.
-- `HADIR_RELEASE_STORE_PASSWORD`: keystore password.
-- `HADIR_RELEASE_KEY_ALIAS`: signing key alias.
-- `HADIR_RELEASE_KEY_PASSWORD`: signing key password.
+- `ANDROID_KEYSTORE_BASE64`: Base64-encoded Android release keystore.
+- `ANDROID_KEYSTORE_PASSWORD`: keystore password.
+- `ANDROID_KEY_ALIAS`: signing key alias.
+- `ANDROID_KEY_PASSWORD`: signing key password.
 
-Never commit the keystore, passwords, or decoded key file to the repository. The workflow fails before building if a required secret is missing.
+Never commit the keystore, passwords, or decoded key file to the repository. Never replace or rotate the signing key as part of routine release maintenance. Updates must use the same signing certificate as the installed production app.
 
-**Signing-key continuity is mandatory.** Use the same keystore/certificate that signed the currently distributed Hadir app. Replacing it with a newly generated key can prevent Android from installing an update over an existing installation. Do not rotate or replace the signing key as part of routine release setup.
+## Other platforms
 
-## Release scope
-
-This workflow publishes Android APKs for the in-app updater. iOS distribution remains separate and continues to use the existing Flutter/iOS validation workflow.
+This workflow publishes Android APKs for the in-app updater only. iOS distribution and validation remain separate.
