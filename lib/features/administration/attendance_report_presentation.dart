@@ -42,3 +42,28 @@ String attendanceReportNote(Map<String, dynamic> row) {
   if (code.isEmpty) return '—';
   return _exceptionLabels[code] ?? code;
 }
+
+String attendanceReportSourceLabel(dynamic value) {
+  switch ('${value ?? ''}'.trim().toUpperCase()) {
+    case 'AUTOMATIC_VIP':
+      return 'تلقائي VIP';
+    case 'AUTOMATIC':
+      return 'تلقائي';
+    case 'MANUAL_OWNER':
+      return 'إداري';
+    case 'MANUAL_EMPLOYEE':
+      return 'الموظف';
+    case 'MIXED':
+      return 'مختلط';
+    default:
+      return 'غير محدد';
+  }
+}
+
+String attendanceReportExceptionLabel(Map<String, dynamic> row) {
+  final status = '${row['status'] ?? ''}'.trim().toUpperCase();
+  if (status == 'ESCAPED') return 'هرب من العمل';
+  final code = '${row['exceptionCode'] ?? ''}'.trim().toUpperCase();
+  if (code.isEmpty) return '—';
+  return _exceptionLabels[code] ?? code;
+}
