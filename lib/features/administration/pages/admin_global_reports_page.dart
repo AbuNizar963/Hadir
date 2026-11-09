@@ -697,7 +697,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
               item.key,
               '${item.value}',
               analysisTotal == 0 ? '0.0%' : '${(item.value / analysisTotal * 100).toStringAsFixed(1)}%',
-              '█' * ((item.value / maxStatus * 45).round().clamp(0, 45)),
+              List<String>.filled(((item.value / maxStatus * 45).round().clamp(0, 45)).toInt(), '█').join(),
             ]),
       ]);
 
