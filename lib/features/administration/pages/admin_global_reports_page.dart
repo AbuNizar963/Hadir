@@ -608,7 +608,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
             '${row['lateMinutes'] ?? 0}',
             '${row['earlyLeaveMinutes'] ?? 0}',
             '${row['overtimeMinutes'] ?? 0}',
-            '${_rowNote(row)}',
+            _rowNote(row),
           ]).toList();
       writeSheet('السجل اليومي', [
         [
@@ -634,7 +634,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
                 '${row['employeeName'] ?? '—'}',
                 '${row['jobNumber'] ?? '—'}',
                 'غياب',
-                '${_rowNote(row)}',
+                _rowNote(row),
               ])
           .toList();
       writeSheet('أيام الغياب', [
@@ -697,7 +697,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
             '${row['lateMinutes'] ?? 0}',
             '${row['earlyLeaveMinutes'] ?? 0}',
             '${row['overtimeMinutes'] ?? 0}',
-            '${_rowNote(row)}',
+            _rowNote(row),
           ]).toList();
       pdf.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
