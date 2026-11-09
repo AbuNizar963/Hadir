@@ -1,11 +1,12 @@
 name: Build Hadir Android Flutter Release
 
 on:
-  # Publish only after a push reaches the protected Flutter app branch.
-  # The release job runs its own analysis and tests before signing or publishing.
-  push:
+  # Publish only when a pull request is merged into the Flutter app branch.
+  pull_request:
     branches:
       - flutter-mobile-app
+    types:
+      - closed
   workflow_dispatch:
 
 permissions:
@@ -17,6 +18,7 @@ concurrency:
 
 jobs:
   build-android-release:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     name: Build signed Flutter Android APK
     runs-on: ubuntu-latest
     steps:
@@ -32,7 +34,24 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 1
+          fetch-depth: 0
+      - name: Determine unique Android release version
+        shell: bash
+        run: |
+          git fetch --force --tags origin
+          existing_tag="$(git tag --points-at "${GITHUB_SHA}" --list 'android-v1.0.*' | sort -V | tail -n 1)"
+          if [ -n "$existing_tag" ]; then
+            version_code="${existing_tag##*.}"
+          else
+            latest_version="$(git tag --list 'android-v1.0.*' | sed -nE 's/^android-v1\.0\.([0-9]+)$/\1/p' | sort -n | tail -n 1)"
+            version_code=$((${latest_version:-0} + 1))
+          fi
+          if ! [[ "$version_code" =~ ^[0-9]+$ ]] || [ "$version_code" -lt 1 ]; then
+            echo "Could not determine a valid Android release version."
+            exit 1
+          fi
+          echo "HADIR_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+          echo "Selected Android release version: 1.0.$version_code"
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -117,8 +136,8 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease \
-            -PhadirVersionCode=${{ github.run_number }} \
-            -PhadirVersionName=1.0.${{ github.run_number }} \
+            -PhadirVersionCode=${HADIR_VERSION_CODE} \
+            -PhadirVersionName=1.0.${HADIR_VERSION_CODE} \
             --stacktrace
           for abi in armeabi-v7a arm64-v8a x86_64 universal; do
             test -f "app/build/outputs/apk/release/app-${abi}-release.apk"
@@ -144,8 +163,8 @@ jobs:
           echo "Hadir Flutter APK versionCode=$VERSION_CODE versionName=$VERSION_NAME"
           test "$TARGET_SDK" = "36"
           test "$PACKAGE_NAME" = "com.hadir.attendance"
-          test "$VERSION_CODE" = "${{ github.run_number }}"
-          test "$VERSION_NAME" = "1.0.${{ github.run_number }}"
+          test "$VERSION_CODE" = "$HADIR_VERSION_CODE"
+          test "$VERSION_NAME" = "1.0.$HADIR_VERSION_CODE"
       - name: Verify production APK signature
         shell: bash
         run: |
@@ -171,11 +190,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          TAG="android-v1.0.${{ github.run_number }}"
-          TITLE="HADIR Android 1.0.${{ github.run_number }}"
+          TAG="android-v1.0.${HADIR_VERSION_CODE}"
+          TITLE="HADIR Android 1.0.${HADIR_VERSION_CODE}"
           APK_DIR="build/app/outputs/flutter-apk"
           if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK_DIR"/*.apk --repo "${{ github.repository }}" --clobber
           else
-            gh release create "$TAG" "$APK_DIR"/*.apk --repo "${{ github.repository }}" --title "$TITLE" --target "${{ github.sha }}" --notes "تحديث تلقائي لتطبيق حاضر Android Flutter. versionCode=${{ github.run_number }}. يتوفر APK مناسب لكل معمارية مع نسخة شاملة احتياطية."
+            gh release create "$TAG" "$APK_DIR"/*.apk --repo "${{ github.repository }}" --title "$TITLE" --target "${{ github.sha }}" --notes "تحديث تلقائي لتطبيق حاضر Android Flutter. versionCode=${HADIR_VERSION_CODE}. يتوفر APK مناسب لكل معمارية مع نسخة شاملة احتياطية."
           fi
