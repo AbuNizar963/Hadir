@@ -69,7 +69,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # sdkmanager may finish before `yes` closes its pipe; avoid treating
+          # that expected SIGPIPE from `yes` as a license-acceptance failure.
+          set +o pipefail
           yes | sdkmanager --licenses >/dev/null
+          set -o pipefail
           sdkmanager "cmake;3.22.1" "ndk;28.2.13676358"
           test -x "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/ninja"
           test -x "$ANDROID_SDK_ROOT/ndk/28.2.13676358/ndk-build"
