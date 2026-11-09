@@ -144,7 +144,10 @@ export async function handleWorkforce(
   const u = new URL(req.url);
   const method = req.method;
   if (pathname === "/api/workforce/live" && method === "POST" && !actor) {
-    const b = (await req.json().catch(() => ({}))) as any;
+    const boundedRequest = await requestWithBodyLimit(req, 16 * 1024);
+    if (!boundedRequest)
+      return J({ error: "حجم طلب إعادة ربط الجهاز يتجاوز الحد المسموح" }, 413);
+    const b = (await boundedRequest.json().catch(() => ({}))) as any;
     const action = String(b.action || "");
     if (action !== "device-rebind-request")
       return J({ error: "غير مصرح" }, 401);
