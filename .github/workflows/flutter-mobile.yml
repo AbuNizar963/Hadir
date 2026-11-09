@@ -151,19 +151,14 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          # Build the App Bundle with ABI splits explicitly disabled. Keep this
-          # invocation separate from APK splits to avoid AGP shrunk-resource collisions.
-          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew clean bundleRelease -PhadirDisableAbiSplits=true --stacktrace
-          test -f app/build/outputs/bundle/release/app-release.aab
-
-          # Build the optimized, architecture-specific APKs in a fresh Gradle invocation.
-          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleRelease --stacktrace
+          # Build the installable Android APK only. AAB is not part of the
+          # current distribution target and must not gate APK delivery.
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew clean assembleRelease --stacktrace
           release_apk="app/build/outputs/apk/release/app-universal-release.apk"
           if [ ! -f "$release_apk" ]; then
             release_apk="app/build/outputs/apk/release/app-release.apk"
           fi
-          test -f "$release_apk"
-          test -f app/build/outputs/bundle/release/app-release.aab
+          test -s "$release_apk"
           mkdir -p ../build/app/outputs/flutter-apk
           cp "$release_apk" ../build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
@@ -174,10 +169,6 @@ jobs:
         with:
           name: hadir-android-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: hadir-android-release-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
 
   ios:
     runs-on: macos-latest
@@ -208,4 +199,21 @@ jobs:
         run: npx --yes prettier@3.6.2 --write backend/src/index.ts
       - run: flutter analyze
       - run: flutter test
-      - run: flutter build ios --no-codesign
+      - name: Build unsigned iOS app for CI testing
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned iOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="build/ios/iphoneos/Runner.app"
+          test -d "$app_path"
+          mkdir -p build/ios-artifacts
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" build/ios-artifacts/hadir-ios-unsigned.zip
+          test -s build/ios-artifacts/hadir-ios-unsigned.zip
+      - name: Upload unsigned iOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadir-ios-unsigned
+          path: build/ios-artifacts/hadir-ios-unsigned.zip
+          if-no-files-found: error
+          retention-days: 14
