@@ -772,8 +772,10 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
           'PRESENT' => (0xffd1fae5, 0xff047857),
           'LATE' => (0xfffef3c7, 0xffb45309),
           'ABSENT' || 'ESCAPED' || 'INVALID' => (0xfffee2e2, 0xffb91c1c),
+          'EARLY' => (0xffffedd5, 0xffc2410c),
           'PERMISSION' => (0xffe0f2fe, 0xff0369a1),
           'LEAVE' => (0xffede9fe, 0xff6d28d9),
+          'REST' || 'HOLIDAY' || 'NOT_STARTED' => (0xffe2e8f0, 0xff475569),
           'MISSING_CHECKOUT' => (0xfffef3c7, 0xffa16207),
           _ => (0xffe2e8f0, 0xff475569),
         };
@@ -869,7 +871,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
                     textDirection: pw.TextDirection.rtl,
                     style: pw.TextStyle(
                       font: bold,
-                      fontSize: 15,
+                      fontSize: 20,
                       color: PdfColor.fromInt(0xff111827),
                     ),
                   ),
@@ -881,7 +883,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
                   textDirection: pw.TextDirection.rtl,
                   style: pw.TextStyle(
                     font: bold,
-                    fontSize: 11.25,
+                    fontSize: 15,
                     color: PdfColor.fromInt(0xff111827),
                   ),
                 ),
@@ -896,7 +898,6 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
                 ),
               ),
               child: pw.Table(
-                textDirection: pw.TextDirection.rtl,
                 defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
                 columnWidths: {
                   0: pw.FixedColumnWidth(9 * PdfPageFormat.mm),
