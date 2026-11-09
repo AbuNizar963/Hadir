@@ -41,7 +41,59 @@ if (source.includes("const keys = Array.from(new Set([CURRENT_LOGO_KEY, configur
 const deletePattern = /^  if \(req\.method === "DELETE"\) \{\r?\n[\s\S]*?^  \}/gm;
 const deleteMatches = [...source.matchAll(deletePattern)];
 
-const newDeleteBlock = "  if (req.method === \"DELETE\") {\n    // R2 is authoritative for the current logo. Report every storage failure\n    // instead of claiming a complete deletion when one side is still present.\n    const row = await env.DB.prepare(\n      \"SELECT value FROM settings WHERE key=? LIMIT 1\",\n    )\n      .bind(LOGO_KEY_SETTING)\n      .first<{ value: string }>();\n    const key = String(row?.value || \"\").trim();\n    try {\n      await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY);\n      if (key && key !== CURRENT_LOGO_KEY) {\n        await env.PROFILE_IMAGES.delete(key);\n      }\n    } catch (error) {\n      console.error(\"company logo R2 delete failed\", error);\n      return json(\n        { ok: false, r2Deleted: false, settingsCleaned: false },\n        502,\n        origin,\n      );\n    }\n    try {\n      await env.DB.batch([\n        env.DB.prepare(\"DELETE FROM settings WHERE key=?\").bind(\n          LOGO_KEY_SETTING,\n        ),\n        env.DB.prepare(\"DELETE FROM settings WHERE key=?\").bind(\n          LOGO_URL_SETTING,\n        ),\n        env.DB.prepare(\"DELETE FROM settings WHERE key=?\").bind(\n          LOGO_BACKUP_SETTING,\n        ),\n      ]);\n    } catch (error) {\n      console.error(\"company logo D1 cleanup failed after R2 deletion\", error);\n      return json(\n        {\n          ok: true,\n          r2Deleted: true,\n          settingsCleaned: false,\n          warning: \"تم حذف الشعار من R2 لكن تعذر تنظيف مرجعه في D1.\",\n        },\n        200,\n        origin,\n      );\n    }\n    return json(\n      { ok: true, r2Deleted: true, settingsCleaned: true },\n      200,\n      origin,\n    );\n  }";
+const newDeleteBlock = `  if (req.method === "DELETE") {
+    // R2 is authoritative for the current logo. Report every storage failure
+    // instead of claiming a complete deletion when one side is still present.
+    const row = await env.DB.prepare(
+      "SELECT value FROM settings WHERE key=? LIMIT 1",
+    )
+      .bind(LOGO_KEY_SETTING)
+      .first<{ value: string }>();
+    const key = String(row?.value || "").trim();
+    try {
+      await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY);
+      if (key && key !== CURRENT_LOGO_KEY) {
+        await env.PROFILE_IMAGES.delete(key);
+      }
+    } catch (error) {
+      console.error("company logo R2 delete failed", error);
+      return json(
+        { ok: false, r2Deleted: false, settingsCleaned: false },
+        502,
+        origin,
+      );
+    }
+    try {
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_KEY_SETTING,
+        ),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_URL_SETTING,
+        ),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_BACKUP_SETTING,
+        ),
+      ]);
+    } catch (error) {
+      console.error("company logo D1 cleanup failed after R2 deletion", error);
+      return json(
+        {
+          ok: true,
+          r2Deleted: true,
+          settingsCleaned: false,
+          warning: "تم حذف الشعار من R2 لكن تعذر تنظيف مرجعه في D1.",
+        },
+        200,
+        origin,
+      );
+    }
+    return json(
+      { ok: true, r2Deleted: true, settingsCleaned: true },
+      200,
+      origin,
+    );
+  }`;
 
 if (source.includes("settingsCleaned: true")) {
   console.log("Company logo cache-version patch: DELETE already tolerates D1 cleanup failures.");
