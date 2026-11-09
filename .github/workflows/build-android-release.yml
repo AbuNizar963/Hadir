@@ -1,7 +1,11 @@
 name: Build Hadir Android Flutter Release
 
 on:
-  # Publishing a signed production release is intentionally manual.
+  # Publish only after a push reaches the protected Flutter app branch.
+  # The release job runs its own analysis and tests before signing or publishing.
+  push:
+    branches:
+      - flutter-mobile-app
   workflow_dispatch:
 
 permissions:
