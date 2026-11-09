@@ -766,7 +766,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
           actions: [
             IconButton(onPressed: _exporting || _allRows.isEmpty ? null : _print, tooltip: 'PDF / طباعة', icon: const Icon(Icons.print_outlined)),
             PopupMenuButton<String>(
-              enabled: !_exporting && _rows.isNotEmpty,
+              enabled: !_exporting && _allRows.isNotEmpty,
               onSelected: (value) => value == 'excel' ? _shareExcel() : _shareCsv(),
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'excel', child: Text('تصدير Excel')),
