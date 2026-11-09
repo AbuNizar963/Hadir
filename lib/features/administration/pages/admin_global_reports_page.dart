@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart' show Options, ResponseType;
 import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
@@ -694,72 +695,226 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
 
   Future<void> _print() async {
     final rows = _allRows;
-    if (rows.isEmpty) return;
+    final api = _api;
+    if (rows.isEmpty || api == null) return;
     setState(() => _exporting = true);
     try {
-      final regular = await PdfGoogleFonts.notoSansArabicRegular();
-      final bold = await PdfGoogleFonts.notoSansArabicBold();
+      final settingsResponse = await api.settings();
+      final settings = _map(
+        settingsResponse['settings'] ?? settingsResponse['data'] ?? settingsResponse,
+      );
+      final brandName = '${settings['brandName'] ?? settings['companyName'] ?? 'HADIR'}'
+          .trim();
+      final logoUrl = '${settings['brandLogo'] ?? ''}'.trim();
+      final regular = await PdfGoogleFonts.cairoRegular();
+      final bold = await PdfGoogleFonts.cairoBold();
+
+      pw.MemoryImage? logo;
+      if (logoUrl.isNotEmpty) {
+        final logoResponse = await api.dio.get<List<int>>(
+          logoUrl,
+          options: Options(responseType: ResponseType.bytes),
+        );
+        final logoBytes = logoResponse.data;
+        if (logoBytes == null || logoBytes.isEmpty) {
+          throw StateError('تعذر تحميل شعار الجهة للطباعة.');
+        }
+        logo = pw.MemoryImage(Uint8List.fromList(logoBytes));
+      }
+
       final pdf = pw.Document();
-      final summary = _summary;
       final isDaily = _int(_report['days']) == 1;
-      final data = rows.map((row) => <String>[
-            '${row['attendanceDay'] ?? '—'}',
-            '${row['employeeName'] ?? '—'}',
-            _displayStatus(row),
-            _clock(row['checkInAt']),
-            _clock(row['checkOutAt']),
-            _minutes(row['workedMinutes']),
-            '${row['lateMinutes'] ?? 0}',
-            '${row['earlyLeaveMinutes'] ?? 0}',
-            '${row['overtimeMinutes'] ?? 0}',
-            _rowNote(row),
-          ]).toList();
-      pdf.addPage(pw.MultiPage(
-        pageFormat: PdfPageFormat.a4.landscape,
-        textDirection: pw.TextDirection.rtl,
-        build: (_) => [
-          pw.Text(
-            isDaily
-                ? 'HADIR / حاضر · التقرير اليومي الرسمي للحضور والانصراف'
-                : 'HADIR / حاضر · تقرير الحضور والانصراف للفترة',
-            style: pw.TextStyle(font: bold, fontSize: 18),
+      final reportTitle = isDaily
+          ? 'سجل الحضور والانصراف اليومي'
+          : 'سجل الحضور والانصراف للفترة';
+      final reportDate = isDaily
+          ? _date(_from)
+          : '${_date(_from)} → ${_date(_to)}';
+
+      pw.Widget cell(
+        String value, {
+        bool header = false,
+        bool emphasize = false,
+        pw.Widget? child,
+      }) {
+        return pw.Container(
+          alignment: pw.Alignment.center,
+          padding: pw.EdgeInsets.symmetric(
+            horizontal: 1.4 * PdfPageFormat.mm,
+            vertical: 1.6 * PdfPageFormat.mm,
           ),
-          pw.SizedBox(height: 6),
-          pw.Text(
-            '${_date(_from)} → ${_date(_to)} · المنطقة الزمنية: ${_report['timezone'] ?? '—'}',
-            style: pw.TextStyle(font: regular, fontSize: 10),
+          decoration: pw.BoxDecoration(
+            color: header ? PdfColor.fromInt(0xffe2e8f0) : null,
+            border: pw.Border.all(
+              color: PdfColor.fromInt(0xff475569),
+              width: 0.25 * PdfPageFormat.mm,
+            ),
           ),
-          pw.SizedBox(height: 8),
-          pw.Text(
-            'الموظفون: ${summary['employees'] ?? 0}  |  حاضر: ${summary['present'] ?? 0}  |  متأخر: ${summary['late'] ?? 0}  |  غياب: ${summary['absent'] ?? 0}  |  انصراف معلق: ${summary['open'] ?? 0}',
-            style: pw.TextStyle(font: bold, fontSize: 9),
+          child: child ??
+              pw.Text(
+                value,
+                textAlign: pw.TextAlign.center,
+                textDirection: pw.TextDirection.rtl,
+                style: pw.TextStyle(
+                  font: header || emphasize ? bold : regular,
+                  fontSize: 10.5,
+                  color: PdfColor.fromInt(
+                    header ? 0xff0f172a : 0xff111827,
+                  ),
+                ),
+              ),
+        );
+      }
+
+      pw.Widget statusCell(Map<String, dynamic> row) {
+        final status = attendanceReportStatus(row);
+        final colors = switch (status) {
+          'PRESENT' => (0xffd1fae5, 0xff047857),
+          'LATE' => (0xfffef3c7, 0xffb45309),
+          'ABSENT' || 'ESCAPED' || 'INVALID' => (0xfffee2e2, 0xffb91c1c),
+          'EARLY' => (0xffffedd5, 0xffc2410c),
+          'PERMISSION' => (0xffe0f2fe, 0xff0369a1),
+          'LEAVE' => (0xffede9fe, 0xff6d28d9),
+          'REST' || 'HOLIDAY' || 'NOT_STARTED' => (0xffe2e8f0, 0xff475569),
+          'MISSING_CHECKOUT' => (0xfffef3c7, 0xffa16207),
+          _ => (0xffe2e8f0, 0xff475569),
+        };
+        return cell(
+          '',
+          child: pw.Container(
+            constraints: pw.BoxConstraints(
+              minWidth: 22 * PdfPageFormat.mm,
+            ),
+            padding: pw.EdgeInsets.symmetric(
+              horizontal: 2.2 * PdfPageFormat.mm,
+              vertical: 1 * PdfPageFormat.mm,
+            ),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromInt(colors.$1),
+              borderRadius: pw.BorderRadius.circular(999),
+            ),
+            alignment: pw.Alignment.center,
+            child: pw.Text(
+              _displayStatus(row),
+              textAlign: pw.TextAlign.center,
+              textDirection: pw.TextDirection.rtl,
+              style: pw.TextStyle(
+                font: bold,
+                fontSize: 10.5,
+                color: PdfColor.fromInt(colors.$2),
+              ),
+            ),
           ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            'ساعات العمل: ${_minutes(summary['workedMinutes'])}  |  التأخر: ${summary['lateMinutes'] ?? 0} د  |  الانصراف المبكر: ${summary['earlyLeaveMinutes'] ?? 0} د  |  الإضافي: ${summary['overtimeMinutes'] ?? 0} د',
-            style: pw.TextStyle(font: regular, fontSize: 8),
-          ),
-          pw.SizedBox(height: 10),
-          pw.TableHelper.fromTextArray(
-            data: data,
-            headers: const [
-              'التاريخ',
-              'الموظف',
-              'الحالة',
-              'الحضور',
-              'الانصراف',
-              'العمل',
-              'التأخر',
-              'الانصراف المبكر',
-              'الإضافي',
-              'الملاحظات',
+        );
+      }
+
+      final tableRows = <pw.TableRow>[
+        pw.TableRow(
+          children: [
+            cell('ت', header: true),
+            cell('الاختصاص', header: true),
+            cell('اسم الموظف', header: true),
+            cell('الحالة', header: true),
+            cell('الحضور', header: true),
+            cell('الانصراف', header: true),
+            cell('ملاحظات', header: true),
+          ],
+        ),
+        ...rows.asMap().entries.map((entry) {
+          final index = entry.key;
+          final row = entry.value;
+          final employeeId = '${row['employeeId'] ?? ''}';
+          Map<String, dynamic>? employee;
+          for (final candidate in _employees) {
+            if ('${candidate['id'] ?? candidate['employeeId'] ?? ''}' == employeeId) {
+              employee = candidate;
+              break;
+            }
+          }
+          final specialty = employee == null
+              ? '${row['specialty'] ?? row['jobTitle'] ?? '—'}'
+              : '${employee['specialty'] ?? employee['jobTitle'] ?? employee['position'] ?? '—'}';
+          return pw.TableRow(
+            children: [
+              cell('${index + 1}'),
+              cell(specialty),
+              cell('${row['employeeName'] ?? row['name'] ?? '—'}', emphasize: true),
+              statusCell(row),
+              cell(_clock(row['checkInAt'])),
+              cell(_clock(row['checkOutAt'])),
+              cell(_rowNote(row)),
             ],
-            headerStyle: pw.TextStyle(font: bold, fontSize: 7),
-            cellStyle: pw.TextStyle(font: regular, fontSize: 7),
-            tableDirection: pw.TextDirection.rtl,
-          ),
-        ],
-      ));
+          );
+        }),
+      ];
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.all(6 * PdfPageFormat.mm),
+          build: (_) => [
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                if (logo != null)
+                  pw.Container(
+                    width: 31 * PdfPageFormat.mm,
+                    height: 31 * PdfPageFormat.mm,
+                    margin: pw.EdgeInsets.only(bottom: 2 * PdfPageFormat.mm),
+                    child: pw.Image(logo, fit: pw.BoxFit.contain),
+                  ),
+                pw.SizedBox(
+                  width: double.infinity,
+                  child: pw.Text(
+                    brandName.isEmpty ? 'HADIR' : brandName,
+                    textAlign: pw.TextAlign.center,
+                    textDirection: pw.TextDirection.rtl,
+                    style: pw.TextStyle(
+                      font: bold,
+                      fontSize: 20,
+                      color: PdfColor.fromInt(0xff111827),
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 1.5 * PdfPageFormat.mm),
+                pw.Text(
+                  '$reportTitle · $reportDate',
+                  textAlign: pw.TextAlign.center,
+                  textDirection: pw.TextDirection.rtl,
+                  style: pw.TextStyle(
+                    font: bold,
+                    fontSize: 15,
+                    color: PdfColor.fromInt(0xff111827),
+                  ),
+                ),
+                pw.SizedBox(height: 7 * PdfPageFormat.mm),
+              ],
+            ),
+            pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(
+                  color: PdfColor.fromInt(0xff111827),
+                  width: 0.45 * PdfPageFormat.mm,
+                ),
+              ),
+              child: pw.Table(
+                defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+                columnWidths: {
+                  0: pw.FixedColumnWidth(9 * PdfPageFormat.mm),
+                  1: pw.FixedColumnWidth(29 * PdfPageFormat.mm),
+                  2: pw.FixedColumnWidth(42 * PdfPageFormat.mm),
+                  3: pw.FixedColumnWidth(24 * PdfPageFormat.mm),
+                  4: pw.FixedColumnWidth(24 * PdfPageFormat.mm),
+                  5: pw.FixedColumnWidth(24 * PdfPageFormat.mm),
+                  6: const pw.FlexColumnWidth(),
+                },
+                children: tableRows,
+              ),
+            ),
+          ],
+        ),
+      );
+
       await Printing.layoutPdf(
         name: 'HADIR-attendance-${_date(_from)}-${_date(_to)}.pdf',
         onLayout: (_) => pdf.save(),
@@ -768,7 +923,6 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
       if (mounted) setState(() => _exporting = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     const tabs = <String>['نظرة تنفيذية', 'السجل الرسمي', 'الموظفون', 'الاستثناءات'];
