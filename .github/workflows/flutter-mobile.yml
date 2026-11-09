@@ -39,6 +39,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: hadir-flutter-mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android:
     name: Android validation and APK build
@@ -59,6 +63,20 @@ jobs:
           channel: stable
           cache: true
       - run: flutter --version
+      - name: Set up Android SDK tools
+        uses: android-actions/setup-android@v4
+      - name: Install pinned Android native build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          # sdkmanager may finish before `yes` closes its pipe; avoid treating
+          # that expected SIGPIPE from `yes` as a license-acceptance failure.
+          set +o pipefail
+          yes | sdkmanager --licenses >/dev/null
+          set -o pipefail
+          sdkmanager "cmake;3.22.1" "ndk;28.2.13676358"
+          test -x "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/ninja"
+          test -x "$ANDROID_SDK_ROOT/ndk/28.2.13676358/ndk-build"
       - name: Generate Android wrapper when incomplete
         shell: bash
         run: |
@@ -92,18 +110,6 @@ jobs:
             backend/test/request-body-limit.test.js
       - run: flutter analyze
       - run: flutter test
-      - name: Build Android debug APK
-        run: |
-          cd android
-          chmod +x gradlew
-          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleDebug --stacktrace
-          debug_apk="app/build/outputs/apk/debug/app-universal-debug.apk"
-          if [ ! -f "$debug_apk" ]; then
-            debug_apk="app/build/outputs/apk/debug/app-debug.apk"
-          fi
-          test -f "$debug_apk"
-          mkdir -p ../build/app/outputs/flutter-apk
-          cp "$debug_apk" ../build/app/outputs/flutter-apk/app-debug.apk
       - name: Prepare ephemeral release signing key
         run: |
           keytool -genkeypair -v \
@@ -115,7 +121,7 @@ jobs:
             -keysize 2048 \
             -validity 3650 \
             -dname "CN=HADIR CI, OU=Build, O=HADIR, L=NA, ST=NA, C=US"
-      - name: Build optimized Android release APK
+      - name: Build Android debug and release APKs
         env:
           HADIR_RELEASE_KEYSTORE: ci-release.keystore
           HADIR_RELEASE_STORE_PASSWORD: changeit
@@ -124,15 +130,24 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          # Build the installable Android APK only. AAB is not part of the
-          # current distribution target and must not gate APK delivery.
-          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew clean assembleRelease --stacktrace
+          # Build both variants in one Gradle invocation to reuse configuration,
+          # dependency resolution, and the Gradle daemon.
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew clean assembleDebug assembleRelease --stacktrace
+
+          debug_apk="app/build/outputs/apk/debug/app-universal-debug.apk"
+          if [ ! -f "$debug_apk" ]; then
+            debug_apk="app/build/outputs/apk/debug/app-debug.apk"
+          fi
+
           release_apk="app/build/outputs/apk/release/app-universal-release.apk"
           if [ ! -f "$release_apk" ]; then
             release_apk="app/build/outputs/apk/release/app-release.apk"
           fi
+
+          test -s "$debug_apk"
           test -s "$release_apk"
           mkdir -p ../build/app/outputs/flutter-apk
+          cp "$debug_apk" ../build/app/outputs/flutter-apk/app-debug.apk
           cp "$release_apk" ../build/app/outputs/flutter-apk/app-release.apk
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
@@ -157,6 +172,15 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods
+          key: hadir-cocoapods-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            hadir-cocoapods-${{ runner.os }}-
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.2'
