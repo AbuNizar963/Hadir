@@ -145,7 +145,13 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease --stacktrace
+          # Build the App Bundle with ABI splits explicitly disabled. Keep this
+          # invocation separate from APK splits to avoid AGP shrunk-resource collisions.
+          ./gradlew clean bundleRelease -PhadirDisableAbiSplits=true --stacktrace
+          test -f app/build/outputs/bundle/release/app-release.aab
+
+          # Build the optimized, architecture-specific APKs in a fresh Gradle invocation.
+          ./gradlew assembleRelease --stacktrace
           release_apk="app/build/outputs/apk/release/app-universal-release.apk"
           if [ ! -f "$release_apk" ]; then
             release_apk="app/build/outputs/apk/release/app-release.apk"
