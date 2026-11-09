@@ -6,7 +6,7 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 
-max_attempts="${GRADLE_NETWORK_RETRY_ATTEMPTS:-3}"
+max_attempts="${GRADLE_NETWORK_RETRY_ATTEMPTS:-5}"
 if ! [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]]; then
   echo "GRADLE_NETWORK_RETRY_ATTEMPTS must be a positive integer." >&2
   exit 2
