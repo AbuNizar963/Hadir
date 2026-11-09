@@ -8,6 +8,8 @@ import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import io.flutter.plugin.common.EventChannel
 import java.io.File
@@ -20,6 +22,22 @@ class UpdateInstaller(private val context: Context) {
     companion object {
         const val PERMISSION_ERROR = "INSTALL_PERMISSION_REQUIRED"
         private const val REQUEST_CODE = 7401
+    }
+
+    // Flutter platform channels must only be called from Android's main thread.
+    private val mainThreadHandler = Handler(Looper.getMainLooper())
+
+    private fun emitProgress(sink: EventChannel.EventSink?, event: Map<String, Any?>) {
+        if (sink == null) return
+        mainThreadHandler.post { sink.success(event) }
+    }
+
+    private fun emitFailure(sink: EventChannel.EventSink?, failure: Throwable) {
+        if (sink == null) return
+        mainThreadHandler.post {
+            sink.error("UPDATE_FAILED", failure.message ?: "تعذر تنزيل أو تثبيت التحديث", null)
+            sink.endOfStream()
+        }
     }
 
     fun currentVersionCode(): Long {
@@ -61,7 +79,7 @@ class UpdateInstaller(private val context: Context) {
                     try {
                         download(url, apk, sink)
                         validateDownloadedApk(apk, versionCode, expectedSize, expectedSha256)
-                        sink?.success(mapOf(
+                        emitProgress(sink, mapOf(
                             "downloadedBytes" to apk.length(),
                             "totalBytes" to expectedSize,
                             "percent" to 100,
@@ -78,8 +96,7 @@ class UpdateInstaller(private val context: Context) {
                 }
                 throw error ?: IllegalStateException("تعذر تنزيل ملف التحديث")
             } catch (failure: Throwable) {
-                sink?.error("UPDATE_FAILED", failure.message ?: "تعذر تنزيل أو تثبيت التحديث", null)
-                sink?.endOfStream()
+                emitFailure(sink, failure)
             }
         }
         thread.name = "hadir-updater"
@@ -123,7 +140,7 @@ class UpdateInstaller(private val context: Context) {
                             val speed = downloaded.toDouble() / elapsed.toDouble()
                             val eta = if (total > 0 && speed > 0) ((total - downloaded).coerceAtLeast(0) / speed).toLong() else null
                             val percent = if (total > 0) ((downloaded * 100L) / total).coerceIn(0L, 99L).toInt() else -1
-                            sink?.success(mapOf(
+                            emitProgress(sink, mapOf(
                                 "downloadedBytes" to downloaded,
                                 "totalBytes" to total,
                                 "percent" to percent,
