@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/api.dart';
 import '../../../core/hadir_time.dart';
 import '../../../core/session.dart';
+import '../attendance_report_presentation.dart';
 
 /// Read-only reporting surface shared by the web site and Flutter.
 /// Attendance mutations remain exclusively in the central attendance engine.
@@ -52,32 +53,10 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
     return '${minutes ~/ 60}س ${minutes % 60}د';
   }
 
-  String _statusLabel(String status) => const <String, String>{
-        'PRESENT': 'حاضر',
-        'LATE': 'متأخر',
-        'ABSENT': 'غياب',
-        'LEAVE': 'إجازة',
-        'PERMISSION': 'استئذان',
-        'REST': 'راحة',
-        'ESCAPED': 'هروب',
-        'NOT_STARTED': 'لم يبدأ',
-        'INVALID': 'غير صالح',
-        'OPEN': 'انصراف معلق',
-      }[status] ?? status;
+  String _displayStatus(Map<String, dynamic> row) =>
+      attendanceReportStatusLabel(row);
 
-  String _displayStatus(Map<String, dynamic> row) {
-    final status = '${row['status'] ?? ''}';
-    return _statusLabel(status == 'OPEN' ? 'PRESENT' : status);
-  }
-
-  String _note(Map<String, dynamic> row) {
-    final status = '${row['status'] ?? ''}';
-    final exceptionCode = '${row['exceptionCode'] ?? ''}'.trim();
-    if (status == 'OPEN' || exceptionCode == 'MISSING_CHECKOUT') {
-      return 'انصراف معلق';
-    }
-    return exceptionCode.isEmpty ? '—' : exceptionCode;
-  }
+  String _note(Map<String, dynamic> row) => attendanceReportNote(row);
 
   String _clock(dynamic value) {
     if (value == null || '$value'.trim().isEmpty) return '—';
@@ -86,13 +65,19 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
     return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
+  List<Map<String, dynamic>> get _allRows => _list(_report['rows']);
+
   List<Map<String, dynamic>> get _rows {
-    final rows = _list(_report['rows']);
-    return rows.where((row) {
-      final status = '${row['status'] ?? ''}';
+    return _allRows.where((row) {
+      final status = attendanceReportStatus(row);
       if (_status != 'ALL' && status != _status) return false;
       if (!_exceptionsOnly) return true;
-      return const <String>{'LATE', 'ABSENT', 'ESCAPED', 'OPEN'}.contains(status) ||
+      return const <String>{
+            'LATE',
+            'ABSENT',
+            'ESCAPED',
+            'MISSING_CHECKOUT',
+          }.contains(status) ||
           _int(row['lateMinutes']) > 0 ||
           _int(row['earlyLeaveMinutes']) > 0 ||
           _int(row['overtimeMinutes']) > 0 ||
@@ -305,7 +290,11 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
                       DropdownMenuItem(value: 'LEAVE', child: Text('إجازة')),
                       DropdownMenuItem(value: 'PERMISSION', child: Text('استئذان')),
                       DropdownMenuItem(value: 'REST', child: Text('راحة')),
-                      DropdownMenuItem(value: 'OPEN', child: Text('انصراف معلق')),
+                      DropdownMenuItem(value: 'ESCAPED', child: Text('هروب')),
+                       DropdownMenuItem(value: 'NOT_STARTED', child: Text('لم يبدأ')),
+                       DropdownMenuItem(value: 'MISSING_CHECKOUT', child: Text('انصراف معلق')),
+                       DropdownMenuItem(value: 'INVALID', child: Text('غير صالح')),
+                       DropdownMenuItem(value: 'HOLIDAY', child: Text('عطلة رسمية')),
                     ],
                     onChanged: (value) => setState(() => _status = value ?? 'ALL'),
                   ),
@@ -446,20 +435,51 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
   }
 
   Future<void> _shareCsv() async {
-    if (_rows.isEmpty) return;
+    final rows = _allRows;
+    if (rows.isEmpty) return;
     setState(() => _exporting = true);
     try {
-      final buffer = StringBuffer('التاريخ,الموظف,الرقم الوظيفي,الحالة,ملاحظات,الحضور,الانصراف,الساعات,التأخر,المبكر,الإضافي,الاستثناء\n');
-      String quote(dynamic value) => '"${'${value ?? ''}'.replaceAll('"', '""')}"';
-      for (final row in _rows) {
+      final buffer = StringBuffer();
+      String quote(dynamic value) =>
+          '"${'${value ?? ''}'.replaceAll('"', '""')}"';
+      buffer.writeln([
+        'التاريخ',
+        'الموظف',
+        'الرقم الوظيفي',
+        'الحالة',
+        'الحضور',
+        'الانصراف',
+        'العمل',
+        'التأخر',
+        'الانصراف المبكر',
+        'الإضافي',
+        'الملاحظات',
+      ].map(quote).join(','));
+      for (final row in rows) {
         buffer.writeln([
-          row['attendanceDay'], row['employeeName'], row['jobNumber'], _displayStatus(row), _note(row),
-          _clock(row['checkInAt']), _clock(row['checkOutAt']), _minutes(row['workedMinutes']), row['lateMinutes'] ?? 0,
-          row['earlyLeaveMinutes'] ?? 0, row['overtimeMinutes'] ?? 0, row['exceptionCode'] ?? '',
+          row['attendanceDay'],
+          row['employeeName'],
+          row['jobNumber'],
+          _displayStatus(row),
+          _clock(row['checkInAt']),
+          _clock(row['checkOutAt']),
+          _minutes(row['workedMinutes']),
+          row['lateMinutes'] ?? 0,
+          row['earlyLeaveMinutes'] ?? 0,
+          row['overtimeMinutes'] ?? 0,
+          row['notes'] ?? _note(row),
         ].map(quote).join(','));
       }
+      final fileName =
+          'HADIR-attendance-${_date(_from)}-${_date(_to)}.csv';
       await SharePlus.instance.share(ShareParams(
-        files: [XFile.fromData(Uint8List.fromList(utf8.encode(buffer.toString())), mimeType: 'text/csv', name: 'hadir-attendance.csv')],
+        files: [
+          XFile.fromData(
+            Uint8List.fromList(utf8.encode('\uFEFF${buffer.toString()}')),
+            mimeType: 'text/csv',
+            name: fileName,
+          ),
+        ],
         text: 'تقرير حاضر ${_date(_from)} → ${_date(_to)}',
       ));
     } finally {
@@ -468,30 +488,183 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
   }
 
   Future<void> _shareExcel() async {
-    if (_rows.isEmpty) return;
+    final rows = _allRows;
+    if (rows.isEmpty) return;
     setState(() => _exporting = true);
     try {
       final excel = Excel.createExcel();
-      final sheet = excel['تقرير الحضور'];
-      const headers = <String>['التاريخ', 'الموظف', 'الرقم الوظيفي', 'الحالة', 'ملاحظات', 'الحضور', 'الانصراف', 'الساعات', 'التأخر', 'المبكر', 'الإضافي', 'الاستثناء'];
-      for (var column = 0; column < headers.length; column++) {
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: column, rowIndex: 0)).value = TextCellValue(headers[column]);
-      }
-      for (var index = 0; index < _rows.length; index++) {
-        final row = _rows[index];
-        final values = <String>[
-          '${row['attendanceDay'] ?? ''}', '${row['employeeName'] ?? ''}', '${row['jobNumber'] ?? ''}', _displayStatus(row), _note(row),
-          _clock(row['checkInAt']), _clock(row['checkOutAt']), _minutes(row['workedMinutes']), '${row['lateMinutes'] ?? 0}',
-          '${row['earlyLeaveMinutes'] ?? 0}', '${row['overtimeMinutes'] ?? 0}', '${row['exceptionCode'] ?? ''}',
-        ];
-        for (var column = 0; column < values.length; column++) {
-          sheet.cell(CellIndex.indexByColumnRow(columnIndex: column, rowIndex: index + 1)).value = TextCellValue(values[column]);
+      excel.rename('Sheet1', 'لوحة التحكم');
+      final headerStyle = CellStyle(
+        backgroundColorHex: '#173F5F',
+        fontColorHex: '#FFFFFF',
+        bold: true,
+        horizontalAlign: HorizontalAlign.Center,
+        verticalAlign: VerticalAlign.Center,
+        wrap: TextWrapping.WrapText,
+      );
+
+      void writeSheet(String name, List<List<String>> values) {
+        final sheet = excel[name];
+        sheet.isRTL = true;
+        for (var rowIndex = 0; rowIndex < values.length; rowIndex++) {
+          for (var columnIndex = 0;
+              columnIndex < values[rowIndex].length;
+              columnIndex++) {
+            final cell = sheet.cell(CellIndex.indexByColumnRow(
+              columnIndex: columnIndex,
+              rowIndex: rowIndex,
+            ));
+            cell.value = TextCellValue(values[rowIndex][columnIndex]);
+            if (rowIndex == 0) cell.cellStyle = headerStyle;
+          }
         }
       }
+
+      final summary = _summary;
+      final days = _int(_report['days']);
+      final reportType = days == 1 ? 'يومي' : days <= 31 ? 'شهري' : 'سنوي';
+      final attendanceRate = summary['attendanceRate'] is num
+          ? (summary['attendanceRate'] as num).toStringAsFixed(1)
+          : '${summary['attendanceRate'] ?? 0}';
+      final punctualityRate = summary['punctualityRate'] is num
+          ? (summary['punctualityRate'] as num).toStringAsFixed(1)
+          : '${summary['punctualityRate'] ?? 0}';
+
+      writeSheet('لوحة التحكم', [
+        ['حاضر · تقرير الحضور والانصراف'],
+        ['الفترة', '${_date(_from)} → ${_date(_to)}'],
+        ['نوع التقرير', reportType],
+        ['تاريخ إنشاء التقرير', '${_report['generatedAt'] ?? '—'}'],
+        ['عدد الموظفين', '${summary['employees'] ?? _summaries.length}'],
+        ['سجلات الموظف/اليوم', '${summary['employeeDays'] ?? rows.length}'],
+        ['نسبة الحضور', '$attendanceRate%'],
+        ['الانضباط', '$punctualityRate%'],
+        ['حاضر', '${summary['present'] ?? 0}'],
+        ['متأخر', '${summary['late'] ?? 0}'],
+        ['غياب', '${summary['absent'] ?? 0}'],
+        ['انصراف معلق', '${summary['open'] ?? 0}'],
+        ['إجازة', '${summary['leave'] ?? 0}'],
+        ['استئذان', '${summary['permission'] ?? 0}'],
+        ['راحة', '${summary['rest'] ?? 0}'],
+        ['هروب', '${summary['escaped'] ?? 0}'],
+        ['ساعات العمل', _minutes(summary['workedMinutes'])],
+        ['الساعات المتوقعة', _minutes(summary['expectedMinutes'])],
+        ['دقائق التأخر', '${summary['lateMinutes'] ?? 0}'],
+        ['الانصراف المبكر', '${summary['earlyLeaveMinutes'] ?? 0}'],
+        ['العمل الإضافي', '${summary['overtimeMinutes'] ?? 0}'],
+      ]);
+
+      final employeeRows = _summaries.map((employee) => <String>[
+            '${employee['employeeName'] ?? '—'}',
+            '${employee['jobNumber'] ?? '—'}',
+            '${employee['days'] ?? 0}',
+            '${employee['present'] ?? 0}',
+            '${employee['late'] ?? 0}',
+            '${employee['absent'] ?? 0}',
+            '${employee['leave'] ?? 0}',
+            '${employee['permission'] ?? 0}',
+            '${employee['rest'] ?? 0}',
+            '${employee['escaped'] ?? 0}',
+            '${employee['open'] ?? 0}',
+            _minutes(employee['workedMinutes']),
+            '${employee['lateMinutes'] ?? 0}',
+            '${employee['earlyLeaveMinutes'] ?? 0}',
+            '${employee['overtimeMinutes'] ?? 0}',
+          ]).toList();
+      writeSheet('ملخص الموظفين', [
+        [
+          'الموظف',
+          'الرقم الوظيفي',
+          'أيام التقرير',
+          'حاضر',
+          'متأخر',
+          'غياب',
+          'إجازة',
+          'استئذان',
+          'راحة',
+          'هروب',
+          'انصراف معلق',
+          'ساعات العمل',
+          'دقائق التأخر',
+          'دقائق الانصراف المبكر',
+          'إضافي',
+        ],
+        ...employeeRows,
+      ]);
+
+      final dailyRows = rows.map((row) => <String>[
+            '${row['attendanceDay'] ?? '—'}',
+            '${row['employeeName'] ?? '—'}',
+            '${row['jobNumber'] ?? '—'}',
+            _displayStatus(row),
+            _clock(row['checkInAt']),
+            _clock(row['checkOutAt']),
+            _minutes(row['workedMinutes']),
+            '${row['lateMinutes'] ?? 0}',
+            '${row['earlyLeaveMinutes'] ?? 0}',
+            '${row['overtimeMinutes'] ?? 0}',
+            '${row['notes'] ?? _note(row)}',
+          ]).toList();
+      writeSheet('السجل اليومي', [
+        [
+          'التاريخ',
+          'الموظف',
+          'الرقم الوظيفي',
+          'الحالة',
+          'الحضور',
+          'الانصراف',
+          'العمل',
+          'التأخر',
+          'الانصراف المبكر',
+          'الإضافي',
+          'الملاحظات',
+        ],
+        ...dailyRows,
+      ]);
+
+      final absenceRows = rows
+          .where((row) => '${row['status'] ?? ''}' == 'ABSENT')
+          .map((row) => <String>[
+                '${row['attendanceDay'] ?? '—'}',
+                '${row['employeeName'] ?? '—'}',
+                '${row['jobNumber'] ?? '—'}',
+                'غياب',
+                '${row['notes'] ?? _note(row)}',
+              ])
+          .toList();
+      writeSheet('أيام الغياب', [
+        ['التاريخ', 'الموظف', 'الرقم الوظيفي', 'الحالة', 'التفصيل'],
+        ...absenceRows,
+      ]);
+
+      writeSheet('التحليل التنفيذي', [
+        ['الحالة', 'العدد'],
+        ['حاضر', '${summary['present'] ?? 0}'],
+        ['متأخر', '${summary['late'] ?? 0}'],
+        ['غياب', '${summary['absent'] ?? 0}'],
+        ['إجازة', '${summary['leave'] ?? 0}'],
+        ['استئذان', '${summary['permission'] ?? 0}'],
+        ['راحة', '${summary['rest'] ?? 0}'],
+        ['هروب', '${summary['escaped'] ?? 0}'],
+        ['انصراف معلق', '${summary['open'] ?? 0}'],
+        ['غير صالح', '${summary['invalid'] ?? 0}'],
+        ['لم يبدأ', '${summary['notStarted'] ?? 0}'],
+      ]);
+
+      excel.setDefaultSheet('لوحة التحكم');
       final bytes = excel.encode();
       if (bytes == null) throw StateError('تعذر إنشاء ملف Excel.');
+      final fileName =
+          'HADIR-attendance-${_date(_from)}-${_date(_to)}.xlsx';
       await SharePlus.instance.share(ShareParams(
-        files: [XFile.fromData(Uint8List.fromList(bytes), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', name: 'hadir-attendance.xlsx')],
+        files: [
+          XFile.fromData(
+            Uint8List.fromList(bytes),
+            mimeType:
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            name: fileName,
+          ),
+        ],
         text: 'تقرير حاضر ${_date(_from)} → ${_date(_to)}',
       ));
     } finally {
@@ -500,35 +673,77 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
   }
 
   Future<void> _print() async {
-    if (_rows.isEmpty) return;
+    final rows = _allRows;
+    if (rows.isEmpty) return;
     setState(() => _exporting = true);
     try {
       final regular = await PdfGoogleFonts.notoSansArabicRegular();
       final bold = await PdfGoogleFonts.notoSansArabicBold();
       final pdf = pw.Document();
-      final data = _rows.map((row) => <String>[
-            '${row['attendanceDay'] ?? '—'}', '${row['employeeName'] ?? '—'}', _displayStatus(row), _note(row),
-            _clock(row['checkInAt']), _clock(row['checkOutAt']), _minutes(row['workedMinutes']), '${row['lateMinutes'] ?? 0}',
-            '${row['earlyLeaveMinutes'] ?? 0}', '${row['overtimeMinutes'] ?? 0}',
+      final summary = _summary;
+      final isDaily = _int(_report['days']) == 1;
+      final data = rows.map((row) => <String>[
+            '${row['attendanceDay'] ?? '—'}',
+            '${row['employeeName'] ?? '—'}',
+            _displayStatus(row),
+            _clock(row['checkInAt']),
+            _clock(row['checkOutAt']),
+            _minutes(row['workedMinutes']),
+            '${row['lateMinutes'] ?? 0}',
+            '${row['earlyLeaveMinutes'] ?? 0}',
+            '${row['overtimeMinutes'] ?? 0}',
+            '${row['notes'] ?? _note(row)}',
           ]).toList();
       pdf.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
         textDirection: pw.TextDirection.rtl,
         build: (_) => [
-          pw.Text('HADIR / حاضر · تقرير الحضور', style: pw.TextStyle(font: bold, fontSize: 18)),
+          pw.Text(
+            isDaily
+                ? 'HADIR / حاضر · التقرير اليومي الرسمي للحضور والانصراف'
+                : 'HADIR / حاضر · تقرير الحضور والانصراف للفترة',
+            style: pw.TextStyle(font: bold, fontSize: 18),
+          ),
           pw.SizedBox(height: 6),
-          pw.Text('${_date(_from)} → ${_date(_to)}', style: pw.TextStyle(font: regular, fontSize: 10)),
+          pw.Text(
+            '${_date(_from)} → ${_date(_to)} · المنطقة الزمنية: ${_report['timezone'] ?? '—'}',
+            style: pw.TextStyle(font: regular, fontSize: 10),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'الموظفون: ${summary['employees'] ?? 0}  |  حاضر: ${summary['present'] ?? 0}  |  متأخر: ${summary['late'] ?? 0}  |  غياب: ${summary['absent'] ?? 0}  |  انصراف معلق: ${summary['open'] ?? 0}',
+            style: pw.TextStyle(font: bold, fontSize: 9),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'ساعات العمل: ${_minutes(summary['workedMinutes'])}  |  التأخر: ${summary['lateMinutes'] ?? 0} د  |  الانصراف المبكر: ${summary['earlyLeaveMinutes'] ?? 0} د  |  الإضافي: ${summary['overtimeMinutes'] ?? 0} د',
+            style: pw.TextStyle(font: regular, fontSize: 8),
+          ),
           pw.SizedBox(height: 10),
           pw.TableHelper.fromTextArray(
             data: data,
-            headers: const ['التاريخ', 'الموظف', 'الحالة', 'ملاحظات', 'الحضور', 'الانصراف', 'الساعات', 'التأخر', 'المبكر', 'الإضافي'],
+            headers: const [
+              'التاريخ',
+              'الموظف',
+              'الحالة',
+              'الحضور',
+              'الانصراف',
+              'العمل',
+              'التأخر',
+              'الانصراف المبكر',
+              'الإضافي',
+              'الملاحظات',
+            ],
             headerStyle: pw.TextStyle(font: bold, fontSize: 7),
             cellStyle: pw.TextStyle(font: regular, fontSize: 7),
             tableDirection: pw.TextDirection.rtl,
           ),
         ],
       ));
-      await Printing.layoutPdf(name: 'hadir-report-${_date(_from)}-${_date(_to)}.pdf', onLayout: (_) => pdf.save());
+      await Printing.layoutPdf(
+        name: 'HADIR-attendance-${_date(_from)}-${_date(_to)}.pdf',
+        onLayout: (_) => pdf.save(),
+      );
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
