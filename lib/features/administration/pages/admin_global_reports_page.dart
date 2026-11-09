@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart' show Options, ResponseType;
 import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
@@ -849,7 +850,6 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: pw.EdgeInsets.all(6 * PdfPageFormat.mm),
-          textDirection: pw.TextDirection.rtl,
           build: (_) => [
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.center,
