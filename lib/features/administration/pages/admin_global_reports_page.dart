@@ -824,7 +824,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
           final employeeId = '${row['employeeId'] ?? ''}';
           Map<String, dynamic>? employee;
           for (final candidate in _employees) {
-            if ('${candidate['id'] ?? ''}' == employeeId) {
+            if ('${candidate['id'] ?? candidate['employeeId'] ?? ''}' == employeeId) {
               employee = candidate;
               break;
             }
@@ -836,7 +836,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
             children: [
               cell('${index + 1}'),
               cell(specialty),
-              cell('${row['employeeName'] ?? '—'}', emphasize: true),
+              cell('${row['employeeName'] ?? row['name'] ?? '—'}', emphasize: true),
               statusCell(row),
               cell(_clock(row['checkInAt'])),
               cell(_clock(row['checkOutAt'])),
