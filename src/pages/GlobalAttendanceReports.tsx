@@ -462,6 +462,7 @@ export default function GlobalAttendanceReports() {
       dailyRows: rows.map((row) => ({
         employee: row.employeeName,
         jobNumber: row.jobNumber,
+        specialty: row.attendanceSource,
         date: row.attendanceDay,
         day: row.attendanceDay,
         status: labels[reportStatus(row)] || reportStatus(row),
@@ -478,6 +479,7 @@ export default function GlobalAttendanceReports() {
         .map((row) => ({
           employee: row.employeeName,
           jobNumber: row.jobNumber,
+          specialty: row.attendanceSource,
           date: row.attendanceDay,
           day: row.attendanceDay,
           status: "غياب",
