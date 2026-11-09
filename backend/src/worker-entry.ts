@@ -373,7 +373,7 @@ export default {
       ).first<{ value: string }>();
       let country = "";
       try {
-        country = String(JSON.parse(String(setting?.value || '\\"\\"')) || "")
+        country = String(JSON.parse(String(setting?.value || '\"\"')) || "")
           .trim()
           .toUpperCase();
       } catch {
