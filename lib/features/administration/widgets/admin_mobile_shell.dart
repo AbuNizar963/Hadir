@@ -76,12 +76,7 @@ class AdminMobileShell extends StatelessWidget {
 
     return Container(
       constraints: const BoxConstraints(minHeight: 72),
-      padding: EdgeInsets.fromLTRB(
-        compact ? 8 : 12,
-        7,
-        compact ? 8 : 12,
-        7,
-      ),
+      padding: EdgeInsets.fromLTRB(compact ? 8 : 12, 7, compact ? 8 : 12, 7),
       decoration: BoxDecoration(
         color: scheme.surface.withValues(alpha: .96),
         border: Border(
@@ -166,46 +161,18 @@ class AdminMobileShell extends StatelessWidget {
   Widget _navigation(BuildContext context, int selected) {
     final scheme = Theme.of(context).colorScheme;
     final items = const [
-      (
-        Icons.dashboard_outlined,
-        Icons.dashboard_rounded,
-        'لوحة التحكم',
-      ),
-      (
-        Icons.groups_outlined,
-        Icons.groups_rounded,
-        'الموظفون',
-      ),
+      (Icons.dashboard_outlined, Icons.dashboard_rounded, 'لوحة التحكم'),
+      (Icons.groups_outlined, Icons.groups_rounded, 'الموظفون'),
       (
         Icons.assignment_ind_outlined,
         Icons.assignment_ind_rounded,
         'قوى العمل',
       ),
-      (
-        Icons.assignment_outlined,
-        Icons.assignment_rounded,
-        'الطلبات',
-      ),
-      (
-        Icons.fact_check_outlined,
-        Icons.fact_check_rounded,
-        'التدقيق',
-      ),
-      (
-        Icons.bar_chart_outlined,
-        Icons.bar_chart_rounded,
-        'التقارير',
-      ),
-      (
-        Icons.archive_outlined,
-        Icons.archive_rounded,
-        'أرشيف التقارير',
-      ),
-      (
-        Icons.settings_outlined,
-        Icons.settings_rounded,
-        'الإعدادات',
-      ),
+      (Icons.assignment_outlined, Icons.assignment_rounded, 'الطلبات'),
+      (Icons.fact_check_outlined, Icons.fact_check_rounded, 'التدقيق'),
+      (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'التقارير'),
+      (Icons.archive_outlined, Icons.archive_rounded, 'أرشيف التقارير'),
+      (Icons.settings_outlined, Icons.settings_rounded, 'الإعدادات'),
     ];
 
     return Container(
@@ -233,10 +200,7 @@ class AdminMobileShell extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               constraints: const BoxConstraints(minWidth: 82),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 3,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: active
                     ? scheme.primary.withValues(alpha: .13)
@@ -294,13 +258,9 @@ class AdminMobileShell extends StatelessWidget {
         padding: EdgeInsets.zero,
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        side: BorderSide(
-          color: scheme.outlineVariant.withValues(alpha: .85),
-        ),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .85)),
         backgroundColor: scheme.surface.withValues(alpha: .55),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -435,46 +395,44 @@ class AdminMobileShell extends StatelessWidget {
   }
 
   Widget _themeSelector(BuildContext context) => AnimatedBuilder(
-        animation: HadirThemeController.instance,
-        builder: (context, _) {
-          final scheme = Theme.of(context).colorScheme;
-          final controller = HadirThemeController.instance;
+    animation: HadirThemeController.instance,
+    builder: (context, _) {
+      final scheme = Theme.of(context).colorScheme;
+      final controller = HadirThemeController.instance;
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: DropdownButtonFormField<ThemeMode>(
-              initialValue: controller.mode,
-              decoration: InputDecoration(
-                labelText: 'مظهر التطبيق',
-                prefixIcon: const Icon(Icons.brightness_6_outlined),
-                filled: true,
-                fillColor: scheme.surfaceContainerHighest.withValues(
-                  alpha: .45,
-                ),
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: ThemeMode.system,
-                  child: Text('تلقائي حسب الجهاز'),
-                ),
-                DropdownMenuItem(
-                  value: ThemeMode.light,
-                  child: Text('الوضع الفاتح'),
-                ),
-                DropdownMenuItem(
-                  value: ThemeMode.dark,
-                  child: Text('الوضع الداكن'),
-                ),
-              ],
-              onChanged: (mode) {
-                if (mode != null) {
-                  controller.setMode(mode);
-                }
-              },
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: DropdownButtonFormField<ThemeMode>(
+          initialValue: controller.mode,
+          decoration: InputDecoration(
+            labelText: 'مظهر التطبيق',
+            prefixIcon: const Icon(Icons.brightness_6_outlined),
+            filled: true,
+            fillColor: scheme.surfaceContainerHighest.withValues(alpha: .45),
+          ),
+          items: const [
+            DropdownMenuItem(
+              value: ThemeMode.system,
+              child: Text('تلقائي حسب الجهاز'),
             ),
-          );
-        },
+            DropdownMenuItem(
+              value: ThemeMode.light,
+              child: Text('الوضع الفاتح'),
+            ),
+            DropdownMenuItem(
+              value: ThemeMode.dark,
+              child: Text('الوضع الداكن'),
+            ),
+          ],
+          onChanged: (mode) {
+            if (mode != null) {
+              controller.setMode(mode);
+            }
+          },
+        ),
       );
+    },
+  );
 
   Widget _optionTile(
     BuildContext context,
@@ -498,17 +456,11 @@ class AdminMobileShell extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: TextStyle(
-          color: scheme.onSurface,
-          fontWeight: FontWeight.w900,
-        ),
+        style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w900),
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(
-          color: scheme.onSurfaceVariant,
-          fontSize: 10.5,
-        ),
+        style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10.5),
       ),
       trailing: Icon(
         Icons.chevron_left_rounded,
@@ -519,9 +471,7 @@ class AdminMobileShell extends StatelessWidget {
 
         if (route == '/notifications') {
           Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const _AdminNotificationsPage(),
-            ),
+            MaterialPageRoute(builder: (_) => const _AdminNotificationsPage()),
           );
         } else {
           context.push(route);

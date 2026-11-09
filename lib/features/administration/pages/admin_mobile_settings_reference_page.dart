@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../../core/api.dart';
 import '../../../core/hadir_brand.dart';
 import '../../../core/session.dart';
@@ -148,10 +149,11 @@ class _AdminMobileSettingsReferencePageState
     try {
       final picker = ImagePicker();
       final image = await picker.pickImage(
-          source: ImageSource.gallery,
-          maxWidth: 1024,
-          maxHeight: 1024,
-          imageQuality: 88);
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 88,
+      );
       if (image == null || !mounted) return;
       setState(() => pendingLogoPath = image.path);
     } catch (e) {
@@ -185,8 +187,10 @@ class _AdminMobileSettingsReferencePageState
 
   Future<void> removeCompanyLogo() async {
     if (logoBusy) return;
-    final confirmed = await confirm('إزالة شعار الشركة',
-        'سيتم إزالة الشعار المركزي من R2 وإخفاؤه من هوية الجهة.');
+    final confirmed = await confirm(
+      'إزالة شعار الشركة',
+      'سيتم إزالة الشعار المركزي من R2 وإخفاؤه من هوية الجهة.',
+    );
     if (!confirmed) return;
     setState(() => logoBusy = true);
     try {
@@ -230,8 +234,10 @@ class _AdminMobileSettingsReferencePageState
         backgroundColor: inner,
         title: Text(
           title,
-          style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
         ),
         content: Text(message, style: const TextStyle(color: muted)),
         actions: [
@@ -250,152 +256,152 @@ class _AdminMobileSettingsReferencePageState
   }
 
   InputDecoration input(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: muted),
-        filled: true,
-        fillColor: const Color(0xFF070C16),
-        border: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-          borderSide: BorderSide(color: line),
-        ),
-        enabledBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-          borderSide: BorderSide(color: line),
-        ),
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
-          borderSide: BorderSide(color: green),
-        ),
-      );
+    hintText: hint,
+    hintStyle: const TextStyle(color: muted),
+    filled: true,
+    fillColor: const Color(0xFF070C16),
+    border: const OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+      borderSide: BorderSide(color: line),
+    ),
+    enabledBorder: const OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+      borderSide: BorderSide(color: line),
+    ),
+    focusedBorder: const OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+      borderSide: BorderSide(color: green),
+    ),
+  );
 
   Widget eyebrow(String text, {Color color = green}) => Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.2,
-          fontFamily: 'monospace',
-        ),
-      );
+    text,
+    style: TextStyle(
+      color: color,
+      fontSize: 10,
+      fontWeight: FontWeight.w900,
+      letterSpacing: 1.2,
+      fontFamily: 'monospace',
+    ),
+  );
 
   Widget iconBox(IconData icon, {Color color = green}) => Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: .10),
-          borderRadius: BorderRadius.circular(13),
-        ),
-        child: Icon(icon, color: color, size: 21),
-      );
+    width: 42,
+    height: 42,
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .10),
+      borderRadius: BorderRadius.circular(13),
+    ),
+    child: Icon(icon, color: color, size: 21),
+  );
 
   Widget box(Widget child, {Color border = line}) => Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: card,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: border),
-        ),
-        child: child,
-      );
+    padding: const EdgeInsets.all(15),
+    decoration: BoxDecoration(
+      color: card,
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: border),
+    ),
+    child: child,
+  );
 
-  Widget sectionHead(String title, String subtitle, IconData icon,
-          {Color color = green}) =>
-      Row(
-        children: [
-          iconBox(icon, color: color),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: muted, fontSize: 9.5),
-                ),
-              ],
+  Widget sectionHead(
+    String title,
+    String subtitle,
+    IconData icon, {
+    Color color = green,
+  }) => Row(
+    children: [
+      iconBox(icon, color: color),
+      const SizedBox(width: 9),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-        ],
-      );
+            Text(subtitle, style: const TextStyle(color: muted, fontSize: 9.5)),
+          ],
+        ),
+      ),
+    ],
+  );
 
   Widget pageHeader(String title, String subtitle, IconData icon) => Row(
-        children: [
-          IconButton(
-            onPressed: () => setState(() => view = SettingsRefView.home),
-            icon: const Icon(Icons.chevron_right_rounded, color: muted),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: muted, fontSize: 10),
-                ),
-              ],
+    children: [
+      IconButton(
+        onPressed: () => setState(() => view = SettingsRefView.home),
+        icon: const Icon(Icons.chevron_right_rounded, color: muted),
+      ),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-          const SizedBox(width: 9),
-          iconBox(icon),
-        ],
-      );
+            Text(subtitle, style: const TextStyle(color: muted, fontSize: 10)),
+          ],
+        ),
+      ),
+      const SizedBox(width: 9),
+      iconBox(icon),
+    ],
+  );
 
   Widget _modernHome() {
     final scheme = Theme.of(context).colorScheme;
     final brandName = '${settings['brandName'] ?? 'HADIR'}'.trim();
-    final categories = <({
-      String code,
-      String title,
-      String subtitle,
-      IconData icon,
-      SettingsRefView target,
-    })>[
-      (
-        code: '01',
-        title: 'الملف الشخصي للشركة',
-        subtitle: 'الهوية والتخصصات والمنطقة الزمنية والعطل',
-        icon: Icons.business_outlined,
-        target: SettingsRefView.identity
-      ),
-      (
-        code: '02',
-        title: 'مواقع الدوام',
-        subtitle: 'المقر والفروع ونطاق GPS ورموز QR',
-        icon: Icons.location_on_outlined,
-        target: SettingsRefView.locations
-      ),
-      (
-        code: '03',
-        title: 'إدارة الموظفين',
-        subtitle: 'الصلاحيات والسياسات والعمليات الجماعية',
-        icon: Icons.groups_outlined,
-        target: SettingsRefView.security
-      ),
-      (
-        code: '05',
-        title: 'صيانة النظام',
-        subtitle: 'التشخيص وإعادة التهيئة وحالة الخادم',
-        icon: Icons.health_and_safety_outlined,
-        target: SettingsRefView.diagnostics
-      ),
-    ];
+    final categories =
+        <
+          ({
+            String code,
+            String title,
+            String subtitle,
+            IconData icon,
+            SettingsRefView target,
+          })
+        >[
+          (
+            code: '01',
+            title: 'الملف الشخصي للشركة',
+            subtitle: 'الهوية والتخصصات والمنطقة الزمنية والعطل',
+            icon: Icons.business_outlined,
+            target: SettingsRefView.identity,
+          ),
+          (
+            code: '02',
+            title: 'مواقع الدوام',
+            subtitle: 'المقر والفروع ونطاق GPS ورموز QR',
+            icon: Icons.location_on_outlined,
+            target: SettingsRefView.locations,
+          ),
+          (
+            code: '03',
+            title: 'إدارة الموظفين',
+            subtitle: 'الصلاحيات والسياسات والعمليات الجماعية',
+            icon: Icons.groups_outlined,
+            target: SettingsRefView.security,
+          ),
+          (
+            code: '05',
+            title: 'صيانة النظام',
+            subtitle: 'التشخيص وإعادة التهيئة وحالة الخادم',
+            icon: Icons.health_and_safety_outlined,
+            target: SettingsRefView.diagnostics,
+          ),
+        ];
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 92),
       children: [
@@ -404,8 +410,9 @@ class _AdminMobileSettingsReferencePageState
           decoration: BoxDecoration(
             color: scheme.surface,
             borderRadius: BorderRadius.circular(22),
-            border:
-                Border.all(color: scheme.outlineVariant.withValues(alpha: .72)),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: .72),
+            ),
           ),
           child: Row(
             children: [
@@ -419,14 +426,19 @@ class _AdminMobileSettingsReferencePageState
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: (settings['brandLogo']?.toString().trim().isNotEmpty ??
+                  child:
+                      (settings['brandLogo']?.toString().trim().isNotEmpty ??
                           false)
-                      ? Image.network(settings['brandLogo'].toString(),
+                      ? Image.network(
+                          settings['brandLogo'].toString(),
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => Image.asset(
-                              'assets/branding/hadir_logo_transparent.png'))
+                            'assets/branding/hadir_logo_transparent.png',
+                          ),
+                        )
                       : Image.asset(
-                          'assets/branding/hadir_logo_transparent.png'),
+                          'assets/branding/hadir_logo_transparent.png',
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -434,46 +446,65 @@ class _AdminMobileSettingsReferencePageState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('HADIR · OWNER',
-                        style: TextStyle(
-                            color: scheme.primary,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.1)),
+                    Text(
+                      'HADIR · OWNER',
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text('الإعدادات',
-                        style: TextStyle(
-                            color: scheme.onSurface,
-                            fontSize: 25,
-                            fontWeight: FontWeight.w900)),
+                    Text(
+                      'الإعدادات',
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                     const SizedBox(height: 3),
-                    Text(brandName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: scheme.onSurfaceVariant, fontSize: 11)),
+                    Text(
+                      brandName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
                   ],
                 ),
               ),
               IconButton(
-                  onPressed: loading ? null : () => load(withAdmins: true),
-                  icon: Icon(Icons.refresh_rounded,
-                      color: scheme.onSurfaceVariant)),
+                onPressed: loading ? null : () => load(withAdmins: true),
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        Text('تنظيم النظام',
-            style: TextStyle(
-                color: scheme.onSurfaceVariant,
-                fontSize: 11,
-                fontWeight: FontWeight.w800)),
+        Text(
+          'تنظيم النظام',
+          style: TextStyle(
+            color: scheme.onSurfaceVariant,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         const SizedBox(height: 7),
-        Text('اختر قسمًا لإدارة إعدادات حاضر',
-            style: TextStyle(
-                color: scheme.onSurface,
-                fontSize: 18,
-                fontWeight: FontWeight.w900)),
+        Text(
+          'اختر قسمًا لإدارة إعدادات حاضر',
+          style: TextStyle(
+            color: scheme.onSurface,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
         const SizedBox(height: 10),
         for (final category in categories) ...[
           _modernCategoryCard(category, scheme),
@@ -484,20 +515,26 @@ class _AdminMobileSettingsReferencePageState
         Container(
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: .08),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: scheme.primary.withValues(alpha: .18))),
-          child: Row(children: [
-            Icon(Icons.info_outline_rounded, color: scheme.primary, size: 19),
-            const SizedBox(width: 9),
-            Expanded(
+            color: scheme.primary.withValues(alpha: .08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: scheme.primary.withValues(alpha: .18)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: scheme.primary, size: 19),
+              const SizedBox(width: 9),
+              Expanded(
                 child: Text(
-                    'تُحفظ التغييرات من زر الحفظ الثابت أسفل الشاشة. بعض الأقسام تحتوي على حفظ مستقل.',
-                    style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 10.5,
-                        height: 1.5)))
-          ]),
+                  'تُحفظ التغييرات من زر الحفظ الثابت أسفل الشاشة. بعض الأقسام تحتوي على حفظ مستقل.',
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 10.5,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -512,9 +549,7 @@ class _AdminMobileSettingsReferencePageState
         decoration: BoxDecoration(
           color: scheme.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: scheme.primary.withValues(alpha: .28),
-          ),
+          border: Border.all(color: scheme.primary.withValues(alpha: .28)),
         ),
         child: Row(
           children: [
@@ -564,14 +599,16 @@ class _AdminMobileSettingsReferencePageState
   }
 
   Widget _modernCategoryCard(
-      ({
-        String code,
-        String title,
-        String subtitle,
-        IconData icon,
-        SettingsRefView target
-      }) category,
-      ColorScheme scheme) {
+    ({
+      String code,
+      String title,
+      String subtitle,
+      IconData icon,
+      SettingsRefView target,
+    })
+    category,
+    ColorScheme scheme,
+  ) {
     return InkWell(
       onTap: () {
         setState(() => view = category.target);
@@ -581,211 +618,236 @@ class _AdminMobileSettingsReferencePageState
       child: Container(
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-                color: scheme.outlineVariant.withValues(alpha: .72))),
-        child: Row(children: [
-          Container(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: .72),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(12)),
-              child: Icon(category.icon, color: scheme.primary, size: 21)),
-          const SizedBox(width: 11),
-          Expanded(
+                color: scheme.primary.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(category.icon, color: scheme.primary, size: 21),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text('${category.code} · ${category.title}',
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${category.code} · ${category.title}',
                     style: TextStyle(
-                        color: scheme.onSurface,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900)),
-                const SizedBox(height: 3),
-                Text(category.subtitle,
+                      color: scheme.onSurface,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    category.subtitle,
                     style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 10,
-                        height: 1.35))
-              ])),
-          Icon(Icons.chevron_left_rounded, color: scheme.onSurfaceVariant),
-        ]),
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 10,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_left_rounded, color: scheme.onSurfaceVariant),
+          ],
+        ),
       ),
     );
   }
 
   Widget home() => ListView(
-        padding: const EdgeInsets.fromLTRB(18, 15, 18, 86),
-        children: [
-          box(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                eyebrow('HADIR · OWNER'),
-                const SizedBox(height: 3),
-                const Text(
-                  'الإعدادات',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 27,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const Text(
-                  'إدارة النظام والهوية والمواقع والحسابات والأمان',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(color: muted, fontSize: 10.5),
-                ),
-                const SizedBox(height: 15),
-                brand(),
-              ],
-            ),
-            border: green.withValues(alpha: .22),
-          ),
-          const SizedBox(height: 10),
-          box(
-            Column(
-              children: [
-                sectionHead(
-                  'الإعدادات',
-                  'اختر القسم المطلوب لفتح صفحته',
-                  Icons.settings_outlined,
-                ),
-                homeRow(
-                  'الهوية والحسابات',
-                  'هوية الشركة وحسابات الإدارة',
-                  Icons.person_outline_rounded,
-                  SettingsRefView.identity,
-                ),
-                homeRow(
-                  'المواقع و QR',
-                  'مواقع العمل ورموز الحضور',
-                  Icons.location_on_outlined,
-                  SettingsRefView.locations,
-                ),
-                homeRow(
-                  'الأمان والصلاحيات',
-                  'الحسابات والعمليات الجماعية',
-                  Icons.person_add_alt_1_outlined,
-                  SettingsRefView.security,
-                ),
-                homeRow(
-                  'التشخيص وإعادة التهيئة',
-                  'التشخيص وإعادة ضبط البيانات',
-                  Icons.gps_fixed_outlined,
-                  SettingsRefView.diagnostics,
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-
-  Widget brand() => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: inner,
-          borderRadius: BorderRadius.circular(21),
-          border: Border.all(color: green.withValues(alpha: .18)),
-        ),
-        child: Column(
+    padding: const EdgeInsets.fromLTRB(18, 15, 18, 86),
+    children: [
+      box(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 96,
-              height: 96,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B2437),
-                shape: BoxShape.circle,
-                border:
-                    Border.all(color: green.withValues(alpha: .25), width: 2),
-              ),
-              child: ClipOval(
-                child: (settings['brandLogo']?.toString().trim().isNotEmpty ??
-                        false)
-                    ? Image.network(settings['brandLogo'].toString(),
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Image.asset(
-                            'assets/branding/hadir_logo_transparent.png'))
-                    : Image.asset('assets/branding/hadir_logo_transparent.png'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${settings['brandName'] ?? 'قسم شرطة الشهباء'}',
-              style: const TextStyle(
+            eyebrow('HADIR · OWNER'),
+            const SizedBox(height: 3),
+            const Text(
+              'الإعدادات',
+              textAlign: TextAlign.right,
+              style: TextStyle(
                 color: Colors.white,
-                fontSize: 20,
+                fontSize: 27,
                 fontWeight: FontWeight.w900,
               ),
             ),
             const Text(
-              'هوية الشركة · الإعدادات المركزية',
-              style: TextStyle(color: muted, fontSize: 9.5),
+              'إدارة النظام والهوية والمواقع والحسابات والأمان',
+              textAlign: TextAlign.right,
+              style: TextStyle(color: muted, fontSize: 10.5),
             ),
-            TextButton(
-              onPressed: () => setState(() => view = SettingsRefView.identity),
-              child: const Text(
-                'إدارة الهوية',
-                style: TextStyle(
-                    color: red, fontSize: 10, fontWeight: FontWeight.w900),
-              ),
+            const SizedBox(height: 15),
+            brand(),
+          ],
+        ),
+        border: green.withValues(alpha: .22),
+      ),
+      const SizedBox(height: 10),
+      box(
+        Column(
+          children: [
+            sectionHead(
+              'الإعدادات',
+              'اختر القسم المطلوب لفتح صفحته',
+              Icons.settings_outlined,
+            ),
+            homeRow(
+              'الهوية والحسابات',
+              'هوية الشركة وحسابات الإدارة',
+              Icons.person_outline_rounded,
+              SettingsRefView.identity,
+            ),
+            homeRow(
+              'المواقع و QR',
+              'مواقع العمل ورموز الحضور',
+              Icons.location_on_outlined,
+              SettingsRefView.locations,
+            ),
+            homeRow(
+              'الأمان والصلاحيات',
+              'الحسابات والعمليات الجماعية',
+              Icons.person_add_alt_1_outlined,
+              SettingsRefView.security,
+            ),
+            homeRow(
+              'التشخيص وإعادة التهيئة',
+              'التشخيص وإعادة ضبط البيانات',
+              Icons.gps_fixed_outlined,
+              SettingsRefView.diagnostics,
             ),
           ],
         ),
-      );
+      ),
+    ],
+  );
 
-  Widget homeRow(String title, String subtitle, IconData icon,
-          SettingsRefView target) =>
-      InkWell(
-        onTap: () {
-          setState(() => view = target);
-          if (target == SettingsRefView.identity) load(withAdmins: true);
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: line)),
+  Widget brand() => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: inner,
+      borderRadius: BorderRadius.circular(21),
+      border: Border.all(color: green.withValues(alpha: .18)),
+    ),
+    child: Column(
+      children: [
+        Container(
+          width: 96,
+          height: 96,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1B2437),
+            shape: BoxShape.circle,
+            border: Border.all(color: green.withValues(alpha: .25), width: 2),
           ),
-          child: Row(
-            children: [
-              iconBox(icon),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w900,
-                      ),
+          child: ClipOval(
+            child:
+                (settings['brandLogo']?.toString().trim().isNotEmpty ?? false)
+                ? Image.network(
+                    settings['brandLogo'].toString(),
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/branding/hadir_logo_transparent.png',
                     ),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(color: muted, fontSize: 9.5),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_left_rounded, color: muted),
-            ],
+                  )
+                : Image.asset('assets/branding/hadir_logo_transparent.png'),
           ),
         ),
-      );
+        const SizedBox(height: 8),
+        Text(
+          '${settings['brandName'] ?? 'قسم شرطة الشهباء'}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const Text(
+          'هوية الشركة · الإعدادات المركزية',
+          style: TextStyle(color: muted, fontSize: 9.5),
+        ),
+        TextButton(
+          onPressed: () => setState(() => view = SettingsRefView.identity),
+          child: const Text(
+            'إدارة الهوية',
+            style: TextStyle(
+              color: red,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget homeRow(
+    String title,
+    String subtitle,
+    IconData icon,
+    SettingsRefView target,
+  ) => InkWell(
+    onTap: () {
+      setState(() => view = target);
+      if (target == SettingsRefView.identity) load(withAdmins: true);
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: line)),
+      ),
+      child: Row(
+        children: [
+          iconBox(icon),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: muted, fontSize: 9.5),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_left_rounded, color: muted),
+        ],
+      ),
+    ),
+  );
 
   Widget identity() {
     final specialtyItems = specialties();
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
       children: [
-        pageHeader('الهوية والحسابات', 'هوية الشركة والحسابات الإدارية',
-            Icons.badge_outlined),
+        pageHeader(
+          'الهوية والحسابات',
+          'هوية الشركة والحسابات الإدارية',
+          Icons.badge_outlined,
+        ),
         const SizedBox(height: 9),
         box(
           Column(
@@ -800,43 +862,56 @@ class _AdminMobileSettingsReferencePageState
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                    color: inner,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: green.withValues(alpha: .18))),
+                  color: inner,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: green.withValues(alpha: .18)),
+                ),
                 child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(children: [
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
                         iconBox(Icons.image_outlined),
                         const SizedBox(width: 9),
                         const Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                              Text('الشعار الرسمي',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w900)),
-                              Text('الشعار الذي يظهر كهوية الشركة داخل النظام',
-                                  style:
-                                      TextStyle(color: muted, fontSize: 9.5)),
-                            ]))
-                      ]),
-                      const SizedBox(height: 10),
-                      Row(children: [
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'الشعار الرسمي',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                'الشعار الذي يظهر كهوية الشركة داخل النظام',
+                                style: TextStyle(color: muted, fontSize: 9.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
                         Container(
-                            width: 72,
-                            height: 72,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                                color: const Color(0xFF070C16),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: line)),
-                            child: pendingLogoPath != null
-                                ? Image.file(File(pendingLogoPath!),
-                                    fit: BoxFit.contain)
-                                : ((settings['brandLogo']
+                          width: 72,
+                          height: 72,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF070C16),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: line),
+                          ),
+                          child: pendingLogoPath != null
+                              ? Image.file(
+                                  File(pendingLogoPath!),
+                                  fit: BoxFit.contain,
+                                )
+                              : ((settings['brandLogo']
                                             ?.toString()
                                             .trim()
                                             .isNotEmpty ??
@@ -844,55 +919,84 @@ class _AdminMobileSettingsReferencePageState
                                     ? Image.network(
                                         settings['brandLogo'].toString(),
                                         fit: BoxFit.contain,
-                                        errorBuilder: (_, __, ___) => Image.asset(
-                                            'assets/branding/hadir_logo_transparent.png'))
+                                        errorBuilder: (_, __, ___) =>
+                                            Image.asset(
+                                              'assets/branding/hadir_logo_transparent.png',
+                                            ),
+                                      )
                                     : Image.asset(
-                                        'assets/branding/hadir_logo_transparent.png'))),
+                                        'assets/branding/hadir_logo_transparent.png',
+                                      )),
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
-                            child: Wrap(spacing: 7, runSpacing: 7, children: [
-                          OutlinedButton.icon(
-                              onPressed: logoBusy ? null : pickCompanyLogo,
-                              icon: const Icon(
+                          child: Wrap(
+                            spacing: 7,
+                            runSpacing: 7,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: logoBusy ? null : pickCompanyLogo,
+                                icon: const Icon(
                                   Icons.add_photo_alternate_outlined,
-                                  size: 17),
-                              label: Text(settings['brandLogo']
-                                          ?.toString()
-                                          .trim()
-                                          .isNotEmpty ??
-                                      false
-                                  ? 'تغيير الشعار'
-                                  : 'اختيار الشعار')),
-                          if (pendingLogoPath != null)
-                            FilledButton.icon(
-                                onPressed: logoBusy ? null : saveCompanyLogo,
-                                icon: const Icon(Icons.check_rounded, size: 17),
-                                label: const Text('حفظ الشعار'),
-                                style: FilledButton.styleFrom(
+                                  size: 17,
+                                ),
+                                label: Text(
+                                  settings['brandLogo']
+                                              ?.toString()
+                                              .trim()
+                                              .isNotEmpty ??
+                                          false
+                                      ? 'تغيير الشعار'
+                                      : 'اختيار الشعار',
+                                ),
+                              ),
+                              if (pendingLogoPath != null)
+                                FilledButton.icon(
+                                  onPressed: logoBusy ? null : saveCompanyLogo,
+                                  icon: const Icon(
+                                    Icons.check_rounded,
+                                    size: 17,
+                                  ),
+                                  label: const Text('حفظ الشعار'),
+                                  style: FilledButton.styleFrom(
                                     backgroundColor: green,
-                                    foregroundColor: Colors.black)),
-                          if (settings['brandLogo']
-                                  ?.toString()
-                                  .trim()
-                                  .isNotEmpty ??
-                              false)
-                            TextButton.icon(
-                                onPressed: logoBusy ? null : removeCompanyLogo,
-                                icon: const Icon(Icons.delete_outline_rounded,
-                                    size: 17),
-                                label: const Text('إزالة'),
-                                style:
-                                    TextButton.styleFrom(foregroundColor: red)),
-                        ])),
-                      ]),
-                      if (pendingLogoPath != null)
-                        const Padding(
-                            padding: EdgeInsets.only(top: 8),
-                            child: Text(
-                                'تم تجهيز صورة جديدة. اضغط «حفظ الشعار» لرفعها إلى R2.',
-                                textAlign: TextAlign.right,
-                                style: TextStyle(color: cyan, fontSize: 9.5))),
-                    ]),
+                                    foregroundColor: Colors.black,
+                                  ),
+                                ),
+                              if (settings['brandLogo']
+                                      ?.toString()
+                                      .trim()
+                                      .isNotEmpty ??
+                                  false)
+                                TextButton.icon(
+                                  onPressed: logoBusy
+                                      ? null
+                                      : removeCompanyLogo,
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 17,
+                                  ),
+                                  label: const Text('إزالة'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: red,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (pendingLogoPath != null)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'تم تجهيز صورة جديدة. اضغط «حفظ الشعار» لرفعها إلى R2.',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(color: cyan, fontSize: 9.5),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               field(
                 'اسم الشركة / الجهة',
@@ -905,9 +1009,10 @@ class _AdminMobileSettingsReferencePageState
                 child: Text(
                   'تخصصات العمل',
                   style: TextStyle(
-                      color: muted,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700),
+                    color: muted,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const SizedBox(height: 6),
@@ -936,8 +1041,10 @@ class _AdminMobileSettingsReferencePageState
               for (final entry in specialtyItems.asMap().entries)
                 Container(
                   margin: const EdgeInsets.only(top: 4),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: inner,
                     borderRadius: BorderRadius.circular(10),
@@ -946,8 +1053,11 @@ class _AdminMobileSettingsReferencePageState
                     children: [
                       IconButton(
                         onPressed: () => removeSpecialty(entry.value),
-                        icon: const Icon(Icons.delete_outline,
-                            color: red, size: 16),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: red,
+                          size: 16,
+                        ),
                       ),
                       Expanded(
                         child: Text(
@@ -960,8 +1070,11 @@ class _AdminMobileSettingsReferencePageState
                           ),
                         ),
                       ),
-                      const Icon(Icons.drag_indicator_rounded,
-                          color: muted, size: 15),
+                      const Icon(
+                        Icons.drag_indicator_rounded,
+                        color: muted,
+                        size: 15,
+                      ),
                     ],
                   ),
                 ),
@@ -1052,15 +1165,17 @@ class _AdminMobileSettingsReferencePageState
     );
   }
 
-  Widget fieldController(String hint, TextEditingController controller,
-          {bool obscure = false}) =>
-      TextField(
-        controller: controller,
-        obscureText: obscure,
-        textDirection: TextDirection.rtl,
-        style: const TextStyle(color: Colors.white, fontSize: 12),
-        decoration: input(hint),
-      );
+  Widget fieldController(
+    String hint,
+    TextEditingController controller, {
+    bool obscure = false,
+  }) => TextField(
+    controller: controller,
+    obscureText: obscure,
+    textDirection: TextDirection.rtl,
+    style: const TextStyle(color: Colors.white, fontSize: 12),
+    decoration: input(hint),
+  );
 
   Future<void> saveOwner() async {
     final patch = <String, dynamic>{
@@ -1074,85 +1189,87 @@ class _AdminMobileSettingsReferencePageState
   }
 
   Widget accounts() => box(
-        Column(
-          children: [
-            sectionHead(
-              'حسابات المدراء والمشرفين',
-              'إدارة حسابات الإدارة والصلاحيات',
-              Icons.admin_panel_settings_outlined,
-            ),
-            const SizedBox(height: 7),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                onPressed: createAdmin,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('إضافة حساب'),
-              ),
-            ),
-            if (admins.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: Text(
-                  'لا توجد حسابات إضافية أو لم يتم تحميلها بعد.',
-                  style: TextStyle(color: muted, fontSize: 9.5),
-                ),
-              ),
-            for (final raw in admins)
-              Builder(
-                builder: (context) {
-                  final account = raw is Map
-                      ? Map<String, dynamic>.from(raw)
-                      : <String, dynamic>{};
-                  final active = account['active'] != false;
-                  final id = '${account['id'] ?? ''}';
-                  return Container(
-                    margin: const EdgeInsets.only(top: 5),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: inner,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          active
-                              ? Icons.check_circle_outline
-                              : Icons.block_outlined,
-                          color: active ? green : red,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '${account['name'] ?? account['username'] ?? 'حساب'} · ${account['role'] ?? 'manager'}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        Switch(
-                          value: active,
-                          onChanged: id.isEmpty
-                              ? null
-                              : (value) => toggleAdmin(id, value),
-                        ),
-                        IconButton(
-                          onPressed: id.isEmpty ? null : () => deleteAdmin(id),
-                          icon: const Icon(Icons.delete_outline,
-                              color: red, size: 17),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-          ],
+    Column(
+      children: [
+        sectionHead(
+          'حسابات المدراء والمشرفين',
+          'إدارة حسابات الإدارة والصلاحيات',
+          Icons.admin_panel_settings_outlined,
         ),
-      );
+        const SizedBox(height: 7),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            onPressed: createAdmin,
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('إضافة حساب'),
+          ),
+        ),
+        if (admins.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text(
+              'لا توجد حسابات إضافية أو لم يتم تحميلها بعد.',
+              style: TextStyle(color: muted, fontSize: 9.5),
+            ),
+          ),
+        for (final raw in admins)
+          Builder(
+            builder: (context) {
+              final account = raw is Map
+                  ? Map<String, dynamic>.from(raw)
+                  : <String, dynamic>{};
+              final active = account['active'] != false;
+              final id = '${account['id'] ?? ''}';
+              return Container(
+                margin: const EdgeInsets.only(top: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: inner,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      active
+                          ? Icons.check_circle_outline
+                          : Icons.block_outlined,
+                      color: active ? green : red,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${account['name'] ?? account['username'] ?? 'حساب'} · ${account['role'] ?? 'manager'}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Switch(
+                      value: active,
+                      onChanged: id.isEmpty
+                          ? null
+                          : (value) => toggleAdmin(id, value),
+                    ),
+                    IconButton(
+                      onPressed: id.isEmpty ? null : () => deleteAdmin(id),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: red,
+                        size: 17,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    ),
+  );
 
   Future<void> createAdmin() async {
     final name = await prompt('اسم المدير أو المشرف');
@@ -1191,8 +1308,10 @@ class _AdminMobileSettingsReferencePageState
         backgroundColor: inner,
         title: Text(
           hint,
-          style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
         ),
         content: TextField(
           controller: controller,
@@ -1244,191 +1363,209 @@ class _AdminMobileSettingsReferencePageState
   }
 
   Widget locationsView() => ListView(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
-        children: [
-          pageHeader('المواقع و QR', 'مواقع العمل ورموز الحضور',
-              Icons.location_on_outlined),
-          const SizedBox(height: 9),
-          box(
-            Column(
-              children: [
-                sectionHead(
-                  'مواقع العمل',
-                  'إدارة مواقع العمل في القائمة المستقلة',
-                  Icons.location_on_outlined,
-                ),
-                const SizedBox(height: 7),
-                for (final raw in locations)
-                  Builder(
-                    builder: (context) {
-                      final location = raw is Map
-                          ? Map<String, dynamic>.from(raw)
-                          : <String, dynamic>{};
-                      final id = '${location['id'] ?? ''}';
-                      return Container(
-                        margin: const EdgeInsets.only(top: 5),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: inner,
-                          borderRadius: BorderRadius.circular(10),
+    padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
+    children: [
+      pageHeader(
+        'المواقع و QR',
+        'مواقع العمل ورموز الحضور',
+        Icons.location_on_outlined,
+      ),
+      const SizedBox(height: 9),
+      box(
+        Column(
+          children: [
+            sectionHead(
+              'مواقع العمل',
+              'إدارة مواقع العمل في القائمة المستقلة',
+              Icons.location_on_outlined,
+            ),
+            const SizedBox(height: 7),
+            for (final raw in locations)
+              Builder(
+                builder: (context) {
+                  final location = raw is Map
+                      ? Map<String, dynamic>.from(raw)
+                      : <String, dynamic>{};
+                  final id = '${location['id'] ?? ''}';
+                  return Container(
+                    margin: const EdgeInsets.only(top: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: inner,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          color: green,
+                          size: 18,
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.location_on_outlined,
-                                color: green, size: 18),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${location['name'] ?? id}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${location['lat'] ?? '—'} · ${location['lng'] ?? '—'} · ${location['radiusMeters'] ?? '—'} م',
-                                    style: const TextStyle(
-                                        color: muted, fontSize: 9),
-                                  ),
-                                ],
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${location['name'] ?? id}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
-                            ),
-                            IconButton(
-                              onPressed: () => editLocation(location),
-                              icon: const Icon(Icons.edit_outlined,
-                                  color: cyan, size: 17),
-                            ),
-                            if (id != 'main')
-                              IconButton(
-                                onPressed: () => deleteLocation(id),
-                                icon: const Icon(Icons.delete_outline,
-                                    color: red, size: 17),
+                              Text(
+                                '${location['lat'] ?? '—'} · ${location['lng'] ?? '—'} · ${location['radiusMeters'] ?? '—'} م',
+                                style: const TextStyle(
+                                  color: muted,
+                                  fontSize: 9,
+                                ),
                               ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                const SizedBox(height: 7),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    editingLocation = null;
-                    clearLocation();
-                    setState(() => addingLocation = true);
-                  },
-                  icon: const Icon(Icons.add, color: green, size: 17),
-                  label: const Text(
-                    'إضافة موقع عمل جديد',
-                    style: TextStyle(color: green),
-                  ),
-                ),
-                if (addingLocation) ...[
-                  const Divider(color: line, height: 20),
-                  fieldController('اسم الموقع', locationName),
-                  const SizedBox(height: 7),
-                  fieldController('خط العرض', locationLat),
-                  const SizedBox(height: 7),
-                  fieldController('خط الطول', locationLng),
-                  const SizedBox(height: 7),
-                  fieldController('النطاق بالمتر', locationRadius),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () =>
-                              setState(() => addingLocation = false),
-                          child: const Text('إلغاء'),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: saveLocation,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: green,
-                            foregroundColor: Colors.black,
+                            ],
                           ),
-                          child: const Text('حفظ الموقع'),
                         ),
+                        IconButton(
+                          onPressed: () => editLocation(location),
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            color: cyan,
+                            size: 17,
+                          ),
+                        ),
+                        if (id != 'main')
+                          IconButton(
+                            onPressed: () => deleteLocation(id),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: red,
+                              size: 17,
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            const SizedBox(height: 7),
+            OutlinedButton.icon(
+              onPressed: () {
+                editingLocation = null;
+                clearLocation();
+                setState(() => addingLocation = true);
+              },
+              icon: const Icon(Icons.add, color: green, size: 17),
+              label: const Text(
+                'إضافة موقع عمل جديد',
+                style: TextStyle(color: green),
+              ),
+            ),
+            if (addingLocation) ...[
+              const Divider(color: line, height: 20),
+              fieldController('اسم الموقع', locationName),
+              const SizedBox(height: 7),
+              fieldController('خط العرض', locationLat),
+              const SizedBox(height: 7),
+              fieldController('خط الطول', locationLng),
+              const SizedBox(height: 7),
+              fieldController('النطاق بالمتر', locationRadius),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => setState(() => addingLocation = false),
+                      child: const Text('إلغاء'),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: saveLocation,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: green,
+                        foregroundColor: Colors.black,
                       ),
-                    ],
+                      child: const Text('حفظ الموقع'),
+                    ),
                   ),
                 ],
-              ],
+              ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 9),
+      box(
+        Column(
+          children: [
+            sectionHead(
+              'رمز QR',
+              'الرمز المستخدم للتحقق من الحضور والانصراف',
+              Icons.qr_code_2_rounded,
+              color: cyan,
             ),
-          ),
-          const SizedBox(height: 9),
-          box(
-            Column(
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: eyebrow('QR ACCESS · 04', color: cyan),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: QrImageView(
+                data: '${settings['qrCode'] ?? 'HADIR-SITE-01-STATIC'}',
+                size: 220,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              '${settings['qrCode'] ?? 'HADIR-SITE-01-STATIC'}',
+              style: const TextStyle(
+                color: muted,
+                fontSize: 9,
+                fontFamily: 'monospace',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
               children: [
-                sectionHead(
-                  'رمز QR',
-                  'الرمز المستخدم للتحقق من الحضور والانصراف',
-                  Icons.qr_code_2_rounded,
-                  color: cyan,
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: eyebrow('QR ACCESS · 04', color: cyan),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: QrImageView(
-                    data: '${settings['qrCode'] ?? 'HADIR-SITE-01-STATIC'}',
-                    size: 220,
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => save({
+                      'qrCode':
+                          'HADIR-${DateTime.now().millisecondsSinceEpoch}',
+                    }),
+                    icon: const Icon(Icons.qr_code_2, size: 16),
+                    label: const Text('توليد رمز جديد'),
                   ),
                 ),
-                const SizedBox(height: 7),
-                Text(
-                  '${settings['qrCode'] ?? 'HADIR-SITE-01-STATIC'}',
-                  style: const TextStyle(
-                      color: muted, fontSize: 9, fontFamily: 'monospace'),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => save({
-                          'qrCode':
-                              'HADIR-${DateTime.now().millisecondsSinceEpoch}'
-                        }),
-                        icon: const Icon(Icons.qr_code_2, size: 16),
-                        label: const Text('توليد رمز جديد'),
-                      ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () =>
+                        toast('الرمز جاهز للطباعة أو المشاركة من الجهاز'),
+                    icon: const Icon(Icons.print_outlined, size: 16),
+                    label: const Text('طباعة الرمز'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: cyan,
+                      foregroundColor: Colors.black,
                     ),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () =>
-                            toast('الرمز جاهز للطباعة أو المشاركة من الجهاز'),
-                        icon: const Icon(Icons.print_outlined, size: 16),
-                        label: const Text('طباعة الرمز'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: cyan,
-                          foregroundColor: Colors.black,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      );
+          ],
+        ),
+      ),
+    ],
+  );
 
   void clearLocation() {
     locationName.clear();
@@ -1495,116 +1632,134 @@ class _AdminMobileSettingsReferencePageState
   }
 
   Widget security() => ListView(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
-        children: [
-          pageHeader('الأمان والصلاحيات',
-              'حساب المالك والعمليات الجماعية للموظفين', Icons.shield_outlined),
-          const SizedBox(height: 9),
-          box(
-            Column(
-              children: [
-                sectionHead(
-                  'إدارة الموظفين دفعة واحدة',
-                  'عمليات جماعية متاحة للمالك فقط',
-                  Icons.manage_accounts_outlined,
+    padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
+    children: [
+      pageHeader(
+        'الأمان والصلاحيات',
+        'حساب المالك والعمليات الجماعية للموظفين',
+        Icons.shield_outlined,
+      ),
+      const SizedBox(height: 9),
+      box(
+        Column(
+          children: [
+            sectionHead(
+              'إدارة الموظفين دفعة واحدة',
+              'عمليات جماعية متاحة للمالك فقط',
+              Icons.manage_accounts_outlined,
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: bulkAction.isEmpty ? null : bulkAction,
+              dropdownColor: inner,
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+              decoration: input('اختيار إعداد'),
+              items: const [
+                DropdownMenuItem(
+                  value: 'password',
+                  child: Text('تغيير كلمة مرور جميع الموظفين'),
                 ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: bulkAction.isEmpty ? null : bulkAction,
-                  dropdownColor: inner,
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
-                  decoration: input('اختيار إعداد'),
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'password',
-                        child: Text('تغيير كلمة مرور جميع الموظفين')),
-                    DropdownMenuItem(
-                        value: 'avatar',
-                        child: Text('تغيير الصورة الشخصية للجميع')),
-                    DropdownMenuItem(
-                        value: 'grace', child: Text('مهلة التأخر')),
-                    DropdownMenuItem(
-                        value: 'earlyCheckout',
-                        child: Text('مهلة الانصراف المبكر')),
-                    DropdownMenuItem(
-                        value: 'adminWorkHours',
-                        child: Text('أوقات دوام الموظفين الإداريين')),
-                    DropdownMenuItem(
-                        value: 'rotationWorkHours',
-                        child: Text('أوقات دوام الموظفين التناوبيين')),
-                    DropdownMenuItem(
-                        value: 'rotationDays',
-                        child: Text('أيام التناوب للموظفين التناوبيين')),
-                    DropdownMenuItem(
-                        value: 'unlinkDevices',
-                        child: Text('فك ربط جميع الأجهزة')),
-                    DropdownMenuItem(
-                        value: 'revokeSessions',
-                        child: Text('تسجيل خروج جميع الموظفين')),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => bulkAction = value ?? ''),
+                DropdownMenuItem(
+                  value: 'avatar',
+                  child: Text('تغيير الصورة الشخصية للجميع'),
                 ),
-                const SizedBox(height: 8),
-                if (bulkAction == 'grace' || bulkAction == 'earlyCheckout')
-                  fieldController('عدد الدقائق', bulkMinutes),
-                if (bulkAction == 'adminWorkHours' ||
-                    bulkAction == 'rotationWorkHours')
-                  info('08:00 → 16:00',
-                      'وقت البداية والنهاية يطبقان حسب نوع الدوام.'),
-                if (bulkAction == 'rotationDays')
-                  info('4 أيام مناوبة + 4 أيام راحة',
-                      'دورة التناوب للموظفين التناوبيين.'),
-                if (bulkAction == 'avatar')
-                  info('الصورة الموحدة',
-                      'رفع الصورة الموحدة يتم من واجهة الموظفين الذكية.'),
-                if (bulkAction == 'password')
-                  info('كلمة مرور جديدة',
-                      'سيتم إلغاء الجلسات الحالية بعد التطبيق.'),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton(
-                    onPressed: runBulk,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: green,
-                      foregroundColor: Colors.black,
-                    ),
-                    child: const Text('تنفيذ العملية'),
-                  ),
+                DropdownMenuItem(value: 'grace', child: Text('مهلة التأخر')),
+                DropdownMenuItem(
+                  value: 'earlyCheckout',
+                  child: Text('مهلة الانصراف المبكر'),
+                ),
+                DropdownMenuItem(
+                  value: 'adminWorkHours',
+                  child: Text('أوقات دوام الموظفين الإداريين'),
+                ),
+                DropdownMenuItem(
+                  value: 'rotationWorkHours',
+                  child: Text('أوقات دوام الموظفين التناوبيين'),
+                ),
+                DropdownMenuItem(
+                  value: 'rotationDays',
+                  child: Text('أيام التناوب للموظفين التناوبيين'),
+                ),
+                DropdownMenuItem(
+                  value: 'unlinkDevices',
+                  child: Text('فك ربط جميع الأجهزة'),
+                ),
+                DropdownMenuItem(
+                  value: 'revokeSessions',
+                  child: Text('تسجيل خروج جميع الموظفين'),
                 ),
               ],
+              onChanged: (value) => setState(() => bulkAction = value ?? ''),
             ),
-          ),
-        ],
-      );
-
-  Widget info(String title, String subtitle) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(11),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0A111E),
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: green.withValues(alpha: .17)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800),
-            ),
-            Text(
-              subtitle,
-              textAlign: TextAlign.right,
-              style: const TextStyle(color: muted, fontSize: 9.5),
+            const SizedBox(height: 8),
+            if (bulkAction == 'grace' || bulkAction == 'earlyCheckout')
+              fieldController('عدد الدقائق', bulkMinutes),
+            if (bulkAction == 'adminWorkHours' ||
+                bulkAction == 'rotationWorkHours')
+              info(
+                '08:00 → 16:00',
+                'وقت البداية والنهاية يطبقان حسب نوع الدوام.',
+              ),
+            if (bulkAction == 'rotationDays')
+              info(
+                '4 أيام مناوبة + 4 أيام راحة',
+                'دورة التناوب للموظفين التناوبيين.',
+              ),
+            if (bulkAction == 'avatar')
+              info(
+                'الصورة الموحدة',
+                'رفع الصورة الموحدة يتم من واجهة الموظفين الذكية.',
+              ),
+            if (bulkAction == 'password')
+              info(
+                'كلمة مرور جديدة',
+                'سيتم إلغاء الجلسات الحالية بعد التطبيق.',
+              ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton(
+                onPressed: runBulk,
+                style: FilledButton.styleFrom(
+                  backgroundColor: green,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('تنفيذ العملية'),
+              ),
             ),
           ],
         ),
-      );
+      ),
+    ],
+  );
+
+  Widget info(String title, String subtitle) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(
+      color: const Color(0xFF0A111E),
+      borderRadius: BorderRadius.circular(13),
+      border: Border.all(color: green.withValues(alpha: .17)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        Text(
+          subtitle,
+          textAlign: TextAlign.right,
+          style: const TextStyle(color: muted, fontSize: 9.5),
+        ),
+      ],
+    ),
+  );
 
   Future<void> runBulk() async {
     if (bulkAction.isEmpty) {
@@ -1633,14 +1788,18 @@ class _AdminMobileSettingsReferencePageState
     }
     if ((bulkAction == 'unlinkDevices' || bulkAction == 'revokeSessions') &&
         !await confirm(
-            'تأكيد العملية', 'ستؤثر هذه العملية على جميع الموظفين.')) {
+          'تأكيد العملية',
+          'ستؤثر هذه العملية على جميع الموظفين.',
+        )) {
       return;
     }
     try {
       final apiClient = await api();
       if (apiClient == null) return;
-      final response =
-          await apiClient.dio.post('/api/owner/bulk-settings', data: payload);
+      final response = await apiClient.dio.post(
+        '/api/owner/bulk-settings',
+        data: payload,
+      );
       final data = response.data is Map
           ? Map<String, dynamic>.from(response.data as Map)
           : <String, dynamic>{};
@@ -1651,59 +1810,65 @@ class _AdminMobileSettingsReferencePageState
   }
 
   Widget diagnostics() => ListView(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
-        children: [
-          pageHeader('التشخيص وإعادة التهيئة',
-              'مراجعة صحة النظام وإجراءات المالك', Icons.gps_fixed_outlined),
-          const SizedBox(height: 9),
-          box(
-            Column(
+    padding: const EdgeInsets.fromLTRB(18, 10, 18, 86),
+    children: [
+      pageHeader(
+        'التشخيص وإعادة التهيئة',
+        'مراجعة صحة النظام وإجراءات المالك',
+        Icons.gps_fixed_outlined,
+      ),
+      const SizedBox(height: 9),
+      box(
+        Column(
+          children: [
+            sectionHead(
+              'تشخيص النظام',
+              'SYSTEM HEALTH · 07',
+              Icons.gps_fixed_outlined,
+            ),
+            const SizedBox(height: 10),
+            Row(
               children: [
-                sectionHead('تشخيص النظام', 'SYSTEM HEALTH · 07',
-                    Icons.gps_fixed_outlined),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: checkHealth,
-                        icon: const Icon(Icons.gps_fixed_outlined, size: 16),
-                        label: const Text('فتح سجل التشخيص'),
-                      ),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: checkHealth,
+                    icon: const Icon(Icons.gps_fixed_outlined, size: 16),
+                    label: const Text('فتح سجل التشخيص'),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: checkHealth,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('فحص النظام'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: green,
+                      foregroundColor: Colors.black,
                     ),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: checkHealth,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('فحص النظام'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: green,
-                          foregroundColor: Colors.black,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 9),
-          danger(
-            'DANGER ZONE · 08',
-            'إعادة تهيئة النظام',
-            'إجراء مسؤول للمالك لإعادة بيانات التشغيل والاختبار.',
-            'إعادة تهيئة النظام',
-          ),
-          const SizedBox(height: 9),
-          danger(
-            'LOCAL RESET · 09',
-            'إعادة تعيين البيانات',
-            'إعادة تعيين بيانات النظام المحلية بعد التأكيد.',
-            'إعادة تعيين البيانات',
-          ),
-        ],
-      );
+          ],
+        ),
+      ),
+      const SizedBox(height: 9),
+      danger(
+        'DANGER ZONE · 08',
+        'إعادة تهيئة النظام',
+        'إجراء مسؤول للمالك لإعادة بيانات التشغيل والاختبار.',
+        'إعادة تهيئة النظام',
+      ),
+      const SizedBox(height: 9),
+      danger(
+        'LOCAL RESET · 09',
+        'إعادة تعيين البيانات',
+        'إعادة تعيين بيانات النظام المحلية بعد التأكيد.',
+        'إعادة تعيين البيانات',
+      ),
+    ],
+  );
 
   Widget danger(String code, String title, String subtitle, String button) =>
       box(
@@ -1738,8 +1903,10 @@ class _AdminMobileSettingsReferencePageState
         context: context,
         builder: (dialogContext) => AlertDialog(
           backgroundColor: inner,
-          title:
-              const Text('حالة الخادم', style: TextStyle(color: Colors.white)),
+          title: const Text(
+            'حالة الخادم',
+            style: TextStyle(color: Colors.white),
+          ),
           content: Text(
             health.entries
                 .map((entry) => '${entry.key}: ${entry.value}')
@@ -1851,7 +2018,9 @@ class _AdminMobileSettingsReferencePageState
                     child: Text(
                       busy ? 'جارٍ الحفظ…' : 'حفظ الإعدادات',
                       style: const TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.w900),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
