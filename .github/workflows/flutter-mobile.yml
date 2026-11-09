@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v6
         with:
@@ -90,37 +90,6 @@ jobs:
             backend/src/attendance-challenge-gateway.ts \
             backend/src/request-body-limit.js \
             backend/test/request-body-limit.test.js
-      - name: Persist source formatting and lifecycle fixes
-        shell: bash
-        run: |
-          set -euo pipefail
-          files=(
-            lib/features/administration/widgets/admin_mobile_shell.dart
-            lib/features/employee/widgets/employee_mobile_shell.dart
-            lib/features/employee/widgets/employee_mobile_shell_reference.dart
-            lib/features/administration/pages/admin_management_page_implementation.dart
-            lib/features/administration/pages/admin_mobile_settings_reference_page.dart
-            backend/src/index.ts
-            backend/src/entry.ts
-            backend/src/company-logo.ts
-            backend/src/r2.ts
-            backend/src/workforce.ts
-            backend/src/attendance-challenge.ts
-            backend/src/attendance-challenge-gateway.ts
-            backend/src/request-body-limit.js
-            backend/test/request-body-limit.test.js
-          )
-          if git diff --quiet -- "${files[@]}"; then
-            echo "Mobile shell, admin screens, and backend worker sources are already current."
-            exit 0
-          fi
-          git config user.name "HADIR Bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${files[@]}"
-          git commit -m "chore(apps): format mobile admin sources"
-          target_branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          test -n "$target_branch"
-          git push origin "HEAD:${target_branch}"
       - run: flutter analyze
       - run: flutter test
       - name: Build Android debug APK
@@ -231,3 +200,72 @@ jobs:
           path: build/ios-artifacts/hadir-ios-unsigned.zip
           if-no-files-found: error
           retention-days: 14
+
+  persist-source-formatting:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/flutter-mobile-app'
+    name: Persist source formatting on trusted Flutter branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout trusted Flutter branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - name: Set up Flutter for Dart formatting
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - name: Apply safe mobile menu patch
+        run: node scripts/patch-admin-mobile-menu-scroll.mjs
+      - name: Apply employee deletion integrity patch
+        working-directory: backend
+        run: node scripts/patch-employee-delete-integrity.mjs
+      - name: Format mobile shell sources
+        run: dart format lib/features/administration/widgets/admin_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell_reference.dart lib/features/administration/pages/admin_management_page_implementation.dart lib/features/administration/pages/admin_mobile_settings_reference_page.dart
+      - name: Format backend worker source
+        run: |
+          npx --yes prettier@3.6.2 --write \\
+            backend/src/index.ts \\
+            backend/src/entry.ts \\
+            backend/src/company-logo.ts \\
+            backend/src/r2.ts \\
+            backend/src/workforce.ts \\
+            backend/src/attendance-challenge.ts \\
+            backend/src/attendance-challenge-gateway.ts \\
+            backend/src/request-body-limit.js \\
+            backend/test/request-body-limit.test.js
+      - name: Persist source formatting and lifecycle fixes
+          shell: bash
+          run: |
+            set -euo pipefail
+            files=(
+              lib/features/administration/widgets/admin_mobile_shell.dart
+              lib/features/employee/widgets/employee_mobile_shell.dart
+              lib/features/employee/widgets/employee_mobile_shell_reference.dart
+              lib/features/administration/pages/admin_management_page_implementation.dart
+              lib/features/administration/pages/admin_mobile_settings_reference_page.dart
+              backend/src/index.ts
+              backend/src/entry.ts
+              backend/src/company-logo.ts
+              backend/src/r2.ts
+              backend/src/workforce.ts
+              backend/src/attendance-challenge.ts
+              backend/src/attendance-challenge-gateway.ts
+              backend/src/request-body-limit.js
+              backend/test/request-body-limit.test.js
+            )
+            if git diff --quiet -- "${files[@]}"; then
+              echo "Mobile shell, admin screens, and backend worker sources are already current."
+              exit 0
+            fi
+            git config user.name "HADIR Bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "${files[@]}"
+            git commit -m "chore(apps): format mobile admin sources"
+            target_branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+            test -n "$target_branch"
+            git push origin "HEAD:${target_branch}"
