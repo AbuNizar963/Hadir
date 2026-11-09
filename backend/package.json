@@ -7,13 +7,14 @@
     "dev": "wrangler dev",
     "check": "node scripts/patch-pdf-filename-metadata.mjs && node scripts/patch-company-logo-cache-version.mjs && node scripts/patch-company-logo-settings-read.mjs && node scripts/patch-employee-delete-integrity.mjs && wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
-    "migrate": "wrangler d1 migrations apply Hadir --remote"
+    "migrate": "wrangler d1 migrations apply Hadir --remote",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.2.2",
     "@mmmike/web-push": "^1.3.0"
   },
   "devDependencies": {
-    "wrangler": "4.123.0"
+    "wrangler": "4.158.0"
   }
 }

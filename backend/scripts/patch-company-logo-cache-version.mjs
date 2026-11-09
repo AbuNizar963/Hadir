@@ -38,16 +38,72 @@ if (source.includes("const keys = Array.from(new Set([CURRENT_LOGO_KEY, configur
   source = source.replace(oldGetBlock, newGetBlock);
 }
 
-const oldDeleteBlock = `  if (req.method === "DELETE") {\n    const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_KEY_SETTING).first<{ value: string }>();\n    const key = String(row?.value || "").trim();\n    if (key) await env.PROFILE_IMAGES.delete(key).catch(() => undefined);\n    if (key !== CURRENT_LOGO_KEY) await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY).catch(() => undefined);\n    await env.DB.batch([\n      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_KEY_SETTING),\n      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_URL_SETTING),\n      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_BACKUP_SETTING),\n    ]);\n    return json({ ok: true }, 200, origin);\n  }`;
-const newDeleteBlock = `  if (req.method === "DELETE") {\n    // R2 is authoritative for the current logo. Delete the canonical object\n    // regardless of a stale D1 pointer, and treat D1 cleanup as best-effort so\n    // a temporary D1 write limit can never surface as a fake network failure.\n    const row = await env.DB.prepare("SELECT value FROM settings WHERE key=? LIMIT 1").bind(LOGO_KEY_SETTING).first<{ value: string }>();\n    const key = String(row?.value || "").trim();\n    await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY).catch((error) => console.error("company logo canonical R2 delete failed", error));\n    if (key && key !== CURRENT_LOGO_KEY) await env.PROFILE_IMAGES.delete(key).catch((error) => console.error("company logo legacy R2 delete failed", error));\n    try {\n      await env.DB.batch([\n        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_KEY_SETTING),\n        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_URL_SETTING),\n        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_BACKUP_SETTING),\n      ]);\n    } catch (error) {\n      console.error("company logo D1 cleanup failed; R2 logo was still deleted", error);\n    }\n    return json({ ok: true, r2Deleted: true, settingsCleaned: true }, 200, origin);\n  }`;
+const deletePattern = /^  if \(req\.method === "DELETE"\) \{\r?\n[\s\S]*?^  \}/gm;
+const deleteMatches = [...source.matchAll(deletePattern)];
+
+const newDeleteBlock = `  if (req.method === "DELETE") {
+    // R2 is authoritative for the current logo. Report every storage failure
+    // instead of claiming a complete deletion when one side is still present.
+    const row = await env.DB.prepare(
+      "SELECT value FROM settings WHERE key=? LIMIT 1",
+    )
+      .bind(LOGO_KEY_SETTING)
+      .first<{ value: string }>();
+    const key = String(row?.value || "").trim();
+    try {
+      await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY);
+      if (key && key !== CURRENT_LOGO_KEY) {
+        await env.PROFILE_IMAGES.delete(key);
+      }
+    } catch (error) {
+      console.error("company logo R2 delete failed", error);
+      return json(
+        { ok: false, r2Deleted: false, settingsCleaned: false },
+        502,
+        origin,
+      );
+    }
+    try {
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_KEY_SETTING,
+        ),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_URL_SETTING,
+        ),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_BACKUP_SETTING,
+        ),
+      ]);
+    } catch (error) {
+      console.error("company logo D1 cleanup failed after R2 deletion", error);
+      return json(
+        {
+          ok: true,
+          r2Deleted: true,
+          settingsCleaned: false,
+          warning: "تم حذف الشعار من R2 لكن تعذر تنظيف مرجعه في D1.",
+        },
+        200,
+        origin,
+      );
+    }
+    return json(
+      { ok: true, r2Deleted: true, settingsCleaned: true },
+      200,
+      origin,
+    );
+  }`;
 
 if (source.includes("settingsCleaned: true")) {
   console.log("Company logo cache-version patch: DELETE already tolerates D1 cleanup failures.");
 } else {
-  if (!source.includes(oldDeleteBlock)) {
-    throw new Error("Company logo cache-version patch: DELETE anchor not found; refusing unsafe replacement.");
+  if (deleteMatches.length !== 1) {
+    throw new Error(
+      `Company logo cache-version patch: expected exactly one formatted DELETE handler, found ${deleteMatches.length}; refusing unsafe replacement.`,
+    );
   }
-  source = source.replace(oldDeleteBlock, newDeleteBlock);
+  source = source.replace(deletePattern, newDeleteBlock);
 }
 
 writeFileSync(file, source, "utf8");
