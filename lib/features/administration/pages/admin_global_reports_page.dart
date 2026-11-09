@@ -58,6 +58,21 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
 
   String _note(Map<String, dynamic> row) => attendanceReportNote(row);
 
+  String _exceptionLabel(Map<String, dynamic> row) {
+    final status = '${row['status'] ?? ''}'.trim().toUpperCase();
+    if (status == 'ESCAPED') return 'هرب من العمل';
+    final code = '${row['exceptionCode'] ?? ''}'.trim().toUpperCase();
+    const labels = <String, String>{
+      'MISSING_CHECKOUT': 'انصراف معلق',
+      'CHECKOUT_WITHOUT_CHECKIN': 'انصراف دون حضور',
+      'ABSENT_NO_APPROVED_REASON': 'غياب دون عذر معتمد',
+      'LATE_ARRIVAL': 'تأخر في الحضور',
+      'EARLY_LEAVE': 'انصراف مبكر',
+      'OVERTIME': 'عمل إضافي',
+    };
+    return code.isEmpty ? '—' : labels[code] ?? code;
+  }
+
   String _sourceLabel(dynamic value) {
     switch ('${value ?? ''}'.trim().toUpperCase()) {
       case 'AUTOMATIC_VIP':
@@ -651,7 +666,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
             '${row['attendanceDay'] ?? '—'}',
             '${row['attendanceDay'] ?? '—'}',
             'غياب',
-            _rowNote(row),
+            _exceptionLabel(row),
           ]).toList();
       writeSheet('أيام الغياب', [
         ['HADIR · سجل أيام الغياب · $period'],
