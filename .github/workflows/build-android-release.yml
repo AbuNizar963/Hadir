@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: hadir-android-release-${{ github.ref }}
@@ -32,8 +32,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: Cache Gradle distributions and dependencies
-        uses: gradle/actions/setup-gradle@v4
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -86,6 +84,8 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+      - name: Cache Gradle distributions and dependencies
+        uses: gradle/actions/setup-gradle@v4
       - name: Determine unique Android release version
         id: version
         shell: bash
@@ -260,6 +260,8 @@ jobs:
     needs:
       - build-android-release
       - verify-ios
+    permissions:
+      contents: write
     name: Publish Android APK Release
     runs-on: ubuntu-latest
     steps:
