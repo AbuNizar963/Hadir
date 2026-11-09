@@ -12,6 +12,7 @@ import {
   PROFESSIONAL_FACT_CALCULATION_VERSION,
 } from "./professional-attendance-fact-builder";
 import { refreshHolidayCalendar } from "./holiday-calendar";
+import { isMonthlyReportArchiveSchedule } from "./scheduled-tasks.js";
 export { HadirRealtime };
 
 type Env = {
@@ -364,38 +365,39 @@ export default {
   ) {
     if (typeof (base as any).scheduled === "function")
       await (base as any).scheduled(controller, env, ctx);
-    if (controller.cron === "0 2 1 * *") {
+    if (!isMonthlyReportArchiveSchedule(controller.cron)) return;
+
+    try {
+      const setting = await env.DB.prepare(
+        "SELECT value FROM settings WHERE key='holidayCountry' LIMIT 1",
+      ).first<{ value: string }>();
+      let country = "";
       try {
-        const setting = await env.DB.prepare(
-          "SELECT value FROM settings WHERE key='holidayCountry' LIMIT 1",
-        ).first<{ value: string }>();
-        let country = "";
-        try {
-          country = String(JSON.parse(String(setting?.value || '\"\"')) || "")
-            .trim()
-            .toUpperCase();
-        } catch {
-          country = String(setting?.value || "")
-            .trim()
-            .toUpperCase();
-        }
-        if (country) {
-          const timezone = String(env.APP_TIMEZONE || "Asia/Damascus");
-          const year = Number(
-            new Intl.DateTimeFormat("en-US", {
-              timeZone: timezone,
-              year: "numeric",
-            }).format(new Date()),
-          );
-          console.log(
-            "[holiday-calendar] monthly refresh",
-            JSON.stringify(await refreshHolidayCalendar(env.DB, country, year)),
-          );
-        }
-      } catch (error) {
-        console.error("[holiday-calendar] monthly refresh failed", error);
+        country = String(JSON.parse(String(setting?.value || '\\"\\"')) || "")
+          .trim()
+          .toUpperCase();
+      } catch {
+        country = String(setting?.value || "")
+          .trim()
+          .toUpperCase();
       }
+      if (country) {
+        const timezone = String(env.APP_TIMEZONE || "Asia/Damascus");
+        const year = Number(
+          new Intl.DateTimeFormat("en-US", {
+            timeZone: timezone,
+            year: "numeric",
+          }).format(new Date()),
+        );
+        console.log(
+          "[holiday-calendar] monthly refresh",
+          JSON.stringify(await refreshHolidayCalendar(env.DB, country, year)),
+        );
+      }
+    } catch (error) {
+      console.error("[holiday-calendar] monthly refresh failed", error);
     }
+
     const archiveTask = archiveClosedMonth(env, new Date(), false, {
       materializeFacts: false,
       deferWhenFactsNeedPreparation: true,
