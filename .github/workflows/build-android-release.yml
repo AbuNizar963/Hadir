@@ -255,7 +255,24 @@ jobs:
           test -f ios/Runner.xcodeproj/project.pbxproj
           test -f ios/Runner/Info.plist
       - run: flutter pub get
-      - run: flutter build ios --no-codesign
+      - name: Build unsigned iOS app for testing
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned iOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="build/ios/iphoneos/Runner.app"
+          test -d "$app_path"
+          mkdir -p build/ios-artifacts
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" build/ios-artifacts/hadir-ios-unsigned.zip
+          test -s build/ios-artifacts/hadir-ios-unsigned.zip
+      - name: Upload unsigned iOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadir-ios-unsigned
+          path: build/ios-artifacts/hadir-ios-unsigned.zip
+          if-no-files-found: error
+          retention-days: 14
 
   publish-android-release:
     needs:
