@@ -58,6 +58,11 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
 
   String _note(Map<String, dynamic> row) => attendanceReportNote(row);
 
+  String _rowNote(Map<String, dynamic> row) {
+    final notes = '${row['notes'] ?? ''}'.trim();
+    return notes.isEmpty ? _note(row) : notes;
+  }
+
   String _clock(dynamic value) {
     if (value == null || '$value'.trim().isEmpty) return '—';
     final date = HadirTime.fromTimestamp(value);
@@ -348,7 +353,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
   }
 
   Widget _officialLog() {
-    if (_rows.isEmpty) {
+    if (_allRows.isEmpty) {
       return const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: Text('لا توجد بيانات مطابقة للفلاتر الحالية.'))));
     }
     return Card(
@@ -467,7 +472,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
           row['lateMinutes'] ?? 0,
           row['earlyLeaveMinutes'] ?? 0,
           row['overtimeMinutes'] ?? 0,
-          row['notes'] ?? _note(row),
+          _rowNote(row),
         ].map(quote).join(','));
       }
       final fileName =
@@ -603,7 +608,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
             '${row['lateMinutes'] ?? 0}',
             '${row['earlyLeaveMinutes'] ?? 0}',
             '${row['overtimeMinutes'] ?? 0}',
-            '${row['notes'] ?? _note(row)}',
+            '${_rowNote(row)}',
           ]).toList();
       writeSheet('السجل اليومي', [
         [
@@ -629,7 +634,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
                 '${row['employeeName'] ?? '—'}',
                 '${row['jobNumber'] ?? '—'}',
                 'غياب',
-                '${row['notes'] ?? _note(row)}',
+                '${_rowNote(row)}',
               ])
           .toList();
       writeSheet('أيام الغياب', [
@@ -692,7 +697,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
             '${row['lateMinutes'] ?? 0}',
             '${row['earlyLeaveMinutes'] ?? 0}',
             '${row['overtimeMinutes'] ?? 0}',
-            '${row['notes'] ?? _note(row)}',
+            '${_rowNote(row)}',
           ]).toList();
       pdf.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4.landscape,
@@ -759,7 +764,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
         appBar: AppBar(
           title: const Text('مركز التقارير والحضور', style: TextStyle(fontWeight: FontWeight.w900)),
           actions: [
-            IconButton(onPressed: _exporting || _rows.isEmpty ? null : _print, tooltip: 'PDF / طباعة', icon: const Icon(Icons.print_outlined)),
+            IconButton(onPressed: _exporting || _allRows.isEmpty ? null : _print, tooltip: 'PDF / طباعة', icon: const Icon(Icons.print_outlined)),
             PopupMenuButton<String>(
               enabled: !_exporting && _rows.isNotEmpty,
               onSelected: (value) => value == 'excel' ? _shareExcel() : _shareCsv(),
