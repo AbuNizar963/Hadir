@@ -45,6 +45,23 @@ const checks = [
     ].every((name) => workbookExport.includes(name)),
   ],
   [
+    "The canonical report exposes employee-day totals used by both clients",
+    reportClient.includes("employeeDays: number") &&
+      reportClient.includes("attendanceRate: number"),
+  ],
+  [
+    "The daily series exposes the canonical date and attendance status counts",
+    reportClient.includes("attendanceDay: string") &&
+      reportClient.includes("present: number") &&
+      reportClient.includes("late: number") &&
+      reportClient.includes("absent: number"),
+  ],
+  [
+    "The web workbook carries attendance source into daily and absence sheets",
+    webReport.includes("specialty: row.attendanceSource") &&
+      workbookExport.includes("attendanceSource"),
+  ],
+  [
     "Historical reports retain the canonical rotation visibility rule",
     reportEngine.includes("isRotationVisibleDay") &&
       reportEngine.includes("shouldIncludeReportRow"),
