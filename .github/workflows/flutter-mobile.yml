@@ -37,11 +37,15 @@ on:
       - '.github/workflows/build-android-release.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   android:
+    name: Android validation and APK build
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
         with:
@@ -67,6 +71,154 @@ jobs:
       - name: Configure verified Gradle distribution for CI
         run: bash scripts/configure-gradle-wrapper-ci.sh
       - run: flutter pub get
+      - name: Apply safe mobile menu patch
+        run: node scripts/patch-admin-mobile-menu-scroll.mjs
+      - name: Apply employee deletion integrity patch
+        working-directory: backend
+        run: node scripts/patch-employee-delete-integrity.mjs
+      - name: Format mobile shell sources
+        run: dart format lib/features/administration/widgets/admin_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell_reference.dart lib/features/administration/pages/admin_management_page_implementation.dart lib/features/administration/pages/admin_mobile_settings_reference_page.dart
+      - name: Format backend worker source
+        run: |
+          npx --yes prettier@3.6.2 --write \
+            backend/src/index.ts \
+            backend/src/entry.ts \
+            backend/src/company-logo.ts \
+            backend/src/r2.ts \
+            backend/src/workforce.ts \
+            backend/src/attendance-challenge.ts \
+            backend/src/attendance-challenge-gateway.ts \
+            backend/src/request-body-limit.js \
+            backend/test/request-body-limit.test.js
+      - run: flutter analyze
+      - run: flutter test
+      - name: Build Android debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleDebug --stacktrace
+          debug_apk="app/build/outputs/apk/debug/app-universal-debug.apk"
+          if [ ! -f "$debug_apk" ]; then
+            debug_apk="app/build/outputs/apk/debug/app-debug.apk"
+          fi
+          test -f "$debug_apk"
+          mkdir -p ../build/app/outputs/flutter-apk
+          cp "$debug_apk" ../build/app/outputs/flutter-apk/app-debug.apk
+      - name: Prepare ephemeral release signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/ci-release.keystore \
+            -storepass changeit \
+            -keypass changeit \
+            -alias hadir-ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -dname "CN=HADIR CI, OU=Build, O=HADIR, L=NA, ST=NA, C=US"
+      - name: Build optimized Android release APK
+        env:
+          HADIR_RELEASE_KEYSTORE: ci-release.keystore
+          HADIR_RELEASE_STORE_PASSWORD: changeit
+          HADIR_RELEASE_KEY_ALIAS: hadir-ci
+          HADIR_RELEASE_KEY_PASSWORD: changeit
+        run: |
+          cd android
+          chmod +x gradlew
+          # Build the installable Android APK only. AAB is not part of the
+          # current distribution target and must not gate APK delivery.
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew clean assembleRelease --stacktrace
+          release_apk="app/build/outputs/apk/release/app-universal-release.apk"
+          if [ ! -f "$release_apk" ]; then
+            release_apk="app/build/outputs/apk/release/app-release.apk"
+          fi
+          test -s "$release_apk"
+          mkdir -p ../build/app/outputs/flutter-apk
+          cp "$release_apk" ../build/app/outputs/flutter-apk/app-release.apk
+      - name: Upload Android debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadir-android-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload Android release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadir-android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: iOS unsigned build validation
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - name: Generate iOS project files when incomplete
+        run: |
+          if [ ! -f ios/Runner.xcodeproj/project.pbxproj ]; then
+            flutter create --platforms=ios --project-name hadir .
+          fi
+          test -f ios/Runner.xcodeproj/project.pbxproj
+          test -f ios/Runner/Info.plist
+      - run: flutter pub get
+      - name: Apply safe mobile menu patch
+        run: node scripts/patch-admin-mobile-menu-scroll.mjs
+      - name: Apply employee deletion integrity patch
+        working-directory: backend
+        run: node scripts/patch-employee-delete-integrity.mjs
+      - name: Format mobile shell sources
+        run: dart format lib/features/administration/widgets/admin_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell_reference.dart lib/features/administration/pages/admin_management_page_implementation.dart lib/features/administration/pages/admin_mobile_settings_reference_page.dart
+      - name: Format backend worker source
+        run: npx --yes prettier@3.6.2 --write backend/src/index.ts
+      - run: flutter analyze
+      - run: flutter test
+      - name: Build unsigned iOS app for CI testing
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned iOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="build/ios/iphoneos/Runner.app"
+          test -d "$app_path"
+          mkdir -p build/ios-artifacts
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" build/ios-artifacts/hadir-ios-unsigned.zip
+          test -s build/ios-artifacts/hadir-ios-unsigned.zip
+      - name: Upload unsigned iOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadir-ios-unsigned
+          path: build/ios-artifacts/hadir-ios-unsigned.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  persist-source-formatting:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/flutter-mobile-app'
+    name: Persist source formatting on trusted Flutter branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout trusted Flutter branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - name: Set up Flutter for Dart formatting
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
       - name: Apply safe mobile menu patch
         run: node scripts/patch-admin-mobile-menu-scroll.mjs
       - name: Apply employee deletion integrity patch
@@ -114,98 +266,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "${files[@]}"
           git commit -m "chore(apps): format mobile admin sources"
-          target_branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          test -n "$target_branch"
+          target_branch="$GITHUB_REF_NAME"
+          test "$target_branch" = "flutter-mobile-app"
           git push origin "HEAD:${target_branch}"
-      - run: flutter analyze
-      - run: flutter test
-      - name: Build Android debug APK
-        run: |
-          cd android
-          chmod +x gradlew
-          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleDebug --stacktrace
-          debug_apk="app/build/outputs/apk/debug/app-universal-debug.apk"
-          if [ ! -f "$debug_apk" ]; then
-            debug_apk="app/build/outputs/apk/debug/app-debug.apk"
-          fi
-          test -f "$debug_apk"
-          mkdir -p ../build/app/outputs/flutter-apk
-          cp "$debug_apk" ../build/app/outputs/flutter-apk/app-debug.apk
-      - name: Prepare ephemeral release signing key
-        run: |
-          keytool -genkeypair -v \
-            -keystore android/ci-release.keystore \
-            -storepass changeit \
-            -keypass changeit \
-            -alias hadir-ci \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 3650 \
-            -dname "CN=HADIR CI, OU=Build, O=HADIR, L=NA, ST=NA, C=US"
-      - name: Build optimized Android release APK and AAB
-        env:
-          HADIR_RELEASE_KEYSTORE: ci-release.keystore
-          HADIR_RELEASE_STORE_PASSWORD: changeit
-          HADIR_RELEASE_KEY_ALIAS: hadir-ci
-          HADIR_RELEASE_KEY_PASSWORD: changeit
-        run: |
-          cd android
-          chmod +x gradlew
-          # Build the App Bundle with ABI splits explicitly disabled. Keep this
-          # invocation separate from APK splits to avoid AGP shrunk-resource collisions.
-          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew clean bundleRelease -PhadirDisableAbiSplits=true --stacktrace
-          test -f app/build/outputs/bundle/release/app-release.aab
-
-          # Build the optimized, architecture-specific APKs in a fresh Gradle invocation.
-          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleRelease --stacktrace
-          release_apk="app/build/outputs/apk/release/app-universal-release.apk"
-          if [ ! -f "$release_apk" ]; then
-            release_apk="app/build/outputs/apk/release/app-release.apk"
-          fi
-          test -f "$release_apk"
-          test -f app/build/outputs/bundle/release/app-release.aab
-          mkdir -p ../build/app/outputs/flutter-apk
-          cp "$release_apk" ../build/app/outputs/flutter-apk/app-release.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: hadir-android-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: hadir-android-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: hadir-android-release-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
-
-  ios:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.47.2'
-          channel: stable
-          cache: true
-      - run: flutter --version
-      - name: Generate iOS project files when incomplete
-        run: |
-          if [ ! -f ios/Runner.xcodeproj/project.pbxproj ]; then
-            flutter create --platforms=ios --project-name hadir .
-          fi
-          test -f ios/Runner.xcodeproj/project.pbxproj
-          test -f ios/Runner/Info.plist
-      - run: flutter pub get
-      - name: Apply safe mobile menu patch
-        run: node scripts/patch-admin-mobile-menu-scroll.mjs
-      - name: Apply employee deletion integrity patch
-        working-directory: backend
-        run: node scripts/patch-employee-delete-integrity.mjs
-      - name: Format mobile shell sources
-        run: dart format lib/features/administration/widgets/admin_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell.dart lib/features/employee/widgets/employee_mobile_shell_reference.dart lib/features/administration/pages/admin_management_page_implementation.dart lib/features/administration/pages/admin_mobile_settings_reference_page.dart
-      - name: Format backend worker source
-        run: npx --yes prettier@3.6.2 --write backend/src/index.ts
-      - run: flutter analyze
-      - run: flutter test
-      - run: flutter build ios --no-codesign

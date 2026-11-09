@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
   verify-flutter:
+    timeout-minutes: 30
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     name: Verify Flutter mobile app
     runs-on: ubuntu-latest
@@ -67,13 +68,15 @@ jobs:
           test -f pubspec.yaml
           test -f lib/main.dart
           test -f android/app/build.gradle
-          test -f ios/Runner.xcodeproj/project.pbxproj
+          # The iOS project is generated and validated in the dedicated macOS job.
+          # Do not require its generated Xcode project in this Linux verification job.
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
 
   build-android-release:
     needs: verify-flutter
+    timeout-minutes: 60
     name: Build signed Android APK
     runs-on: ubuntu-latest
     outputs:
@@ -231,6 +234,7 @@ jobs:
 
   verify-ios:
     needs: verify-flutter
+    timeout-minutes: 60
     name: Verify iOS build
     runs-on: macos-latest
     steps:
@@ -254,9 +258,27 @@ jobs:
           test -f ios/Runner.xcodeproj/project.pbxproj
           test -f ios/Runner/Info.plist
       - run: flutter pub get
-      - run: flutter build ios --no-codesign
+      - name: Build unsigned iOS app for testing
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned iOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="build/ios/iphoneos/Runner.app"
+          test -d "$app_path"
+          mkdir -p build/ios-artifacts
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" build/ios-artifacts/hadir-ios-unsigned.zip
+          test -s build/ios-artifacts/hadir-ios-unsigned.zip
+      - name: Upload unsigned iOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadir-ios-unsigned
+          path: build/ios-artifacts/hadir-ios-unsigned.zip
+          if-no-files-found: error
+          retention-days: 14
 
   publish-android-release:
+    timeout-minutes: 15
     needs:
       - build-android-release
       - verify-ios
