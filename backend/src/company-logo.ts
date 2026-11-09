@@ -248,23 +248,57 @@ export async function handleCompanyLogoRequest(
   }
 
   if (req.method === "DELETE") {
+    // R2 is authoritative for the current logo. Report every storage failure
+    // instead of claiming a complete deletion when one side is still present.
     const row = await env.DB.prepare(
       "SELECT value FROM settings WHERE key=? LIMIT 1",
     )
       .bind(LOGO_KEY_SETTING)
       .first<{ value: string }>();
     const key = String(row?.value || "").trim();
-    if (key) await env.PROFILE_IMAGES.delete(key).catch(() => undefined);
-    if (key !== CURRENT_LOGO_KEY)
-      await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY).catch(() => undefined);
-    await env.DB.batch([
-      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_KEY_SETTING),
-      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(LOGO_URL_SETTING),
-      env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
-        LOGO_BACKUP_SETTING,
-      ),
-    ]);
-    return json({ ok: true }, 200, origin);
+    try {
+      await env.PROFILE_IMAGES.delete(CURRENT_LOGO_KEY);
+      if (key && key !== CURRENT_LOGO_KEY) {
+        await env.PROFILE_IMAGES.delete(key);
+      }
+    } catch (error) {
+      console.error("company logo R2 delete failed", error);
+      return json(
+        { ok: false, r2Deleted: false, settingsCleaned: false },
+        502,
+        origin,
+      );
+    }
+    try {
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_KEY_SETTING,
+        ),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_URL_SETTING,
+        ),
+        env.DB.prepare("DELETE FROM settings WHERE key=?").bind(
+          LOGO_BACKUP_SETTING,
+        ),
+      ]);
+    } catch (error) {
+      console.error("company logo D1 cleanup failed after R2 deletion", error);
+      return json(
+        {
+          ok: true,
+          r2Deleted: true,
+          settingsCleaned: false,
+          warning: "تم حذف الشعار من R2 لكن تعذر تنظيف مرجعه في D1.",
+        },
+        200,
+        origin,
+      );
+    }
+    return json(
+      { ok: true, r2Deleted: true, settingsCleaned: true },
+      200,
+      origin,
+    );
   }
 
   return json({ error: "الطريقة غير مدعومة" }, 405, origin);
