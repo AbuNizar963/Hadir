@@ -20,10 +20,10 @@ fi
 
 temporary_file="$(mktemp)"
 trap 'rm -f "$temporary_file"' EXIT
-awk -v url="$ci_distribution_url" -v checksum="$ci_distribution_checksum" '
+awk -v checksum="$ci_distribution_checksum" '
   BEGIN { url_written = 0; checksum_written = 0 }
   /^distributionUrl=/ {
-    print "distributionUrl=" url
+    print "distributionUrl=https\\://downloads.gradle.org/distributions/gradle-9.3.1-bin.zip"
     url_written = 1
     next
   }
