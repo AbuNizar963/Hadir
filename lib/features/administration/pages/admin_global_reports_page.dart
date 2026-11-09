@@ -500,12 +500,12 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
       final excel = Excel.createExcel();
       excel.rename('Sheet1', 'لوحة التحكم');
       final headerStyle = CellStyle(
-        backgroundColorHex: '#173F5F',
-        fontColorHex: '#FFFFFF',
+        backgroundColorHex: ExcelColor.fromHexString('#173F5F'),
+        fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
         bold: true,
         horizontalAlign: HorizontalAlign.Center,
         verticalAlign: VerticalAlign.Center,
-        wrap: TextWrapping.WrapText,
+        textWrapping: TextWrapping.WrapText,
       );
 
       void writeSheet(String name, List<List<String>> values) {
