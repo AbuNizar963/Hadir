@@ -34,6 +34,7 @@ class _ModernHomePageState extends State<ModernHomePage> {
   Map<String, dynamic>? _dailyStatus;
   bool _loading = true;
   String? _error;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -51,38 +52,46 @@ class _ModernHomePageState extends State<ModernHomePage> {
   }
 
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     try {
       final token = await _session.token();
       final api = HadirApi(token: token);
-      final today = intl.DateFormat('yyyy-MM-dd').format(HadirTime.now());
       final base = await Future.wait([
         api.me(),
         api.attendance(limit: 100),
       ]);
+      if (!mounted || generation != _loadGeneration) return;
+
+      final me = base[0] as Map<String, dynamic>;
+      final user = me['user'];
+      setState(() {
+        _name = user is Map ? '${user['name'] ?? 'الموظف'}' : 'الموظف';
+        _attendance = base[1] as List<dynamic>;
+        _dailyStatus = null;
+        _loading = false;
+        _error = null;
+      });
+
+      // Daily status is useful enrichment, but it is not required to render
+      // the employee dashboard. Fetch it after the essential home data so a
+      // slower report endpoint cannot hold the first screen hostage.
+      final today = intl.DateFormat('yyyy-MM-dd').format(HadirTime.now());
       Map<String, dynamic>? daily;
       try {
         daily = await api.dailyStatus(date: today);
       } catch (_) {
-        daily = null;
+        // Keep the dashboard usable with the attendance-based fallback.
       }
-      final me = base[0] as Map<String, dynamic>;
-      final user = me['user'];
-      if (!mounted) return;
-      setState(() {
-        _name = user is Map ? '${user['name'] ?? 'الموظف'}' : 'الموظف';
-        _attendance = base[1] as List<dynamic>;
-        _dailyStatus = daily == null ? null : _extractDailyStatus(daily);
-        _loading = false;
-        _error = null;
-      });
+      if (!mounted || generation != _loadGeneration || daily == null) return;
+      setState(() => _dailyStatus = _extractDailyStatus(daily));
     } catch (e) {
+      if (!mounted || generation != _loadGeneration) return;
       if (e is DioException && e.response?.statusCode == 401) {
         await _session.clear();
-        if (!mounted) return;
+        if (!mounted || generation != _loadGeneration) return;
         context.go('/login');
         return;
       }
-      if (!mounted) return;
       setState(() {
         _loading = false;
         _error = HadirApi.errorMessage(e);
