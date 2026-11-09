@@ -32,6 +32,30 @@ void main() {
       );
     });
 
+
+    test('maps attendance sources to the same labels as the web report', () {
+      expect(attendanceReportSourceLabel('AUTOMATIC_VIP'), 'تلقائي VIP');
+      expect(attendanceReportSourceLabel('AUTOMATIC'), 'تلقائي');
+      expect(attendanceReportSourceLabel('MANUAL_OWNER'), 'إداري');
+      expect(attendanceReportSourceLabel('MANUAL_EMPLOYEE'), 'الموظف');
+      expect(attendanceReportSourceLabel('MIXED'), 'مختلط');
+      expect(attendanceReportSourceLabel('UNKNOWN'), 'غير محدد');
+    });
+
+    test('uses the web exception description in absence exports', () {
+      expect(
+        attendanceReportExceptionLabel(<String, dynamic>{
+          'status': 'ABSENT',
+          'exceptionCode': 'ABSENT_NO_APPROVED_REASON',
+        }),
+        'غياب دون عذر معتمد',
+      );
+      expect(
+        attendanceReportExceptionLabel(<String, dynamic>{'status': 'ESCAPED'}),
+        'هرب من العمل',
+      );
+    });
+
     test('does not invent an exception note when no exception exists', () {
       expect(
         attendanceReportNote(<String, dynamic>{'status': 'PRESENT'}),
