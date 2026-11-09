@@ -7,7 +7,8 @@ const endpoint = "https://hadir.example/api/test";
 function streamRequest(chunks, headers = {}) {
   const body = new ReadableStream({
     start(controller) {
-      for (const chunk of chunks) controller.enqueue(new TextEncoder().encode(chunk));
+      for (const chunk of chunks)
+        controller.enqueue(new TextEncoder().encode(chunk));
       controller.close();
     },
   });
@@ -46,7 +47,9 @@ test("enforces the actual streamed size when Content-Length is absent", async ()
 });
 
 test("does not trust a too-small Content-Length", async () => {
-  const request = streamRequest(["123456", "789012"], { "content-length": "1" });
+  const request = streamRequest(["123456", "789012"], {
+    "content-length": "1",
+  });
   assert.equal(await requestWithBodyLimit(request, 10), null);
 });
 
@@ -66,7 +69,10 @@ test("accepts a body exactly at the limit and preserves multipart parsing", asyn
 
   const bounded = await requestWithBodyLimit(request, maxBytes);
   assert.ok(bounded);
-  assert.equal(bounded.headers.get("content-type"), `multipart/form-data; boundary=${boundary}`);
+  assert.equal(
+    bounded.headers.get("content-type"),
+    `multipart/form-data; boundary=${boundary}`,
+  );
   assert.equal((await bounded.formData()).get("label"), "ok");
 });
 

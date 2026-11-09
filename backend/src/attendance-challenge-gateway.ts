@@ -21,7 +21,10 @@ function allowedOrigin(request: Request, env: Env) {
   const incoming = String(request.headers.get("origin") || "")
     .trim()
     .replace(/\/$/, "");
-  const configured = [String(env.APP_ORIGIN || ""), String(env.APP_ORIGINS || "")]
+  const configured = [
+    String(env.APP_ORIGIN || ""),
+    String(env.APP_ORIGINS || ""),
+  ]
     .flatMap((value) => value.split(","))
     .map((value) => value.trim().replace(/\/$/, ""))
     .filter(Boolean);
@@ -39,19 +42,15 @@ function allowedOrigin(request: Request, env: Env) {
   return configured[0] || "*";
 }
 
-function json(
-  data: unknown,
-  status: number,
-  request: Request,
-  env: Env,
-) {
+function json(data: unknown, status: number, request: Request, env: Env) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
       "access-control-allow-origin": allowedOrigin(request, env),
       "access-control-allow-credentials": "true",
-      "access-control-allow-headers": "content-type, authorization, x-device-id",
+      "access-control-allow-headers":
+        "content-type, authorization, x-device-id",
       "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
       "cache-control": "no-store",
     },
@@ -126,9 +125,7 @@ export default {
           {
             ok: false,
             error:
-              error instanceof Error
-                ? error.message
-                : "فشل إنشاء تحقق الحضور",
+              error instanceof Error ? error.message : "فشل إنشاء تحقق الحضور",
           },
           500,
           request,
@@ -208,10 +205,7 @@ export default {
         return json(
           {
             ok: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : "فشل تسجيل الحضور",
+            error: error instanceof Error ? error.message : "فشل تسجيل الحضور",
           },
           500,
           request,
@@ -223,11 +217,7 @@ export default {
     return base.fetch(request, env, ctx);
   },
 
-  async scheduled(
-    controller: ScheduledEvent,
-    env: Env,
-    ctx: ExecutionContext,
-  ) {
+  async scheduled(controller: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     const scheduled = (base as any).scheduled;
     if (typeof scheduled === "function") {
       await scheduled(controller, env, ctx);

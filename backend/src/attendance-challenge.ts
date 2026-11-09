@@ -45,10 +45,7 @@ function distanceMeters(
   const distance =
     EARTH_RADIUS_METERS *
     2 *
-    Math.atan2(
-      Math.sqrt(safeHaversine),
-      Math.sqrt(1 - safeHaversine),
-    );
+    Math.atan2(Math.sqrt(safeHaversine), Math.sqrt(1 - safeHaversine));
 
   return Number(distance.toFixed(2));
 }
