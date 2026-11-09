@@ -49,7 +49,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
   int _int(dynamic value) => value is num ? value.toInt() : int.tryParse('$value') ?? 0;
 
   String _minutes(dynamic value) {
-    final minutes = _int(value).clamp(0, 999999);
+    final minutes = _int(value) < 0 ? 0 : _int(value);
     return '${minutes ~/ 60}س ${minutes % 60}د';
   }
 
@@ -406,7 +406,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
   }
 
   Widget _officialLog() {
-    if (_allRows.isEmpty) {
+    if (_rows.isEmpty) {
       return const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: Text('لا توجد بيانات مطابقة للفلاتر الحالية.'))));
     }
     return Card(
@@ -519,8 +519,8 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
           row['employeeName'],
           row['jobNumber'],
           _displayStatus(row),
-          _clock(row['checkInAt']),
-          _clock(row['checkOutAt']),
+          row['checkInAt'] ?? '',
+          row['checkOutAt'] ?? '',
           _minutes(row['workedMinutes']),
           row['lateMinutes'] ?? 0,
           row['earlyLeaveMinutes'] ?? 0,
@@ -583,7 +583,6 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
       final totalEarly = _sumRows(summaries, 'earlyLeaveMinutes');
       final totalOpen = _sumRows(summaries, 'open');
       final totalOff = _sumRows(summaries, 'rest');
-      final totalWorked = _sumRows(summaries, 'workedMinutes');
       final totalWorkDays = _sumRows(summaries, 'days');
       final attendanceDenominator = totalPresent + totalLate + totalAbsent;
       final attendanceRate = attendanceDenominator == 0
