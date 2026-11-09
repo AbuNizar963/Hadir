@@ -62,6 +62,8 @@ jobs:
           rm -f android/build.gradle.kts android/settings.gradle.kts android/app/build.gradle.kts
           test -x android/gradlew
           test -f android/gradle/wrapper/gradle-wrapper.properties
+      - name: Configure verified Gradle distribution for CI
+        run: bash scripts/configure-gradle-wrapper-ci.sh
       - run: flutter pub get
       - name: Apply safe mobile menu patch
         run: node scripts/patch-admin-mobile-menu-scroll.mjs
