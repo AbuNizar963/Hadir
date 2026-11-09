@@ -1,3 +1,4 @@
+import { requestWithBodyLimit } from "./request-body-limit.js";
 import { sendUserPush } from "./push";
 import { submitAttendanceThroughCentralEngine } from "./attendance-engine-central";
 
@@ -223,7 +224,9 @@ export async function handleWorkforce(
     method === "PATCH" &&
     actor?.role === "staff"
   ) {
-    const b = (await req.json().catch(() => ({}))) as any;
+    const boundedRequest = await requestWithBodyLimit(req, 160 * 1024);
+    if (!boundedRequest) return J({ error: "حجم الطلب يتجاوز الحد المسموح للصورة" }, 413);
+    const b = (await boundedRequest.json().catch(() => ({}))) as any;
     const sets: string[] = [];
     const values: any[] = [];
     if (typeof b.password === "string" && b.password.length >= 4) {

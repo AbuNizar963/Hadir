@@ -1,3 +1,4 @@
+import { requestWithBodyLimit } from "./request-body-limit.js";
 import app from "./app";
 import { HadirRealtime } from "./realtime";
 import {
@@ -454,7 +455,13 @@ export default {
             status: 403,
             headers: { ...cors(origin), "content-type": "application/json" },
           });
-        const body = await request.json().catch(() => null);
+        const boundedRequest = await requestWithBodyLimit(request, 64 * 1024);
+        if (!boundedRequest)
+          return new Response(JSON.stringify({ error: "حجم بيانات مفتاح الجهاز يتجاوز الحد المسموح" }), {
+            status: 413,
+            headers: { ...cors(origin), "content-type": "application/json" },
+          });
+        const body = await boundedRequest.json().catch(() => null);
         if (!body)
           return new Response(
             JSON.stringify({ error: "بيانات مفتاح الجهاز غير صالحة" }),

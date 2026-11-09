@@ -1,8 +1,10 @@
+import { requestWithBodyLimit } from "./request-body-limit.js";
 type Role = "owner" | "manager" | "supervisor" | "staff";
 type Actor = { id: string; role: Role };
 type Env = { DB: D1Database; PROFILE_IMAGES?: R2Bucket };
 
 const MAX_LOGO_BYTES = 100 * 1024;
+const MAX_LOGO_REQUEST_BYTES = 128 * 1024;
 const LOGO_CONTENT_TYPE = "image/webp";
 const LOGO_KEY_SETTING = "brandLogoR2Key";
 const LOGO_URL_SETTING = "brandLogo";
@@ -144,7 +146,9 @@ export async function handleCompanyLogoRequest(
         415,
         origin,
       );
-    const form = await req.formData().catch(() => null);
+    const boundedRequest = await requestWithBodyLimit(req, MAX_LOGO_REQUEST_BYTES);
+    if (!boundedRequest) return json({ error: "حجم الطلب يتجاوز الحد المسموح للشعار" }, 413, origin);
+    const form = await boundedRequest.formData().catch(() => null);
     const file = form?.get("file");
     if (!(file instanceof File))
       return json({ error: "ملف الشعار مطلوب" }, 400, origin);
