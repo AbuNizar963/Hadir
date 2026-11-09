@@ -1,15 +1,15 @@
 name: Deploy Hadir API
 
 on:
+  # Production API deployment remains manual until web and Flutter backend parity is verified.
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - ".github/workflows/deploy-api.yml"
 
 permissions:
   contents: read
+
+concurrency:
+  group: hadir-api-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
