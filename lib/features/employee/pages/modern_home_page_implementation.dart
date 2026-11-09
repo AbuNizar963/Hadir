@@ -83,7 +83,8 @@ class _ModernHomePageState extends State<ModernHomePage> {
         // Keep the dashboard usable with the attendance-based fallback.
       }
       if (!mounted || generation != _loadGeneration || daily == null) return;
-      setState(() => _dailyStatus = _extractDailyStatus(daily));
+      final dailyStatus = _extractDailyStatus(daily);
+      setState(() => _dailyStatus = dailyStatus);
     } catch (e) {
       if (!mounted || generation != _loadGeneration) return;
       if (e is DioException && e.response?.statusCode == 401) {
