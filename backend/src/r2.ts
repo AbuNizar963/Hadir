@@ -1,8 +1,10 @@
+import { requestWithBodyLimit } from "./request-body-limit.js";
 type Role = "owner" | "manager" | "supervisor" | "staff";
 type Actor = { id: string; username?: string; name: string; role: Role };
 type Env = { DB: D1Database; PROFILE_IMAGES: R2Bucket };
 
 const MAX_PROFILE_IMAGE_BYTES = 100 * 1024;
+const MAX_PROFILE_IMAGE_REQUEST_BYTES = 128 * 1024;
 const IMAGE_CONTENT_TYPE = "image/webp";
 
 function json(data: unknown, status: number, origin: string): Response {
@@ -73,7 +75,9 @@ export async function handleProfileImageRequest(
     if (!canWrite(actor, employeeId)) return json({ error: "لا تملك صلاحية تغيير هذه الصورة" }, 403, origin);
     const contentType = (req.headers.get("content-type") || "").split(";", 1)[0].toLowerCase();
     if (contentType !== "multipart/form-data") return json({ error: "يجب إرسال الصورة بصيغة multipart/form-data" }, 415, origin);
-    const form = await req.formData().catch(() => null);
+    const boundedRequest = await requestWithBodyLimit(req, MAX_PROFILE_IMAGE_REQUEST_BYTES);
+    if (!boundedRequest) return json({ error: "حجم الطلب يتجاوز الحد المسموح للصورة" }, 413, origin);
+    const form = await boundedRequest.formData().catch(() => null);
     const file = form?.get("file");
     if (!(file instanceof File)) return json({ error: "ملف الصورة مطلوب" }, 400, origin);
     if (file.type !== IMAGE_CONTENT_TYPE) return json({ error: "يجب أن تكون الصورة WebP" }, 415, origin);
