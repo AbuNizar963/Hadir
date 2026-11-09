@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
   verify-flutter:
+    timeout-minutes: 30
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     name: Verify Flutter mobile app
     runs-on: ubuntu-latest
@@ -75,6 +76,7 @@ jobs:
 
   build-android-release:
     needs: verify-flutter
+    timeout-minutes: 60
     name: Build signed Android APK
     runs-on: ubuntu-latest
     outputs:
@@ -232,6 +234,7 @@ jobs:
 
   verify-ios:
     needs: verify-flutter
+    timeout-minutes: 60
     name: Verify iOS build
     runs-on: macos-latest
     steps:
@@ -275,6 +278,7 @@ jobs:
           retention-days: 14
 
   publish-android-release:
+    timeout-minutes: 15
     needs:
       - build-android-release
       - verify-ios
