@@ -135,7 +135,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease \
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleRelease \
             "-PhadirVersionCode=${HADIR_VERSION_CODE}" \
             "-PhadirVersionName=1.0.${HADIR_VERSION_CODE}" \
             --stacktrace
