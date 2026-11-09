@@ -58,6 +58,26 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
 
   String _note(Map<String, dynamic> row) => attendanceReportNote(row);
 
+  String _sourceLabel(dynamic value) {
+    switch ('${value ?? ''}'.trim().toUpperCase()) {
+      case 'AUTOMATIC_VIP':
+        return 'تلقائي VIP';
+      case 'AUTOMATIC':
+        return 'تلقائي';
+      case 'MANUAL_OWNER':
+        return 'إداري';
+      case 'MANUAL_EMPLOYEE':
+        return 'الموظف';
+      case 'MIXED':
+        return 'مختلط';
+      default:
+        return 'غير محدد';
+    }
+  }
+
+  int _sumRows(List<Map<String, dynamic>> rows, String key) =>
+      rows.fold<int>(0, (sum, row) => sum + _int(row[key]));
+
   String _rowNote(Map<String, dynamic> row) {
     final notes = '${row['notes'] ?? ''}'.trim();
     return notes.isEmpty ? _note(row) : notes;
@@ -315,6 +335,7 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
 
   Widget _overview() {
     final daily = _list(_analytics['dailySeries']);
+    final employeeDays = _int(_summary['employeeDays']);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -322,9 +343,9 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
           spacing: 10,
           runSpacing: 10,
           children: [
-            SizedBox(width: 210, child: _kpi('الموظفون', _summary['employees'] ?? _summary['employeeCount'] ?? 0, Icons.people_alt_outlined)),
-            SizedBox(width: 210, child: _kpi('سجلات الحضور', _summary['attendance'] ?? _summary['attendanceCount'] ?? _rows.length, Icons.fact_check_outlined)),
-            SizedBox(width: 210, child: _kpi('الساعات', _minutes(_summary['workedMinutes'] ?? _summary['totalWorkedMinutes'] ?? 0), Icons.schedule_outlined)),
+            SizedBox(width: 210, child: _kpi('الموظفون', _summary['employees'] ?? _summaries.length, Icons.people_alt_outlined)),
+            SizedBox(width: 210, child: _kpi('سجلات الموظف/اليوم', employeeDays, Icons.fact_check_outlined)),
+            SizedBox(width: 210, child: _kpi('ساعات العمل', _minutes(_summary['workedMinutes']), Icons.schedule_outlined)),
             SizedBox(width: 210, child: _kpi('الاستثناءات', _exceptions.length, Icons.warning_amber_outlined)),
           ],
         ),
@@ -338,11 +359,28 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
                 children: [
                   const Text('الاتجاه اليومي', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 8),
-                  ...daily.take(14).map((item) => ListTile(
-                        dense: true,
-                        title: Text('${item['date'] ?? item['attendanceDay'] ?? '—'}'),
-                        trailing: Text('${item['count'] ?? item['attendance'] ?? 0}'),
-                      )),
+                  ...daily.take(14).map((item) {
+                    final present = _int(item['present']);
+                    final late = _int(item['late']);
+                    final absent = _int(item['absent']);
+                    final attended = present + late;
+                    final scheduled = attended + absent;
+                    final attendanceRate = scheduled == 0 ? 0.0 : attended / scheduled * 100;
+                    final punctualityRate = attended == 0 ? 0.0 : present / attended * 100;
+                    return ListTile(
+                      dense: true,
+                      title: Text('${item['attendanceDay'] ?? '—'}'),
+                      subtitle: Text('حاضر: $present · متأخر: $late · غياب: $absent'),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('${attendanceRate.toStringAsFixed(1)}% حضور', style: const TextStyle(fontWeight: FontWeight.w700)),
+                          Text('${punctualityRate.toStringAsFixed(1)}% انضباط', style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -512,165 +550,155 @@ class _AdminGlobalReportsPageState extends State<AdminGlobalReportsPage> {
         final sheet = excel[name];
         sheet.isRTL = true;
         for (var rowIndex = 0; rowIndex < values.length; rowIndex++) {
-          for (var columnIndex = 0;
-              columnIndex < values[rowIndex].length;
-              columnIndex++) {
+          for (var columnIndex = 0; columnIndex < values[rowIndex].length; columnIndex++) {
             final cell = sheet.cell(CellIndex.indexByColumnRow(
               columnIndex: columnIndex,
               rowIndex: rowIndex,
             ));
             cell.value = TextCellValue(values[rowIndex][columnIndex]);
-            if (rowIndex == 0) cell.cellStyle = headerStyle;
+            if (rowIndex == 0 || rowIndex == 2) cell.cellStyle = headerStyle;
           }
         }
       }
 
-      final summary = _summary;
+      final summaries = _summaries;
+      final totalPresent = _sumRows(summaries, 'present');
+      final totalAbsent = _sumRows(summaries, 'absent');
+      final totalLate = _sumRows(summaries, 'late');
+      final totalEarly = _sumRows(summaries, 'earlyLeaveMinutes');
+      final totalOpen = _sumRows(summaries, 'open');
+      final totalOff = _sumRows(summaries, 'rest');
+      final totalWorked = _sumRows(summaries, 'workedMinutes');
+      final totalWorkDays = _sumRows(summaries, 'days');
+      final attendanceDenominator = totalPresent + totalLate + totalAbsent;
+      final attendanceRate = attendanceDenominator == 0
+          ? 0.0
+          : (totalPresent + totalLate) / attendanceDenominator;
       final days = _int(_report['days']);
       final reportType = days == 1 ? 'يومي' : days <= 31 ? 'شهري' : 'سنوي';
-      final attendanceRate = summary['attendanceRate'] is num
-          ? (summary['attendanceRate'] as num).toStringAsFixed(1)
-          : '${summary['attendanceRate'] ?? 0}';
-      final punctualityRate = summary['punctualityRate'] is num
-          ? (summary['punctualityRate'] as num).toStringAsFixed(1)
-          : '${summary['punctualityRate'] ?? 0}';
+      final period = '${_date(_from)} → ${_date(_to)}';
+      final sourceLabel = _sourceLabel;
 
       writeSheet('لوحة التحكم', [
-        ['حاضر · تقرير الحضور والانصراف'],
-        ['الفترة', '${_date(_from)} → ${_date(_to)}'],
-        ['نوع التقرير', reportType],
-        ['تاريخ إنشاء التقرير', '${_report['generatedAt'] ?? '—'}'],
-        ['عدد الموظفين', '${summary['employees'] ?? _summaries.length}'],
-        ['سجلات الموظف/اليوم', '${summary['employeeDays'] ?? rows.length}'],
-        ['نسبة الحضور', '$attendanceRate%'],
-        ['الانضباط', '$punctualityRate%'],
-        ['حاضر', '${summary['present'] ?? 0}'],
-        ['متأخر', '${summary['late'] ?? 0}'],
-        ['غياب', '${summary['absent'] ?? 0}'],
-        ['انصراف معلق', '${summary['open'] ?? 0}'],
-        ['إجازة', '${summary['leave'] ?? 0}'],
-        ['استئذان', '${summary['permission'] ?? 0}'],
-        ['راحة', '${summary['rest'] ?? 0}'],
-        ['هروب', '${summary['escaped'] ?? 0}'],
-        ['ساعات العمل', _minutes(summary['workedMinutes'])],
-        ['الساعات المتوقعة', _minutes(summary['expectedMinutes'])],
-        ['دقائق التأخر', '${summary['lateMinutes'] ?? 0}'],
-        ['الانصراف المبكر', '${summary['earlyLeaveMinutes'] ?? 0}'],
-        ['العمل الإضافي', '${summary['overtimeMinutes'] ?? 0}'],
+        ['HADIR / حاضر'],
+        ['الفترة', period, 'نوع التقرير', reportType],
+        ['تاريخ إنشاء التقرير', '${_report['generatedAt'] ?? '—'}', 'عدد الموظفين', '${summaries.length}'],
+        [],
+        ['مؤشرات الأداء الرئيسية'],
+        ['نسبة الحضور', '${(attendanceRate * 100).toStringAsFixed(1)}%', 'أيام العمل المسجلة', '$totalWorkDays'],
+        ['حاضر', '$totalPresent', 'غياب', '$totalAbsent'],
+        ['تأخر', '$totalLate', 'انصراف مبكر', '$totalEarly'],
+        ['انصراف معلق', '$totalOpen', 'راحة/عطلة', '$totalOff'],
+        [],
+        ['ملاحظة تشغيلية', 'هذا الملف يمثل سجل الحضور اليومي للفترة المحددة، مع فصل أيام الغياب والراحة والعطلات.'],
       ]);
 
-      final employeeRows = _summaries.map((employee) => <String>[
-            '${employee['employeeName'] ?? '—'}',
-            '${employee['jobNumber'] ?? '—'}',
-            '${employee['days'] ?? 0}',
-            '${employee['present'] ?? 0}',
-            '${employee['late'] ?? 0}',
-            '${employee['absent'] ?? 0}',
-            '${employee['leave'] ?? 0}',
-            '${employee['permission'] ?? 0}',
-            '${employee['rest'] ?? 0}',
-            '${employee['escaped'] ?? 0}',
-            '${employee['open'] ?? 0}',
-            _minutes(employee['workedMinutes']),
-            '${employee['lateMinutes'] ?? 0}',
-            '${employee['earlyLeaveMinutes'] ?? 0}',
-            '${employee['overtimeMinutes'] ?? 0}',
-          ]).toList();
+      final employeeRows = summaries.map((employee) {
+        final present = _int(employee['present']);
+        final late = _int(employee['late']);
+        final absent = _int(employee['absent']);
+        final denominator = present + late + absent;
+        final rate = denominator == 0 ? 0.0 : (present + late) / denominator;
+        return <String>[
+          '${employee['employeeName'] ?? '—'}',
+          '${employee['jobNumber'] ?? ''}',
+          'غير محدد',
+          '${employee['days'] ?? 0}',
+          '$present',
+          '$absent',
+          '${employee['earlyLeaveMinutes'] ?? 0}',
+          '$late',
+          '${employee['open'] ?? 0}',
+          '${employee['rest'] ?? 0}',
+          _minutes(employee['workedMinutes']),
+          '${(rate * 100).toStringAsFixed(1)}%',
+        ];
+      }).toList();
       writeSheet('ملخص الموظفين', [
-        [
-          'الموظف',
-          'الرقم الوظيفي',
-          'أيام التقرير',
-          'حاضر',
-          'متأخر',
-          'غياب',
-          'إجازة',
-          'استئذان',
-          'راحة',
-          'هروب',
-          'انصراف معلق',
-          'ساعات العمل',
-          'دقائق التأخر',
-          'دقائق الانصراف المبكر',
-          'إضافي',
-        ],
+        ['HADIR · ملخص حضور الموظفين · $period'],
+        [],
+        ['الموظف', 'الرقم الوظيفي', 'نوع العمل', 'أيام العمل', 'حاضر', 'غياب', 'انصراف مبكر', 'تأخر', 'انصراف معلق', 'راحة/عطلة', 'ساعات العمل', 'نسبة الحضور'],
         ...employeeRows,
       ]);
 
-      final dailyRows = rows.map((row) => <String>[
-            '${row['attendanceDay'] ?? '—'}',
+      final detailRows = rows.map((row) => <String>[
             '${row['employeeName'] ?? '—'}',
-            '${row['jobNumber'] ?? '—'}',
+            '${row['jobNumber'] ?? ''}',
+            'غير محدد',
+            sourceLabel(row['attendanceSource']),
+            '${row['attendanceDay'] ?? '—'}',
+            '${row['attendanceDay'] ?? '—'}',
             _displayStatus(row),
-            _clock(row['checkInAt']),
-            _clock(row['checkOutAt']),
+            '${row['checkInAt'] ?? '—'}',
+            '${row['checkOutAt'] ?? '—'}',
             _minutes(row['workedMinutes']),
             '${row['lateMinutes'] ?? 0}',
             '${row['earlyLeaveMinutes'] ?? 0}',
-            '${row['overtimeMinutes'] ?? 0}',
             _rowNote(row),
           ]).toList();
       writeSheet('السجل اليومي', [
-        [
-          'التاريخ',
-          'الموظف',
-          'الرقم الوظيفي',
-          'الحالة',
-          'الحضور',
-          'الانصراف',
-          'العمل',
-          'التأخر',
-          'الانصراف المبكر',
-          'الإضافي',
-          'الملاحظات',
-        ],
-        ...dailyRows,
+        ['HADIR · السجل اليومي للحضور والانصراف · $period'],
+        [],
+        ['الموظف', 'الرقم الوظيفي', 'نوع العمل', 'مصدر الحضور', 'التاريخ', 'اليوم', 'الحالة', 'وقت الحضور', 'وقت الانصراف', 'مدة العمل', 'دقائق التأخر', 'دقائق الانصراف المبكر', 'تفصيل اليوم'],
+        ...detailRows,
       ]);
 
-      final absenceRows = rows
-          .where((row) => '${row['status'] ?? ''}' == 'ABSENT')
-          .map((row) => <String>[
-                '${row['attendanceDay'] ?? '—'}',
-                '${row['employeeName'] ?? '—'}',
-                '${row['jobNumber'] ?? '—'}',
-                'غياب',
-                _rowNote(row),
-              ])
-          .toList();
+      final absenceRows = rows.where((row) => '${row['status'] ?? ''}' == 'ABSENT').map((row) => <String>[
+            '${row['employeeName'] ?? '—'}',
+            '${row['jobNumber'] ?? ''}',
+            'غير محدد',
+            sourceLabel(row['attendanceSource']),
+            '${row['attendanceDay'] ?? '—'}',
+            '${row['attendanceDay'] ?? '—'}',
+            'غياب',
+            _rowNote(row),
+          ]).toList();
       writeSheet('أيام الغياب', [
-        ['التاريخ', 'الموظف', 'الرقم الوظيفي', 'الحالة', 'التفصيل'],
+        ['HADIR · سجل أيام الغياب · $period'],
+        [],
+        ['الموظف', 'الرقم الوظيفي', 'نوع العمل', 'مصدر الحضور', 'تاريخ الغياب', 'اليوم', 'الحالة', 'سبب/تفصيل'],
         ...absenceRows,
       ]);
 
+      final analysis = <MapEntry<String, int>>[
+        MapEntry('حاضر', _int(_summary['present'])),
+        MapEntry('متأخر', _int(_summary['late'])),
+        MapEntry('غياب', _int(_summary['absent'])),
+        MapEntry('إجازة', _int(_summary['leave'])),
+        MapEntry('استئذان', _int(_summary['permission'])),
+        MapEntry('راحة', _int(_summary['rest'])),
+        MapEntry('هروب', _int(_summary['escaped'])),
+        MapEntry('لم يبدأ', _int(_summary['notStarted'])),
+        MapEntry('غير صالح', _int(_summary['invalid'])),
+      ].where((item) => item.value > 0).toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      final analysisTotal = analysis.fold<int>(0, (sum, item) => sum + item.value);
+      final maxStatus = analysis.fold<int>(1, (maxValue, item) => item.value > maxValue ? item.value : maxValue);
       writeSheet('التحليل التنفيذي', [
-        ['الحالة', 'العدد'],
-        ['حاضر', '${summary['present'] ?? 0}'],
-        ['متأخر', '${summary['late'] ?? 0}'],
-        ['غياب', '${summary['absent'] ?? 0}'],
-        ['إجازة', '${summary['leave'] ?? 0}'],
-        ['استئذان', '${summary['permission'] ?? 0}'],
-        ['راحة', '${summary['rest'] ?? 0}'],
-        ['هروب', '${summary['escaped'] ?? 0}'],
-        ['انصراف معلق', '${summary['open'] ?? 0}'],
-        ['غير صالح', '${summary['invalid'] ?? 0}'],
-        ['لم يبدأ', '${summary['notStarted'] ?? 0}'],
+        ['HADIR · التحليل التنفيذي للحضور · $period'],
+        [],
+        ['الحالة', 'العدد', 'النسبة', 'المؤشر'],
+        ...analysis.map((item) => <String>[
+              item.key,
+              '${item.value}',
+              analysisTotal == 0 ? '0.0%' : '${(item.value / analysisTotal * 100).toStringAsFixed(1)}%',
+              '█' * ((item.value / maxStatus * 45).round().clamp(0, 45)),
+            ]),
       ]);
 
       excel.setDefaultSheet('لوحة التحكم');
       final bytes = excel.encode();
       if (bytes == null) throw StateError('تعذر إنشاء ملف Excel.');
-      final fileName =
-          'HADIR-attendance-${_date(_from)}-${_date(_to)}.xlsx';
+      final fileName = 'HADIR-attendance-${_date(_from)}-${_date(_to)}.xlsx';
       await SharePlus.instance.share(ShareParams(
         files: [
           XFile.fromData(
             Uint8List.fromList(bytes),
-            mimeType:
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             name: fileName,
           ),
         ],
-        text: 'تقرير حاضر ${_date(_from)} → ${_date(_to)}',
+        text: 'تقرير حاضر $period',
       ));
     } finally {
       if (mounted) setState(() => _exporting = false);
