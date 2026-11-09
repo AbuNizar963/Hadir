@@ -96,6 +96,17 @@ jobs:
             backend/test/request-body-limit.test.js
       - run: flutter analyze
       - run: flutter test
+      - name: Prepare ephemeral release signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/ci-release.keystore \
+            -storepass changeit \
+            -keypass changeit \
+            -alias hadir-ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -dname "CN=HADIR CI, OU=Build, O=HADIR, L=NA, ST=NA, C=US"
       - name: Build Android debug and release APKs
         env:
           HADIR_RELEASE_KEYSTORE: ci-release.keystore
