@@ -119,7 +119,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleDebug --stacktrace
           debug_apk="app/build/outputs/apk/debug/app-universal-debug.apk"
           if [ ! -f "$debug_apk" ]; then
             debug_apk="app/build/outputs/apk/debug/app-debug.apk"
@@ -149,11 +149,11 @@ jobs:
           chmod +x gradlew
           # Build the App Bundle with ABI splits explicitly disabled. Keep this
           # invocation separate from APK splits to avoid AGP shrunk-resource collisions.
-          ./gradlew clean bundleRelease -PhadirDisableAbiSplits=true --stacktrace
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew clean bundleRelease -PhadirDisableAbiSplits=true --stacktrace
           test -f app/build/outputs/bundle/release/app-release.aab
 
           # Build the optimized, architecture-specific APKs in a fresh Gradle invocation.
-          ./gradlew assembleRelease --stacktrace
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleRelease --stacktrace
           release_apk="app/build/outputs/apk/release/app-universal-release.apk"
           if [ ! -f "$release_apk" ]; then
             release_apk="app/build/outputs/apk/release/app-release.apk"
