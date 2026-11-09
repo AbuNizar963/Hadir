@@ -26,7 +26,10 @@ for ((attempt = 1; attempt <= max_attempts; attempt++)); do
     exit 0
   fi
 
-  if ! grep -Eiq 'HTTP response code: (502|503|504)|connection reset|connection timed out|read timed out' "$log_file"; then
+  # Gradle may report transient repository failures in different formats:
+  # its wrapper uses "HTTP response code", while Maven artifact resolution
+  # commonly reports "Received status code 504" from a redirected host.
+  if ! grep -Eiq 'HTTP response code: (502|503|504)|status code (502|503|504)|gateway[ -]time[- ]?out|connection reset|connection timed out|read timed out' "$log_file"; then
     echo "Gradle failed for a non-transient reason; not retrying." >&2
     exit "$command_status"
   fi
