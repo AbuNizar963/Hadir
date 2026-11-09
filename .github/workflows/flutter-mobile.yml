@@ -18,6 +18,7 @@ on:
       - 'pubspec.yaml'
       - '.github/workflows/flutter-mobile.yml'
       - '.github/workflows/android-release.yml'
+      - '.github/workflows/build-android-release.yml'
   pull_request:
     paths:
       - 'android/**'
@@ -33,6 +34,7 @@ on:
       - 'pubspec.yaml'
       - '.github/workflows/flutter-mobile.yml'
       - '.github/workflows/android-release.yml'
+      - '.github/workflows/build-android-release.yml'
 
 permissions:
   contents: write
@@ -60,6 +62,8 @@ jobs:
           rm -f android/build.gradle.kts android/settings.gradle.kts android/app/build.gradle.kts
           test -x android/gradlew
           test -f android/gradle/wrapper/gradle-wrapper.properties
+      - name: Configure verified Gradle distribution for CI
+        run: bash scripts/configure-gradle-wrapper-ci.sh
       - run: flutter pub get
       - name: Apply safe mobile menu patch
         run: node scripts/patch-admin-mobile-menu-scroll.mjs
@@ -117,7 +121,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleDebug --stacktrace
           debug_apk="app/build/outputs/apk/debug/app-universal-debug.apk"
           if [ ! -f "$debug_apk" ]; then
             debug_apk="app/build/outputs/apk/debug/app-debug.apk"
@@ -147,11 +151,11 @@ jobs:
           chmod +x gradlew
           # Build the App Bundle with ABI splits explicitly disabled. Keep this
           # invocation separate from APK splits to avoid AGP shrunk-resource collisions.
-          ./gradlew clean bundleRelease -PhadirDisableAbiSplits=true --stacktrace
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew clean bundleRelease -PhadirDisableAbiSplits=true --stacktrace
           test -f app/build/outputs/bundle/release/app-release.aab
 
           # Build the optimized, architecture-specific APKs in a fresh Gradle invocation.
-          ./gradlew assembleRelease --stacktrace
+          bash ../scripts/run-gradle-with-network-retry.sh ./gradlew assembleRelease --stacktrace
           release_apk="app/build/outputs/apk/release/app-universal-release.apk"
           if [ ! -f "$release_apk" ]; then
             release_apk="app/build/outputs/apk/release/app-release.apk"
