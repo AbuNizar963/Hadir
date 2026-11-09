@@ -16,7 +16,16 @@ String? _validatedEmployeeToken;
 String? _validatedAdminToken;
 String? _validatedAdminRole;
 
-Future<bool> _isTokenValid(String token, {required String role}) async {
+typedef _TokenValidation = ({bool valid, String? role});
+
+/// Validates the stored session with one backend request.
+///
+/// The returned role is reused by the admin route guard so startup does not
+/// issue a second sequential /api/me request just to discover the same role.
+Future<_TokenValidation> _validateToken(
+  String token, {
+  required String role,
+}) async {
   try {
     final data = await HadirApi(token: token).me();
     final user = data['user'] is Map
@@ -24,36 +33,24 @@ Future<bool> _isTokenValid(String token, {required String role}) async {
         : data;
     final actualRole = user['role']?.toString();
 
-    if (role == 'admin') {
-      return const {'owner', 'manager', 'supervisor'}.contains(actualRole);
-    }
+    final valid = role == 'admin'
+        ? const {'owner', 'manager', 'supervisor'}.contains(actualRole)
+        : actualRole == 'staff';
 
-    return actualRole == 'staff';
+    return (valid: valid, role: valid ? actualRole : null);
   } on DioException catch (error) {
     final status = error.response?.statusCode;
-    if (status == 401 || status == 403) return false;
-    return true;
-  } catch (_) {
-    return true;
-  }
-}
-
-Future<String?> _readAdminRole(String token) async {
-  try {
-    final data = await HadirApi(token: token).me();
-    final user = data['user'] is Map
-        ? Map<String, dynamic>.from(data['user'] as Map)
-        : data;
-    final role = user['role']?.toString();
-
-    if (const {'owner', 'manager', 'supervisor'}.contains(role)) {
-      return role;
+    if (status == 401 || status == 403) {
+      return (valid: false, role: null);
     }
-  } catch (_) {
-    // A temporary network failure must not log out an already authenticated user.
-  }
 
-  return null;
+    // Preserve the existing offline behavior: transient API failures must not
+    // discard a session that was already stored on this device.
+    return (valid: true, role: null);
+  } catch (_) {
+    // A non-authentication failure is transient, not proof of an invalid token.
+    return (valid: true, role: null);
+  }
 }
 
 Set<String>? _requiredAdminRoles(String location) {
@@ -171,8 +168,14 @@ String? resolveAuthenticatedRedirect({
 GoRouter buildAppRouter() => GoRouter(
       initialLocation: '/',
       redirect: (_, state) async {
-        final employeeToken = await _session.token();
-        final adminToken = await _session.adminToken();
+        // Read both secure-storage keys concurrently and reuse this snapshot
+        // throughout the guard instead of performing additional native reads.
+        final tokens = await Future.wait<String?>([
+          _session.token(),
+          _session.adminToken(),
+        ]);
+        var employeeToken = tokens[0];
+        var adminToken = tokens[1];
         final location = state.matchedLocation;
 
         if (employeeToken == null || employeeToken.isEmpty) {
@@ -186,13 +189,17 @@ GoRouter buildAppRouter() => GoRouter(
         if (employeeToken != null &&
             employeeToken.isNotEmpty &&
             employeeToken != _validatedEmployeeToken) {
-          final valid = await _isTokenValid(employeeToken, role: 'employee');
-          if (!valid) {
+          final validation = await _validateToken(
+            employeeToken,
+            role: 'employee',
+          );
+          if (!validation.valid) {
             _validatedEmployeeToken = null;
             await _session.clearEmployee();
+            employeeToken = null;
             return resolveAuthenticatedRedirect(
               location: location,
-              adminToken: await _session.adminToken(),
+              adminToken: adminToken,
             );
           }
           _validatedEmployeeToken = employeeToken;
@@ -201,19 +208,23 @@ GoRouter buildAppRouter() => GoRouter(
         if (adminToken != null &&
             adminToken.isNotEmpty &&
             adminToken != _validatedAdminToken) {
-          final valid = await _isTokenValid(adminToken, role: 'admin');
-          if (!valid) {
+          final validation = await _validateToken(
+            adminToken,
+            role: 'admin',
+          );
+          if (!validation.valid) {
             _validatedAdminToken = null;
             _validatedAdminRole = null;
             await _session.clearAdmin();
+            adminToken = null;
             return resolveAuthenticatedRedirect(
               location: location,
-              employeeToken: await _session.token(),
+              employeeToken: employeeToken,
             );
           }
 
           _validatedAdminToken = adminToken;
-          _validatedAdminRole = await _readAdminRole(adminToken);
+          _validatedAdminRole = validation.role;
         }
 
         final requiredRoles = _requiredAdminRoles(location);
@@ -225,8 +236,8 @@ GoRouter buildAppRouter() => GoRouter(
 
         return resolveAuthenticatedRedirect(
           location: location,
-          employeeToken: await _session.token(),
-          adminToken: await _session.adminToken(),
+          employeeToken: employeeToken,
+          adminToken: adminToken,
         );
       },
       errorBuilder: (_, __) => const _NotFoundPage(),
