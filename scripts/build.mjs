@@ -27,6 +27,8 @@ const commitSha = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || g
 const branch = process.env.CF_PAGES_BRANCH || process.env.GITHUB_REF_NAME || "unknown";
 const deploymentUrl = process.env.CF_PAGES_URL || "";
 
+run("node", ["scripts/verify-attendance-report-contract.mjs"]);
+
 run("npx", ["vite", "build"]);
 
 // Keep the install identity correct when the app is hosted below the domain
